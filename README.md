@@ -1,20 +1,18 @@
 # Schuco Platform
 
-Monorepo for the Schuco quote/preventivo platform — a clone of the PREVIO demo built with Next.js, Hono, shadcn/ui, and SQLite.
+Monorepo for the Schuco quote/preventivo platform — a clone of the PREVIO demo built with Next.js, Hono, and shadcn/ui.
 
 ## Stack
 
 - **Frontend:** Next.js 15, shadcn/ui, Tailwind CSS v4, next-intl (IT/EN/DE)
 - **Backend:** Hono (Node.js)
-- **Database:** SQLite via Drizzle ORM (AWS-ready migration path later)
-- **Packages:** `@schuco/calculation` for pricing logic
+- **Data:** Static demo data (no database required)
+- **Packages:** `@schuco/calculation` for pricing logic, `@schuco/db` for demo fixtures
 
 ## Quick start
 
 ```bash
 pnpm install
-pnpm db:push
-pnpm db:seed
 pnpm dev
 ```
 
@@ -29,7 +27,7 @@ apps/
   api/     → Hono REST API
 packages/
   calculation/  → Quote pricing engine
-  db/           → Drizzle schema + SQLite
+  db/           → Static demo data and types
 ```
 
 ## Demo routes

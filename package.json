@@ -3,9 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "turbo dev",
-    "build": "turbo build",
-    "db:push": "pnpm --filter @schuco/db db:push",
-    "db:seed": "pnpm --filter @schuco/db db:seed"
+    "build": "turbo build"
   },
   "devDependencies": {
     "turbo": "^2.5.4",

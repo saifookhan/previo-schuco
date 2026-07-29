@@ -29,8 +29,8 @@ const HomePage = () => (
           Configure, quote, and manage Schüco projects
         </h1>
         <p className="mt-6 text-lg text-slate-600">
-          Demo platform for window and door quotes — built with Next.js, Hono,
-          and SQLite. Manage invoices, users, roles, and company settings in one place.
+          Demo platform for window and door quotes — built with Next.js and Hono.
+          Manage invoices, users, roles, and company settings in one place.
         </p>
         <div className="mt-10 flex gap-4">
           <Link href="/login">

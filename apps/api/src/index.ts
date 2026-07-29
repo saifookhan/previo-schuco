@@ -6,43 +6,43 @@ import {
   generateQuoteReference,
   type QuoteConfiguration,
 } from '@schuco/calculation'
-import { createDb, schema } from '@schuco/db'
-import { desc, eq } from 'drizzle-orm'
+import {
+  DEMO_PRODUCTS,
+  DEMO_QUOTES,
+  getProductFamiliesByReference,
+  getQuoteByReference,
+  type Quote,
+} from '@schuco/db'
 import { z } from 'zod'
 
 const app = new Hono()
-const db = createDb(process.env.DATABASE_URL ?? '../../packages/db/schuco.db')
+
+/** In-memory quotes created during the session (not persisted). */
+const sessionQuotes: Quote[] = []
 
 app.use('*', cors({ origin: ['http://localhost:3000', 'http://127.0.0.1:3000'] }))
 
 app.get('/health', (c) => c.json({ status: 'ok', service: 'schuco-api' }))
 
-app.get('/api/products', async (c) => {
-  const products = await db.select().from(schema.products)
-  return c.json(products)
-})
+app.get('/api/products', (c) => c.json(DEMO_PRODUCTS))
 
-app.get('/api/quotes/:reference', async (c) => {
+app.get('/api/quotes/:reference', (c) => {
   const reference = c.req.param('reference')
-  const [quote] = await db
-    .select()
-    .from(schema.quotes)
-    .where(eq(schema.quotes.reference, reference))
-    .limit(1)
+  const quote = getQuoteByReference(reference) ?? sessionQuotes.find((q) => q.reference === reference)
 
   if (!quote) {
     return c.json({ error: 'Quote not found' }, 404)
   }
 
-  return c.json(quote)
+  const families = getProductFamiliesByReference(reference)
+
+  return c.json({ quote, families })
 })
 
-app.get('/api/quotes', async (c) => {
-  const quotes = await db
-    .select()
-    .from(schema.quotes)
-    .orderBy(desc(schema.quotes.createdAt))
-    .limit(20)
+app.get('/api/quotes', (c) => {
+  const quotes = [...DEMO_QUOTES, ...sessionQuotes]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 20)
 
   return c.json(quotes)
 })
@@ -86,26 +86,26 @@ app.post('/api/quotes', async (c) => {
   const result = calculateQuote(parsed.data as QuoteConfiguration)
   const reference = generateQuoteReference()
 
-  const [quote] = await db
-    .insert(schema.quotes)
-    .values({
-      reference,
-      customerName: parsed.data.customerName,
-      customerEmail: parsed.data.customerEmail,
-      productType: parsed.data.productType,
-      widthMm: parsed.data.widthMm,
-      heightMm: parsed.data.heightMm,
-      glazing: parsed.data.glazing,
-      security: parsed.data.security,
-      color: parsed.data.color,
-      quantity: parsed.data.quantity,
-      subtotal: result.subtotal,
-      vatAmount: result.vatAmount,
-      total: result.total,
-      locale: parsed.data.locale,
-      createdAt: new Date().toISOString(),
-    })
-    .returning()
+  const quote: Quote = {
+    id: DEMO_QUOTES.length + sessionQuotes.length + 1,
+    reference,
+    customerName: parsed.data.customerName,
+    customerEmail: parsed.data.customerEmail ?? null,
+    productType: parsed.data.productType,
+    widthMm: parsed.data.widthMm,
+    heightMm: parsed.data.heightMm,
+    glazing: parsed.data.glazing,
+    security: parsed.data.security,
+    color: parsed.data.color,
+    quantity: parsed.data.quantity,
+    subtotal: result.subtotal,
+    vatAmount: result.vatAmount,
+    total: result.total,
+    locale: parsed.data.locale,
+    createdAt: new Date().toISOString(),
+  }
+
+  sessionQuotes.push(quote)
 
   return c.json({ quote, calculation: result })
 })
