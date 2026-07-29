@@ -30,7 +30,7 @@
   },
   "actions": {
     "addFamily": "Aggiungi famiglia di prodotto",
-    "addFamilyHint": "Per l'inserimento del prodotto si apre finestra pop-up che permette filtro e ricerca del prodotto dal DB o l'inserimento di prodotto vuoto"
+    "addFamilyHint": "Per l'inserimento del prodotto si apre finestra pop-up che permette filtro e ricerca del prodotto o l'inserimento di prodotto vuoto"
   },
   "summary": {
     "title": "Riepilogo e Chiusura"

@@ -30,7 +30,7 @@
   },
   "actions": {
     "addFamily": "Add product family",
-    "addFamilyHint": "Opens a popup to filter and search products from the database or insert an empty product"
+    "addFamilyHint": "Opens a popup to filter and search products or insert an empty product"
   },
   "summary": {
     "title": "Summary and Closing"
