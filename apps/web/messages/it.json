@@ -1,0 +1,46 @@
+{
+  "meta": {
+    "title": "Schuco — Demo Preventivo",
+    "description": "Piattaforma preventivi Schuco"
+  },
+  "header": {
+    "clientLabel": "Cliente / Azienda",
+    "projectLabel": "Progetto / Cantiere",
+    "totalLabel": "Totale preventivo IVA esclusa",
+    "printSettings": "Impostazioni di stampa",
+    "preview": "Apri anteprima in nuova scheda",
+    "export": "Esporta file"
+  },
+  "intro": {
+    "title": "Introduzione",
+    "preview": "Gentile Cliente, come anticipato, abbiamo il piacere di sott…",
+    "body": "Gentile Cliente,\n\ncome anticipato, abbiamo il piacere di sottoporre la presente offerta per la fornitura e posa in opera dei serramenti Schüco per il Vostro progetto.\n\nRestiamo a disposizione per ogni chiarimento."
+  },
+  "family": {
+    "placeholder": "Nome famiglia prodotto",
+    "valid": "Il prodotto è valido",
+    "invalid": "Il prodotto non è più valido…",
+    "markAlternative": "Segna come Alternativa",
+    "duplicate": "Duplica famiglia",
+    "delete": "Elimina famiglia",
+    "expand": "Espandi famiglia",
+    "drag": "Trascina per riordinare la famiglia",
+    "std": "STD",
+    "alt": "ALT"
+  },
+  "actions": {
+    "addFamily": "Aggiungi famiglia di prodotto",
+    "addFamilyHint": "Per l'inserimento del prodotto si apre finestra pop-up che permette filtro e ricerca del prodotto dal DB o l'inserimento di prodotto vuoto"
+  },
+  "summary": {
+    "title": "Riepilogo e Chiusura"
+  },
+  "language": {
+    "label": "Lingua"
+  },
+  "demo": {
+    "reference": "PRV-2026-014",
+    "client": "Sig. Marco Rossi",
+    "project": "Villa Rossi — Ristrutturazione totale"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "meta": {
+    "title": "Schuco — Demo Quote",
+    "description": "Schuco quote platform"
+  },
+  "header": {
+    "clientLabel": "Client / Company",
+    "projectLabel": "Project / Site",
+    "totalLabel": "Quote total excl. VAT",
+    "printSettings": "Print settings",
+    "preview": "Open preview in new tab",
+    "export": "Export file"
+  },
+  "intro": {
+    "title": "Introduction",
+    "preview": "Dear Client, as discussed, we are pleased to submit…",
+    "body": "Dear Client,\n\nas discussed, we are pleased to submit this quotation for the supply and installation of Schüco window systems for your project.\n\nWe remain at your disposal for any clarification."
+  },
+  "family": {
+    "placeholder": "Product family name",
+    "valid": "Product is valid",
+    "invalid": "Product is no longer valid…",
+    "markAlternative": "Mark as Alternative",
+    "duplicate": "Duplicate family",
+    "delete": "Delete family",
+    "expand": "Expand family",
+    "drag": "Drag to reorder family",
+    "std": "STD",
+    "alt": "ALT"
+  },
+  "actions": {
+    "addFamily": "Add product family",
+    "addFamilyHint": "Opens a popup to filter and search products from the database or insert an empty product"
+  },
+  "summary": {
+    "title": "Summary and Closing"
+  },
+  "language": {
+    "label": "Language"
+  },
+  "demo": {
+    "reference": "PRV-2026-014",
+    "client": "Mr. Marco Rossi",
+    "project": "Villa Rossi — Full renovation"
+  }
+}
