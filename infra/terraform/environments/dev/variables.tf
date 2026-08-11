@@ -37,7 +37,7 @@ variable "callback_urls" {
   type = list(string)
   default = [
     "http://localhost:3000/api/auth/callback",
-    "https://previo-schuco.vercel.app/api/auth/callback",
+    "https://previo-schuco-web.vercel.app/api/auth/callback",
   ]
 }
 
@@ -45,7 +45,7 @@ variable "logout_urls" {
   type = list(string)
   default = [
     "http://localhost:3000/login",
-    "https://previo-schuco.vercel.app/login",
+    "https://previo-schuco-web.vercel.app/login",
   ]
 }
 
@@ -53,7 +53,7 @@ variable "cors_origins" {
   type = list(string)
   default = [
     "http://localhost:3000",
-    "https://previo-schuco.vercel.app",
+    "https://previo-schuco-web.vercel.app",
   ]
 }
 

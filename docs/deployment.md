@@ -76,27 +76,37 @@ DATABASE_URL="<from Secrets Manager previo/dev/database url field>"
 cd packages/db && pnpm db:migrate
 ```
 
-## 4. Vercel project — `previo-schuco`
+## 4. Vercel project — `previo-schuco-web`
 
-1. Go to [vercel.com/new](https://vercel.com/new)
-2. Import GitHub repo `saifookhan/previo-schuco`
-3. Project name: **previo-schuco**
-4. Root Directory: **apps/web**
-5. Framework: Next.js (uses [`apps/web/vercel.json`](../apps/web/vercel.json))
+Project: [previo-schuco-web](https://vercel.com/einsteinsaifoos-projects/previo-schuco-web)  
+Production URL: **https://previo-schuco-web.vercel.app**
+
+1. Root Directory: **apps/web** (monorepo)
+2. Framework: Next.js (uses [`apps/web/vercel.json`](../apps/web/vercel.json))
+
+**Vercel does not connect to Postgres directly.** The web app calls the ECS API (`NEXT_PUBLIC_API_URL`); the API uses RDS via `DATABASE_URL` from Secrets Manager.
+
+After Terraform dev is applied:
+
+```bash
+aws sso login
+./infra/terraform/scripts/configure-vercel-dev.sh
+cd apps/web && vercel --prod
+```
 
 ### Environment variables (dev)
 
 | Variable | Value |
 |----------|-------|
-| `NEXT_PUBLIC_API_URL` | Terraform `api_url` output |
-| `NEXT_PUBLIC_APP_URL` | `https://previo-schuco.vercel.app` (or preview URL) |
+| `NEXT_PUBLIC_API_URL` | Terraform `api_url` output (ECS ALB) |
+| `NEXT_PUBLIC_APP_URL` | `https://previo-schuco-web.vercel.app` |
 | `NEXT_PUBLIC_COGNITO_REGION` | `eu-central-1` |
 | `NEXT_PUBLIC_COGNITO_USER_POOL_ID` | Terraform output |
 | `NEXT_PUBLIC_COGNITO_CLIENT_ID` | Terraform output |
 | `NEXT_PUBLIC_COGNITO_DOMAIN` | Terraform output (domain prefix only) |
 | `AUTH_SECRET` | `openssl rand -base64 32` |
 
-Update Cognito callback/logout URLs in Terraform if your Vercel URL differs, then `terraform apply`.
+Update Cognito callback/logout URLs and API CORS via Terraform (`variables.tf` includes the Vercel URL), then `./infra/terraform/scripts/apply-dev.sh -auto-approve`.
 
 ## 5. Local development
 
