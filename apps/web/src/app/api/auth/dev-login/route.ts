@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
-import { authConfig } from '@/lib/auth/config'
+import { DEMO_USER_SEEDS } from '@schuco/db/demo-users'
+
 import { setSession } from '@/lib/auth/session'
 
 /**
@@ -14,22 +15,18 @@ export const POST = async (request: Request): Promise<NextResponse> => {
   const body = (await request.json()) as { email?: string }
   const email = body.email?.toLowerCase() ?? ''
 
-  const devUsers: Record<string, { sub: string; name: string }> = {
-    'admin@schuco-demo.it': { sub: 'seed-super-admin', name: 'Anna Bianchi' },
-    'admin@technometal-demo.it': { sub: 'seed-company-admin', name: 'Luca Verdi' },
-    'manager@technometal-demo.it': { sub: 'seed-super-user', name: 'Giulia Neri' },
-    'sales@technometal-demo.it': { sub: 'seed-user', name: 'Marco Rossi' },
-  }
+  const match = DEMO_USER_SEEDS.find(
+    (user) => user.email === email && user.status === 'active',
+  )
 
-  const match = devUsers[email]
   if (!match) {
     return NextResponse.json({ error: 'Unknown dev user email' }, { status: 400 })
   }
 
   const exp = Math.floor(Date.now() / 1000) + 86400
   await setSession({
-    sub: match.sub,
-    email,
+    sub: match.cognitoSub,
+    email: match.email,
     name: match.name,
     accessToken: 'dev-token',
     idToken: 'dev-token',

@@ -1,5 +1,6 @@
 'use client'
 
+import { ACTIVE_DEMO_USER_EMAILS } from '@/lib/demo-users'
 import { Building2 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
@@ -10,12 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { isCognitoConfigured } from '@/lib/auth/config'
 
-const DEV_USERS = [
-  'admin@schuco-demo.it',
-  'admin@technometal-demo.it',
-  'manager@technometal-demo.it',
-  'sales@technometal-demo.it',
-]
+const DEV_USERS = ACTIVE_DEMO_USER_EMAILS
 
 /**
  * Login form — Cognito hosted UI or dev login when Cognito is not configured.

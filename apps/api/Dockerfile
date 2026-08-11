@@ -6,6 +6,7 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/calculation/package.json ./packages/calculation/
+COPY packages/contracts/package.json ./packages/contracts/
 COPY packages/db/package.json ./packages/db/
 RUN pnpm install --frozen-lockfile
 

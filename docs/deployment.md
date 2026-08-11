@@ -106,16 +106,25 @@ docker compose up -d postgres migrate api
 pnpm dev
 ```
 
+`pnpm dev` starts **web only** (`:3000`). The API runs in Docker on `:3001` — do not run `turbo dev` with the API locally unless you stop the Docker API first (port conflict).
+
 Open http://localhost:3000/login — use dev seed emails (see `.env.example` / login form).
+
+**API documentation:** http://localhost:3001/docs (Swagger UI). The OpenAPI spec covers the core BFF plus planned calculation and files services.
 
 Seed users:
 
-| Email | Role |
-|-------|------|
-| admin@schuco-demo.it | super-admin |
-| admin@technometal-demo.it | company-admin |
-| manager@technometal-demo.it | super-user |
-| sales@technometal-demo.it | user |
+| Email | Role | Company |
+|-------|------|---------|
+| admin@schuco-demo.it | super-admin | Schuco |
+| elena.costa@schuco-demo.it | company-admin (inactive) | Schuco |
+| admin@suppli-demo.it | company-admin | Suppli |
+| admin@technometal-demo.it | company-admin | Technometal |
+| manager@technometal-demo.it | super-user | Technometal |
+| sales@technometal-demo.it | user | Technometal |
+| admin@fabbrikka-demo.it | company-admin | Fabbrikka |
+
+All defined in [`packages/db/src/demo-users.ts`](../packages/db/src/demo-users.ts) and seeded via `pnpm db:migrate`.
 
 ## 6. Cognito user provisioning
 

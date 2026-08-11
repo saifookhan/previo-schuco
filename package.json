@@ -2,7 +2,9 @@
   "name": "schuco",
   "private": true,
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "turbo dev --filter=@schuco/web",
+    "dev:web": "pnpm --filter @schuco/web dev",
+    "dev:api": "pnpm --filter @schuco/api dev",
     "build": "turbo build",
     "db:migrate": "pnpm --filter @schuco/db db:migrate"
   },

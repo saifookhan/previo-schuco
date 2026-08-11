@@ -8,7 +8,7 @@ How the monorepo is organized today and how it evolves toward separate deployabl
 |-----------|-----------|
 | **Libraries first** | Domain logic lives in `packages/`; promote to `apps/<service>` only when deploy/scaling/team boundaries require it |
 | **One auth gateway** | `apps/api` remains the BFF — Cognito, RBAC, tenant context; other services are internal |
-| **Shared contracts** | `@schuco/contracts` (future) holds Zod schemas/types so services don’t drift |
+| **Shared contracts** | `@schuco/contracts` holds Zod schemas and the OpenAPI document so services don’t drift |
 | **Independent docs** | User-facing docs in Docusaurus (`apps/docs`); repo `docs/` for ADRs and internal notes |
 
 ---
@@ -22,6 +22,7 @@ previo-schuco/
 │   └── api/                 # Hono BFF → ECS (dev) / Docker (local)
 ├── packages/
 │   ├── calculation/         # Pure quote pricing (imported by API)
+│   ├── contracts/           # Shared Zod schemas + OpenAPI spec
 │   └── db/                  # Drizzle schema, migrations, RBAC queries
 ├── docs/                    # Markdown (project context, deployment, architecture)
 ├── infra/terraform/         # AWS dev (VPC, RDS, Cognito, ECS, S3)
@@ -164,7 +165,7 @@ Internal packages stay `private: true`; Changesets is for changelog discipline a
 | Content | Location |
 |---------|----------|
 | Product/domain docs, user guides | `apps/docs/docs/` |
-| API reference (OpenAPI → plugin) | Generated from `@schuco/contracts` |
+| API reference (OpenAPI → plugin) | `@schuco/contracts` + Swagger UI at `/docs` |
 | Deployment runbooks | Port from `docs/deployment.md` |
 | ADRs, internal architecture | Repo `docs/` or `apps/docs/docs/internal/` |
 
@@ -206,9 +207,9 @@ Each new ECS app gets:
 
 - [ ] Add `@changesets/cli` + `.changeset/config.json`
 - [ ] Scaffold `apps/docs` (Docusaurus classic)
-- [ ] Add `packages/contracts` with quote/product Zod schemas
+- [x] Add `packages/contracts` with quote/product Zod schemas
 - [ ] Extract `apps/calculation-service` (Phase 3, if needed)
 - [ ] Extract `apps/files-service` (Phase 4)
-- [ ] OpenAPI generation from contracts for Docusaurus API tab
+- [x] OpenAPI spec in `@schuco/contracts` (Swagger UI at `/docs`; Docusaurus plugin later)
 
 See also: [project-context.md](./project-context.md), [deployment.md](./deployment.md).

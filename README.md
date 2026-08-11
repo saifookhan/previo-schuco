@@ -18,12 +18,14 @@ See [docs/architecture.md](docs/architecture.md) for monorepo evolution, Changes
 ```bash
 pnpm install
 cp .env.example .env
-docker compose up -d
-pnpm dev
+docker compose up -d          # Postgres + API on :3001
+pnpm dev                      # Web only on :3000 (API runs in Docker)
 ```
 
 - Web: http://localhost:3000
 - API: http://localhost:3001
+- Swagger UI: http://localhost:3001/docs
+- OpenAPI spec: http://localhost:3001/openapi.json
 - Login: dev seed users on `/login` when Cognito is not configured
 
 ## Project structure
@@ -36,7 +38,7 @@ apps/
 packages/
   calculation/  → Quote pricing engine
   db/           → Drizzle schema, migrations, RBAC
-  contracts/    → Shared API schemas (planned)
+  contracts/    → Shared Zod schemas + OpenAPI spec
 infra/
   terraform/    → AWS infrastructure
 docs/

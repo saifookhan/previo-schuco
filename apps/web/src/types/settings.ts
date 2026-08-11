@@ -1,3 +1,5 @@
+import { DEMO_USER_SEEDS } from '@/lib/demo-users'
+
 export type RoleId = 'super-admin' | 'company-admin' | 'super-user' | 'user' | string
 
 export interface Role {
@@ -48,43 +50,13 @@ export const DEMO_ROLES: Role[] = [
   },
 ]
 
-export const DEMO_USERS: User[] = [
-  {
-    id: '1',
-    name: 'Anna Bianchi',
-    email: 'admin@schuco-demo.it',
-    roleId: 'super-admin',
-    status: 'active',
-  },
-  {
-    id: '2',
-    name: 'Luca Verdi',
-    email: 'admin@technometal-demo.it',
-    roleId: 'company-admin',
-    status: 'active',
-  },
-  {
-    id: '3',
-    name: 'Giulia Neri',
-    email: 'manager@technometal-demo.it',
-    roleId: 'super-user',
-    status: 'active',
-  },
-  {
-    id: '4',
-    name: 'Marco Rossi',
-    email: 'sales@technometal-demo.it',
-    roleId: 'user',
-    status: 'active',
-  },
-  {
-    id: '5',
-    name: 'Elena Costa',
-    email: 'elena.costa@schuco-demo.it',
-    roleId: 'company-admin',
-    status: 'inactive',
-  },
-]
+export const DEMO_USERS: User[] = DEMO_USER_SEEDS.map((user, index) => ({
+  id: String(index + 1),
+  name: user.name,
+  email: user.email,
+  roleId: user.roleId,
+  status: user.status,
+}))
 
 export const ACCESS_MODULES = [
   'Dashboard',

@@ -1,0 +1,59 @@
+---
+description: PREVIO platform context, monorepo layout, auth/RBAC, and demo data conventions
+alwaysApply: true
+---
+
+# PREVIO — Project Conventions
+
+## Stack
+
+- **Monorepo:** pnpm workspaces + Turborepo
+- **Frontend:** `apps/web` (Next.js 15) → Vercel
+- **API:** `apps/api` (Hono) → ECS / Docker locally
+- **Auth:** Cognito (authentication) + PostgreSQL RBAC (authorization)
+- **DB:** Drizzle ORM in `packages/db`
+
+## Layout
+
+```
+apps/web, apps/api          → deployables
+packages/calculation, db      → shared libraries
+packages/contracts          → planned shared API schemas
+apps/docs                   → planned Docusaurus site
+docs/                       → project-context.md, architecture.md, deployment.md
+infra/terraform/            → AWS (dev/stage/prod)
+```
+
+Promote logic to separate `apps/*-service` only when independent deploy/scaling is needed (see `docs/architecture.md`).
+
+## RBAC — four roles
+
+| ID | Display name |
+|----|--------------|
+| `super-admin` | Super Admin (PREVIO / Schuco) |
+| `company-admin` | Company Admin |
+| `super-user` | Super User (Sales Manager) |
+| `user` | User (Sales Associate) |
+
+Users may belong to multiple business units; edit rights are a subset.
+
+## Demo users — single source of truth
+
+Define demo users in `packages/db/src/demo-users.ts` only. Seed via `packages/db/src/seed.ts`.
+
+- Client UI: import from `@schuco/db/demo-users` (never `@schuco/db` in client components — pulls Postgres)
+- Server routes: may import from `@schuco/db`
+- Do not duplicate user lists in dev-login, login form, or settings fixtures
+
+## Local dev
+
+```bash
+docker compose up -d   # Postgres + API + migrate/seed
+pnpm dev               # Web (API on :3001 via Docker)
+```
+
+Dev login uses seed emails when Cognito is not configured.
+
+## Commits
+
+Use conventional commits (`feat`, `fix`, `chore`, `docs`, `refactor`, `test`).

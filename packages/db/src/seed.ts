@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 
 import type { Db } from './client'
+import { DEMO_USER_SEEDS, type DemoBusinessUnitKey, type DemoCompanyKey } from './demo-users'
 import {
   businessUnits,
   companies,
@@ -34,142 +35,169 @@ export const CANONICAL_ROLES = [
   },
 ] as const
 
+const COMPANY_SEEDS: Array<{
+  key: DemoCompanyKey
+  type: 'platform' | 'supplier' | 'client'
+  name: string
+  vatNumber: string
+}> = [
+  { key: 'schuco', type: 'platform', name: 'Schüco / PREVIO Platform', vatNumber: 'IT00000000001' },
+  { key: 'suppli', type: 'supplier', name: 'Suppli S.r.l.', vatNumber: 'IT12345678901' },
+  { key: 'technometal', type: 'client', name: 'Technometal S.p.A.', vatNumber: 'IT98765432109' },
+  { key: 'fabbrikka', type: 'client', name: 'Fabbrikka S.r.l.', vatNumber: 'IT11223344556' },
+]
+
+const BUSINESS_UNIT_SEEDS: Array<{
+  key: DemoBusinessUnitKey
+  companyKey: DemoCompanyKey
+  name: string
+  address: string
+}> = [
+  { key: 'schuco_hq', companyKey: 'schuco', name: 'Schuco HQ', address: 'Via dell\'Innovazione 1, Milano' },
+  { key: 'suppli_hq', companyKey: 'suppli', name: 'Suppli HQ', address: 'Via Industria 5, Bergamo' },
+  { key: 'technometal_a', companyKey: 'technometal', name: 'Technometal_A', address: 'Via Roma 10, Milano' },
+  { key: 'technometal_b', companyKey: 'technometal', name: 'Technometal_B', address: 'Via Torino 20, Torino' },
+  { key: 'fabbrikka_hq', companyKey: 'fabbrikka', name: 'Fabbrikka HQ', address: 'Via Artigiani 3, Verona' },
+]
+
 /**
  * Seed Phase 1 RBAC demo data (idempotent).
  * @param db - Drizzle database client
  */
 export const seedDatabase = async (db: Db): Promise<void> => {
   for (const role of CANONICAL_ROLES) {
-    await db
-      .insert(roles)
-      .values(role)
-      .onConflictDoNothing({ target: roles.id })
+    await db.insert(roles).values(role).onConflictDoNothing({ target: roles.id })
   }
 
-  const existingSchuco = await db
-    .select()
-    .from(companies)
-    .where(eq(companies.vatNumber, 'IT00000000001'))
-    .limit(1)
+  const companyIds = new Map<DemoCompanyKey, string>()
+  for (const company of COMPANY_SEEDS) {
+    const existing = await db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(eq(companies.vatNumber, company.vatNumber))
+      .limit(1)
 
-  if (existingSchuco.length > 0) {
-    return
+    if (existing[0]) {
+      companyIds.set(company.key, existing[0].id)
+      continue
+    }
+
+    const [created] = await db
+      .insert(companies)
+      .values({
+        type: company.type,
+        name: company.name,
+        vatNumber: company.vatNumber,
+      })
+      .returning({ id: companies.id })
+
+    companyIds.set(company.key, created.id)
   }
 
-  const [schuco] = await db
-    .insert(companies)
-    .values({
-      type: 'platform',
-      name: 'Schüco / PREVIO Platform',
-      vatNumber: 'IT00000000001',
+  const businessUnitIds = new Map<DemoBusinessUnitKey, string>()
+  for (const unit of BUSINESS_UNIT_SEEDS) {
+    const companyId = companyIds.get(unit.companyKey)
+    if (!companyId) {
+      continue
+    }
+
+    const existing = await db
+      .select({ id: businessUnits.id })
+      .from(businessUnits)
+      .where(eq(businessUnits.name, unit.name))
+      .limit(1)
+
+    if (existing[0]) {
+      businessUnitIds.set(unit.key, existing[0].id)
+      continue
+    }
+
+    const [created] = await db
+      .insert(businessUnits)
+      .values({
+        companyId,
+        name: unit.name,
+        address: unit.address,
+      })
+      .returning({ id: businessUnits.id })
+
+    businessUnitIds.set(unit.key, created.id)
+  }
+
+  const schucoId = companyIds.get('schuco')
+  const suppliId = companyIds.get('suppli')
+  const fabbrikkaId = companyIds.get('fabbrikka')
+  const technometalId = companyIds.get('technometal')
+
+  if (schucoId && suppliId && fabbrikkaId && technometalId) {
+    await db.insert(supplierClientLinks).values([
+      { supplierCompanyId: schucoId, clientCompanyId: fabbrikkaId },
+      { supplierCompanyId: suppliId, clientCompanyId: fabbrikkaId },
+      { supplierCompanyId: suppliId, clientCompanyId: technometalId },
+    ]).onConflictDoNothing({
+      target: [supplierClientLinks.supplierCompanyId, supplierClientLinks.clientCompanyId],
     })
-    .returning()
+  }
 
-  const [suppli] = await db
-    .insert(companies)
-    .values({
-      type: 'supplier',
-      name: 'Suppli S.r.l.',
-      vatNumber: 'IT12345678901',
-    })
-    .returning()
+  for (const demoUser of DEMO_USER_SEEDS) {
+    const companyId = companyIds.get(demoUser.companyKey)
+    if (!companyId) {
+      continue
+    }
 
-  const [technometal] = await db
-    .insert(companies)
-    .values({
-      type: 'client',
-      name: 'Technometal S.p.A.',
-      vatNumber: 'IT98765432109',
-    })
-    .returning()
+    const existing = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, demoUser.email))
+      .limit(1)
 
-  const [fabbrikka] = await db
-    .insert(companies)
-    .values({
-      type: 'client',
-      name: 'Fabbrikka S.r.l.',
-      vatNumber: 'IT11223344556',
-    })
-    .returning()
+    let userId = existing[0]?.id
 
-  const [schucoBu] = await db
-    .insert(businessUnits)
-    .values({
-      companyId: schuco.id,
-      name: 'Schuco HQ',
-      address: 'Via dell\'Innovazione 1, Milano',
-    })
-    .returning()
+    if (userId) {
+      await db
+        .update(users)
+        .set({
+          cognitoSub: demoUser.cognitoSub,
+          name: demoUser.name,
+          companyId,
+          roleId: demoUser.roleId,
+          status: demoUser.status,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId))
+    } else {
+      const [created] = await db
+        .insert(users)
+        .values({
+          cognitoSub: demoUser.cognitoSub,
+          email: demoUser.email,
+          name: demoUser.name,
+          companyId,
+          roleId: demoUser.roleId,
+          status: demoUser.status,
+        })
+        .returning({ id: users.id })
 
-  const [technoA] = await db
-    .insert(businessUnits)
-    .values({
-      companyId: technometal.id,
-      name: 'Technometal_A',
-      address: 'Via Roma 10, Milano',
-    })
-    .returning()
+      userId = created.id
+    }
 
-  const [technoB] = await db
-    .insert(businessUnits)
-    .values({
-      companyId: technometal.id,
-      name: 'Technometal_B',
-      address: 'Via Torino 20, Torino',
-    })
-    .returning()
+    for (const buKey of demoUser.businessUnits) {
+      const businessUnitId = businessUnitIds.get(buKey)
+      if (!businessUnitId) {
+        continue
+      }
 
-  await db.insert(supplierClientLinks).values([
-    { supplierCompanyId: schuco.id, clientCompanyId: fabbrikka.id },
-    { supplierCompanyId: suppli.id, clientCompanyId: fabbrikka.id },
-    { supplierCompanyId: suppli.id, clientCompanyId: technometal.id },
-  ])
-
-  const [demoAdmin] = await db
-    .insert(users)
-    .values({
-      cognitoSub: 'seed-super-admin',
-      email: 'admin@schuco-demo.it',
-      name: 'Anna Bianchi',
-      companyId: schuco.id,
-      roleId: 'super-admin',
-      status: 'active',
-    })
-    .returning()
-
-  await db.insert(users).values({
-    cognitoSub: 'seed-company-admin',
-    email: 'admin@technometal-demo.it',
-    name: 'Luca Verdi',
-    companyId: technometal.id,
-    roleId: 'company-admin',
-    status: 'active',
-  })
-
-  const [demoSuperUser] = await db
-    .insert(users)
-    .values({
-      cognitoSub: 'seed-super-user',
-      email: 'manager@technometal-demo.it',
-      name: 'Giulia Neri',
-      companyId: technometal.id,
-      roleId: 'super-user',
-      status: 'active',
-    })
-    .returning()
-
-  await db.insert(users).values({
-    cognitoSub: 'seed-user',
-    email: 'sales@technometal-demo.it',
-    name: 'Marco Rossi',
-    companyId: technometal.id,
-    roleId: 'user',
-    status: 'active',
-  })
-
-  await db.insert(userBusinessUnits).values([
-    { userId: demoAdmin.id, businessUnitId: schucoBu.id, canEdit: true },
-    { userId: demoSuperUser.id, businessUnitId: technoA.id, canEdit: false },
-    { userId: demoSuperUser.id, businessUnitId: technoB.id, canEdit: true },
-  ])
+      await db
+        .insert(userBusinessUnits)
+        .values({
+          userId,
+          businessUnitId,
+          canEdit: demoUser.editBusinessUnits.includes(buKey),
+        })
+        .onConflictDoUpdate({
+          target: [userBusinessUnits.userId, userBusinessUnits.businessUnitId],
+          set: { canEdit: demoUser.editBusinessUnits.includes(buKey) },
+        })
+    }
+  }
 }

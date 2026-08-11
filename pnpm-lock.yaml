@@ -20,9 +20,15 @@ importers:
       '@hono/node-server':
         specifier: ^1.14.1
         version: 1.19.17(hono@4.12.32)
+      '@hono/swagger-ui':
+        specifier: ^0.6.1
+        version: 0.6.1(hono@4.12.32)
       '@schuco/calculation':
         specifier: workspace:*
         version: link:../../packages/calculation
+      '@schuco/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@schuco/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -66,6 +72,9 @@ importers:
       '@schuco/calculation':
         specifier: workspace:*
         version: link:../../packages/calculation
+      '@schuco/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -114,6 +123,16 @@ importers:
         version: 5.9.3
 
   packages/calculation:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
+  packages/contracts:
+    dependencies:
+      zod:
+        specifier: ^3.24.4
+        version: 3.25.76
     devDependencies:
       typescript:
         specifier: ^5.8.3
@@ -634,6 +653,11 @@ packages:
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
+
+  '@hono/swagger-ui@0.6.1':
+    resolution: {integrity: sha512-sJTvldu1GPeEPfyeLG7gRj+W4vEuD+JDi+JjJ3TJs/DvMUtBLs0KJO5yokGegWWdy5qrbdnQGekbhgNRmPmYKQ==}
+    peerDependencies:
+      hono: '>=4.0.0'
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -2207,6 +2231,10 @@ snapshots:
       '@formatjs/fast-memoize': 3.1.7
 
   '@hono/node-server@1.19.17(hono@4.12.32)':
+    dependencies:
+      hono: 4.12.32
+
+  '@hono/swagger-ui@0.6.1(hono@4.12.32)':
     dependencies:
       hono: 4.12.32
 
