@@ -1,4 +1,4 @@
-export type RoleId = 'super-admin' | 'admin' | 'sales-manager' | string
+export type RoleId = 'super-admin' | 'company-admin' | 'super-user' | 'user' | string
 
 export interface Role {
   id: RoleId
@@ -29,17 +29,22 @@ export const DEMO_ROLES: Role[] = [
   {
     id: 'super-admin',
     name: 'Super Admin',
-    description: 'Full platform access including user and role management',
+    description: 'PREVIO / Schuco platform operators with cross-tenant access',
   },
   {
-    id: 'admin',
-    name: 'Admin',
-    description: 'Manage quotes, users, and company settings',
+    id: 'company-admin',
+    name: 'Company Admin',
+    description: 'Manages company settings, users, and product visibility',
   },
   {
-    id: 'sales-manager',
-    name: 'Sales Manager',
-    description: 'Create and edit quotes and invoices',
+    id: 'super-user',
+    name: 'Super User (Sales Manager)',
+    description: 'Sales coordinator — team offers within scoped business units',
+  },
+  {
+    id: 'user',
+    name: 'User (Sales Associate)',
+    description: 'Standard sales staff — own offers only',
   },
 ]
 
@@ -47,36 +52,36 @@ export const DEMO_USERS: User[] = [
   {
     id: '1',
     name: 'Anna Bianchi',
-    email: 'anna.bianchi@schuco-demo.it',
+    email: 'admin@schuco-demo.it',
     roleId: 'super-admin',
     status: 'active',
   },
   {
     id: '2',
     name: 'Luca Verdi',
-    email: 'luca.verdi@schuco-demo.it',
-    roleId: 'admin',
+    email: 'admin@technometal-demo.it',
+    roleId: 'company-admin',
     status: 'active',
   },
   {
     id: '3',
     name: 'Giulia Neri',
-    email: 'giulia.neri@schuco-demo.it',
-    roleId: 'sales-manager',
+    email: 'manager@technometal-demo.it',
+    roleId: 'super-user',
     status: 'active',
   },
   {
     id: '4',
     name: 'Marco Rossi',
-    email: 'marco.rossi@schuco-demo.it',
-    roleId: 'sales-manager',
+    email: 'sales@technometal-demo.it',
+    roleId: 'user',
     status: 'active',
   },
   {
     id: '5',
     name: 'Elena Costa',
     email: 'elena.costa@schuco-demo.it',
-    roleId: 'admin',
+    roleId: 'company-admin',
     status: 'inactive',
   },
 ]
@@ -101,7 +106,7 @@ export const DEFAULT_ACCESS_MATRIX: Record<RoleId, Record<AccessModule, boolean>
     Company: true,
     Reports: true,
   },
-  admin: {
+  'company-admin': {
     Dashboard: true,
     Invoices: true,
     Users: true,
@@ -109,13 +114,21 @@ export const DEFAULT_ACCESS_MATRIX: Record<RoleId, Record<AccessModule, boolean>
     Company: true,
     Reports: true,
   },
-  'sales-manager': {
+  'super-user': {
     Dashboard: true,
     Invoices: true,
     Users: false,
     Roles: false,
     Company: false,
     Reports: true,
+  },
+  user: {
+    Dashboard: true,
+    Invoices: true,
+    Users: false,
+    Roles: false,
+    Company: false,
+    Reports: false,
   },
 }
 

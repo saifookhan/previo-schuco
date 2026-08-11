@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: previo
+      POSTGRES_PASSWORD: previo
+      POSTGRES_DB: previo
+    ports:
+      - '5432:5432'
+    volumes:
+      - previo_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U previo -d previo']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: migrate
+    command: pnpm --filter @schuco/db db:migrate
+    environment:
+      DATABASE_URL: postgresql://previo:previo@postgres:5432/previo
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - '3001:3001'
+    environment:
+      PORT: 3001
+      NODE_ENV: development
+      DATABASE_URL: postgresql://previo:previo@postgres:5432/previo
+      COGNITO_REGION: ${COGNITO_REGION:-eu-central-1}
+      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-}
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  previo_pg_data:

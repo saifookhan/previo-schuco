@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { DEMO_ROLES, type Role } from '@/types/settings'
 
+const CANONICAL_ROLE_IDS = ['super-admin', 'company-admin', 'super-user', 'user'] as const
+
 /**
  * Demo roles management with add/remove capability.
  */
@@ -32,7 +34,7 @@ const RolesPage = () => {
   }
 
   const removeRole = (id: string) => {
-    if (['super-admin', 'admin', 'sales-manager'].includes(id)) return
+    if (CANONICAL_ROLE_IDS.includes(id as (typeof CANONICAL_ROLE_IDS)[number])) return
     setRoles((prev) => prev.filter((r) => r.id !== id))
   }
 
@@ -51,7 +53,7 @@ const RolesPage = () => {
                 <CardTitle>{role.name}</CardTitle>
                 <p className="mt-1 text-sm text-slate-500">{role.description}</p>
               </div>
-              {!['super-admin', 'admin', 'sales-manager'].includes(role.id) && (
+              {!CANONICAL_ROLE_IDS.includes(role.id as (typeof CANONICAL_ROLE_IDS)[number]) && (
                 <button
                   onClick={() => removeRole(role.id)}
                   className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"

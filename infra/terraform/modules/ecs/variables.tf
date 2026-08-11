@@ -1,0 +1,12 @@
+variable "project" { type = string }
+variable "environment" { type = string }
+variable "vpc_id" { type = string }
+variable "public_subnet_ids" { type = list(string) }
+variable "private_subnet_ids" { type = list(string) }
+variable "aws_region" { type = string }
+variable "db_secret_arn" { type = string }
+variable "cognito_user_pool_id" { type = string }
+variable "cors_origins" { type = string }
+variable "api_image" { type = string }
+variable "task_security_group_id" { type = string }
+variable "alb_security_group_id" { type = string }

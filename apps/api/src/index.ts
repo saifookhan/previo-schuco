@@ -15,19 +15,31 @@ import {
 } from '@schuco/db'
 import { z } from 'zod'
 
-const app = new Hono()
+import type { AuthVariables } from './middleware/auth'
+import { requireAuth, requireRoles } from './middleware/auth'
+import { me } from './routes/me'
+
+const app = new Hono<{ Variables: AuthVariables }>()
 
 /** In-memory quotes created during the session (not persisted). */
 const sessionQuotes: Quote[] = []
 
-app.use('*', cors({ origin: ['http://localhost:3000', 'http://127.0.0.1:3000'] }))
+const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+
+app.use('*', cors({ origin: corsOrigins, credentials: true }))
 
 app.get('/health', (c) => c.json({ status: 'ok', service: 'schuco-api' }))
 
-app.get('/api/products', (c) => c.json(DEMO_PRODUCTS))
+app.route('/api/me', me)
 
-app.get('/api/quotes/:reference', (c) => {
-  const reference = c.req.param('reference')
+const quoteRoles = ['super-admin', 'company-admin', 'super-user', 'user']
+
+app.get('/api/products', requireAuth, requireRoles(quoteRoles), (c) => c.json(DEMO_PRODUCTS))
+
+app.get('/api/quotes/:reference', requireAuth, requireRoles(quoteRoles), (c) => {
+  const reference = c.req.param('reference') ?? ''
   const quote = getQuoteByReference(reference) ?? sessionQuotes.find((q) => q.reference === reference)
 
   if (!quote) {
@@ -39,7 +51,7 @@ app.get('/api/quotes/:reference', (c) => {
   return c.json({ quote, families })
 })
 
-app.get('/api/quotes', (c) => {
+app.get('/api/quotes', requireAuth, requireRoles(quoteRoles), (c) => {
   const quotes = [...DEMO_QUOTES, ...sessionQuotes]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 20)
@@ -57,7 +69,7 @@ const calculateSchema = z.object({
   quantity: z.number().int().positive(),
 })
 
-app.post('/api/calculate', async (c) => {
+app.post('/api/calculate', requireAuth, requireRoles(quoteRoles), async (c) => {
   const body = await c.req.json()
   const parsed = calculateSchema.safeParse(body)
 
@@ -75,7 +87,7 @@ const saveQuoteSchema = calculateSchema.extend({
   locale: z.enum(['it', 'en', 'de']).default('it'),
 })
 
-app.post('/api/quotes', async (c) => {
+app.post('/api/quotes', requireAuth, requireRoles(quoteRoles), async (c) => {
   const body = await c.req.json()
   const parsed = saveQuoteSchema.safeParse(body)
 
