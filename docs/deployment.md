@@ -108,6 +108,29 @@ cd apps/web && vercel --prod
 
 Update Cognito callback/logout URLs and API CORS via Terraform (`variables.tf` includes the Vercel URL), then `./infra/terraform/scripts/apply-dev.sh -auto-approve`.
 
+**Cognito `redirect_mismatch` on Vercel:** the app client still has the old callback URL. Fix without a full apply:
+
+```bash
+aws login   # or aws sso login
+./infra/terraform/scripts/update-cognito-vercel-urls.sh
+```
+
+**Login still fails after Cognito fix:** set `NEXT_PUBLIC_API_URL` (missing today — web defaults to `localhost:3001`):
+
+```bash
+./infra/terraform/scripts/configure-vercel-dev.sh
+cd apps/web && vercel --prod
+```
+
+Optional: enable seed-user login on Vercel while Cognito users are being set up:
+
+```bash
+vercel env add NEXT_PUBLIC_ALLOW_DEV_LOGIN production,preview,development \
+  --value true --no-sensitive --yes --force -S einsteinsaifoos-projects
+vercel env add ALLOW_DEV_LOGIN production,preview \
+  --value true --yes --force -S einsteinsaifoos-projects
+```
+
 ## 5. Local development
 
 ```bash

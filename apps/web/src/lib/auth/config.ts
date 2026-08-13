@@ -15,6 +15,14 @@ export const authConfig = {
 export const isCognitoConfigured = (): boolean =>
   Boolean(authConfig.userPoolId && authConfig.clientId && authConfig.domain)
 
+/** Allow seed-user dev login on hosted previews (e.g. Vercel dev). Server-only check. */
+export const isDevLoginAllowed = (): boolean =>
+  process.env.NODE_ENV !== 'production' || process.env.ALLOW_DEV_LOGIN === 'true'
+
+/** Client-visible flag to show dev login form alongside Cognito. */
+export const isDevLoginUiEnabled = (): boolean =>
+  process.env.NEXT_PUBLIC_ALLOW_DEV_LOGIN === 'true' || !isCognitoConfigured()
+
 /** OAuth redirect URI registered in Cognito app client. */
 export const getRedirectUri = (): string => `${authConfig.appUrl}/api/auth/callback`
 

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { isCognitoConfigured } from '@/lib/auth/config'
+import { isCognitoConfigured, isDevLoginUiEnabled } from '@/lib/auth/config'
 
 const DEV_USERS = ACTIVE_DEMO_USER_EMAILS
 
@@ -19,8 +19,16 @@ const DEV_USERS = ACTIVE_DEMO_USER_EMAILS
 export const LoginForm = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const devMode = searchParams.get('dev') === '1' || !isCognitoConfigured()
+  const devMode = searchParams.get('dev') === '1' || isDevLoginUiEnabled()
+  const cognitoMode = isCognitoConfigured() && searchParams.get('dev') !== '1'
   const error = searchParams.get('error')
+
+  const errorMessage: Record<string, string> = {
+    cognito_not_configured: 'Cognito is not configured for this environment.',
+    invalid_state: 'Sign-in session expired. Please try again.',
+    missing_verifier: 'Sign-in session expired. Please try again.',
+    token_exchange: 'Could not complete sign-in with Cognito.',
+  }
   const [email, setEmail] = useState('admin@schuco-demo.it')
   const [loading, setLoading] = useState(false)
 
@@ -55,13 +63,19 @@ export const LoginForm = () => {
         </div>
         <CardTitle>Sign in to PREVIO</CardTitle>
         <p className="mt-1 text-sm text-slate-500">
-          {devMode ? 'Local dev login (seed users)' : 'Sign in with your company account'}
+          {devMode && cognitoMode
+            ? 'Dev seed login or Cognito'
+            : devMode
+              ? 'Local dev login (seed users)'
+              : 'Sign in with your company account'}
         </p>
         {error ? (
-          <p className="mt-2 text-sm text-red-600">Authentication failed: {error}</p>
+          <p className="mt-2 text-sm text-red-600">
+            Authentication failed: {errorMessage[error] ?? error}
+          </p>
         ) : null}
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         {devMode ? (
           <form onSubmit={handleDevSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -83,11 +97,12 @@ export const LoginForm = () => {
               {loading ? 'Signing in…' : 'Dev sign in'}
             </Button>
           </form>
-        ) : (
+        ) : null}
+        {cognitoMode ? (
           <Button type="button" className="w-full" onClick={handleCognitoLogin}>
             Continue with Cognito
           </Button>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   )

@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server'
 
 import { DEMO_USER_SEEDS } from '@schuco/db/demo-users'
 
+import { isDevLoginAllowed } from '@/lib/auth/config'
 import { setSession } from '@/lib/auth/session'
 
 /**
  * Dev-only login for local testing without Cognito.
  */
 export const POST = async (request: Request): Promise<NextResponse> => {
-  if (process.env.NODE_ENV === 'production') {
+  if (!isDevLoginAllowed()) {
     return NextResponse.json({ error: 'Not available' }, { status: 403 })
   }
 
