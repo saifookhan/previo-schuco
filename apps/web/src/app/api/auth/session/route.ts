@@ -22,12 +22,22 @@ export const GET = async (): Promise<NextResponse> => {
     headers.Authorization = `Bearer ${session.accessToken}`
   }
 
-  const response = await fetch(`${authConfig.apiUrl}/api/me`, { headers, cache: 'no-store' })
+  try {
+    const response = await fetch(`${authConfig.apiUrl}/api/me`, { headers, cache: 'no-store' })
 
-  if (!response.ok) {
-    return NextResponse.json({ user: null, session: { email: session.email } }, { status: 401 })
+    if (!response.ok) {
+      return NextResponse.json({ user: null, session: { email: session.email } }, { status: 401 })
+    }
+
+    const data = (await response.json()) as { user: unknown }
+    return NextResponse.json({
+      user: data.user,
+      session: { email: session.email, sub: session.sub },
+    })
+  } catch {
+    return NextResponse.json(
+      { error: 'API unreachable', apiUrl: authConfig.apiUrl },
+      { status: 503 },
+    )
   }
-
-  const data = (await response.json()) as { user: unknown }
-  return NextResponse.json({ user: data.user, session: { email: session.email, sub: session.sub } })
 }
