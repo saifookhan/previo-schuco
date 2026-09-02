@@ -212,4 +212,4 @@ Each new ECS app gets:
 - [ ] Extract `apps/files-service` (Phase 4)
 - [x] OpenAPI spec in `@schuco/contracts` (Swagger UI at `/docs`; Docusaurus plugin later)
 
-See also: [project-context.md](./project-context.md), [deployment.md](./deployment.md).
+See also: [technical-overview.md](./technical-overview.md), [project-context.md](./project-context.md), [deployment.md](./deployment.md).

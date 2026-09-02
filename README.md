@@ -2,6 +2,7 @@
 
 Monorepo for the PREVIO quote/preventivo platform built with Next.js, Hono, AWS (Cognito, RDS, ECS), and Vercel.
 
+See [docs/technical-overview.md](docs/technical-overview.md) for architecture diagrams and onboarding guide.  
 See [docs/project-context.md](docs/project-context.md) for domain model and roadmap.  
 See [docs/architecture.md](docs/architecture.md) for monorepo evolution, Changesets, Docusaurus, and service split.
 
@@ -42,6 +43,7 @@ packages/
 infra/
   terraform/    → AWS infrastructure
 docs/
+  technical-overview.md
   project-context.md
   deployment.md
   architecture.md

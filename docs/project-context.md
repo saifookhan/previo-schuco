@@ -144,3 +144,5 @@ docs/
 ```
 
 **Target (Phase 2–5):** see [architecture.md](./architecture.md) — `apps/docs`, `packages/contracts`, optional `calculation-service` and `files-service` on ECS.
+
+**Diagrams:** see [technical-overview.md](./technical-overview.md) for system architecture, domain model, auth flow, and RBAC.
