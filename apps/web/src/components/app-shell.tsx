@@ -9,6 +9,7 @@ import {
   LogOut,
   Settings,
   Shield,
+  ShieldCheck,
   Users,
 } from 'lucide-react'
 
@@ -32,6 +33,10 @@ const settingsNav = [
     minRole: 'super-admin' as RoleId,
   },
   { href: '/app/settings/company', label: 'Company', icon: Building2, minRole: 'company-admin' as RoleId },
+]
+
+const adminNav = [
+  { href: '/admin/dashboard', label: 'Admin portal', icon: ShieldCheck, minRole: 'super-admin' as RoleId },
 ]
 
 interface AppShellProps {
@@ -105,6 +110,31 @@ export const AppShell = ({ children }: AppShellProps) => {
                     className={cn(
                       'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                       pathname === href
+                        ? 'bg-brand/10 text-brand'
+                        : 'text-slate-600 hover:bg-slate-100',
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {filterNav(adminNav).length > 0 ? (
+            <div>
+              <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Platform
+              </p>
+              <div className="space-y-1">
+                {filterNav(adminNav).map(({ href, label, icon: Icon }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                      pathname.startsWith('/admin')
                         ? 'bg-brand/10 text-brand'
                         : 'text-slate-600 hover:bg-slate-100',
                     )}

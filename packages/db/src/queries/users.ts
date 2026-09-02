@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm'
+import { asc, eq, inArray, sql } from 'drizzle-orm'
 
 import type { Db } from '../client'
 import {
@@ -13,6 +13,26 @@ export interface BusinessUnitScope {
   id: string
   name: string
   canEdit: boolean
+}
+
+export interface UserListRow {
+  id: string
+  cognitoSub: string
+  email: string
+  name: string | null
+  status: 'active' | 'inactive'
+  role: {
+    id: string
+    name: string
+  }
+  company: {
+    id: string
+    name: string
+    type: 'platform' | 'supplier' | 'client'
+  }
+  businessUnits: BusinessUnitScope[]
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface UserProfile {
@@ -140,6 +160,75 @@ export const syncUserFromCognito = async (
   }
 
   return null
+}
+
+/**
+ * List users visible under current RLS context (tenant or cross-tenant for super-admin).
+ * @param db - Drizzle client with RLS session vars set
+ */
+export const listUsers = async (db: Db): Promise<UserListRow[]> => {
+  const userRows = await db
+    .select({
+      userId: users.id,
+      cognitoSub: users.cognitoSub,
+      email: users.email,
+      name: users.name,
+      status: users.status,
+      roleId: roles.id,
+      roleName: roles.name,
+      companyId: companies.id,
+      companyName: companies.name,
+      companyType: companies.type,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+    })
+    .from(users)
+    .innerJoin(roles, eq(users.roleId, roles.id))
+    .innerJoin(companies, eq(users.companyId, companies.id))
+    .orderBy(asc(users.email))
+
+  if (userRows.length === 0) {
+    return []
+  }
+
+  const userIds = userRows.map((row) => row.userId)
+  const buRows = await db
+    .select({
+      userId: userBusinessUnits.userId,
+      id: businessUnits.id,
+      name: businessUnits.name,
+      canEdit: userBusinessUnits.canEdit,
+    })
+    .from(userBusinessUnits)
+    .innerJoin(businessUnits, eq(userBusinessUnits.businessUnitId, businessUnits.id))
+    .where(inArray(userBusinessUnits.userId, userIds))
+
+  const businessUnitsByUser = new Map<string, BusinessUnitScope[]>()
+  for (const bu of buRows) {
+    const existing = businessUnitsByUser.get(bu.userId) ?? []
+    existing.push({ id: bu.id, name: bu.name, canEdit: bu.canEdit })
+    businessUnitsByUser.set(bu.userId, existing)
+  }
+
+  return userRows.map((row) => ({
+    id: row.userId,
+    cognitoSub: row.cognitoSub,
+    email: row.email,
+    name: row.name,
+    status: row.status,
+    role: {
+      id: row.roleId,
+      name: row.roleName,
+    },
+    company: {
+      id: row.companyId,
+      name: row.companyName,
+      type: row.companyType,
+    },
+    businessUnits: businessUnitsByUser.get(row.userId) ?? [],
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }))
 }
 
 /**

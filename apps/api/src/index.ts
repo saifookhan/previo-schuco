@@ -3,12 +3,14 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 
 import type { AuthVariables } from './middleware/auth'
+import { adminUsers } from './routes/admin/users'
 import { calculate } from './routes/calculate'
 import { createDocsRoutes } from './routes/docs'
 import { health } from './routes/health'
 import { me } from './routes/me'
 import { products } from './routes/products'
 import { quotes } from './routes/quotes'
+import { users } from './routes/users'
 
 const app = new Hono<{ Variables: AuthVariables }>()
 
@@ -23,6 +25,8 @@ app.use('*', cors({ origin: corsOrigins, credentials: true }))
 
 app.route('/health', health)
 app.route('/api/me', me)
+app.route('/api/users', users)
+app.route('/api/admin/users', adminUsers)
 app.route('/api/products', products)
 app.route('/api/quotes', quotes)
 app.route('/api/calculate', calculate)

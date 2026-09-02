@@ -72,6 +72,9 @@ importers:
       '@schuco/calculation':
         specifier: workspace:*
         version: link:../../packages/calculation
+      '@schuco/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@schuco/db':
         specifier: workspace:*
         version: link:../../packages/db

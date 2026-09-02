@@ -79,6 +79,8 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
     tags: [
       { name: 'Platform', description: 'Health checks and API documentation' },
       { name: 'Auth & RBAC', description: 'Session user profile and tenant context' },
+      { name: 'Users', description: 'Tenant-scoped user management (company-admin)' },
+      { name: 'Admin', description: 'Cross-tenant platform administration (super-admin)' },
       { name: 'Products', description: 'Product catalog' },
       { name: 'Quotes', description: 'Quote listing, detail, and creation (Core API)' },
       { name: 'Calculation', description: 'Quote pricing — in-process today, HTTP service Phase 3' },
@@ -130,6 +132,32 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           security: [{ bearerAuth: [] }, { devUserSub: [] }],
           responses: {
             '200': jsonResponse('Authenticated user profile', 'MeResponse'),
+            ...errorResponses(),
+          },
+        },
+      },
+      '/api/users': {
+        get: {
+          tags: ['Users'],
+          summary: 'List company users',
+          description: 'Returns users in the authenticated company-admin tenant. Excludes cognitoSub and cross-company fields.',
+          operationId: 'listCompanyUsers',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          responses: {
+            '200': jsonResponse('Tenant user list', 'UsersListResponse'),
+            ...errorResponses(),
+          },
+        },
+      },
+      '/api/admin/users': {
+        get: {
+          tags: ['Admin'],
+          summary: 'List all platform users',
+          description: 'Cross-tenant user directory for super-admins. Includes cognitoSub, company, and timestamps.',
+          operationId: 'listAdminUsers',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          responses: {
+            '200': jsonResponse('Platform user list', 'AdminUsersListResponse'),
             ...errorResponses(),
           },
         },
@@ -479,6 +507,61 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
             name: { type: 'string' },
             canEdit: { type: 'boolean' },
           },
+        },
+        UserDto: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            email: { type: 'string', format: 'email' },
+            name: { type: 'string', nullable: true },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            role: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', enum: ['super-admin', 'company-admin', 'super-user', 'user'] },
+                name: { type: 'string' },
+              },
+            },
+            businessUnits: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/BusinessUnitScope' },
+            },
+          },
+        },
+        AdminUserDto: {
+          allOf: [
+            { $ref: '#/components/schemas/UserDto' },
+            {
+              type: 'object',
+              properties: {
+                cognitoSub: { type: 'string' },
+                company: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', format: 'uuid' },
+                    name: { type: 'string' },
+                    type: { type: 'string', enum: ['platform', 'supplier', 'client'] },
+                  },
+                },
+                createdAt: { type: 'string', format: 'date-time' },
+                updatedAt: { type: 'string', format: 'date-time' },
+              },
+            },
+          ],
+        },
+        UsersListResponse: {
+          type: 'object',
+          properties: {
+            users: { type: 'array', items: { $ref: '#/components/schemas/UserDto' } },
+          },
+          required: ['users'],
+        },
+        AdminUsersListResponse: {
+          type: 'object',
+          properties: {
+            users: { type: 'array', items: { $ref: '#/components/schemas/AdminUserDto' } },
+          },
+          required: ['users'],
         },
         Product: {
           type: 'object',

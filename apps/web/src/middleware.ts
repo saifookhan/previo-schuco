@@ -11,7 +11,7 @@ const intlMiddleware = createMiddleware({
   localePrefix: 'never',
 })
 
-const protectedPrefixes = ['/app']
+const protectedPrefixes = ['/app', '/admin']
 
 /**
  * Protect /app routes; delegate i18n to next-intl middleware.

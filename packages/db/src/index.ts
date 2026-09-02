@@ -20,9 +20,11 @@ export {
 } from './demo-users'
 export {
   getUserProfileByCognitoSub,
+  listUsers,
   setRlsContext,
   syncUserFromCognito,
   type BusinessUnitScope,
+  type UserListRow,
   type UserProfile,
 } from './queries/users'
 export * from './schema'
