@@ -8,7 +8,7 @@ export {
 
 export type { NewQuote, Product, ProductFamily, Quote } from './types'
 
-export { createDb, type Db } from './client'
+export { createDb, type Db, type DbLike } from './client'
 export { CANONICAL_ROLES, seedDatabase } from './seed'
 export {
   ACTIVE_DEMO_USER_EMAILS,
@@ -21,10 +21,13 @@ export {
 export {
   getUserProfileByCognitoSub,
   listUsers,
-  setRlsContext,
   syncUserFromCognito,
+  withRlsTransaction,
+  withSystemTransaction,
   type BusinessUnitScope,
   type UserListRow,
   type UserProfile,
 } from './queries/users'
+export { getCompanyById } from './queries/companies'
+export { writeAuditLog, type WriteAuditLogInput } from './queries/audit'
 export * from './schema'

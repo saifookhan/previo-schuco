@@ -1,9 +1,8 @@
 import { usersListResponseSchema } from '@schuco/contracts'
-import { listUsers } from '@schuco/db'
 import { Hono } from 'hono'
 
 import { toUserDto } from '../lib/user-dto'
-import { getDb } from '../lib/db'
+import { listUsersForCompany } from '../services/users-service'
 import type { AuthVariables } from '../middleware/auth'
 import { requireAuth, requireRoles } from '../middleware/auth'
 
@@ -11,10 +10,14 @@ import { requireAuth, requireRoles } from '../middleware/auth'
 export const users = new Hono<{ Variables: AuthVariables }>()
 
 /**
- * List users in the authenticated user's company.
+ * List users in the authenticated user's company (or, for a super-admin
+ * sending X-Tenant-Id, the company they're acting as — see ADR 0008).
  */
-users.get('/', requireAuth, requireRoles(['company-admin']), async (c) => {
-  const rows = await listUsers(getDb())
+users.get('/', requireAuth, requireRoles(['company-admin', 'super-admin']), async (c) => {
+  const rows = await listUsersForCompany({
+    effectiveCompanyId: c.get('effectiveCompanyId'),
+    isSuperAdmin: c.get('isSuperAdmin'),
+  })
   const payload = { users: rows.map(toUserDto) }
   const parsed = usersListResponseSchema.safeParse(payload)
 

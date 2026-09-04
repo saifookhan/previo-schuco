@@ -1,4 +1,19 @@
 services:
+  redis:
+    image: redis:7-alpine
+    # noeviction + AOF persistence: a full/restarted Redis must never
+    # silently drop or lose queued jobs (ADR 0009).
+    command: redis-server --maxmemory-policy noeviction --appendonly yes
+    ports:
+      - '6380:6379'
+    volumes:
+      - previo_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -6,7 +21,7 @@ services:
       POSTGRES_PASSWORD: previo
       POSTGRES_DB: previo
     ports:
-      - '5432:5432'
+      - '5434:5432'
     volumes:
       - previo_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +37,9 @@ services:
       target: migrate
     command: pnpm --filter @schuco/db db:migrate
     environment:
+      # Superuser/owner — needed for DDL, role creation, and grants.
       DATABASE_URL: postgresql://previo:previo@postgres:5432/previo
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-previo_app}
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,7 +53,9 @@ services:
     environment:
       PORT: 3001
       NODE_ENV: development
-      DATABASE_URL: postgresql://previo:previo@postgres:5432/previo
+      # Restricted, non-superuser role — subject to RLS. Never the owner/superuser (see ADR 0006).
+      DATABASE_URL: postgresql://previo_app:${APP_DB_PASSWORD:-previo_app}@postgres:5432/previo
+      REDIS_URL: redis://redis:6379
       COGNITO_REGION: ${COGNITO_REGION:-eu-central-1}
       COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-}
       CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
@@ -44,6 +63,24 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: pnpm exec tsx src/worker.ts
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://previo_app:${APP_DB_PASSWORD:-previo_app}@postgres:5432/previo
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
 volumes:
   previo_pg_data:
+  previo_redis_data:

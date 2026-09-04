@@ -13,3 +13,10 @@ export const createDb = (connectionString: string) => {
 }
 
 export type Db = ReturnType<typeof createDb>
+
+/**
+ * Either the top-level Db client or a transaction handle — accepted anywhere
+ * queries run so RLS-scoped transactions (see withRlsTransaction) can be
+ * passed through query functions unchanged.
+ */
+export type DbLike = Db | Parameters<Parameters<Db['transaction']>[0]>[0]

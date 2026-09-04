@@ -54,3 +54,42 @@ CREATE POLICY supplier_client_tenant ON supplier_client_links
     OR supplier_company_id = app_current_company_id()
     OR client_company_id = app_current_company_id()
   );
+
+-- audit_log (ADR 0010): a company sees entries where it's the effective
+-- target (actions taken against it, including by an acting-as super-admin);
+-- super-admin sees everything. Table must already exist — created by an
+-- earlier-numbered drizzle migration, which always runs before this file.
+ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS audit_log_tenant ON audit_log;
+CREATE POLICY audit_log_tenant ON audit_log
+  FOR ALL
+  USING (
+    app_is_super_admin()
+    OR effective_company_id = app_current_company_id()
+  );
+
+-- Application role: this is what the API connects as at runtime. It must
+-- NOT be a table owner or a Postgres superuser — both bypass RLS entirely
+-- and unconditionally, regardless of ENABLE/FORCE ROW LEVEL SECURITY (see
+-- ADR 0006). Migrations keep running as the existing owner/superuser role;
+-- only the API's DATABASE_URL should ever point at this role.
+-- Password substituted by migrate-seed.ts from APP_DB_PASSWORD; the
+-- literal below is a local-only placeholder default.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'previo_app') THEN
+    CREATE ROLE previo_app LOGIN PASSWORD '__APP_DB_PASSWORD__';
+  END IF;
+END
+$$;
+ALTER ROLE previo_app WITH PASSWORD '__APP_DB_PASSWORD__';
+
+GRANT USAGE ON SCHEMA public TO previo_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO previo_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO previo_app;
+
+-- Append-only (ADR 0010): the application never updates or deletes an
+-- audit record — only INSERT (and SELECT to read it back). Revoked after
+-- the blanket grant above so this table is the one deliberate exception.
+REVOKE UPDATE, DELETE ON audit_log FROM previo_app;

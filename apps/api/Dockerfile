@@ -8,6 +8,8 @@ COPY apps/api/package.json ./apps/api/
 COPY packages/calculation/package.json ./packages/calculation/
 COPY packages/contracts/package.json ./packages/contracts/
 COPY packages/db/package.json ./packages/db/
+COPY packages/env/package.json ./packages/env/
+COPY packages/queue/package.json ./packages/queue/
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS migrate
