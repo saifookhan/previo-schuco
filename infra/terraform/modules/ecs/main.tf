@@ -74,7 +74,7 @@ resource "aws_iam_role_policy" "secrets" {
     Statement = [{
       Effect   = "Allow"
       Action   = ["secretsmanager:GetSecretValue"]
-      Resource = [var.db_secret_arn]
+      Resource = [var.app_db_secret_arn]
     }]
   })
 }
@@ -128,7 +128,7 @@ resource "aws_ecs_task_definition" "api" {
     ]
     secrets = [{
       name      = "DATABASE_URL"
-      valueFrom = "${var.db_secret_arn}:url::"
+      valueFrom = "${var.app_db_secret_arn}:url::" # restricted app-role connection only — see ADR 0007
     }]
     logConfiguration = {
       logDriver = "awslogs"

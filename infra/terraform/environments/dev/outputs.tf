@@ -23,6 +23,26 @@ output "rds_endpoint" {
   sensitive = true
 }
 
+# Master/owner secret ARN — fetch for migrations only (`pnpm db:migrate`
+# needs DDL rights). Never point a running service at this.
+output "rds_master_secret_arn" {
+  value = module.rds.secret_arn
+}
+
+# Restricted app-role secret ARN — what apps/api's DATABASE_URL is built
+# from at runtime (ADR 0007). Also fetch this to get the APP_DB_PASSWORD
+# value the migration step needs (the SQL migration creates/updates the
+# `previo_app` role's password to match this secret).
+output "rds_app_secret_arn" {
+  value = module.rds.app_secret_arn
+}
+
+# apps/web (Vercel) session-signing secret — set as a Vercel env var, not
+# consumed by any Terraform-managed service (ADR 0011).
+output "auth_secret_arn" {
+  value = aws_secretsmanager_secret.auth_secret.arn
+}
+
 output "documents_bucket" {
   value = module.s3.bucket_name
 }

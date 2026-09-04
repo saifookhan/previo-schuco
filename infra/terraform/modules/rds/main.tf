@@ -72,3 +72,34 @@ resource "aws_secretsmanager_secret_version" "db" {
     url      = "postgresql://${var.db_username}:${random_password.db.result}@${aws_db_instance.main.address}:${aws_db_instance.main.port}/${var.db_name}"
   })
 }
+
+# Restricted app-role credential (ADR 0007, ADR 0011) — the ONLY secret
+# apps/api's (and the worker's) DATABASE_URL may ever be built from. The
+# master/owner secret above is for migrations and one-off admin operations
+# only; never point a running service at it. This role itself is created
+# by a SQL migration (packages/db/migrations/0001_rls.sql), not by
+# Terraform — Terraform only generates and stores the password both sides
+# must agree on. Terraform state holding this value is an explicit,
+# accepted trade-off (see ADR 0011) since the role's password must match
+# what the SQL migration sets, which needs a single source Terraform can
+# feed into both the migration step and the running service.
+resource "random_password" "app" {
+  length  = 24
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "db_app" {
+  name = "${var.project}/${var.environment}/database-app"
+}
+
+resource "aws_secretsmanager_secret_version" "db_app" {
+  secret_id = aws_secretsmanager_secret.db_app.id
+  secret_string = jsonencode({
+    username = var.app_db_username
+    password = random_password.app.result
+    host     = aws_db_instance.main.address
+    port     = aws_db_instance.main.port
+    dbname   = var.db_name
+    url      = "postgresql://${var.app_db_username}:${random_password.app.result}@${aws_db_instance.main.address}:${aws_db_instance.main.port}/${var.db_name}"
+  })
+}
