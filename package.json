@@ -5,7 +5,13 @@
     "dev": "turbo dev --filter=@schuco/web",
     "dev:web": "pnpm --filter @schuco/web dev",
     "dev:api": "pnpm --filter @schuco/api dev",
+    "dev:worker": "pnpm --filter @schuco/api worker:dev",
+    "dev:local": "DB_TARGET=local REDIS_TARGET=local API_TARGET=local turbo dev --filter=@schuco/web --filter=@schuco/api --parallel",
+    "dev:hybrid": "API_TARGET=local DB_TARGET=dev REDIS_TARGET=dev turbo dev --filter=@schuco/web --filter=@schuco/api --parallel",
+    "dev:remote": "API_TARGET=dev pnpm --filter @schuco/web dev",
+    "env:fetch": "bash scripts/env-fetch.sh",
     "build": "turbo build",
+    "test": "turbo test",
     "db:migrate": "pnpm --filter @schuco/db db:migrate"
   },
   "devDependencies": {

@@ -1,3 +1,4 @@
+export * from './audit-log'
 export * from './business-units'
 export * from './companies'
 export * from './enums'
