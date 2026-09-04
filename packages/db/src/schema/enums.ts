@@ -7,5 +7,5 @@ export const companyTypeEnum = pgEnum('company_type', [
   'client',
 ])
 
-/** User account status. */
-export const userStatusEnum = pgEnum('user_status', ['active', 'inactive'])
+/** User account status. 'invited' = admin-created, not yet linked to a Cognito login (see ADR 0004). */
+export const userStatusEnum = pgEnum('user_status', ['invited', 'active', 'inactive'])

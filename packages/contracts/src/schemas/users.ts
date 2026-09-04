@@ -8,7 +8,7 @@ export const userDtoSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
   name: z.string().nullable(),
-  status: z.enum(['active', 'inactive']),
+  status: z.enum(['invited', 'active', 'inactive']),
   role: z.object({
     id: roleIdSchema,
     name: z.string(),

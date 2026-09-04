@@ -17,7 +17,7 @@ export const userProfileSchema = z.object({
   cognitoSub: z.string(),
   email: z.string().email(),
   name: z.string().nullable(),
-  status: z.enum(['active', 'inactive']),
+  status: z.enum(['invited', 'active', 'inactive']),
   role: z.object({
     id: roleIdSchema,
     name: z.string(),
