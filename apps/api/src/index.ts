@@ -1,40 +1,11 @@
-import { serve } from '@hono/node-server'
-import { Hono } from 'hono'
-import { cors } from 'hono/cors'
+import { bootstrapApiEnv } from '@schuco/env'
 
-import type { AuthVariables } from './middleware/auth'
-import { adminUsers } from './routes/admin/users'
-import { calculate } from './routes/calculate'
-import { createDocsRoutes } from './routes/docs'
-import { health } from './routes/health'
-import { me } from './routes/me'
-import { products } from './routes/products'
-import { quotes } from './routes/quotes'
-import { users } from './routes/users'
+// Resolve env into process.env BEFORE anything else loads (ADR 0005).
+// A plain top-level `import` further down would be hoisted and evaluated
+// before this call runs regardless of source order (ES module semantics),
+// so the actual app is loaded via a dynamic import instead — that's a
+// runtime operation, guaranteed to happen after the synchronous call
+// above it.
+bootstrapApiEnv()
 
-const app = new Hono<{ Variables: AuthVariables }>()
-
-const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
-  .split(',')
-  .map((origin) => origin.trim())
-
-const port = Number(process.env.PORT ?? 3001)
-const apiPublicUrl = process.env.API_PUBLIC_URL ?? `http://localhost:${port}`
-
-app.use('*', cors({ origin: corsOrigins, credentials: true }))
-
-app.route('/health', health)
-app.route('/api/me', me)
-app.route('/api/users', users)
-app.route('/api/admin/users', adminUsers)
-app.route('/api/products', products)
-app.route('/api/quotes', quotes)
-app.route('/api/calculate', calculate)
-app.route('/', createDocsRoutes(apiPublicUrl))
-
-serve({ fetch: app.fetch, port }, () => {
-  console.log(`Schuco API running on http://localhost:${port}`)
-  console.log(`Swagger UI: http://localhost:${port}/docs`)
-})
-
-export default app
+await import('./server')

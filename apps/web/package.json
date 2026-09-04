@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start"
+    "dev": "tsx scripts/bootstrap-env.ts dev --turbopack",
+    "build": "tsx scripts/bootstrap-env.ts build",
+    "start": "tsx scripts/bootstrap-env.ts start"
   },
   "dependencies": {
     "@radix-ui/react-collapsible": "^1.1.8",
@@ -16,6 +16,7 @@
     "@schuco/calculation": "workspace:*",
     "@schuco/contracts": "workspace:*",
     "@schuco/db": "workspace:*",
+    "@schuco/env": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "jose": "^6.0.11",
@@ -32,6 +33,7 @@
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
     "tailwindcss": "^4.1.7",
+    "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }
 }
