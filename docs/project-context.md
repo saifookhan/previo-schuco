@@ -121,8 +121,9 @@ Many-to-many: a supplier can have multiple clients; a client can have multiple s
 - Stage/prod Terraform apply
 - Cognito Lambda triggers
 - Full access-matrix wired to DB
-- pgaudit / audit tables
 - Offer-level permission enforcement (Phase 3)
+
+**No longer deferred** — implemented ahead of schedule as part of the multi-tenant architecture hardening: tenant-aware audit logging (`audit_log` table, append-only, transactional with the business mutation it records — see [ADR 0010](adr/0010-tenant-aware-audit-logging.md)).
 
 ## Repository layout
 

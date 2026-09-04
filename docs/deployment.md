@@ -134,16 +134,36 @@ vercel env add ALLOW_DEV_LOGIN production,preview \
 ## 5. Local development
 
 ```bash
-cp .env.example .env
-docker compose up -d postgres migrate api
+cp .env.example .env.local        # NOT .env — see docs/environments.md, ADR 0005
+docker compose up -d postgres redis migrate api worker
 pnpm dev
 ```
 
-`pnpm dev` starts **web only** (`:3000`). The API runs in Docker on `:3001` — do not run `turbo dev` with the API locally unless you stop the Docker API first (port conflict).
+`pnpm dev` starts **web only** (`:3000`). The API and the BullMQ worker run in Docker on `:3001` — do not run `turbo dev` with the API locally unless you stop the Docker API first (port conflict).
+
+Postgres is exposed on host port `5434` (not the default `5432` — avoids clashing with another local Postgres) and Redis on host port `6380`; `.env.example`/`.env.local` already reflect this. The API and worker connect as the restricted `previo_app` role, never the migration/owner role — see [ADR 0007](adr/0007-application-db-role.md).
 
 Open http://localhost:3000/login — use dev seed emails (see `.env.example` / login form).
 
 **API documentation:** http://localhost:3001/docs (Swagger UI). The OpenAPI spec covers the core BFF plus planned calculation and files services.
+
+### Alternative local presets
+
+```bash
+pnpm dev:local     # web + api + worker, all against local Docker Postgres/Redis (same as above, one command)
+pnpm dev:hybrid    # web + api local, DB/Redis pointed at dev — run `pnpm env:fetch dev` first (needs AWS SSO)
+pnpm dev:remote    # web only; API/DB/Redis all remote dev
+```
+
+See [ADR 0005](adr/0005-env-target-composition.md) for how `DB_TARGET`/`REDIS_TARGET`/`API_TARGET` compose, and [ADR 0011](adr/0011-secrets-config-management.md) for how `pnpm env:fetch <target>` pulls credentials from Secrets Manager (dev is fetchable by default; staging needs a separately-granted IAM permission; production is never fetched to a workstation).
+
+### Tests
+
+```bash
+pnpm test
+```
+
+Runs `packages/db`'s and `apps/api`'s Vitest suites via Turborepo, against a real `previo_test` Postgres database (dropped and recreated on each run) — RLS/tenant-isolation tests exercise actual Postgres policies, not a mocked repository layer. See [ADR 0012](adr/0012-testing-strategy-and-service-layer.md).
 
 Seed users:
 
