@@ -17,10 +17,10 @@ export interface BusinessUnitScope {
 
 export interface UserListRow {
   id: string
-  cognitoSub: string
+  cognitoSub: string | null
   email: string
   name: string | null
-  status: 'invited' | 'active' | 'inactive'
+  status: 'invited' | 'invite_failed' | 'active' | 'inactive'
   role: {
     id: string
     name: string
@@ -37,10 +37,10 @@ export interface UserListRow {
 
 export interface UserProfile {
   id: string
-  cognitoSub: string
+  cognitoSub: string | null
   email: string
   name: string | null
-  status: 'invited' | 'active' | 'inactive'
+  status: 'invited' | 'invite_failed' | 'active' | 'inactive'
   role: {
     id: string
     name: string
@@ -60,9 +60,9 @@ export interface UserProfile {
  * @param db - Drizzle client
  * @param cognitoSub - Cognito subject claim
  */
-export const getUserProfileByCognitoSub = async (
+const getUserProfileByWhere = async (
   db: DbLike,
-  cognitoSub: string,
+  where: ReturnType<typeof eq>,
 ): Promise<UserProfile | null> => {
   const rows = await db
     .select({
@@ -82,7 +82,7 @@ export const getUserProfileByCognitoSub = async (
     .from(users)
     .innerJoin(roles, eq(users.roleId, roles.id))
     .innerJoin(companies, eq(users.companyId, companies.id))
-    .where(eq(users.cognitoSub, cognitoSub))
+    .where(where)
     .limit(1)
 
   const row = rows[0]
@@ -120,6 +120,20 @@ export const getUserProfileByCognitoSub = async (
     businessUnits: buRows,
   }
 }
+
+export const getUserProfileByCognitoSub = async (
+  db: DbLike,
+  cognitoSub: string,
+): Promise<UserProfile | null> => getUserProfileByWhere(db, eq(users.cognitoSub, cognitoSub))
+
+/**
+ * Load full user profile by internal id — needed right after
+ * admin-inviting a user, who has no cognito_sub yet (ADR 0004).
+ * @param db - Drizzle client
+ * @param id - Internal user UUID
+ */
+export const getUserProfileById = async (db: DbLike, id: string): Promise<UserProfile | null> =>
+  getUserProfileByWhere(db, eq(users.id, id))
 
 /**
  * Upsert user on first login (lazy Cognito sync).
@@ -169,6 +183,72 @@ export const syncUserFromCognito = async (
   }
 
   return null
+}
+
+export interface CreateInvitedUserInput {
+  email: string
+  name?: string | null
+  companyId: string
+  roleId: string
+  businessUnitIds?: string[]
+}
+
+/**
+ * Create the DB grant for an admin-invited user (ADR 0004) — status
+ * 'invited', cognito_sub NULL. This is the authoritative step; the
+ * Cognito call happens after and separately (see
+ * `../../apps/api/src/lib/cognito-admin.ts`), never before — a failure
+ * there only ever leaves "a DB grant with no matching Cognito identity
+ * yet," never an orphaned Cognito identity with no DB record.
+ * @param db - RLS-scoped transaction (the caller's own company, or the
+ *   super-admin cross-tenant path)
+ * @param input - Invitee details
+ */
+export const createInvitedUser = async (
+  db: DbLike,
+  input: CreateInvitedUserInput,
+): Promise<UserProfile> => {
+  const [inserted] = await db
+    .insert(users)
+    .values({
+      cognitoSub: null,
+      email: input.email.toLowerCase(),
+      name: input.name ?? null,
+      companyId: input.companyId,
+      roleId: input.roleId,
+      status: 'invited',
+    })
+    .returning({ id: users.id })
+
+  if (input.businessUnitIds?.length) {
+    await db.insert(userBusinessUnits).values(
+      input.businessUnitIds.map((businessUnitId) => ({
+        userId: inserted.id,
+        businessUnitId,
+        canEdit: false,
+      })),
+    )
+  }
+
+  const profile = await getUserProfileById(db, inserted.id)
+  if (!profile) {
+    throw new Error('Failed to load newly-invited user profile')
+  }
+  return profile
+}
+
+/**
+ * Mark an invite as failed after the Cognito call errors — a distinct,
+ * queryable, retryable state, never left silently as 'invited' forever
+ * (ADR 0004's reconciliation strategy).
+ * @param db - RLS-scoped transaction
+ * @param userId - The invited user's internal id
+ */
+export const markInviteFailed = async (db: DbLike, userId: string): Promise<void> => {
+  await db
+    .update(users)
+    .set({ status: 'invite_failed', updatedAt: new Date() })
+    .where(eq(users.id, userId))
 }
 
 /**

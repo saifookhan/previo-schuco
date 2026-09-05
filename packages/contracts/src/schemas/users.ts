@@ -8,7 +8,7 @@ export const userDtoSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
   name: z.string().nullable(),
-  status: z.enum(['invited', 'active', 'inactive']),
+  status: z.enum(['invited', 'invite_failed', 'active', 'inactive']),
   role: z.object({
     id: roleIdSchema,
     name: z.string(),
@@ -20,7 +20,7 @@ export type UserDto = z.infer<typeof userDtoSchema>
 
 /** Cross-tenant user row for super-admin platform management. */
 export const adminUserDtoSchema = userDtoSchema.extend({
-  cognitoSub: z.string(),
+  cognitoSub: z.string().nullable(),
   company: z.object({
     id: z.string().uuid(),
     name: z.string(),
@@ -45,3 +45,27 @@ export const adminUsersListResponseSchema = z.object({
 })
 
 export type AdminUsersListResponse = z.infer<typeof adminUsersListResponseSchema>
+
+/**
+ * POST /api/users (company-admin, self-scoped) and
+ * POST /api/admin/invites (super-admin, cross-tenant) request body.
+ * `companyId` is omitted by the caller for the self-scoped route — the
+ * route forces it to the caller's own company; it's required for the
+ * cross-tenant admin route. See ADR 0004.
+ */
+export const inviteUserRequestSchema = z.object({
+  email: z.string().email(),
+  name: z.string().optional(),
+  roleId: roleIdSchema,
+  companyId: z.string().uuid().optional(),
+  businessUnitIds: z.array(z.string().uuid()).optional(),
+})
+
+export type InviteUserRequest = z.infer<typeof inviteUserRequestSchema>
+
+/** POST /api/users and POST /api/admin/invites response. */
+export const inviteUserResponseSchema = z.object({
+  user: userDtoSchema,
+})
+
+export type InviteUserResponse = z.infer<typeof inviteUserResponseSchema>

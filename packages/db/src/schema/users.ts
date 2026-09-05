@@ -7,7 +7,10 @@ import { roles } from './roles'
 /** Application user linked to Cognito. */
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
-  cognitoSub: text('cognito_sub').notNull().unique(),
+  // Nullable: an admin-invited user (ADR 0004) has a DB grant before
+  // Cognito identity exists — syncUserFromCognito backfills this by
+  // email match on first login. UNIQUE still allows multiple NULLs.
+  cognitoSub: text('cognito_sub').unique(),
   email: text('email').notNull().unique(),
   name: text('name'),
   companyId: uuid('company_id')

@@ -19,15 +19,20 @@ export {
   type DemoUserSeed,
 } from './demo-users'
 export {
+  createInvitedUser,
   getUserProfileByCognitoSub,
+  getUserProfileById,
   listUsers,
+  markInviteFailed,
   syncUserFromCognito,
   withRlsTransaction,
   withSystemTransaction,
   type BusinessUnitScope,
+  type CreateInvitedUserInput,
   type UserListRow,
   type UserProfile,
 } from './queries/users'
 export { getCompanyById } from './queries/companies'
+export { filterBusinessUnitIdsByCompany } from './queries/business-units'
 export { writeAuditLog, type WriteAuditLogInput } from './queries/audit'
 export * from './schema'

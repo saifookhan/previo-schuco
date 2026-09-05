@@ -473,10 +473,10 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           type: 'object',
           properties: {
             id: { type: 'string', format: 'uuid' },
-            cognitoSub: { type: 'string' },
+            cognitoSub: { type: 'string', nullable: true },
             email: { type: 'string', format: 'email' },
             name: { type: 'string', nullable: true },
-            status: { type: 'string', enum: ['active', 'inactive'] },
+            status: { type: 'string', enum: ['invited', 'invite_failed', 'active', 'inactive'] },
             role: {
               type: 'object',
               properties: {
@@ -514,7 +514,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
             id: { type: 'string', format: 'uuid' },
             email: { type: 'string', format: 'email' },
             name: { type: 'string', nullable: true },
-            status: { type: 'string', enum: ['active', 'inactive'] },
+            status: { type: 'string', enum: ['invited', 'invite_failed', 'active', 'inactive'] },
             role: {
               type: 'object',
               properties: {
@@ -534,7 +534,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
             {
               type: 'object',
               properties: {
-                cognitoSub: { type: 'string' },
+                cognitoSub: { type: 'string', nullable: true },
                 company: {
                   type: 'object',
                   properties: {

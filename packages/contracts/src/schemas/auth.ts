@@ -14,10 +14,10 @@ export type BusinessUnitScope = z.infer<typeof businessUnitScopeSchema>
 /** Authenticated user profile with RBAC context. */
 export const userProfileSchema = z.object({
   id: z.string().uuid(),
-  cognitoSub: z.string(),
+  cognitoSub: z.string().nullable(),
   email: z.string().email(),
   name: z.string().nullable(),
-  status: z.enum(['invited', 'active', 'inactive']),
+  status: z.enum(['invited', 'invite_failed', 'active', 'inactive']),
   role: z.object({
     id: roleIdSchema,
     name: z.string(),
