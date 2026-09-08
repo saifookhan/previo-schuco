@@ -173,9 +173,14 @@ export const syncUserFromCognito = async (
       .set({
         cognitoSub: input.cognitoSub,
         name: input.name ?? undefined,
-        // Flip a pending invite to active on first login. Never touch an
+        // Flip a pending invite to active on first login. 'invite_failed'
+        // is still a pending invite — it only means the Cognito call errored
+        // client-side after actually succeeding, so a real login here proves
+        // the identity exists and should recover the account. Never touch an
         // explicitly 'inactive' user — a stale token shouldn't reactivate them.
-        ...(current[0]?.status === 'invited' ? { status: 'active' as const } : {}),
+        ...(current[0]?.status === 'invited' || current[0]?.status === 'invite_failed'
+          ? { status: 'active' as const }
+          : {}),
         updatedAt: new Date(),
       })
       .where(eq(users.id, emailMatch[0].id))

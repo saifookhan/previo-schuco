@@ -1,6 +1,7 @@
 import { inviteUserRequestSchema, inviteUserResponseSchema, usersListResponseSchema } from '@schuco/contracts'
 import { Hono } from 'hono'
 
+import { canGrantRole } from '../lib/role-hierarchy'
 import { profileToUserDto, toUserDto } from '../lib/user-dto'
 import { inviteUser, listUsersForCompany } from '../services/users-service'
 import type { AuthVariables } from '../middleware/auth'
@@ -39,6 +40,10 @@ users.post('/', requireAuth, requireRoles(['company-admin']), async (c) => {
   const parsedBody = inviteUserRequestSchema.safeParse(body)
   if (!parsedBody.success) {
     return c.json({ error: 'Invalid request body', details: parsedBody.error.issues }, 400)
+  }
+
+  if (!canGrantRole(c.get('user').role.id, parsedBody.data.roleId)) {
+    return c.json({ error: `Cannot assign role '${parsedBody.data.roleId}'` }, 403)
   }
 
   const ctx = {
