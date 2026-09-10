@@ -1,5 +1,6 @@
 # PREVIO — Schuco Platform
 
+
 Monorepo for the PREVIO quote/preventivo platform built with Next.js, Hono, AWS (Cognito, RDS, ECS), Redis/BullMQ, and Vercel.
 
 See [docs/technical-overview.md](docs/technical-overview.md) for architecture diagrams and onboarding guide.  
