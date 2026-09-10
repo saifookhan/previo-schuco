@@ -73,16 +73,18 @@ CREATE POLICY audit_log_tenant ON audit_log
 -- and unconditionally, regardless of ENABLE/FORCE ROW LEVEL SECURITY (see
 -- ADR 0006). Migrations keep running as the existing owner/superuser role;
 -- only the API's DATABASE_URL should ever point at this role.
--- Password substituted by migrate-seed.ts from APP_DB_PASSWORD; the
--- literal below is a local-only placeholder default.
+-- Created here with a throwaway placeholder password if it doesn't exist
+-- yet — never the real APP_DB_PASSWORD (that would mean splicing a secret
+-- into this file's text). apply-migrations.ts sets the real password
+-- immediately after via a parameterized ALTER ROLE, both on first create
+-- and on every subsequent run, so this placeholder is never live.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'previo_app') THEN
-    CREATE ROLE previo_app LOGIN PASSWORD '__APP_DB_PASSWORD__';
+    CREATE ROLE previo_app LOGIN PASSWORD 'set-by-apply-migrations-ts';
   END IF;
 END
 $$;
-ALTER ROLE previo_app WITH PASSWORD '__APP_DB_PASSWORD__';
 
 GRANT USAGE ON SCHEMA public TO previo_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO previo_app;

@@ -6,7 +6,7 @@ codebase every time. Update this file whenever one of these items changes
 state; don't let it silently drift like `docs/project-context.md`'s phase
 table can.
 
-**Last verified:** 2026-09-06 (against `feat/multi-tenant-env-hardening`, by reading `infra/terraform/**`, `.github/workflows/**`, and `docs/deployment.md` directly — not from memory).
+**Last verified:** 2026-09-08 (against `feat/multi-tenant-env-hardening`, by actually applying dev Terraform and deploying — not just reading code).
 
 ## Authentication & RBAC
 
@@ -32,7 +32,7 @@ table can.
 
 | Environment | Status | Notes |
 |---|---|---|
-| **dev** | ✅ Provisioned | VPC/network, RDS Postgres, Cognito, ECS Fargate + ALB + ECR, S3 — `infra/terraform/environments/dev/` |
+| **dev** | ✅ Provisioned & state-clean | VPC/network, RDS Postgres, Cognito, ECS Fargate + ALB + ECR, S3 — `infra/terraform/environments/dev/`. 2026-09-08: recovered from a month-old interrupted apply that had left ALB/ECR/IAM roles/ECS service created in AWS but untracked in state (`terraform import` × 7 resources); state now matches reality. |
 | **stage** | ❌ Not started | `infra/terraform/environments/stage/` is a placeholder README only ("copy dev/ and adjust tfvars when ready") — no `.tf` files exist |
 | **prod** | ❌ Not started | Same — `infra/terraform/environments/prod/` is a placeholder README only |
 
@@ -40,7 +40,7 @@ table can.
 
 | Environment | API | Web | Notes |
 |---|---|---|---|
-| **dev** | ✅ Live | ✅ Live | API on ECS Fargate behind an ALB; web on Vercel (`previo-schuco-web.vercel.app`) |
+| **dev** | ✅ Live, healthy | ✅ Live (dev-login only; real Cognito on Vercel not yet wired) | API confirmed healthy at `http://previo-schuco-dev-alb-355685339.eu-central-1.elb.amazonaws.com` (`/health` ok, `/api/me` correctly 401s unauthenticated) as of 2026-09-08. ECR was empty (no image ever pushed) — built + pushed. First push was arm64 (Apple Silicon default) and crashed Fargate (`exec format error` — Fargate is x86_64); rebuilt with `docker buildx build --platform linux/amd64` and redeployed successfully. Web on Vercel (`previo-schuco-web.vercel.app`), but its `NEXT_PUBLIC_COGNITO_*`/`NEXT_PUBLIC_API_URL`/`AUTH_SECRET` env vars have not been pushed yet (`configure-vercel-dev.sh` not run) — Cognito login button won't appear on Vercel until that's done. DB migration status against this RDS instance not yet re-verified this session. |
 | **stage** | ❌ None | ❌ None | No infra, no pipeline |
 | **prod** | ❌ None | ❌ None | No infra, no pipeline |
 
@@ -62,7 +62,15 @@ table can.
 | Route53 hosted zone / custom domain | ❌ Not provisioned | ALB is reached via its raw AWS DNS name; no custom domain for the API |
 | Auto-renewal | N/A yet | Moot until a cert exists — see recommendation below |
 
-**Recommendation:** add ACM + Route53 + an HTTPS listener to the `ecs` module before dev is used for anything beyond internal testing, and definitely before stage/prod exist. See conversation notes / follow-up task for the concrete Terraform shape.
+**Recommendation:** add ACM + Route53 + an HTTPS listener to the `ecs` module before dev is used for anything beyond internal testing, and definitely before stage/prod exist. Blocked on: a registered domain (none currently owned — the Vercel URL is Vercel's own free subdomain, not a purchased domain). See conversation notes / follow-up task for the concrete Terraform shape.
+
+## Build note: Apple Silicon vs Fargate architecture
+
+Building the API image with a plain `docker build` on an arm64 Mac produces an arm64 image; Fargate tasks here run x86_64 (`runtimePlatform` isn't pinned in `infra/terraform/modules/ecs/main.tf`, so it defaults to `X86_64`). An arm64 image on an x86_64 task fails at container start with `exec format error`, not at image-pull time — it looks like a successful deploy right up until the task crash-loops. Always build/push with:
+
+```bash
+docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t <ecr-url>:latest --push .
+```
 
 ## Not yet started (product side, for context)
 

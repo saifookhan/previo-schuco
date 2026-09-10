@@ -22,4 +22,10 @@ describe('canGrantRole', () => {
     expect(canGrantRole('super-admin', 'super-admin')).toBe(true)
     expect(canGrantRole('super-admin', 'company-admin')).toBe(true)
   })
+
+  it('fails closed for a caller role not in the table (e.g. super-user, user)', () => {
+    expect(canGrantRole('super-user', 'user')).toBe(false)
+    expect(canGrantRole('user', 'user')).toBe(false)
+    expect(canGrantRole('some-future-role', 'user')).toBe(false)
+  })
 })

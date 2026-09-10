@@ -1,9 +1,14 @@
 import { inviteUserRequestSchema, inviteUserResponseSchema, usersListResponseSchema } from '@schuco/contracts'
 import { Hono } from 'hono'
 
-import { canGrantRole } from '../lib/role-hierarchy'
 import { profileToUserDto, toUserDto } from '../lib/user-dto'
-import { inviteUser, listUsersForCompany } from '../services/users-service'
+import {
+  InvalidBusinessUnitsError,
+  InviteConflictError,
+  RoleNotGrantableError,
+  inviteUser,
+  listUsersForCompany,
+} from '../services/users-service'
 import type { AuthVariables } from '../middleware/auth'
 import { requireAuth, requireRoles } from '../middleware/auth'
 
@@ -42,21 +47,36 @@ users.post('/', requireAuth, requireRoles(['company-admin']), async (c) => {
     return c.json({ error: 'Invalid request body', details: parsedBody.error.issues }, 400)
   }
 
-  if (!canGrantRole(c.get('user').role.id, parsedBody.data.roleId)) {
-    return c.json({ error: `Cannot assign role '${parsedBody.data.roleId}'` }, 403)
-  }
-
   const ctx = {
     effectiveCompanyId: c.get('effectiveCompanyId'),
     isSuperAdmin: c.get('isSuperAdmin'),
   }
 
-  const profile = await inviteUser(
-    ctx,
-    { actorUserId: c.get('actorUserId'), actorCompanyId: c.get('user').company.id },
-    ctx.effectiveCompanyId,
-    parsedBody.data,
-  )
+  let profile
+  try {
+    profile = await inviteUser(
+      ctx,
+      {
+        actorUserId: c.get('actorUserId'),
+        actorCompanyId: c.get('user').company.id,
+        callerRoleId: c.get('user').role.id,
+        requestId: c.get('requestId'),
+      },
+      ctx.effectiveCompanyId,
+      parsedBody.data,
+    )
+  } catch (error) {
+    if (error instanceof RoleNotGrantableError) {
+      return c.json({ error: error.message }, 403)
+    }
+    if (error instanceof InvalidBusinessUnitsError) {
+      return c.json({ error: error.message }, 400)
+    }
+    if (error instanceof InviteConflictError) {
+      return c.json({ error: error.message }, 409)
+    }
+    throw error
+  }
 
   const parsed = inviteUserResponseSchema.safeParse({ user: profileToUserDto(profile) })
   if (!parsed.success) {

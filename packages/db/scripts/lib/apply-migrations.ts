@@ -23,11 +23,23 @@ export const applyMigrationsAndRls = async (
 
   await migrate(db, { migrationsFolder: MIGRATIONS_DIR })
 
-  const rlsSql = readFileSync(join(MIGRATIONS_DIR, '0001_rls.sql'), 'utf8').replaceAll(
-    '__APP_DB_PASSWORD__',
-    appDbPassword,
-  )
+  const rlsSql = readFileSync(join(MIGRATIONS_DIR, '0001_rls.sql'), 'utf8')
   const rlsClient = postgres(connectionString, { max: 1 })
   await rlsClient.unsafe(rlsSql)
+  // ALTER ROLE is a utility statement — Postgres doesn't accept a bind
+  // parameter ($1) in place of the password literal there (`syntax error
+  // at or near "$1"` if you try). Instead: pass appDbPassword as a real
+  // bound parameter to a plain SELECT (safe — parameters work fine for
+  // expressions), and have Postgres's own quote_literal() produce a
+  // correctly-escaped SQL string literal server-side; that escaped text
+  // is then safe to splice into the ALTER ROLE statement regardless of
+  // what characters (quotes included) the password contains.
+  const [{ quoted }] = await rlsClient<
+    [{ quoted: string }]
+  >`SELECT quote_literal(${appDbPassword}) AS quoted`
+  // Runs unconditionally (fresh role or pre-existing), so the role's
+  // password always ends up matching this value, never the migration
+  // file's throwaway placeholder.
+  await rlsClient.unsafe(`ALTER ROLE previo_app WITH PASSWORD ${quoted}`)
   await rlsClient.end()
 }

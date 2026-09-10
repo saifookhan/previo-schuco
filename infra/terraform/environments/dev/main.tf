@@ -42,14 +42,20 @@ module "cognito" {
 }
 
 module "rds" {
-  source                    = "../../modules/rds"
-  project                   = var.project
-  environment               = var.environment
-  vpc_id                    = module.network.vpc_id
-  subnet_ids                = module.network.private_subnet_ids
+  source      = "../../modules/rds"
+  project     = var.project
+  environment = var.environment
+  vpc_id      = module.network.vpc_id
+  # Public subnets (the ALB's), not private — required for
+  # publicly_accessible to actually route from the internet (a private
+  # subnet's route table has no Internet Gateway route, so the flag alone
+  # does nothing there). Dev-only tradeoff, see the module variable's doc.
+  subnet_ids                = module.network.public_subnet_ids
   allowed_security_group_id = aws_security_group.api_tasks.id
   db_username               = var.db_username
   db_name                   = var.db_name
+  publicly_accessible       = true
+  db_port                   = 54329
 }
 
 module "ecs" {

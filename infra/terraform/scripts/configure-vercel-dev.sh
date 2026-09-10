@@ -4,7 +4,7 @@ set -euo pipefail
 # Sync Vercel env vars for previo-schuco-web from Terraform dev outputs.
 # Web → ECS API → RDS (Vercel never connects to Postgres directly).
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 ENV_DIR="${ROOT}/infra/terraform/environments/dev"
 WEB_DIR="${ROOT}/apps/web"
 VERCEL_APP_URL="${VERCEL_APP_URL:-https://previo-schuco-web.vercel.app}"

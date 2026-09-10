@@ -2,7 +2,12 @@ import { inviteUserRequestSchema, inviteUserResponseSchema } from '@schuco/contr
 import { Hono } from 'hono'
 
 import { profileToUserDto } from '../../lib/user-dto'
-import { inviteUser } from '../../services/users-service'
+import {
+  InvalidBusinessUnitsError,
+  InviteConflictError,
+  RoleNotGrantableError,
+  inviteUser,
+} from '../../services/users-service'
 import type { AuthVariables } from '../../middleware/auth'
 import { requireAuth, requireRoles } from '../../middleware/auth'
 
@@ -33,12 +38,31 @@ adminInvites.post('/', requireAuth, requireRoles(['super-admin']), async (c) => 
     isSuperAdmin: c.get('isSuperAdmin'),
   }
 
-  const profile = await inviteUser(
-    ctx,
-    { actorUserId: c.get('actorUserId'), actorCompanyId: c.get('user').company.id },
-    parsedBody.data.companyId,
-    parsedBody.data,
-  )
+  let profile
+  try {
+    profile = await inviteUser(
+      ctx,
+      {
+        actorUserId: c.get('actorUserId'),
+        actorCompanyId: c.get('user').company.id,
+        callerRoleId: c.get('user').role.id,
+        requestId: c.get('requestId'),
+      },
+      parsedBody.data.companyId,
+      parsedBody.data,
+    )
+  } catch (error) {
+    if (error instanceof RoleNotGrantableError) {
+      return c.json({ error: error.message }, 403)
+    }
+    if (error instanceof InvalidBusinessUnitsError) {
+      return c.json({ error: error.message }, 400)
+    }
+    if (error instanceof InviteConflictError) {
+      return c.json({ error: error.message }, 409)
+    }
+    throw error
+  }
 
   const parsed = inviteUserResponseSchema.safeParse({ user: profileToUserDto(profile) })
   if (!parsed.success) {

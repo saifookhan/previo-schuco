@@ -8,6 +8,23 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      # Matches docker-compose.yml's postgres service (superuser
+      # previo/previo, port 5434) — packages/db/scripts/setup-test-db.ts
+      # and the *_TEST_DATABASE_URL vars below assume exactly this shape.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: previo
+          POSTGRES_PASSWORD: previo
+          POSTGRES_DB: previo
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U previo -d previo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -24,7 +41,24 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
+        # CI never has a .env.local (ADR 0005's per-target resolution is a
+        # dev/deploy-time concern), so apps/web's bootstrap-env needs its
+        # required vars supplied directly — same "already resolved" path
+        # Docker/ECS use (packages/env/src/resolve.ts), not real values.
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          AUTH_SECRET: ci-build-placeholder-not-a-real-secret
         run: pnpm build
+
+      - name: Test
+        # RLS/tenant-isolation tests exercise real Postgres policies (ADR
+        # 0012), not a mocked repository layer — the postgres service
+        # above stands in for docker-compose's local one.
+        env:
+          APP_DB_PASSWORD: previo_app
+          TEST_DATABASE_URL: postgresql://previo_app:previo_app@localhost:5434/previo_test
+          TEST_DB_SUPERUSER_URL: postgresql://previo:previo@localhost:5434/previo
+        run: pnpm test
 
       - name: Docker build API
         run: docker build -f apps/api/Dockerfile .

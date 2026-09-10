@@ -1,8 +1,8 @@
 /**
  * Which roles a caller may grant when inviting a user. `super-admin` is
- * the platform operator role (cross-tenant) and is never grantable through
- * a tenant-scoped route — only reachable via a caller who is already a
- * super-admin, which bypasses this table entirely (see `canGrantRole`).
+ * handled as an explicit allow-all branch below, not a table entry — it's
+ * the platform operator role (cross-tenant), and there's nothing above it
+ * to escalate to.
  */
 const GRANTABLE_ROLES_BY_CALLER: Record<string, ReadonlySet<string>> = {
   'company-admin': new Set(['company-admin', 'super-user', 'user']),
@@ -10,12 +10,16 @@ const GRANTABLE_ROLES_BY_CALLER: Record<string, ReadonlySet<string>> = {
 
 /**
  * Whether `callerRoleId` may assign `targetRoleId` to an invited user.
- * A caller not listed in the table (currently just `super-admin`) can
- * grant any role — there's nothing above `super-admin` to escalate to.
+ * Fails closed: any `callerRoleId` not explicitly handled — including one
+ * `requireRoles` might allow in the future that this table doesn't yet
+ * know about — is denied, never silently granted. `super-admin` is the
+ * one explicit allow-all.
  * @param callerRoleId - Role of the user performing the invite
  * @param targetRoleId - Role being assigned to the invitee
  */
 export const canGrantRole = (callerRoleId: string, targetRoleId: string): boolean => {
-  const grantable = GRANTABLE_ROLES_BY_CALLER[callerRoleId]
-  return grantable ? grantable.has(targetRoleId) : true
+  if (callerRoleId === 'super-admin') {
+    return true
+  }
+  return GRANTABLE_ROLES_BY_CALLER[callerRoleId]?.has(targetRoleId) ?? false
 }

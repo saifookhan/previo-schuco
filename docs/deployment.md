@@ -69,10 +69,11 @@ aws ecs update-service \
   --region $AWS_REGION
 ```
 
-Run database migrations against RDS (from a machine with VPC access or a one-off ECS task):
+Run database migrations against RDS (from a machine with VPC access or a one-off ECS task). Both values below must come from Secrets Manager — never hand-typed — or the `previo_app` role's password will diverge from what the running ECS task's `DATABASE_URL` (the `database-app` secret) actually has, and the API will fail to log in:
 
 ```bash
 DATABASE_URL="<from Secrets Manager previo/dev/database url field>"
+APP_DB_PASSWORD="<from Secrets Manager previo/dev/database-app password field>"
 cd packages/db && pnpm db:migrate
 ```
 

@@ -1,15 +1,33 @@
 import {
   createInvitedUser,
   filterBusinessUnitIdsByCompany,
+  getUserByEmailInCompany,
+  getUserProfileById,
   listUsers,
   markInviteFailed,
+  resetInvitePending,
   type UserListRow,
   type UserProfile,
 } from '@schuco/db'
 
+import { canGrantRole } from '../lib/role-hierarchy'
 import { createCognitoInvite } from '../lib/cognito-admin'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
 import { recordAuditEvent } from './audit-service'
+
+/** The caller's role isn't allowed to grant the requested role (see `canGrantRole`). */
+export class RoleNotGrantableError extends Error {}
+
+/** One or more requested `businessUnitIds` don't belong to `companyId`. */
+export class InvalidBusinessUnitsError extends Error {}
+
+/**
+ * A user with this email already exists in this company and isn't a
+ * resumable pending invite (`'invited'`/`'invite_failed'`) — e.g. already
+ * `'active'`. Distinct from the retry path, where an existing pending
+ * invite is resumed instead of rejected.
+ */
+export class InviteConflictError extends Error {}
 
 /**
  * List users in the caller's own company (or, for a super-admin sending
@@ -41,22 +59,37 @@ export interface InviteUserInput {
 export interface InviteActor {
   actorUserId: string
   actorCompanyId: string
+  /** Role of the user performing the invite — enforced here via `canGrantRole`, not just at the route (defense in depth: this is the one place every invite path funnels through). */
+  callerRoleId: string
+  /** Correlates this invite's audit entry back to the HTTP request (ADR 0010). */
+  requestId?: string | null
 }
 
 /**
- * Invite a user into `companyId` (ADR 0004). The DB grant is created and
+ * Invite a user into `companyId` (ADR 0004), or resume a still-pending
+ * invite for the same email. The DB grant is created/updated and
  * committed first — it's authoritative; the Cognito call happens after,
  * separately, so a failure there only ever leaves "a DB grant with no
  * Cognito identity yet" (queryable as `status: 'invite_failed'`), never
  * an orphaned Cognito identity with no DB record.
  *
+ * `email` is globally unique, so a second invite to the same address is
+ * handled explicitly rather than left to hit the unique constraint: an
+ * existing `'invited'`/`'invite_failed'` row in this company is a retry
+ * (resend Cognito, no new row); anything else (already `'active'`, or a
+ * different company entirely — which RLS would hide, surfacing as "not
+ * found" here) is a conflict.
+ *
  * Callers: the company-admin route forces `companyId` to the caller's
  * own company; the super-admin route takes it explicitly from the
  * request body. Neither ever comes from a URL path (ADR 0001).
  * @param ctx - Tenant context resolved by `requireAuth`
- * @param actor - Who's inviting, for the audit record
+ * @param actor - Who's inviting, for authorization and the audit record
  * @param companyId - Company the invited user belongs to
  * @param input - Invitee details
+ * @throws {RoleNotGrantableError} `actor.callerRoleId` may not grant `input.roleId`
+ * @throws {InvalidBusinessUnitsError} a requested business unit doesn't belong to `companyId`
+ * @throws {InviteConflictError} the email is already taken by a non-pending user
  */
 export const inviteUser = async (
   ctx: TenantContext,
@@ -64,13 +97,48 @@ export const inviteUser = async (
   companyId: string,
   input: InviteUserInput,
 ): Promise<UserProfile> => {
-  const validBusinessUnitIds = input.businessUnitIds?.length
-    ? await withTenantDb(ctx, (tx) =>
-        filterBusinessUnitIdsByCompany(tx, companyId, input.businessUnitIds!),
-      )
-    : []
+  if (!canGrantRole(actor.callerRoleId, input.roleId)) {
+    throw new RoleNotGrantableError(`'${actor.callerRoleId}' cannot assign role '${input.roleId}'`)
+  }
+
+  let validBusinessUnitIds: string[] = []
+  if (input.businessUnitIds?.length) {
+    validBusinessUnitIds = await withTenantDb(ctx, (tx) =>
+      filterBusinessUnitIdsByCompany(tx, companyId, input.businessUnitIds!),
+    )
+    if (validBusinessUnitIds.length !== input.businessUnitIds.length) {
+      throw new InvalidBusinessUnitsError('One or more businessUnitIds do not belong to this company')
+    }
+  }
+
+  const auditActor = {
+    actorType: 'user' as const,
+    actorUserId: actor.actorUserId,
+    actorCompanyId: actor.actorCompanyId,
+    requestId: actor.requestId,
+  }
 
   const created = await withTenantDb(ctx, async (tx) => {
+    const existing = await getUserByEmailInCompany(tx, companyId, input.email)
+
+    if (existing) {
+      if (existing.status !== 'invited' && existing.status !== 'invite_failed') {
+        throw new InviteConflictError(`A user with email '${input.email}' already exists`)
+      }
+      // Retry: resend Cognito for the existing pending row, no new insert.
+      const profile = await getUserProfileById(tx, existing.id)
+      if (!profile) {
+        throw new Error('Failed to load existing invited user profile')
+      }
+      await recordAuditEvent(tx, auditActor, companyId, {
+        action: 'user.invite.retry',
+        resourceType: 'user',
+        resourceId: profile.id,
+        metadata: { email: input.email, roleId: input.roleId },
+      })
+      return profile
+    }
+
     const profile = await createInvitedUser(tx, {
       email: input.email,
       name: input.name,
@@ -78,17 +146,12 @@ export const inviteUser = async (
       roleId: input.roleId,
       businessUnitIds: validBusinessUnitIds,
     })
-    await recordAuditEvent(
-      tx,
-      { actorType: 'user', actorUserId: actor.actorUserId, actorCompanyId: actor.actorCompanyId },
-      companyId,
-      {
-        action: 'user.invite',
-        resourceType: 'user',
-        resourceId: profile.id,
-        metadata: { email: input.email, roleId: input.roleId },
-      },
-    )
+    await recordAuditEvent(tx, auditActor, companyId, {
+      action: 'user.invite',
+      resourceType: 'user',
+      resourceId: profile.id,
+      metadata: { email: input.email, roleId: input.roleId },
+    })
     return profile
   })
 
@@ -99,6 +162,10 @@ export const inviteUser = async (
       console.warn(
         `[usersService.inviteUser] Cognito not configured — DB row created for ${input.email}, no invite email sent (dev bypass).`,
       )
+    }
+    if (created.status === 'invite_failed') {
+      await withTenantDb(ctx, (tx) => resetInvitePending(tx, created.id))
+      return { ...created, status: 'invited' }
     }
     return created
   } catch (error) {

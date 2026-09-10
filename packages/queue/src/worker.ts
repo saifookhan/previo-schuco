@@ -70,6 +70,24 @@ export const createWorker = (domain: JobDomain, registrations: JobRegistration[]
       // Re-validate on the consume side too — Redis could hold a payload
       // enqueued by an older process with a since-changed schema.
       const payload = registration.job.schema.parse(job.data)
+
+      // `scope` (ADR 0009, defineJob) is otherwise documentation-only — a
+      // 'tenant' job's handler is trusted to open its own
+      // withRlsTransaction, and nothing here would notice if it didn't.
+      // This package doesn't depend on @schuco/db, so it can't open that
+      // transaction itself, but it CAN refuse to dispatch a 'tenant' job
+      // whose payload has no companyId to scope by — the cheapest check
+      // that catches the actual failure mode (a tenant job silently
+      // running with no tenant context) without a bigger coupling change.
+      if (registration.job.scope === 'tenant') {
+        const companyId = (payload as { companyId?: unknown })?.companyId
+        if (typeof companyId !== 'string' || companyId.length === 0) {
+          throw new Error(
+            `Job "${job.name}" is tenant-scoped but its payload has no companyId — refusing to dispatch. Give the schema a companyId: string field.`,
+          )
+        }
+      }
+
       await withTimeout(registration.handler(payload, job), timeoutMs, job.name)
     },
     {

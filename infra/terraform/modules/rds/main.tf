@@ -8,13 +8,6 @@ resource "aws_security_group" "rds" {
   description = "RDS Postgres access from ECS"
   vpc_id      = var.vpc_id
 
-  ingress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [var.allowed_security_group_id]
-  }
-
   egress {
     from_port   = 0
     to_port     = 0
@@ -25,14 +18,49 @@ resource "aws_security_group" "rds" {
   tags = {
     Name = "${var.project}-${var.environment}-rds-sg"
   }
+
+  lifecycle {
+    # Ingress rules are separate aws_security_group_rule resources below
+    # (not inline), deliberately: an inline ingress block is authoritative
+    # over ALL rules on the group and deletes anything added outside
+    # Terraform on the next apply. infra/scripts/update-dev-db-access-ip.sh
+    # adds/rotates a developer-IP rule via the AWS CLI between applies —
+    # that rule must survive `terraform apply`, so this group owns zero
+    # inline ingress rules.
+  }
+}
+
+# ECS tasks' access — the only ingress rule Terraform manages directly.
+resource "aws_security_group_rule" "rds_from_ecs" {
+  type                     = "ingress"
+  security_group_id        = aws_security_group.rds.id
+  from_port                = var.db_port
+  to_port                  = var.db_port
+  protocol                 = "tcp"
+  source_security_group_id = var.allowed_security_group_id
+  description              = "ECS API tasks"
 }
 
 resource "aws_db_subnet_group" "main" {
-  name       = "${var.project}-${var.environment}-db-subnet"
+  # A distinct name (not an in-place subnet_ids change on the same name)
+  # when publicly_accessible flips — RDS refuses to shrink a subnet
+  # group's membership while an instance still lives in the subnet being
+  # removed ("Some of the subnets to be deleted are currently in use").
+  # A new subnet group + aws_db_instance.main switching db_subnet_group_name
+  # to it is the supported way to relocate an instance across subnets.
+  name       = "${var.project}-${var.environment}-db-subnet${var.publicly_accessible ? "-public" : ""}"
   subnet_ids = var.subnet_ids
 
   tags = {
     Name = "${var.project}-${var.environment}-db-subnet"
+  }
+
+  lifecycle {
+    # Create the new group and move aws_db_instance.main onto it before
+    # destroying the old one — the default destroy-then-create ordering
+    # for a replaced resource fails here (RDS won't delete a subnet group
+    # a running instance still references).
+    create_before_destroy = true
   }
 }
 
@@ -47,7 +75,8 @@ resource "aws_db_instance" "main" {
   password                   = random_password.db.result
   db_subnet_group_name       = aws_db_subnet_group.main.name
   vpc_security_group_ids     = [aws_security_group.rds.id]
-  publicly_accessible        = false
+  port                       = var.db_port
+  publicly_accessible        = var.publicly_accessible
   skip_final_snapshot        = true
   backup_retention_period    = 1
   auto_minor_version_upgrade = true

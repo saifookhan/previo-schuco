@@ -1,4 +1,4 @@
-import { asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 
 import type { Db, DbLike } from '../client'
 import {
@@ -254,6 +254,45 @@ export const markInviteFailed = async (db: DbLike, userId: string): Promise<void
     .update(users)
     .set({ status: 'invite_failed', updatedAt: new Date() })
     .where(eq(users.id, userId))
+}
+
+export interface ExistingInviteRow {
+  id: string
+  status: 'invited' | 'invite_failed' | 'active' | 'inactive'
+}
+
+/**
+ * Look up an existing user by email within a company, for invite-retry vs.
+ * duplicate detection (ADR 0004): `email` is globally unique, so a second
+ * invite to the same address must either resume a still-pending invite
+ * (`'invited'`/`'invite_failed'`) or be rejected as a conflict — never
+ * silently insert and hit the unique constraint.
+ * @param db - RLS-scoped transaction
+ * @param companyId - Company the invite is being created in
+ * @param email - Invitee email (case-insensitive, matches storage)
+ */
+export const getUserByEmailInCompany = async (
+  db: DbLike,
+  companyId: string,
+  email: string,
+): Promise<ExistingInviteRow | null> => {
+  const rows = await db
+    .select({ id: users.id, status: users.status })
+    .from(users)
+    .where(and(eq(users.companyId, companyId), eq(users.email, email.toLowerCase())))
+    .limit(1)
+  return rows[0] ?? null
+}
+
+/**
+ * Reset a user's status back to `'invited'` — used when retrying a Cognito
+ * invite for a row that's already `'invited'` or `'invite_failed'`, after
+ * `createCognitoInvite` succeeds.
+ * @param db - RLS-scoped transaction
+ * @param userId - The invited user's internal id
+ */
+export const resetInvitePending = async (db: DbLike, userId: string): Promise<void> => {
+  await db.update(users).set({ status: 'invited', updatedAt: new Date() }).where(eq(users.id, userId))
 }
 
 /**

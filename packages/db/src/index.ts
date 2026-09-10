@@ -20,15 +20,18 @@ export {
 } from './demo-users'
 export {
   createInvitedUser,
+  getUserByEmailInCompany,
   getUserProfileByCognitoSub,
   getUserProfileById,
   listUsers,
   markInviteFailed,
+  resetInvitePending,
   syncUserFromCognito,
   withRlsTransaction,
   withSystemTransaction,
   type BusinessUnitScope,
   type CreateInvitedUserInput,
+  type ExistingInviteRow,
   type UserListRow,
   type UserProfile,
 } from './queries/users'
