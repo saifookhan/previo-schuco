@@ -7,6 +7,7 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  Package,
   Settings,
   Shield,
   ShieldCheck,
@@ -21,6 +22,12 @@ import type { RoleId } from '@/types/settings'
 const mainNav = [
   { href: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard, minRole: 'user' as RoleId },
   { href: '/app/invoice', label: 'Invoice', icon: FileText, minRole: 'user' as RoleId },
+  {
+    href: '/app/product-families',
+    label: 'Product families',
+    icon: Package,
+    minRole: 'user' as RoleId,
+  },
 ]
 
 const settingsNav = [

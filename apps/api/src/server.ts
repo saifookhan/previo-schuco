@@ -9,6 +9,7 @@ import { calculate } from './routes/calculate'
 import { createDocsRoutes } from './routes/docs'
 import { health } from './routes/health'
 import { me } from './routes/me'
+import { productFamilies } from './routes/product-families'
 import { products } from './routes/products'
 import { quotes } from './routes/quotes'
 import { users } from './routes/users'
@@ -30,6 +31,7 @@ app.route('/api/users', users)
 app.route('/api/admin/users', adminUsers)
 app.route('/api/admin/invites', adminInvites)
 app.route('/api/products', products)
+app.route('/api/product-families', productFamilies)
 app.route('/api/quotes', quotes)
 app.route('/api/calculate', calculate)
 app.route('/', createDocsRoutes(apiPublicUrl))
