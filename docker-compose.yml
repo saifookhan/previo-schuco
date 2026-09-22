@@ -60,6 +60,9 @@ services:
       COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-}
       CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       API_PUBLIC_URL: http://localhost:3001
+      LOCAL_STORAGE_DIR: /app/data/uploads
+    volumes:
+      - ./data/uploads:/app/data/uploads
     depends_on:
       migrate:
         condition: service_completed_successfully

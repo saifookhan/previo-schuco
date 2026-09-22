@@ -38,4 +38,24 @@ export {
 export { getCompanyById } from './queries/companies'
 export { filterBusinessUnitIdsByCompany } from './queries/business-units'
 export { writeAuditLog, type WriteAuditLogInput } from './queries/audit'
+export {
+  deleteProductFamily,
+  findLatestProductFamilyVersion,
+  getProductFamilyDetail,
+  insertCharacteristic,
+  insertPricingMatrix,
+  insertProductFamily,
+  insertProductFamilyImage,
+  insertProductLine,
+  insertProductLineCharacteristic,
+  listVisibleProductFamilies,
+  setProductFamilyPublished,
+  type InsertCharacteristicInput,
+  type InsertPricingMatrixInput,
+  type InsertProductFamilyImageInput,
+  type InsertProductFamilyInput,
+  type InsertProductLineInput,
+  type ProductFamilyDetail,
+  type ProductFamilySummary,
+} from './queries/product-families'
 export * from './schema'

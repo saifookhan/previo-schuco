@@ -1,0 +1,195 @@
+import { AlertTriangle, History } from 'lucide-react'
+import { getTranslations } from 'next-intl/server'
+import { notFound } from 'next/navigation'
+
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Link } from '@/i18n/navigation'
+import { fetchFromApiResult } from '@/lib/api/server-client'
+import { ProductFamilyImageGallery } from '@/components/product-family-image-gallery'
+import { ProductFamilyMatrixPreview } from '@/components/product-family-matrix-preview'
+import { ProductFamilyNewVersionButton } from '@/components/product-family-new-version-button'
+import { ProductFamilyRowActions } from '@/components/product-family-row-actions'
+import type { ProductFamilyDetail } from '@/types/product-family'
+
+interface ProductFamilyDetailPageProps {
+  params: Promise<{ id: string }>
+}
+
+/** Full detail view for one product family: header, images, product lines, and characteristics. */
+const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps) => {
+  const { id } = await params
+  const t = await getTranslations('productFamilyDetail')
+  const tList = await getTranslations('productFamilies')
+  const tVersion = await getTranslations('productFamilyVersion')
+  const result = await fetchFromApiResult<ProductFamilyDetail>(`/api/product-families/${id}`)
+
+  if (result.status !== 'ok') {
+    if (result.status === 'not_found') {
+      notFound()
+    }
+    return (
+      <div className="p-6 md:p-8">
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          {tList('errorLoading')}
+        </div>
+      </div>
+    )
+  }
+
+  const detail = result.data
+  const { family, images, lines, characteristics, matrices, relations } = detail
+  const matrixById = new Map(matrices.map((m) => [m.id, m]))
+  const mainCharacteristics = characteristics.filter((c) => !c.parentId)
+  const subCharacteristicsByParent = new Map<string, typeof characteristics>()
+  for (const c of characteristics) {
+    if (c.parentId) {
+      subCharacteristicsByParent.set(c.parentId, [...(subCharacteristicsByParent.get(c.parentId) ?? []), c])
+    }
+  }
+  const characteristicNamesByLineId = new Map<string, string[]>()
+  for (const rel of relations) {
+    const name = mainCharacteristics.find((c) => c.id === rel.characteristicId)?.name
+    if (name) {
+      characteristicNamesByLineId.set(rel.productLineId, [
+        ...(characteristicNamesByLineId.get(rel.productLineId) ?? []),
+        name,
+      ])
+    }
+  }
+
+  return (
+    <div className="p-6 md:p-8">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold text-slate-900">{family.name}</h1>
+            <Badge variant={family.isPublished ? 'success' : 'muted'}>
+              {family.isPublished ? tList('published') : tList('draft')}
+            </Badge>
+            <Badge variant="muted">{tVersion('versionBadge', { version: family.version })}</Badge>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            {[family.technicalName, family.category, family.brand].filter(Boolean).join(' · ') || '—'}
+          </p>
+          {family.supersedesId ? (
+            <Link
+              href={`/app/product-families/${family.supersedesId}`}
+              className="mt-1 inline-flex items-center gap-1 text-xs text-slate-400 hover:text-brand"
+            >
+              <History className="h-3 w-3" />
+              {tVersion('viewPreviousVersion')}
+            </Link>
+          ) : null}
+        </div>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <ProductFamilyRowActions
+            familyId={family.id}
+            familyName={family.name}
+            isPublished={family.isPublished}
+            redirectAfterDeleteHref="/app/product-families"
+          />
+          <ProductFamilyNewVersionButton familyId={family.id} />
+        </div>
+      </div>
+
+      {(family.description1 || family.description2) && (
+        <Card className="mb-6">
+          <CardContent className="space-y-1 pt-6 text-sm text-slate-600">
+            {family.description1 ? <p>{family.description1}</p> : null}
+            {family.description2 ? <p>{family.description2}</p> : null}
+          </CardContent>
+        </Card>
+      )}
+
+      <ProductFamilyImageGallery familyId={family.id} familyName={family.name} images={images} />
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>{t('productLinesCount', { count: lines.length })}</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0">
+          <table className="w-full min-w-[880px] text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-slate-500">
+                <th className="px-6 py-3 font-medium">{t('nameHeader')}</th>
+                <th className="px-6 py-3 font-medium">{t('pricingHeader')}</th>
+                <th className="px-6 py-3 font-medium">{t('unitHeader')}</th>
+                <th className="px-6 py-3 font-medium">{t('discountMarkupHeader')}</th>
+                <th className="px-6 py-3 font-medium">{t('characteristicsHeader')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line) => (
+                <tr key={line.id} className="border-b border-slate-50 align-top hover:bg-slate-50/50">
+                  <td className="px-6 py-4 font-medium text-slate-900">
+                    {line.name}
+                    {line.description ? (
+                      <p className="mt-0.5 text-xs font-normal text-slate-400">{line.description}</p>
+                    ) : null}
+                  </td>
+                  <td className="px-6 py-4 text-slate-600">
+                    {line.pricingMatrixId && matrixById.has(line.pricingMatrixId) ? (
+                      <ProductFamilyMatrixPreview
+                        matrix={matrixById.get(line.pricingMatrixId)!}
+                        label={t('pricingMatrix')}
+                      />
+                    ) : (
+                      <span className="font-mono text-xs">
+                        {line.formula} <span className="text-slate-400">(valore = {line.value})</span>
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-slate-600">{line.unitName || line.unitSymbol || '—'}</td>
+                  <td className="px-6 py-4 text-slate-600">
+                    {Number(line.discountPct)}% / {Number(line.markupPct)}%
+                  </td>
+                  <td className="px-6 py-4 text-slate-600">
+                    {(characteristicNamesByLineId.get(line.id) ?? []).map((name) => (
+                      <Badge key={name} variant="muted" className="mr-1 mb-1">
+                        {name}
+                      </Badge>
+                    ))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('characteristicsCount', { count: mainCharacteristics.length })}</CardTitle>
+        </CardHeader>
+        <CardContent className="divide-y divide-slate-50 p-0">
+          {mainCharacteristics.map((main) => (
+            <div key={main.id} className="px-6 py-4">
+              <p className="font-medium text-slate-900">{main.name}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {(subCharacteristicsByParent.get(main.id) ?? []).map((sub) => (
+                  <span
+                    key={sub.id}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600"
+                    title={sub.pricingMatrixId ? undefined : `${sub.formula} (valore = ${sub.value})`}
+                  >
+                    {sub.name}
+                    {sub.pricingMatrixId && matrixById.has(sub.pricingMatrixId) ? (
+                      <ProductFamilyMatrixPreview
+                        matrix={matrixById.get(sub.pricingMatrixId)!}
+                        label={t('pricingMatrix')}
+                      />
+                    ) : null}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+export default ProductFamilyDetailPage

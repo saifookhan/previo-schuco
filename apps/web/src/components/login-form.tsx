@@ -2,6 +2,7 @@
 
 import { ACTIVE_DEMO_USER_EMAILS } from '@/lib/demo-users'
 import { Building2 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 
@@ -17,6 +18,7 @@ const DEV_USERS = ACTIVE_DEMO_USER_EMAILS
  * Login form — Cognito hosted UI or dev login when Cognito is not configured.
  */
 export const LoginForm = () => {
+  const t = useTranslations('login')
   const router = useRouter()
   const searchParams = useSearchParams()
   const devMode = searchParams.get('dev') === '1' || isDevLoginUiEnabled()
@@ -24,10 +26,10 @@ export const LoginForm = () => {
   const error = searchParams.get('error')
 
   const errorMessage: Record<string, string> = {
-    cognito_not_configured: 'Cognito is not configured for this environment.',
-    invalid_state: 'Sign-in session expired. Please try again.',
-    missing_verifier: 'Sign-in session expired. Please try again.',
-    token_exchange: 'Could not complete sign-in with Cognito.',
+    cognito_not_configured: t('errorCognitoNotConfigured'),
+    invalid_state: t('errorInvalidState'),
+    missing_verifier: t('errorMissingVerifier'),
+    token_exchange: t('errorTokenExchange'),
   }
   const [email, setEmail] = useState('admin@schuco-demo.it')
   const [loading, setLoading] = useState(false)
@@ -61,17 +63,17 @@ export const LoginForm = () => {
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10">
           <Building2 className="h-6 w-6 text-brand" />
         </div>
-        <CardTitle>Sign in to PREVIO</CardTitle>
+        <CardTitle>{t('title')}</CardTitle>
         <p className="mt-1 text-sm text-slate-500">
           {devMode && cognitoMode
-            ? 'Dev seed login or Cognito'
+            ? t('subtitleDevAndCognito')
             : devMode
-              ? 'Local dev login (seed users)'
-              : 'Sign in with your company account'}
+              ? t('subtitleDevOnly')
+              : t('subtitleCognitoOnly')}
         </p>
         {error ? (
           <p className="mt-2 text-sm text-red-600">
-            Authentication failed: {errorMessage[error] ?? error}
+            {t('authFailedPrefix')}: {errorMessage[error] ?? error}
           </p>
         ) : null}
       </CardHeader>
@@ -79,7 +81,7 @@ export const LoginForm = () => {
         {devMode ? (
           <form onSubmit={handleDevSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('emailLabel')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -94,13 +96,13 @@ export const LoginForm = () => {
               </datalist>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in…' : 'Dev sign in'}
+              {loading ? t('signingIn') : t('devSignIn')}
             </Button>
           </form>
         ) : null}
         {cognitoMode ? (
           <Button type="button" className="w-full" onClick={handleCognitoLogin}>
-            Continue with Cognito
+            {t('continueWithCognito')}
           </Button>
         ) : null}
       </CardContent>

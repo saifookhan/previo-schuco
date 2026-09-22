@@ -7,36 +7,48 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  Menu,
+  Package,
   Settings,
   Shield,
   ShieldCheck,
   Users,
+  X,
 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { useEffect, useState } from 'react'
 
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { Toaster } from '@/components/toaster'
 import { hasMinimumRole, useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import type { RoleId } from '@/types/settings'
 
 const mainNav = [
-  { href: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard, minRole: 'user' as RoleId },
-  { href: '/app/invoice', label: 'Invoice', icon: FileText, minRole: 'user' as RoleId },
+  { href: '/app/dashboard', labelKey: 'dashboard', icon: LayoutDashboard, minRole: 'user' as RoleId },
+  { href: '/app/invoice', labelKey: 'invoice', icon: FileText, minRole: 'user' as RoleId },
+  {
+    href: '/app/product-families',
+    labelKey: 'productFamilies',
+    icon: Package,
+    minRole: 'user' as RoleId,
+  },
 ]
 
 const settingsNav = [
-  { href: '/app/settings/users', label: 'Users', icon: Users, minRole: 'company-admin' as RoleId },
-  { href: '/app/settings/roles', label: 'Roles', icon: Shield, minRole: 'super-admin' as RoleId },
+  { href: '/app/settings/users', labelKey: 'users', icon: Users, minRole: 'company-admin' as RoleId },
+  { href: '/app/settings/roles', labelKey: 'roles', icon: Shield, minRole: 'super-admin' as RoleId },
   {
     href: '/app/settings/access-rights',
-    label: 'Access Rights',
+    labelKey: 'accessRights',
     icon: Shield,
     minRole: 'super-admin' as RoleId,
   },
-  { href: '/app/settings/company', label: 'Company', icon: Building2, minRole: 'company-admin' as RoleId },
+  { href: '/app/settings/company', labelKey: 'company', icon: Building2, minRole: 'company-admin' as RoleId },
 ]
 
 const adminNav = [
-  { href: '/admin/dashboard', label: 'Admin portal', icon: ShieldCheck, minRole: 'super-admin' as RoleId },
+  { href: '/admin/dashboard', labelKey: 'adminPortal', icon: ShieldCheck, minRole: 'super-admin' as RoleId },
 ]
 
 interface AppShellProps {
@@ -49,6 +61,12 @@ interface AppShellProps {
 export const AppShell = ({ children }: AppShellProps) => {
   const pathname = usePathname()
   const { user, loading, signOut } = useAuth()
+  const t = useTranslations('nav')
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
 
   const filterNav = <T extends { minRole: RoleId }>(items: T[]): T[] => {
     if (!user) {
@@ -58,11 +76,47 @@ export const AppShell = ({ children }: AppShellProps) => {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white">
-        <div className="flex h-16 items-center gap-2 border-b border-slate-100 px-5">
-          <Building2 className="h-6 w-6 text-brand" />
-          <span className="text-lg font-bold text-slate-900">PREVIO</span>
+    <div className="min-h-screen bg-slate-50">
+      <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4 md:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100"
+          aria-label={t('openMenu')}
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <Building2 className="h-5 w-5 text-brand" />
+        <span className="font-bold text-slate-900">PREVIO</span>
+      </div>
+
+      {mobileOpen ? (
+        <div
+          className="fixed inset-0 z-40 bg-slate-900/40 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      ) : null}
+
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col border-r border-slate-200 bg-white transition-transform duration-200 md:translate-x-0',
+          mobileOpen && 'translate-x-0',
+        )}
+      >
+        <div className="flex h-16 items-center justify-between gap-2 border-b border-slate-100 px-5">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-6 w-6 text-brand" />
+            <span className="text-lg font-bold text-slate-900">PREVIO</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            className="rounded-md p-1 text-slate-500 hover:bg-slate-100 md:hidden"
+            aria-label={t('closeMenu')}
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {!loading && user ? (
@@ -75,10 +129,10 @@ export const AppShell = ({ children }: AppShellProps) => {
         <nav className="flex-1 space-y-6 overflow-y-auto p-4">
           <div>
             <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Main
+              {t('main')}
             </p>
             <div className="space-y-1">
-              {filterNav(mainNav).map(({ href, label, icon: Icon }) => (
+              {filterNav(mainNav).map(({ href, labelKey, icon: Icon }) => (
                 <Link
                   key={href}
                   href={href}
@@ -90,7 +144,7 @@ export const AppShell = ({ children }: AppShellProps) => {
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  {label}
+                  {t(labelKey)}
                 </Link>
               ))}
             </div>
@@ -100,10 +154,10 @@ export const AppShell = ({ children }: AppShellProps) => {
             <div>
               <p className="mb-2 flex items-center gap-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
                 <Settings className="h-3 w-3" />
-                Settings
+                {t('settings')}
               </p>
               <div className="space-y-1">
-                {filterNav(settingsNav).map(({ href, label, icon: Icon }) => (
+                {filterNav(settingsNav).map(({ href, labelKey, icon: Icon }) => (
                   <Link
                     key={href}
                     href={href}
@@ -115,7 +169,7 @@ export const AppShell = ({ children }: AppShellProps) => {
                     )}
                   >
                     <Icon className="h-4 w-4" />
-                    {label}
+                    {t(labelKey)}
                   </Link>
                 ))}
               </div>
@@ -125,10 +179,10 @@ export const AppShell = ({ children }: AppShellProps) => {
           {filterNav(adminNav).length > 0 ? (
             <div>
               <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Platform
+                {t('platform')}
               </p>
               <div className="space-y-1">
-                {filterNav(adminNav).map(({ href, label, icon: Icon }) => (
+                {filterNav(adminNav).map(({ href, labelKey, icon: Icon }) => (
                   <Link
                     key={href}
                     href={href}
@@ -140,7 +194,7 @@ export const AppShell = ({ children }: AppShellProps) => {
                     )}
                   >
                     <Icon className="h-4 w-4" />
-                    {label}
+                    {t(labelKey)}
                   </Link>
                 ))}
               </div>
@@ -155,16 +209,19 @@ export const AppShell = ({ children }: AppShellProps) => {
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
           >
             <LogOut className="h-4 w-4" />
-            Sign out
+            {t('signOut')}
           </button>
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col pl-64">
-        <main className="flex-1">{children}</main>
+      <div className="flex flex-1 flex-col md:pl-64">
+        {/* pb-16 reserves room for the floating LanguageSwitcher (fixed bottom-6),
+            so it never overlaps a page's last section. */}
+        <main className="flex-1 pb-16">{children}</main>
       </div>
 
       <LanguageSwitcher />
+      <Toaster />
     </div>
   )
 }
