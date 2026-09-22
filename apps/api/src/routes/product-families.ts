@@ -5,6 +5,8 @@ import { Hono } from 'hono'
 
 import {
   ExcelImportError,
+  createNewVersionFromExcel,
+  deleteProductFamily,
   duplicateProductFamily,
   getProductFamilyDetail,
   importProductFamilyFromExcel,
@@ -56,6 +58,51 @@ productFamilies.post('/import', requireAuth, requireRoles(['company-admin', 'sup
     throw error
   }
 })
+
+/**
+ * Re-imports an updated Excel workbook as a new version of an existing
+ * family (`version + 1`, `supersedesId` set) — the existing version is
+ * left untouched, published or not.
+ */
+productFamilies.post(
+  '/:id/new-version',
+  requireAuth,
+  requireRoles(['company-admin', 'super-user', 'super-admin']),
+  async (c) => {
+    const id = c.req.param('id')
+    if (!id) {
+      return c.json({ error: 'Missing id' }, 400)
+    }
+
+    const body = await c.req.parseBody()
+    const file = body.file
+    if (!(file instanceof File)) {
+      return c.json({ error: 'Missing "file" in multipart form data' }, 400)
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const ctx = {
+      effectiveCompanyId: c.get('effectiveCompanyId'),
+      isSuperAdmin: c.get('isSuperAdmin'),
+    }
+
+    try {
+      const family = await createNewVersionFromExcel(ctx, actorFrom(c), id, {
+        buffer,
+        originalName: file.name,
+      })
+      return c.json({ family }, 201)
+    } catch (error) {
+      if (error instanceof ExcelImportError) {
+        return c.json({ error: error.message }, 400)
+      }
+      if (error instanceof Error && error.message === 'Product family not found') {
+        return c.json({ error: error.message }, 404)
+      }
+      throw error
+    }
+  },
+)
 
 /** Lists product families visible to the caller (own company's, plus published families of linked suppliers). */
 productFamilies.get('/', requireAuth, async (c) => {
@@ -153,5 +200,23 @@ productFamilies.patch('/:id/publish', requireAuth, requireRoles(['company-admin'
     isSuperAdmin: c.get('isSuperAdmin'),
   }
   await setProductFamilyPublishedStatus(ctx, actorFrom(c), id, body.isPublished)
+  return c.json({ ok: true })
+})
+
+/** Permanently deletes a family and everything under it (lines, characteristics, matrices, images). */
+productFamilies.delete('/:id', requireAuth, requireRoles(['company-admin', 'super-user', 'super-admin']), async (c) => {
+  const id = c.req.param('id')
+  if (!id) {
+    return c.json({ error: 'Missing id' }, 400)
+  }
+  const ctx = {
+    effectiveCompanyId: c.get('effectiveCompanyId'),
+    isSuperAdmin: c.get('isSuperAdmin'),
+  }
+  try {
+    await deleteProductFamily(ctx, actorFrom(c), id)
+  } catch {
+    return c.json({ error: 'Not found' }, 404)
+  }
   return c.json({ ok: true })
 })

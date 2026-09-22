@@ -1,6 +1,7 @@
 'use client'
 
 import { Plus, Trash2 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,7 @@ const CANONICAL_ROLE_IDS = ['super-admin', 'company-admin', 'super-user', 'user'
  * Demo roles management with add/remove capability.
  */
 const RolesPage = () => {
+  const t = useTranslations('settingsRoles')
   const [roles, setRoles] = useState<Role[]>(DEMO_ROLES)
   const [newName, setNewName] = useState('')
   const [newDescription, setNewDescription] = useState('')
@@ -26,7 +28,7 @@ const RolesPage = () => {
       {
         id: newName.toLowerCase().replace(/\s+/g, '-'),
         name: newName.trim(),
-        description: newDescription.trim() || 'Custom role',
+        description: newDescription.trim() || t('customRole'),
       },
     ])
     setNewName('')
@@ -41,8 +43,8 @@ const RolesPage = () => {
   return (
     <div className="p-6 md:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Roles</h1>
-        <p className="mt-1 text-sm text-slate-500">Define roles and permission groups</p>
+        <h1 className="text-2xl font-bold text-slate-900">{t('title')}</h1>
+        <p className="mt-1 text-sm text-slate-500">{t('subtitle')}</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -57,7 +59,7 @@ const RolesPage = () => {
                 <button
                   onClick={() => removeRole(role.id)}
                   className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                  aria-label={`Remove ${role.name}`}
+                  aria-label={t('removeLabel', { name: role.name })}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -71,30 +73,30 @@ const RolesPage = () => {
 
         <Card className="border-dashed">
           <CardHeader>
-            <CardTitle>Add role</CardTitle>
+            <CardTitle>{t('addRole')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="role-name">Role name</Label>
+              <Label htmlFor="role-name">{t('roleNameLabel')}</Label>
               <Input
                 id="role-name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Project Manager"
+                placeholder={t('roleNamePlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="role-desc">Description</Label>
+              <Label htmlFor="role-desc">{t('descriptionLabel')}</Label>
               <Input
                 id="role-desc"
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
-                placeholder="Optional description"
+                placeholder={t('descriptionPlaceholder')}
               />
             </div>
             <Button onClick={addRole} className="w-full gap-2">
               <Plus className="h-4 w-4" />
-              Add role
+              {t('addRole')}
             </Button>
           </CardContent>
         </Card>

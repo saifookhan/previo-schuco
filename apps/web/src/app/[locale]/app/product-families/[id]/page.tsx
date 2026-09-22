@@ -1,9 +1,14 @@
-import { Grid3x3 } from 'lucide-react'
+import { AlertTriangle, History } from 'lucide-react'
+import { getTranslations } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { fetchFromApi } from '@/lib/api/server-client'
+import { Link } from '@/i18n/navigation'
+import { fetchFromApiResult } from '@/lib/api/server-client'
+import { ProductFamilyImageGallery } from '@/components/product-family-image-gallery'
+import { ProductFamilyMatrixPreview } from '@/components/product-family-matrix-preview'
+import { ProductFamilyNewVersionButton } from '@/components/product-family-new-version-button'
 import { ProductFamilyRowActions } from '@/components/product-family-row-actions'
 import type { ProductFamilyDetail } from '@/types/product-family'
 
@@ -14,12 +19,28 @@ interface ProductFamilyDetailPageProps {
 /** Full detail view for one product family: header, images, product lines, and characteristics. */
 const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps) => {
   const { id } = await params
-  const detail = await fetchFromApi<ProductFamilyDetail>(`/api/product-families/${id}`)
-  if (!detail) {
-    notFound()
+  const t = await getTranslations('productFamilyDetail')
+  const tList = await getTranslations('productFamilies')
+  const tVersion = await getTranslations('productFamilyVersion')
+  const result = await fetchFromApiResult<ProductFamilyDetail>(`/api/product-families/${id}`)
+
+  if (result.status !== 'ok') {
+    if (result.status === 'not_found') {
+      notFound()
+    }
+    return (
+      <div className="p-6 md:p-8">
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          {tList('errorLoading')}
+        </div>
+      </div>
+    )
   }
 
-  const { family, images, lines, characteristics, relations } = detail
+  const detail = result.data
+  const { family, images, lines, characteristics, matrices, relations } = detail
+  const matrixById = new Map(matrices.map((m) => [m.id, m]))
   const mainCharacteristics = characteristics.filter((c) => !c.parentId)
   const subCharacteristicsByParent = new Map<string, typeof characteristics>()
   for (const c of characteristics) {
@@ -40,19 +61,37 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
 
   return (
     <div className="p-6 md:p-8">
-      <div className="mb-6 flex items-start justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold text-slate-900">{family.name}</h1>
             <Badge variant={family.isPublished ? 'success' : 'muted'}>
-              {family.isPublished ? 'Published' : 'Draft'}
+              {family.isPublished ? tList('published') : tList('draft')}
             </Badge>
+            <Badge variant="muted">{tVersion('versionBadge', { version: family.version })}</Badge>
           </div>
           <p className="mt-1 text-sm text-slate-500">
             {[family.technicalName, family.category, family.brand].filter(Boolean).join(' · ') || '—'}
           </p>
+          {family.supersedesId ? (
+            <Link
+              href={`/app/product-families/${family.supersedesId}`}
+              className="mt-1 inline-flex items-center gap-1 text-xs text-slate-400 hover:text-brand"
+            >
+              <History className="h-3 w-3" />
+              {tVersion('viewPreviousVersion')}
+            </Link>
+          ) : null}
         </div>
-        <ProductFamilyRowActions familyId={family.id} isPublished={family.isPublished} />
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <ProductFamilyRowActions
+            familyId={family.id}
+            familyName={family.name}
+            isPublished={family.isPublished}
+            redirectAfterDeleteHref="/app/product-families"
+          />
+          <ProductFamilyNewVersionButton familyId={family.id} />
+        </div>
       </div>
 
       {(family.description1 || family.description2) && (
@@ -64,33 +103,21 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
         </Card>
       )}
 
-      {images.length > 0 && (
-        <div className="mb-6 flex flex-wrap gap-3">
-          {images.map((image) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={image.id}
-              src={`/api/product-families/${family.id}/images/${image.id}`}
-              alt={image.title ?? family.name}
-              className="h-32 w-32 rounded-lg border border-slate-200 object-cover"
-            />
-          ))}
-        </div>
-      )}
+      <ProductFamilyImageGallery familyId={family.id} familyName={family.name} images={images} />
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>{lines.length} product lines</CardTitle>
+          <CardTitle>{t('productLinesCount', { count: lines.length })}</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full min-w-[880px] text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-slate-500">
-                <th className="px-6 py-3 font-medium">Name</th>
-                <th className="px-6 py-3 font-medium">Pricing</th>
-                <th className="px-6 py-3 font-medium">Unit</th>
-                <th className="px-6 py-3 font-medium">Discount / Markup</th>
-                <th className="px-6 py-3 font-medium">Characteristics</th>
+                <th className="px-6 py-3 font-medium">{t('nameHeader')}</th>
+                <th className="px-6 py-3 font-medium">{t('pricingHeader')}</th>
+                <th className="px-6 py-3 font-medium">{t('unitHeader')}</th>
+                <th className="px-6 py-3 font-medium">{t('discountMarkupHeader')}</th>
+                <th className="px-6 py-3 font-medium">{t('characteristicsHeader')}</th>
               </tr>
             </thead>
             <tbody>
@@ -103,10 +130,11 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
                     ) : null}
                   </td>
                   <td className="px-6 py-4 text-slate-600">
-                    {line.pricingMatrixId ? (
-                      <span className="inline-flex items-center gap-1 text-xs">
-                        <Grid3x3 className="h-3.5 w-3.5" /> Pricing matrix (BxH)
-                      </span>
+                    {line.pricingMatrixId && matrixById.has(line.pricingMatrixId) ? (
+                      <ProductFamilyMatrixPreview
+                        matrix={matrixById.get(line.pricingMatrixId)!}
+                        label={t('pricingMatrix')}
+                      />
                     ) : (
                       <span className="font-mono text-xs">
                         {line.formula} <span className="text-slate-400">(valore = {line.value})</span>
@@ -133,20 +161,26 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
 
       <Card>
         <CardHeader>
-          <CardTitle>{mainCharacteristics.length} characteristics</CardTitle>
+          <CardTitle>{t('characteristicsCount', { count: mainCharacteristics.length })}</CardTitle>
         </CardHeader>
         <CardContent className="divide-y divide-slate-50 p-0">
           {mainCharacteristics.map((main) => (
             <div key={main.id} className="px-6 py-4">
               <p className="font-medium text-slate-900">{main.name}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 {(subCharacteristicsByParent.get(main.id) ?? []).map((sub) => (
                   <span
                     key={sub.id}
-                    className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600"
-                    title={sub.pricingMatrixId ? 'Pricing matrix (BxH)' : `${sub.formula} (valore = ${sub.value})`}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600"
+                    title={sub.pricingMatrixId ? undefined : `${sub.formula} (valore = ${sub.value})`}
                   >
                     {sub.name}
+                    {sub.pricingMatrixId && matrixById.has(sub.pricingMatrixId) ? (
+                      <ProductFamilyMatrixPreview
+                        matrix={matrixById.get(sub.pricingMatrixId)!}
+                        label={t('pricingMatrix')}
+                      />
+                    ) : null}
                   </span>
                 ))}
               </div>

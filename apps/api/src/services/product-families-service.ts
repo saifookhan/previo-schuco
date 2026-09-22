@@ -1,4 +1,6 @@
 import {
+  deleteProductFamily as deleteProductFamilyQuery,
+  findLatestProductFamilyVersion,
   getProductFamilyDetail as getProductFamilyDetailQuery,
   insertCharacteristic,
   insertPricingMatrix,
@@ -54,6 +56,7 @@ const toStoredPct = (rawFraction: number | null | undefined): string | undefined
  * @param actor - Who's importing, for the audit record
  * @param supplierCompanyId - The company this family belongs to (always the caller's own — ADR 0001, no path/body override)
  * @param file - The uploaded workbook
+ * @param versionOptions - When set, this import becomes a new *version* of an existing family (see `createNewVersionFromExcel`) instead of a fresh one: `version` and `supersedesId` are stored as given, and the audit action is `product_family.new_version` instead of `product_family.import`.
  * @throws {ExcelImportError} the workbook is missing a required sheet, or uses an unrecognized Tipo_Listino
  */
 export const importProductFamilyFromExcel = async (
@@ -61,6 +64,7 @@ export const importProductFamilyFromExcel = async (
   actor: ProductFamilyActor,
   supplierCompanyId: string,
   file: { buffer: Buffer; originalName: string },
+  versionOptions?: { version: number; supersedesId: string },
 ): Promise<ProductFamilySummary> => {
   const extensionMatch = /\.[^.]+$/.exec(file.originalName)
   const excelPath = await saveLocalFile('product-family-excel', file.buffer, extensionMatch?.[0] ?? '.xlsx')
@@ -110,6 +114,8 @@ export const importProductFamilyFromExcel = async (
       description1: (parsed.family.description_1 as string | undefined) ?? null,
       description2: (parsed.family.description_2 as string | undefined) ?? null,
       sourceExcelPath: excelPath,
+      version: versionOptions?.version,
+      supersedesId: versionOptions?.supersedesId,
     })
 
     for (const image of savedImages) {
@@ -222,7 +228,7 @@ export const importProductFamilyFromExcel = async (
       },
       supplierCompanyId,
       {
-        action: 'product_family.import',
+        action: versionOptions ? 'product_family.new_version' : 'product_family.import',
         resourceType: 'product_family',
         resourceId: familyId,
         metadata: {
@@ -230,6 +236,7 @@ export const importProductFamilyFromExcel = async (
           productLinesCount: parsed.productLines.length,
           characteristicsCount: parsed.characteristics.length,
           imagesCount: savedImages.length,
+          ...(versionOptions ? { supersedesId: versionOptions.supersedesId, version: versionOptions.version } : {}),
         },
       },
     )
@@ -248,6 +255,42 @@ export const getProductFamilyDetail = (
   ctx: TenantContext,
   familyId: string,
 ): Promise<ProductFamilyDetail | null> => withTenantDb(ctx, (tx) => getProductFamilyDetailQuery(tx, familyId))
+
+/**
+ * Re-imports an updated Excel workbook as a new *version* of an existing
+ * family — a fresh parse of the new file (not a copy-then-edit of the old
+ * version's rows). `existingFamilyId` can be ANY version in the chain,
+ * not just the latest one: this always walks forward to find the actual
+ * latest version first (see `findLatestProductFamilyVersion`), then
+ * inserts with `version = latest.version + 1` and `supersedesId =
+ * latest.id`. Without this, re-importing from an older version's page a
+ * second time would recompute the same "next" version number instead of
+ * continuing the chain (e.g. uploading from v1 twice would produce v2
+ * twice instead of v2 then v3). The existing version(s) are left exactly
+ * as they were (still published if they were published) — publishing/
+ * unpublishing either version is a separate, explicit action, same as
+ * every other publish-state change in this service.
+ * @throws {Error} the existing family doesn't exist or isn't visible/owned by the caller
+ * @throws {ExcelImportError} the new workbook is missing a required sheet, or uses an unrecognized Tipo_Listino
+ */
+export const createNewVersionFromExcel = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  existingFamilyId: string,
+  file: { buffer: Buffer; originalName: string },
+): Promise<ProductFamilySummary> => {
+  const existing = await getProductFamilyDetail(ctx, existingFamilyId)
+  if (!existing) {
+    throw new Error('Product family not found')
+  }
+
+  const latest = await withTenantDb(ctx, (tx) => findLatestProductFamilyVersion(tx, existingFamilyId))
+
+  return importProductFamilyFromExcel(ctx, actor, existing.family.supplierCompanyId, file, {
+    version: latest.version + 1,
+    supersedesId: latest.id,
+  })
+}
 
 /**
  * Deep-copies a product family (its own lines, characteristics, pricing
@@ -401,6 +444,42 @@ export const setProductFamilyPublishedStatus = async (
       ctx.effectiveCompanyId,
       {
         action: isPublished ? 'product_family.publish' : 'product_family.unpublish',
+        resourceType: 'product_family',
+        resourceId: familyId,
+      },
+    )
+  })
+
+/**
+ * Permanently deletes a product family and everything under it (lines,
+ * characteristics, pricing matrices, images, line/characteristic
+ * relations — all cascade via FK). RLS restricts this to the owning
+ * supplier company or a super-admin; a caller without access simply
+ * deletes zero rows rather than erroring, so this throws explicitly
+ * instead of silently no-op'ing.
+ * @throws if the family doesn't exist or isn't visible/owned by the caller
+ */
+export const deleteProductFamily = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+): Promise<void> =>
+  withTenantDb(ctx, async (tx) => {
+    const wasDeleted = await deleteProductFamilyQuery(tx, familyId)
+    if (!wasDeleted) {
+      throw new Error('Product family not found')
+    }
+    await recordAuditEvent(
+      tx,
+      {
+        actorType: 'user',
+        actorUserId: actor.actorUserId,
+        actorCompanyId: actor.actorCompanyId,
+        requestId: actor.requestId,
+      },
+      ctx.effectiveCompanyId,
+      {
+        action: 'product_family.delete',
         resourceType: 'product_family',
         resourceId: familyId,
       },

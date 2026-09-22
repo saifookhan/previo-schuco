@@ -1,6 +1,7 @@
 'use client'
 
 import { Loader2, Upload } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ import { useRouter } from '@/i18n/navigation'
  * server side can read the httpOnly session cookie.
  */
 export const ProductFamilyImportButton = () => {
+  const t = useTranslations('productFamilies')
   const router = useRouter()
   const { user } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -44,13 +46,13 @@ export const ProductFamilyImportButton = () => {
       const data = (await response.json()) as { error?: string }
 
       if (!response.ok) {
-        setError(data.error ?? 'Import failed')
+        setError(data.error ? `${t('importFailed')}: ${data.error}` : t('importFailed'))
         return
       }
 
       router.refresh()
     } catch {
-      setError('Import failed — could not reach the server')
+      setError(t('importFailedUnreachable'))
     } finally {
       setBusy(false)
     }
@@ -72,7 +74,7 @@ export const ProductFamilyImportButton = () => {
         onClick={() => inputRef.current?.click()}
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-        {busy ? 'Importing…' : 'Import from Excel'}
+        {busy ? t('importing') : t('importButton')}
       </Button>
       {error ? <p className="text-xs text-red-600">{error}</p> : null}
     </div>

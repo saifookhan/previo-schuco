@@ -39,6 +39,8 @@ export { getCompanyById } from './queries/companies'
 export { filterBusinessUnitIdsByCompany } from './queries/business-units'
 export { writeAuditLog, type WriteAuditLogInput } from './queries/audit'
 export {
+  deleteProductFamily,
+  findLatestProductFamilyVersion,
   getProductFamilyDetail,
   insertCharacteristic,
   insertPricingMatrix,

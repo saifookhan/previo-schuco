@@ -190,6 +190,33 @@ export const getProductFamilyDetail = async (
   }
 }
 
+/**
+ * Walks forward through a version chain (each version's `supersedesId`
+ * points at its immediate predecessor) starting at `familyId`, returning
+ * whichever version has no newer version pointing at it — i.e. the tip
+ * of the chain. Given any version in a lineage, this always resolves to
+ * the same latest version, so "create a new version" converges to
+ * extending one linear chain no matter which existing version you start
+ * from, instead of re-deriving the same next-version number every time.
+ * @param db - RLS-scoped transaction
+ * @param familyId - Any version in the chain to start walking from
+ */
+export const findLatestProductFamilyVersion = async (
+  db: DbLike,
+  familyId: string,
+): Promise<ProductFamilySummary> => {
+  const [start] = await db.select().from(productFamilies).where(eq(productFamilies.id, familyId))
+  let latest = start
+  while (latest) {
+    const [next] = await db.select().from(productFamilies).where(eq(productFamilies.supersedesId, latest.id))
+    if (!next) {
+      break
+    }
+    latest = next
+  }
+  return latest
+}
+
 export const setProductFamilyPublished = async (
   db: DbLike,
   familyId: string,
@@ -199,4 +226,22 @@ export const setProductFamilyPublished = async (
     .update(productFamilies)
     .set({ isPublished, updatedAt: new Date() })
     .where(eq(productFamilies.id, familyId))
+}
+
+/**
+ * Deletes a product family. RLS restricts this to the owning supplier
+ * company (or a super-admin) — see `product_families_delete` in
+ * `migrations/0001_rls.sql`. Child rows (lines, characteristics, pricing
+ * matrices, images, line/characteristic relations) cascade-delete via FK
+ * `ON DELETE CASCADE`, so no explicit cleanup is needed here.
+ * @param db - RLS-scoped transaction
+ * @param familyId - Product family to delete
+ * @returns true if a row was actually deleted (false if it didn't exist or wasn't visible under RLS)
+ */
+export const deleteProductFamily = async (db: DbLike, familyId: string): Promise<boolean> => {
+  const deleted = await db
+    .delete(productFamilies)
+    .where(eq(productFamilies.id, familyId))
+    .returning({ id: productFamilies.id })
+  return deleted.length > 0
 }

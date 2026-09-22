@@ -11,6 +11,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { getDb } from '../src/lib/db'
 import {
+  createNewVersionFromExcel,
+  deleteProductFamily,
   duplicateProductFamily,
   getProductFamilyDetail,
   importProductFamilyFromExcel,
@@ -156,5 +158,109 @@ describe('duplicateProductFamily + setProductFamilyPublishedStatus', () => {
     // Publishing the duplicate must not affect the original.
     const originalAfter = await getProductFamilyDetail(ctx, original.id)
     expect(originalAfter!.family.isPublished).toBe(false)
+  })
+})
+
+describe('deleteProductFamily', () => {
+  it('deletes a family and everything under it, and a second delete throws instead of silently no-op-ing', async () => {
+    const ctx = { effectiveCompanyId: supplierCompanyId, isSuperAdmin: false }
+
+    const family = await importProductFamilyFromExcel(ctx, actor, supplierCompanyId, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+    expect(await getProductFamilyDetail(ctx, family.id)).not.toBeNull()
+
+    await deleteProductFamily(ctx, actor, family.id)
+
+    expect(await getProductFamilyDetail(ctx, family.id)).toBeNull()
+    const families = await listProductFamilies(ctx)
+    expect(families.some((f) => f.id === family.id)).toBe(false)
+
+    await expect(deleteProductFamily(ctx, actor, family.id)).rejects.toThrow()
+  })
+
+  it('a different supplier cannot delete another supplier\'s family', async () => {
+    const ctx = { effectiveCompanyId: supplierCompanyId, isSuperAdmin: false }
+    const family = await importProductFamilyFromExcel(ctx, actor, supplierCompanyId, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+
+    const otherCtx = { effectiveCompanyId: '00000000-0000-0000-0000-000000000000', isSuperAdmin: false }
+    await expect(deleteProductFamily(otherCtx, actor, family.id)).rejects.toThrow()
+
+    // Still there, untouched, under the real owner's context.
+    expect(await getProductFamilyDetail(ctx, family.id)).not.toBeNull()
+  })
+})
+
+describe('createNewVersionFromExcel', () => {
+  it('creates version 2, pointing at version 1 via supersedesId, without touching the original', async () => {
+    const ctx = { effectiveCompanyId: supplierCompanyId, isSuperAdmin: false }
+
+    const v1 = await importProductFamilyFromExcel(ctx, actor, supplierCompanyId, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+    expect(v1.version).toBe(1)
+    await setProductFamilyPublishedStatus(ctx, actor, v1.id, true)
+
+    const v2 = await createNewVersionFromExcel(ctx, actor, v1.id, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+
+    expect(v2.id).not.toBe(v1.id)
+    expect(v2.version).toBe(2)
+    expect(v2.supersedesId).toBe(v1.id)
+    expect(v2.isPublished).toBe(false) // new version starts as an unpublished draft, same as import/duplicate
+
+    // Re-importing is a fresh parse, not a copy — it independently has its
+    // own full set of lines/characteristics, not references to v1's rows.
+    const v2Detail = await getProductFamilyDetail(ctx, v2.id)
+    expect(v2Detail!.lines).toHaveLength(5)
+    expect(v2Detail!.lines.every((l) => l.productFamilyId === v2.id)).toBe(true)
+
+    // v1 is completely untouched — still published, still version 1.
+    const v1After = await getProductFamilyDetail(ctx, v1.id)
+    expect(v1After!.family.isPublished).toBe(true)
+    expect(v1After!.family.version).toBe(1)
+  })
+
+  it('throws for a family that does not exist, before parsing the workbook', async () => {
+    const ctx = { effectiveCompanyId: supplierCompanyId, isSuperAdmin: false }
+    await expect(
+      createNewVersionFromExcel(ctx, actor, '00000000-0000-0000-0000-000000000000', {
+        buffer: fixtureBuffer,
+        originalName: 'product-family-sample.xlsx',
+      }),
+    ).rejects.toThrow('Product family not found')
+  })
+
+  it('re-importing from v1 a second time (after v2 already exists) produces v3, not v2 again', async () => {
+    const ctx = { effectiveCompanyId: supplierCompanyId, isSuperAdmin: false }
+
+    const v1 = await importProductFamilyFromExcel(ctx, actor, supplierCompanyId, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+
+    const v2 = await createNewVersionFromExcel(ctx, actor, v1.id, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+    expect(v2.version).toBe(2)
+    expect(v2.supersedesId).toBe(v1.id)
+
+    // Triggered from v1 again (not v2) — must still continue the chain
+    // past v2, not recompute "v1.version + 1" and collide with v2.
+    const v3 = await createNewVersionFromExcel(ctx, actor, v1.id, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+    expect(v3.version).toBe(3)
+    expect(v3.supersedesId).toBe(v2.id)
+    expect(v3.id).not.toBe(v2.id)
   })
 })
