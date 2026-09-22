@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm'
 
 import type { DbLike } from '../client'
 import {
@@ -34,7 +34,7 @@ export interface InsertPricingMatrixInput {
   productFamilyId: string
   widths: number[]
   heights: number[]
-  matrix: number[][]
+  matrix: (number | null)[][]
 }
 
 export const insertPricingMatrix = async (db: DbLike, input: InsertPricingMatrixInput): Promise<string> => {
@@ -244,4 +244,102 @@ export const deleteProductFamily = async (db: DbLike, familyId: string): Promise
     .where(eq(productFamilies.id, familyId))
     .returning({ id: productFamilies.id })
   return deleted.length > 0
+}
+
+/** Loads one family's summary row (no children) — for cheap existence/ownership/state checks. RLS-scoped: null if it doesn't exist or isn't visible. */
+export const getProductFamilyById = async (
+  db: DbLike,
+  familyId: string,
+): Promise<ProductFamilySummary | null> => {
+  const [family] = await db.select().from(productFamilies).where(eq(productFamilies.id, familyId))
+  return family ?? null
+}
+
+/** Bumps a family's `updatedAt` — call after editing any of its children. */
+export const touchProductFamily = async (db: DbLike, familyId: string): Promise<void> => {
+  await db.update(productFamilies).set({ updatedAt: new Date() }).where(eq(productFamilies.id, familyId))
+}
+
+export type PricingMatrixRow = typeof pricingMatrices.$inferSelect
+export type ProductLineRow = typeof productLines.$inferSelect
+export type CharacteristicRow = typeof characteristics.$inferSelect
+
+export interface UpdatePricingMatrixInput {
+  widths: number[]
+  heights: number[]
+  matrix: (number | null)[][]
+}
+
+/**
+ * Replaces a pricing matrix's axes and cells. `familyId` is part of the
+ * WHERE so a matrix id from another family can't be edited through this
+ * family's URL (RLS separately guarantees only the owning supplier can
+ * write at all).
+ * @returns the updated row, or null if no such matrix exists in that family / it isn't writable
+ */
+export const updatePricingMatrix = async (
+  db: DbLike,
+  familyId: string,
+  matrixId: string,
+  input: UpdatePricingMatrixInput,
+): Promise<PricingMatrixRow | null> => {
+  const [row] = await db
+    .update(pricingMatrices)
+    .set(input)
+    .where(and(eq(pricingMatrices.id, matrixId), eq(pricingMatrices.productFamilyId, familyId)))
+    .returning()
+  return row ?? null
+}
+
+export interface UpdateProductLineInput {
+  formula?: string
+  value?: string
+  discountPct?: string
+  markupPct?: string
+  installationHoursPerUnit?: string
+}
+
+/** Updates a product line's pricing fields. Returns null if the line isn't in that family / isn't writable. */
+export const updateProductLine = async (
+  db: DbLike,
+  familyId: string,
+  lineId: string,
+  input: UpdateProductLineInput,
+): Promise<ProductLineRow | null> => {
+  const [row] = await db
+    .update(productLines)
+    .set({ ...input, updatedAt: new Date() })
+    .where(and(eq(productLines.id, lineId), eq(productLines.productFamilyId, familyId)))
+    .returning()
+  return row ?? null
+}
+
+export interface UpdateCharacteristicInput {
+  formula?: string | null
+  value?: string | null
+}
+
+/**
+ * Updates a *sub*-characteristic's pricing fields. Top-level
+ * characteristics (parentId null) carry no price of their own, so they're
+ * excluded here — returns null for those, same as for a missing row.
+ */
+export const updateCharacteristic = async (
+  db: DbLike,
+  familyId: string,
+  characteristicId: string,
+  input: UpdateCharacteristicInput,
+): Promise<CharacteristicRow | null> => {
+  const [row] = await db
+    .update(characteristics)
+    .set({ ...input, updatedAt: new Date() })
+    .where(
+      and(
+        eq(characteristics.id, characteristicId),
+        eq(characteristics.productFamilyId, familyId),
+        isNotNull(characteristics.parentId),
+      ),
+    )
+    .returning()
+  return row ?? null
 }

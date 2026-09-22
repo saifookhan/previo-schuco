@@ -219,5 +219,41 @@
     "supersededBy": "Esiste una versione più recente",
     "viewPreviousVersion": "Vedi versione precedente",
     "viewLatestVersion": "Vedi versione più recente"
+  },
+  "productFamilyEdit": {
+    "edit": "Modifica",
+    "close": "Chiudi",
+    "cancel": "Annulla",
+    "save": "Salva",
+    "saving": "Salvataggio…",
+    "saveFailed": "Impossibile salvare",
+    "saveFailedUnreachable": "Impossibile salvare — server non raggiungibile",
+    "matrixSaved": "Matrice prezzi salvata",
+    "pricingSaved": "Prezzi di \"{name}\" salvati",
+    "matrixHint": "Lascia una cella vuota per \"nessun prezzo\". Larghezze e altezze devono essere numeri in ordine strettamente crescente.",
+    "widthN": "Larghezza {n}",
+    "heightN": "Altezza {n}",
+    "cellRC": "Riga {row}, colonna {column}",
+    "addRow": "Aggiungi riga",
+    "addColumn": "Aggiungi colonna",
+    "removeRow": "Rimuovi riga",
+    "removeColumn": "Rimuovi colonna",
+    "matrixError": {
+      "axisEmpty": "Aggiungi almeno una larghezza e un'altezza",
+      "axisNotNumber": "Larghezze e altezze devono essere numeri",
+      "axisNotAscending": "Larghezze e altezze devono essere in ordine strettamente crescente",
+      "cellNotNumber": "I prezzi devono essere numeri non negativi (o vuoti)"
+    },
+    "pricingTitle": "Modifica prezzi",
+    "editItem": "Modifica prezzi di {name}",
+    "fieldValue": "Valore base (valore)",
+    "fieldFormula": "Formula",
+    "formulaHint": "Variabili: valore, B, H, valore_base_in_vendita, ore_di_posa. Funzioni: min, max, round, ceil, floor, abs, sqrt, pow.",
+    "fieldDiscount": "Sconto (%)",
+    "fieldMarkup": "Ricarico (%)",
+    "markupHint": "100 significa nessun ricarico.",
+    "fieldInstallationHours": "Ore di posa per unità",
+    "characteristicBlankHint": "Lascia un campo vuoto per cancellarlo (ad es. quando l'opzione è prezzata da una matrice).",
+    "lockedBadge": "Modifica bloccata"
   }
 }

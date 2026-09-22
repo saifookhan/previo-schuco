@@ -1,5 +1,10 @@
 import {
   deleteProductFamily as deleteProductFamilyQuery,
+  getProductFamilyById,
+  touchProductFamily,
+  updateCharacteristic as updateCharacteristicQuery,
+  updatePricingMatrix as updatePricingMatrixQuery,
+  updateProductLine as updateProductLineQuery,
   findLatestProductFamilyVersion,
   getProductFamilyDetail as getProductFamilyDetailQuery,
   insertCharacteristic,
@@ -10,14 +15,25 @@ import {
   insertProductLineCharacteristic,
   listVisibleProductFamilies,
   setProductFamilyPublished,
+  type CharacteristicRow,
+  type PricingMatrixRow,
   type ProductFamilyDetail,
   type ProductFamilySummary,
+  type ProductLineRow,
 } from '@schuco/db'
 
 import { extractEmbeddedImages } from '../lib/excel-import/extract-embedded-images'
 import { parseProductFamilyWorkbook } from '../lib/excel-import'
 import { resolvePriceListType } from '../lib/excel-import/price-list-types'
 import type { RawPricingMatrix } from '../lib/excel-import/types'
+import {
+  ProductFamilyLockedError,
+  ProductFamilyNotFoundError,
+  isProductFamilyEditable,
+  validateCharacteristicPatch,
+  validateLinePatch,
+  validateMatrixInput,
+} from '../lib/product-family-edit'
 import { saveLocalFile } from '../lib/local-storage'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
 import { recordAuditEvent } from './audit-service'
@@ -485,3 +501,115 @@ export const deleteProductFamily = async (
       },
     )
   })
+
+const auditActor = (actor: ProductFamilyActor) => ({
+  actorType: 'user' as const,
+  actorUserId: actor.actorUserId,
+  actorCompanyId: actor.actorCompanyId,
+  requestId: actor.requestId,
+})
+
+/**
+ * Runs one pricing edit inside a single RLS transaction: loads the family
+ * (404 if missing/not visible), enforces the edit policy (409 when locked),
+ * applies `apply`, bumps the family's `updatedAt`, and writes an audit
+ * record listing which fields changed (never the values — a whole matrix
+ * would bloat the append-only audit log).
+ */
+const editFamilyPricing = <T>(
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  audit: { action: string; resourceId: string; changed: string[] },
+  apply: (tx: Parameters<Parameters<typeof withTenantDb>[1]>[0]) => Promise<T | null>,
+): Promise<T> =>
+  withTenantDb(ctx, async (tx) => {
+    const family = await getProductFamilyById(tx, familyId)
+    if (!family) {
+      throw new ProductFamilyNotFoundError()
+    }
+    if (!isProductFamilyEditable(family)) {
+      throw new ProductFamilyLockedError()
+    }
+
+    const row = await apply(tx)
+    if (!row) {
+      throw new ProductFamilyNotFoundError('Item not found in this product family, or not editable')
+    }
+
+    await touchProductFamily(tx, familyId)
+    await recordAuditEvent(tx, auditActor(actor), family.supplierCompanyId, {
+      action: audit.action,
+      resourceType: 'product_family',
+      resourceId: audit.resourceId,
+      metadata: { productFamilyId: familyId, changed: audit.changed },
+    })
+    return row
+  })
+
+/**
+ * Replaces a pricing matrix's axes and cells.
+ * @throws {ProductFamilyValidationError} malformed input (see `validateMatrixInput`)
+ * @throws {ProductFamilyLockedError} the family is locked by the edit policy
+ * @throws {ProductFamilyNotFoundError} no such family/matrix for this caller
+ */
+export const updatePricingMatrix = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  matrixId: string,
+  input: unknown,
+): Promise<PricingMatrixRow> => {
+  const validated = validateMatrixInput(input)
+  return editFamilyPricing(
+    ctx,
+    actor,
+    familyId,
+    { action: 'product_family.matrix_update', resourceId: matrixId, changed: ['widths', 'heights', 'matrix'] },
+    (tx) => updatePricingMatrixQuery(tx, familyId, matrixId, validated),
+  )
+}
+
+/**
+ * Edits a product line's pricing fields (value, formula, discount, markup,
+ * installation hours) — only the fields present in `input` change.
+ * @throws same as {@link updatePricingMatrix}
+ */
+export const updateProductLine = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  lineId: string,
+  input: unknown,
+): Promise<ProductLineRow> => {
+  const patch = validateLinePatch(input)
+  return editFamilyPricing(
+    ctx,
+    actor,
+    familyId,
+    { action: 'product_family.line_update', resourceId: lineId, changed: Object.keys(patch) },
+    (tx) => updateProductLineQuery(tx, familyId, lineId, patch),
+  )
+}
+
+/**
+ * Edits a sub-characteristic's price (value / formula). Top-level
+ * characteristics have no price, so they're reported as not found.
+ * @throws same as {@link updatePricingMatrix}
+ */
+export const updateCharacteristic = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  characteristicId: string,
+  input: unknown,
+): Promise<CharacteristicRow> => {
+  const patch = validateCharacteristicPatch(input)
+  return editFamilyPricing(
+    ctx,
+    actor,
+    familyId,
+    { action: 'product_family.characteristic_update', resourceId: characteristicId, changed: Object.keys(patch) },
+    (tx) => updateCharacteristicQuery(tx, familyId, characteristicId, patch),
+  )
+}

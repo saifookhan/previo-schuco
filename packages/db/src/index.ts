@@ -40,6 +40,11 @@ export { filterBusinessUnitIdsByCompany } from './queries/business-units'
 export { writeAuditLog, type WriteAuditLogInput } from './queries/audit'
 export {
   deleteProductFamily,
+  getProductFamilyById,
+  touchProductFamily,
+  updateCharacteristic,
+  updatePricingMatrix,
+  updateProductLine,
   findLatestProductFamilyVersion,
   getProductFamilyDetail,
   insertCharacteristic,
@@ -50,12 +55,18 @@ export {
   insertProductLineCharacteristic,
   listVisibleProductFamilies,
   setProductFamilyPublished,
+  type CharacteristicRow,
   type InsertCharacteristicInput,
   type InsertPricingMatrixInput,
   type InsertProductFamilyImageInput,
   type InsertProductFamilyInput,
   type InsertProductLineInput,
+  type PricingMatrixRow,
   type ProductFamilyDetail,
+  type ProductLineRow,
+  type UpdateCharacteristicInput,
+  type UpdatePricingMatrixInput,
+  type UpdateProductLineInput,
   type ProductFamilySummary,
 } from './queries/product-families'
 export * from './schema'

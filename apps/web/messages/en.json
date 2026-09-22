@@ -219,5 +219,41 @@
     "supersededBy": "A newer version exists",
     "viewPreviousVersion": "View previous version",
     "viewLatestVersion": "View newer version"
+  },
+  "productFamilyEdit": {
+    "edit": "Edit",
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "saveFailed": "Could not save",
+    "saveFailedUnreachable": "Could not save — could not reach the server",
+    "matrixSaved": "Pricing matrix saved",
+    "pricingSaved": "Saved pricing for \"{name}\"",
+    "matrixHint": "Leave a cell empty for \"no price\". Widths and heights must be numbers in strictly ascending order.",
+    "widthN": "Width {n}",
+    "heightN": "Height {n}",
+    "cellRC": "Row {row}, column {column}",
+    "addRow": "Add row",
+    "addColumn": "Add column",
+    "removeRow": "Remove row",
+    "removeColumn": "Remove column",
+    "matrixError": {
+      "axisEmpty": "Add at least one width and one height",
+      "axisNotNumber": "Widths and heights must be numbers",
+      "axisNotAscending": "Widths and heights must be in strictly ascending order",
+      "cellNotNumber": "Prices must be non-negative numbers (or empty)"
+    },
+    "pricingTitle": "Edit pricing",
+    "editItem": "Edit pricing for {name}",
+    "fieldValue": "Base value (valore)",
+    "fieldFormula": "Formula",
+    "formulaHint": "Variables: valore, B, H, valore_base_in_vendita, ore_di_posa. Functions: min, max, round, ceil, floor, abs, sqrt, pow.",
+    "fieldDiscount": "Discount (%)",
+    "fieldMarkup": "Markup (%)",
+    "markupHint": "100 means no markup.",
+    "fieldInstallationHours": "Installation hours per unit",
+    "characteristicBlankHint": "Leave a field empty to clear it (e.g. when this option is priced by a matrix).",
+    "lockedBadge": "Locked for editing"
   }
 }

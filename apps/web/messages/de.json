@@ -219,5 +219,41 @@
     "supersededBy": "Es gibt eine neuere Version",
     "viewPreviousVersion": "Vorherige Version ansehen",
     "viewLatestVersion": "Neuere Version ansehen"
+  },
+  "productFamilyEdit": {
+    "edit": "Bearbeiten",
+    "close": "Schließen",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "saving": "Wird gespeichert…",
+    "saveFailed": "Speichern fehlgeschlagen",
+    "saveFailedUnreachable": "Speichern fehlgeschlagen — Server nicht erreichbar",
+    "matrixSaved": "Preismatrix gespeichert",
+    "pricingSaved": "Preise für \"{name}\" gespeichert",
+    "matrixHint": "Leere Zelle = \"kein Preis\". Breiten und Höhen müssen Zahlen in streng aufsteigender Reihenfolge sein.",
+    "widthN": "Breite {n}",
+    "heightN": "Höhe {n}",
+    "cellRC": "Zeile {row}, Spalte {column}",
+    "addRow": "Zeile hinzufügen",
+    "addColumn": "Spalte hinzufügen",
+    "removeRow": "Zeile entfernen",
+    "removeColumn": "Spalte entfernen",
+    "matrixError": {
+      "axisEmpty": "Mindestens eine Breite und eine Höhe hinzufügen",
+      "axisNotNumber": "Breiten und Höhen müssen Zahlen sein",
+      "axisNotAscending": "Breiten und Höhen müssen streng aufsteigend sortiert sein",
+      "cellNotNumber": "Preise müssen nicht-negative Zahlen sein (oder leer)"
+    },
+    "pricingTitle": "Preise bearbeiten",
+    "editItem": "Preise von {name} bearbeiten",
+    "fieldValue": "Basiswert (valore)",
+    "fieldFormula": "Formel",
+    "formulaHint": "Variablen: valore, B, H, valore_base_in_vendita, ore_di_posa. Funktionen: min, max, round, ceil, floor, abs, sqrt, pow.",
+    "fieldDiscount": "Rabatt (%)",
+    "fieldMarkup": "Aufschlag (%)",
+    "markupHint": "100 bedeutet kein Aufschlag.",
+    "fieldInstallationHours": "Montagestunden pro Einheit",
+    "characteristicBlankHint": "Feld leer lassen, um es zu löschen (z. B. wenn die Option über eine Matrix bepreist wird).",
+    "lockedBadge": "Bearbeitung gesperrt"
   }
 }

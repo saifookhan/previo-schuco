@@ -55,6 +55,41 @@ describe('extract2DArray', () => {
   })
 })
 
+describe('extract2DArray — phantom trailing axis entries', () => {
+  it('drops a non-numeric trailing header cell and its column, and a non-numeric trailing height and its row', () => {
+    const rows = [
+      ['DIMENSIONS', 0, 800, 'note'],
+      [0, 1, 2, 3],
+      [800, 4, 5, 6],
+      ['note', 7, 8, 9],
+    ]
+    const result = extract2DArray(rows)
+    expect(result.widths).toEqual([0, 800])
+    expect(result.heights).toEqual([0, 800])
+    expect(result.matrix).toEqual([
+      [1, 2],
+      [4, 5],
+    ])
+  })
+
+  it('real fixture: every imported matrix has purely finite, ascending axes', () => {
+    const parsed = parseProductFamilyWorkbook(fixtureBuffer)
+    const matrices = [
+      ...parsed.productLines.map((l) => l.listinoAcquisto),
+      ...parsed.characteristics.flatMap((c) => c.subCharacters.map((s) => s.listinoAcquisto)),
+    ].filter((v): v is Exclude<typeof v, number> => typeof v === 'object')
+    expect(matrices.length).toBeGreaterThan(0)
+    for (const m of matrices) {
+      for (const axis of [m.widths, m.heights]) {
+        expect(axis.every(Number.isFinite)).toBe(true)
+        expect(axis.every((v, i) => i === 0 || v > axis[i - 1])).toBe(true)
+      }
+      expect(m.matrix).toHaveLength(m.heights.length)
+      expect(m.matrix.every((row) => row.length === m.widths.length)).toBe(true)
+    }
+  })
+})
+
 describe('parseProductFamilyWorkbook (real fixture)', () => {
   const parsed = parseProductFamilyWorkbook(fixtureBuffer)
 

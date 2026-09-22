@@ -9,6 +9,7 @@ import { fetchFromApiResult } from '@/lib/api/server-client'
 import { ProductFamilyImageGallery } from '@/components/product-family-image-gallery'
 import { ProductFamilyMatrixPreview } from '@/components/product-family-matrix-preview'
 import { ProductFamilyNewVersionButton } from '@/components/product-family-new-version-button'
+import { ProductFamilyPricingEditor } from '@/components/product-family-pricing-editor'
 import { ProductFamilyRowActions } from '@/components/product-family-row-actions'
 import type { ProductFamilyDetail } from '@/types/product-family'
 
@@ -22,6 +23,7 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
   const t = await getTranslations('productFamilyDetail')
   const tList = await getTranslations('productFamilies')
   const tVersion = await getTranslations('productFamilyVersion')
+  const tEdit = await getTranslations('productFamilyEdit')
   const result = await fetchFromApiResult<ProductFamilyDetail>(`/api/product-families/${id}`)
 
   if (result.status !== 'ok') {
@@ -39,7 +41,7 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
   }
 
   const detail = result.data
-  const { family, images, lines, characteristics, matrices, relations } = detail
+  const { family, images, lines, characteristics, matrices, relations, editable } = detail
   const matrixById = new Map(matrices.map((m) => [m.id, m]))
   const mainCharacteristics = characteristics.filter((c) => !c.parentId)
   const subCharacteristicsByParent = new Map<string, typeof characteristics>()
@@ -69,6 +71,7 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
               {family.isPublished ? tList('published') : tList('draft')}
             </Badge>
             <Badge variant="muted">{tVersion('versionBadge', { version: family.version })}</Badge>
+            {!editable ? <Badge variant="warning">{tEdit('lockedBadge')}</Badge> : null}
           </div>
           <p className="mt-1 text-sm text-slate-500">
             {[family.technicalName, family.category, family.brand].filter(Boolean).join(' · ') || '—'}
@@ -132,14 +135,30 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
                   <td className="px-6 py-4 text-slate-600">
                     {line.pricingMatrixId && matrixById.has(line.pricingMatrixId) ? (
                       <ProductFamilyMatrixPreview
+                        familyId={family.id}
                         matrix={matrixById.get(line.pricingMatrixId)!}
                         label={t('pricingMatrix')}
+                        editable={editable}
                       />
                     ) : (
                       <span className="font-mono text-xs">
                         {line.formula} <span className="text-slate-400">(valore = {line.value})</span>
                       </span>
                     )}
+                    <ProductFamilyPricingEditor
+                      kind="line"
+                      familyId={family.id}
+                      itemId={line.id}
+                      itemName={line.name}
+                      editable={editable}
+                      initial={{
+                        value: line.value,
+                        formula: line.formula,
+                        discountPct: line.discountPct,
+                        markupPct: line.markupPct,
+                        installationHoursPerUnit: line.installationHoursPerUnit,
+                      }}
+                    />
                   </td>
                   <td className="px-6 py-4 text-slate-600">{line.unitName || line.unitSymbol || '—'}</td>
                   <td className="px-6 py-4 text-slate-600">
@@ -177,10 +196,21 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
                     {sub.name}
                     {sub.pricingMatrixId && matrixById.has(sub.pricingMatrixId) ? (
                       <ProductFamilyMatrixPreview
+                        familyId={family.id}
                         matrix={matrixById.get(sub.pricingMatrixId)!}
                         label={t('pricingMatrix')}
+                        editable={editable}
                       />
-                    ) : null}
+                    ) : (
+                      <ProductFamilyPricingEditor
+                        kind="characteristic"
+                        familyId={family.id}
+                        itemId={sub.id}
+                        itemName={sub.name}
+                        editable={editable}
+                        initial={{ value: sub.value, formula: sub.formula }}
+                      />
+                    )}
                   </span>
                 ))}
               </div>

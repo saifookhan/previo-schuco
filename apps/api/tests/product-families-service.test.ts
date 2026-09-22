@@ -7,7 +7,7 @@ import { join } from 'node:path'
 
 import { auditLog, companies, createDb, roles, users, withSystemTransaction, type Db } from '@schuco/db'
 import { inArray } from 'drizzle-orm'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { getDb } from '../src/lib/db'
 import {
@@ -18,7 +18,15 @@ import {
   importProductFamilyFromExcel,
   listProductFamilies,
   setProductFamilyPublishedStatus,
+  updateCharacteristic,
+  updatePricingMatrix,
+  updateProductLine,
 } from '../src/services/product-families-service'
+import {
+  ProductFamilyLockedError,
+  ProductFamilyNotFoundError,
+  ProductFamilyValidationError,
+} from '../src/lib/product-family-edit'
 
 /**
  * Service-layer test (ADR 0012): imports a REAL supplier workbook
@@ -262,5 +270,136 @@ describe('createNewVersionFromExcel', () => {
     expect(v3.version).toBe(3)
     expect(v3.supersedesId).toBe(v2.id)
     expect(v3.id).not.toBe(v2.id)
+  })
+})
+
+describe('pricing edits (matrix, line, characteristic)', () => {
+  const ctx = () => ({ effectiveCompanyId: supplierCompanyId, isSuperAdmin: false })
+  const importFresh = () =>
+    importProductFamilyFromExcel(ctx(), actor, supplierCompanyId, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+
+  afterEach(() => {
+    delete process.env.PRODUCT_FAMILY_EDIT_POLICY
+  })
+
+  it('edits a pricing matrix: changed cells, an emptied cell, and a new column all persist', async () => {
+    const family = await importFresh()
+    const detail = await getProductFamilyDetail(ctx(), family.id)
+    const matrix = detail!.matrices[0]
+
+    const widths = [...matrix.widths, matrix.widths[matrix.widths.length - 1] + 200]
+    const grid = matrix.matrix.map((row) => [...row, 999])
+    grid[1][1] = null
+
+    const updated = await updatePricingMatrix(ctx(), actor, family.id, matrix.id, {
+      widths,
+      heights: matrix.heights,
+      matrix: grid,
+    })
+    expect(updated.widths).toEqual(widths)
+
+    const after = (await getProductFamilyDetail(ctx(), family.id))!
+    const reread = after.matrices.find((m) => m.id === matrix.id)!
+    expect(reread.widths).toHaveLength(matrix.widths.length + 1)
+    expect(reread.matrix[0][reread.widths.length - 1]).toBe(999)
+    expect(reread.matrix[1][1]).toBeNull()
+    expect(new Date(after.family.updatedAt).getTime()).toBeGreaterThanOrEqual(new Date(family.updatedAt).getTime())
+  })
+
+  it('rejects an invalid matrix without writing anything', async () => {
+    const family = await importFresh()
+    const detail = await getProductFamilyDetail(ctx(), family.id)
+    const matrix = detail!.matrices[0]
+
+    await expect(
+      updatePricingMatrix(ctx(), actor, family.id, matrix.id, {
+        widths: [1000, 800],
+        heights: [800],
+        matrix: [[1, 2]],
+      }),
+    ).rejects.toThrow(ProductFamilyValidationError)
+
+    const reread = (await getProductFamilyDetail(ctx(), family.id))!.matrices.find((m) => m.id === matrix.id)!
+    expect(reread.widths).toEqual(matrix.widths)
+  })
+
+  it('edits a product line\'s value, discount, markup and formula', async () => {
+    const family = await importFresh()
+    const line = (await getProductFamilyDetail(ctx(), family.id))!.lines.find((l) =>
+      l.name.startsWith('Guida aggintiva'),
+    )!
+
+    const updated = await updateProductLine(ctx(), actor, family.id, line.id, {
+      value: 12.5,
+      discountPct: 20,
+      markupPct: 130,
+      formula: '(B/1000) * valore',
+    })
+    expect(Number(updated.value)).toBe(12.5)
+    expect(Number(updated.discountPct)).toBe(20)
+    expect(Number(updated.markupPct)).toBe(130)
+    expect(updated.formula).toBe('(B/1000) * valore')
+
+    await expect(updateProductLine(ctx(), actor, family.id, line.id, { formula: 'valor * 2' })).rejects.toThrow(
+      ProductFamilyValidationError,
+    )
+  })
+
+  it('edits a sub-characteristic but not a top-level one (no price of its own)', async () => {
+    const family = await importFresh()
+    const detail = (await getProductFamilyDetail(ctx(), family.id))!
+    const sub = detail.characteristics.find((c) => c.parentId && c.value !== null)!
+    const top = detail.characteristics.find((c) => !c.parentId)!
+
+    const updated = await updateCharacteristic(ctx(), actor, family.id, sub.id, { value: 7 })
+    expect(Number(updated.value)).toBe(7)
+
+    await expect(updateCharacteristic(ctx(), actor, family.id, top.id, { value: 1 })).rejects.toThrow(
+      ProductFamilyNotFoundError,
+    )
+  })
+
+  it("won't edit another family's matrix through this family's URL", async () => {
+    const a = await importFresh()
+    const b = await importFresh()
+    const bMatrix = (await getProductFamilyDetail(ctx(), b.id))!.matrices[0]
+
+    await expect(
+      updatePricingMatrix(ctx(), actor, a.id, bMatrix.id, {
+        widths: bMatrix.widths,
+        heights: bMatrix.heights,
+        matrix: bMatrix.matrix,
+      }),
+    ).rejects.toThrow(ProductFamilyNotFoundError)
+  })
+
+  it('a different company cannot edit at all (RLS): reported as not found', async () => {
+    const family = await importFresh()
+    const line = (await getProductFamilyDetail(ctx(), family.id))!.lines[0]
+    const stranger = { effectiveCompanyId: '00000000-0000-0000-0000-000000000000', isSuperAdmin: false }
+
+    await expect(updateProductLine(stranger, actor, family.id, line.id, { value: 1 })).rejects.toThrow(
+      ProductFamilyNotFoundError,
+    )
+  })
+
+  it('default policy edits published families; "draft-only" locks them (409) and unlocks on unpublish', async () => {
+    const family = await importFresh()
+    const line = (await getProductFamilyDetail(ctx(), family.id))!.lines[0]
+    await setProductFamilyPublishedStatus(ctx(), actor, family.id, true)
+
+    await updateProductLine(ctx(), actor, family.id, line.id, { value: 3 })
+
+    process.env.PRODUCT_FAMILY_EDIT_POLICY = 'draft-only'
+    await expect(updateProductLine(ctx(), actor, family.id, line.id, { value: 4 })).rejects.toThrow(
+      ProductFamilyLockedError,
+    )
+    expect(Number((await getProductFamilyDetail(ctx(), family.id))!.lines.find((l) => l.id === line.id)!.value)).toBe(3)
+
+    await setProductFamilyPublishedStatus(ctx(), actor, family.id, false)
+    await updateProductLine(ctx(), actor, family.id, line.id, { value: 4 })
   })
 })

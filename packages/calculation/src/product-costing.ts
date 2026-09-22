@@ -1,10 +1,10 @@
 import { evaluate } from 'mathjs'
 
-/** A width×height price lookup table — `matrix[heightIndex][widthIndex]` is the price at that cell. */
+/** A width×height price lookup table — `matrix[heightIndex][widthIndex]` is the price at that cell (`null` = no price defined for that cell). */
 export interface PricingMatrix {
   widths: number[]
   heights: number[]
-  matrix: number[][]
+  matrix: (number | null)[][]
 }
 
 /**

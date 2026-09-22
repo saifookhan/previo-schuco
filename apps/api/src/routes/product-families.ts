@@ -12,8 +12,17 @@ import {
   importProductFamilyFromExcel,
   listProductFamilies,
   setProductFamilyPublishedStatus,
+  updateCharacteristic,
+  updatePricingMatrix,
+  updateProductLine,
   type ProductFamilyActor,
 } from '../services/product-families-service'
+import {
+  ProductFamilyLockedError,
+  ProductFamilyNotFoundError,
+  ProductFamilyValidationError,
+  isProductFamilyEditable,
+} from '../lib/product-family-edit'
 import type { AuthVariables } from '../middleware/auth'
 import { requireAuth, requireRoles } from '../middleware/auth'
 
@@ -128,7 +137,7 @@ productFamilies.get('/:id', requireAuth, async (c) => {
   if (!detail) {
     return c.json({ error: 'Not found' }, 404)
   }
-  return c.json(detail)
+  return c.json({ ...detail, editable: isProductFamilyEditable(detail.family) })
 })
 
 const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
@@ -219,4 +228,73 @@ productFamilies.delete('/:id', requireAuth, requireRoles(['company-admin', 'supe
     return c.json({ error: 'Not found' }, 404)
   }
   return c.json({ ok: true })
+})
+
+const EDIT_ROLES = ['company-admin', 'super-user', 'super-admin'] as const
+
+/** Maps the edit-flow errors to HTTP statuses; anything else is a real 500. */
+const editErrorResponse = (c: Context<{ Variables: AuthVariables }>, error: unknown) => {
+  if (error instanceof ProductFamilyValidationError) {
+    return c.json({ error: error.message }, 400)
+  }
+  if (error instanceof ProductFamilyNotFoundError) {
+    return c.json({ error: error.message }, 404)
+  }
+  if (error instanceof ProductFamilyLockedError) {
+    return c.json({ error: error.message }, 409)
+  }
+  throw error
+}
+
+const editContext = (c: Context<{ Variables: AuthVariables }>) => ({
+  effectiveCompanyId: c.get('effectiveCompanyId'),
+  isSuperAdmin: c.get('isSuperAdmin'),
+})
+
+/** Replaces a pricing matrix's widths/heights/cells. */
+productFamilies.patch('/:id/matrices/:matrixId', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+  const id = c.req.param('id')
+  const matrixId = c.req.param('matrixId')
+  if (!id || !matrixId) {
+    return c.json({ error: 'Missing id' }, 400)
+  }
+  const body = await c.req.json().catch(() => null)
+  try {
+    const matrix = await updatePricingMatrix(editContext(c), actorFrom(c), id, matrixId, body)
+    return c.json({ matrix })
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
+})
+
+/** Edits a product line's pricing fields (value, formula, discount, markup, installation hours). */
+productFamilies.patch('/:id/lines/:lineId', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+  const id = c.req.param('id')
+  const lineId = c.req.param('lineId')
+  if (!id || !lineId) {
+    return c.json({ error: 'Missing id' }, 400)
+  }
+  const body = await c.req.json().catch(() => null)
+  try {
+    const line = await updateProductLine(editContext(c), actorFrom(c), id, lineId, body)
+    return c.json({ line })
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
+})
+
+/** Edits a sub-characteristic's price (value / formula). */
+productFamilies.patch('/:id/characteristics/:characteristicId', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+  const id = c.req.param('id')
+  const characteristicId = c.req.param('characteristicId')
+  if (!id || !characteristicId) {
+    return c.json({ error: 'Missing id' }, 400)
+  }
+  const body = await c.req.json().catch(() => null)
+  try {
+    const characteristic = await updateCharacteristic(editContext(c), actorFrom(c), id, characteristicId, body)
+    return c.json({ characteristic })
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
 })

@@ -152,7 +152,7 @@ export const pricingMatrices = pgTable('pricing_matrices', {
     .references(() => productFamilies.id, { onDelete: 'cascade' }),
   widths: jsonb('widths').notNull().$type<number[]>(),
   heights: jsonb('heights').notNull().$type<number[]>(),
-  matrix: jsonb('matrix').notNull().$type<number[][]>(),
+  matrix: jsonb('matrix').notNull().$type<(number | null)[][]>(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 

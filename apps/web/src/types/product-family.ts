@@ -70,4 +70,6 @@ export interface ProductFamilyDetail {
   characteristics: Characteristic[]
   matrices: PricingMatrix[]
   relations: { productLineId: string; characteristicId: string }[]
+  /** False when the server's edit policy locks this family (e.g. published under `draft-only`). */
+  editable: boolean
 }
