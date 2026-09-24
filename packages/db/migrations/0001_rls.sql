@@ -250,3 +250,48 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 -- audit record — only INSERT (and SELECT to read it back). Revoked after
 -- the blanket grant above so this table is the one deliberate exception.
 REVOKE UPDATE, DELETE ON audit_log FROM previo_app;
+
+-- Quotes (Phase 3): a supplier's quotes to their own end customers.
+-- Unlike product_families, quotes are never shared/published — visibility
+-- is a straight "belongs to my company" check, same shape as companies'
+-- own policy. Child tables (quote_positions, quote_position_characteristics)
+-- delegate via a join back to quotes, mirroring the product-families
+-- child-table pattern above.
+ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_positions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_position_characteristics ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION app_owns_quote(target_quote_id uuid) RETURNS boolean AS $$
+  SELECT app_is_super_admin() OR EXISTS (
+    SELECT 1 FROM quotes q
+    WHERE q.id = target_quote_id AND q.supplier_company_id = app_current_company_id()
+  );
+$$ LANGUAGE sql STABLE;
+
+DROP POLICY IF EXISTS quotes_tenant ON quotes;
+CREATE POLICY quotes_tenant ON quotes
+  FOR ALL
+  USING (app_is_super_admin() OR supplier_company_id = app_current_company_id())
+  WITH CHECK (app_is_super_admin() OR supplier_company_id = app_current_company_id());
+
+DROP POLICY IF EXISTS quote_positions_tenant ON quote_positions;
+CREATE POLICY quote_positions_tenant ON quote_positions
+  FOR ALL
+  USING (app_owns_quote(quote_id))
+  WITH CHECK (app_owns_quote(quote_id));
+
+DROP POLICY IF EXISTS quote_position_characteristics_tenant ON quote_position_characteristics;
+CREATE POLICY quote_position_characteristics_tenant ON quote_position_characteristics
+  FOR ALL
+  USING (
+    app_is_super_admin() OR EXISTS (
+      SELECT 1 FROM quote_positions qp
+      WHERE qp.id = quote_position_id AND app_owns_quote(qp.quote_id)
+    )
+  )
+  WITH CHECK (
+    app_is_super_admin() OR EXISTS (
+      SELECT 1 FROM quote_positions qp
+      WHERE qp.id = quote_position_id AND app_owns_quote(qp.quote_id)
+    )
+  );

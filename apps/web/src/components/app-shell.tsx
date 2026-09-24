@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Building2,
+  FileSpreadsheet,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -33,6 +34,7 @@ const mainNav = [
     icon: Package,
     minRole: 'user' as RoleId,
   },
+  { href: '/app/quotes', labelKey: 'quotes', icon: FileSpreadsheet, minRole: 'user' as RoleId },
 ]
 
 const settingsNav = [

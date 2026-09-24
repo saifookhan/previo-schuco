@@ -12,6 +12,7 @@ import { me } from './routes/me'
 import { productFamilies } from './routes/product-families'
 import { products } from './routes/products'
 import { quotes } from './routes/quotes'
+import { salesQuotes } from './routes/sales-quotes'
 import { users } from './routes/users'
 
 const app = new Hono<{ Variables: AuthVariables }>()
@@ -33,6 +34,7 @@ app.route('/api/admin/invites', adminInvites)
 app.route('/api/products', products)
 app.route('/api/product-families', productFamilies)
 app.route('/api/quotes', quotes)
+app.route('/api/sales-quotes', salesQuotes)
 app.route('/api/calculate', calculate)
 app.route('/', createDocsRoutes(apiPublicUrl))
 

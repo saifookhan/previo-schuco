@@ -40,6 +40,7 @@ export { filterBusinessUnitIdsByCompany } from './queries/business-units'
 export { writeAuditLog, type WriteAuditLogInput } from './queries/audit'
 export {
   deleteProductFamily,
+  getProductFamiliesPublishStatus,
   getProductFamilyById,
   touchProductFamily,
   updateCharacteristic,
@@ -69,4 +70,21 @@ export {
   type UpdateProductLineInput,
   type ProductFamilySummary,
 } from './queries/product-families'
+export {
+  deleteQuotePosition,
+  getQuoteDetail,
+  insertQuote,
+  insertQuotePosition,
+  insertQuotePositionCharacteristic,
+  listQuotes,
+  recalculateQuoteTotal,
+  reorderQuotePositions,
+  type InsertQuoteInput,
+  type InsertQuotePositionCharacteristicInput,
+  type InsertQuotePositionInput,
+  type QuoteDetail,
+  type QuotePositionCharacteristicRow,
+  type QuotePositionRow,
+  type QuoteSummary,
+} from './queries/quotes'
 export * from './schema'

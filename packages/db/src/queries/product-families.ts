@@ -255,6 +255,21 @@ export const getProductFamilyById = async (
   return family ?? null
 }
 
+/** Batch publish-status lookup for a set of family ids (e.g. flagging quote positions whose catalog family is no longer published). Ids not found are simply absent from the map. */
+export const getProductFamiliesPublishStatus = async (
+  db: DbLike,
+  familyIds: string[],
+): Promise<Map<string, boolean>> => {
+  if (familyIds.length === 0) {
+    return new Map()
+  }
+  const rows = await db
+    .select({ id: productFamilies.id, isPublished: productFamilies.isPublished })
+    .from(productFamilies)
+    .where(inArray(productFamilies.id, familyIds))
+  return new Map(rows.map((row) => [row.id, row.isPublished]))
+}
+
 /** Bumps a family's `updatedAt` — call after editing any of its children. */
 export const touchProductFamily = async (db: DbLike, familyId: string): Promise<void> => {
   await db.update(productFamilies).set({ updatedAt: new Date() }).where(eq(productFamilies.id, familyId))
