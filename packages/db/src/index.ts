@@ -19,7 +19,9 @@ export {
   type DemoUserSeed,
 } from './demo-users'
 export {
+  approveUser,
   createInvitedUser,
+  deletePendingUser,
   getUserByEmail,
   getUserByEmailInCompany,
   getUserProfileByCognitoSub,
@@ -37,6 +39,7 @@ export {
   type UserAuthRow,
   type UserListRow,
   type UserProfile,
+  type UserStatus,
 } from './queries/users'
 export {
   getValidAuthTokenByHash,

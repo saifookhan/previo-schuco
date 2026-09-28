@@ -1,5 +1,7 @@
 import {
+  approveUser,
   createInvitedUser,
+  deletePendingUser,
   filterBusinessUnitIdsByCompany,
   getUserByEmailInCompany,
   getUserProfileById,
@@ -23,9 +25,9 @@ export class InvalidBusinessUnitsError extends Error {}
 
 /**
  * A user with this email already exists in this company and isn't a
- * resumable pending invite (`'invited'`/`'invite_failed'`) — e.g. already
- * `'active'`. Distinct from the retry path, where an existing pending
- * invite is resumed instead of rejected.
+ * resumable pending invite (`'pending_approval'`/`'invited'`/`'invite_failed'`)
+ * — e.g. already `'active'`. Distinct from the retry path, where an
+ * existing pending invite is resumed instead of rejected.
  */
 export class InviteConflictError extends Error {}
 
@@ -75,18 +77,25 @@ export interface InviteActor {
  *
  * `email` is globally unique, so a second invite to the same address is
  * handled explicitly rather than left to hit the unique constraint: an
- * existing `'invited'`/`'invite_failed'` row in this company is a retry
- * (resend the invite email, no new row); anything else (already
- * `'active'`, or a different company entirely — which RLS would hide,
- * surfacing as "not found" here) is a conflict.
+ * existing `'pending_approval'`/`'invited'`/`'invite_failed'` row in
+ * this company is a retry (resend the invite email, or for a still-
+ * pending-approval row, just a no-op — nothing to resend until it's
+ * approved); anything else (already `'active'`, or a different company
+ * entirely — which RLS would hide, surfacing as "not found" here) is a
+ * conflict.
  *
  * Callers: the company-admin route forces `companyId` to the caller's
- * own company; the super-admin route takes it explicitly from the
- * request body. Neither ever comes from a URL path (ADR 0001).
+ * own company AND `requiresApproval: true` (Stage 3 — a company-admin's
+ * own invites always need a super-admin's sign-off, via `approveInvite`
+ * below); the super-admin route takes `companyId` from the request body
+ * and `requiresApproval: false` (a super-admin IS the approver, so
+ * there's nothing to gate). Neither `companyId` ever comes from a URL
+ * path (ADR 0001).
  * @param ctx - Tenant context resolved by `requireAuth`
  * @param actor - Who's inviting, for authorization and the audit record
  * @param companyId - Company the invited user belongs to
  * @param input - Invitee details
+ * @param requiresApproval - True: create as `'pending_approval'`, no email sent yet. False: invite immediately.
  * @throws {RoleNotGrantableError} `actor.callerRoleId` may not grant `input.roleId`
  * @throws {InvalidBusinessUnitsError} a requested business unit doesn't belong to `companyId`
  * @throws {InviteConflictError} the email is already taken by a non-pending user
@@ -96,6 +105,7 @@ export const inviteUser = async (
   actor: InviteActor,
   companyId: string,
   input: InviteUserInput,
+  requiresApproval: boolean,
 ): Promise<UserProfile> => {
   if (!canGrantRole(actor.callerRoleId, input.roleId)) {
     throw new RoleNotGrantableError(`'${actor.callerRoleId}' cannot assign role '${input.roleId}'`)
@@ -118,25 +128,24 @@ export const inviteUser = async (
     requestId: actor.requestId,
   }
 
-  const created = await withTenantDb(ctx, async (tx) => {
+  const { created, wasPendingApproval } = await withTenantDb(ctx, async (tx) => {
     const existing = await getUserByEmailInCompany(tx, companyId, input.email)
 
     if (existing) {
-      if (existing.status !== 'invited' && existing.status !== 'invite_failed') {
+      if (existing.status !== 'invited' && existing.status !== 'invite_failed' && existing.status !== 'pending_approval') {
         throw new InviteConflictError(`A user with email '${input.email}' already exists`)
       }
-      // Retry: resend the invite email for the existing pending row, no new insert.
       const profile = await getUserProfileById(tx, existing.id)
       if (!profile) {
         throw new Error('Failed to load existing invited user profile')
       }
       await recordAuditEvent(tx, auditActor, companyId, {
-        action: 'user.invite.retry',
+        action: existing.status === 'pending_approval' ? 'user.invite.request.retry' : 'user.invite.retry',
         resourceType: 'user',
         resourceId: profile.id,
         metadata: { email: input.email, roleId: input.roleId },
       })
-      return profile
+      return { created: profile, wasPendingApproval: existing.status === 'pending_approval' }
     }
 
     const profile = await createInvitedUser(tx, {
@@ -145,15 +154,21 @@ export const inviteUser = async (
       companyId,
       roleId: input.roleId,
       businessUnitIds: validBusinessUnitIds,
+      initialStatus: requiresApproval ? 'pending_approval' : 'invited',
     })
     await recordAuditEvent(tx, auditActor, companyId, {
-      action: 'user.invite',
+      action: requiresApproval ? 'user.invite.request' : 'user.invite',
       resourceType: 'user',
       resourceId: profile.id,
       metadata: { email: input.email, roleId: input.roleId },
     })
-    return profile
+    return { created: profile, wasPendingApproval: requiresApproval }
   })
+
+  // Nothing to email yet — still waiting on a super-admin's approveInvite call.
+  if (wasPendingApproval) {
+    return created
+  }
 
   try {
     await issueInviteToken(created.id, input.email, input.name ?? created.name)
@@ -169,3 +184,90 @@ export const inviteUser = async (
     return { ...created, status: 'invite_failed' }
   }
 }
+
+export interface ApprovalActor {
+  actorUserId: string
+  actorCompanyId: string
+  requestId?: string | null
+}
+
+/** The target user isn't currently `'pending_approval'` (already approved/rejected/never existed). */
+export class NotPendingApprovalError extends Error {}
+
+/**
+ * Approves a company-admin's pending invite request: flips
+ * `'pending_approval'` -> `'invited'` and sends the actual invite email
+ * (Resend) — the step `inviteUser` deliberately skipped when it created
+ * this row. Cross-tenant by nature (a super-admin approving into any
+ * company), so `ctx` is unscoped like `listAllUsers`.
+ * @throws {NotPendingApprovalError} the user isn't awaiting approval
+ */
+export const approveInvite = async (ctx: TenantContext, actor: ApprovalActor, userId: string): Promise<UserProfile> => {
+  const approved = await withTenantDb(ctx, (tx) => approveUser(tx, userId))
+  if (!approved) {
+    throw new NotPendingApprovalError(`User '${userId}' is not awaiting approval`)
+  }
+
+  const auditActor = {
+    actorType: 'user' as const,
+    actorUserId: actor.actorUserId,
+    actorCompanyId: actor.actorCompanyId,
+    requestId: actor.requestId,
+  }
+  await withTenantDb(ctx, (tx) =>
+    recordAuditEvent(tx, auditActor, approved.company.id, {
+      action: 'user.invite.approve',
+      resourceType: 'user',
+      resourceId: approved.id,
+      metadata: { email: approved.email },
+    }),
+  )
+
+  try {
+    await issueInviteToken(approved.id, approved.email, approved.name)
+    return approved
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(`[usersService.approveInvite] Invite email failed for ${approved.email}:`, error)
+    await withTenantDb(ctx, (tx) => markInviteFailed(tx, approved.id))
+    return { ...approved, status: 'invite_failed' }
+  }
+}
+
+/**
+ * Rejects a company-admin's pending invite request — deletes the row
+ * outright (see `deletePendingUser`: there's nothing worth keeping, no
+ * password/access was ever possible). Cross-tenant, same as
+ * `approveInvite`.
+ * @throws {NotPendingApprovalError} the user isn't awaiting approval
+ */
+export const rejectInvite = async (ctx: TenantContext, actor: ApprovalActor, userId: string): Promise<void> => {
+  const pending = await withTenantDb(ctx, (tx) => getUserProfileById(tx, userId))
+  if (!pending || pending.status !== 'pending_approval') {
+    throw new NotPendingApprovalError(`User '${userId}' is not awaiting approval`)
+  }
+
+  const deleted = await withTenantDb(ctx, (tx) => deletePendingUser(tx, userId))
+  if (!deleted) {
+    throw new NotPendingApprovalError(`User '${userId}' is not awaiting approval`)
+  }
+
+  const auditActor = {
+    actorType: 'user' as const,
+    actorUserId: actor.actorUserId,
+    actorCompanyId: actor.actorCompanyId,
+    requestId: actor.requestId,
+  }
+  await withTenantDb(ctx, (tx) =>
+    recordAuditEvent(tx, auditActor, pending.company.id, {
+      action: 'user.invite.reject',
+      resourceType: 'user',
+      resourceId: userId,
+      metadata: { email: pending.email },
+    }),
+  )
+}
+
+/** Lists every user currently awaiting super-admin approval, across all companies. */
+export const listPendingApprovalUsers = (ctx: TenantContext): Promise<UserListRow[]> =>
+  withTenantDb(ctx, (tx) => listUsers(tx, undefined, 'pending_approval'))

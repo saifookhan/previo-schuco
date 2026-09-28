@@ -108,7 +108,13 @@
     "status": "Status",
     "cognitoSub": "Cognito sub",
     "noUsersFound": "No users found.",
-    "errorLoading": "Couldn't load users — the server may be unreachable."
+    "errorLoading": "Couldn't load users — the server may be unreachable.",
+    "pendingApprovalsCount": "{count} pending approvals",
+    "pendingApprovalsSubtitle": "A company-admin requested these users — nothing is emailed to them until you decide.",
+    "approve": "Approve",
+    "reject": "Reject",
+    "decisionFailed": "Could not record your decision",
+    "decisionFailedUnreachable": "Could not record your decision — could not reach the server"
   },
   "settingsUsers": {
     "title": "Users",

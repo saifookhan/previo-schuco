@@ -64,6 +64,13 @@
       "when": 1790607087114,
       "tag": "0009_auth_tokens_password_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790609075616,
+      "tag": "0010_pending_approval_status",
+      "breakpoints": true
     }
   ]
 }

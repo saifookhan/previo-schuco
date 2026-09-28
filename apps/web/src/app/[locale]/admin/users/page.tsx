@@ -4,15 +4,22 @@ import { getTranslations } from 'next-intl/server'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchFromApiResult } from '@/lib/api/server-client'
+import { PendingApprovalsCard } from '@/components/pending-approvals-card'
 import type { AdminUsersListResponse } from '@schuco/contracts'
 
 /**
- * Super-admin users table listing all platform users across companies.
+ * Super-admin users table listing all platform users across companies,
+ * plus a pending-approvals section (Stage 3) for company-admin-requested
+ * users still awaiting a decision.
  */
 const AdminUsersPage = async () => {
   const t = await getTranslations('adminUsers')
-  const result = await fetchFromApiResult<AdminUsersListResponse>('/api/admin/users')
+  const [result, pendingResult] = await Promise.all([
+    fetchFromApiResult<AdminUsersListResponse>('/api/admin/users'),
+    fetchFromApiResult<AdminUsersListResponse>('/api/admin/users/pending'),
+  ])
   const users = result.data?.users ?? []
+  const pending = pendingResult.data?.users ?? []
   const loadFailed = result.status === 'error'
 
   return (
@@ -21,6 +28,8 @@ const AdminUsersPage = async () => {
         <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-400">{t('subtitle')}</p>
       </div>
+
+      <PendingApprovalsCard pending={pending} />
 
       {loadFailed ? (
         <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-300">
@@ -58,7 +67,15 @@ const AdminUsersPage = async () => {
                     <Badge>{user.role.name}</Badge>
                   </td>
                   <td className="px-6 py-4">
-                    <Badge variant={user.status === 'active' ? 'success' : 'muted'}>
+                    <Badge
+                      variant={
+                        user.status === 'active'
+                          ? 'success'
+                          : user.status === 'pending_approval'
+                            ? 'warning'
+                            : 'muted'
+                      }
+                    >
                       {user.status}
                     </Badge>
                   </td>

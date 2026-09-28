@@ -108,7 +108,13 @@
     "status": "Stato",
     "cognitoSub": "Cognito sub",
     "noUsersFound": "Nessun utente trovato.",
-    "errorLoading": "Impossibile caricare gli utenti — il server potrebbe non essere raggiungibile."
+    "errorLoading": "Impossibile caricare gli utenti — il server potrebbe non essere raggiungibile.",
+    "pendingApprovalsCount": "{count} approvazioni in sospeso",
+    "pendingApprovalsSubtitle": "Un company-admin ha richiesto questi utenti — non riceveranno email finché non decidi.",
+    "approve": "Approva",
+    "reject": "Rifiuta",
+    "decisionFailed": "Impossibile registrare la tua decisione",
+    "decisionFailedUnreachable": "Impossibile registrare la tua decisione — server non raggiungibile"
   },
   "settingsUsers": {
     "title": "Utenti",

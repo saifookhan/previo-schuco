@@ -50,6 +50,7 @@ adminInvites.post('/', requireAuth, requireRoles(['super-admin']), async (c) => 
       },
       parsedBody.data.companyId,
       parsedBody.data,
+      false, // requiresApproval — a super-admin IS the approver, nothing to gate (Stage 3)
     )
   } catch (error) {
     if (error instanceof RoleNotGrantableError) {

@@ -108,7 +108,13 @@
     "status": "Status",
     "cognitoSub": "Cognito-Sub",
     "noUsersFound": "Keine Benutzer gefunden.",
-    "errorLoading": "Benutzer konnten nicht geladen werden — der Server ist möglicherweise nicht erreichbar."
+    "errorLoading": "Benutzer konnten nicht geladen werden — der Server ist möglicherweise nicht erreichbar.",
+    "pendingApprovalsCount": "{count} ausstehende Genehmigungen",
+    "pendingApprovalsSubtitle": "Ein Company-Admin hat diese Benutzer angefragt — es wird keine E-Mail gesendet, bis Sie entscheiden.",
+    "approve": "Genehmigen",
+    "reject": "Ablehnen",
+    "decisionFailed": "Ihre Entscheidung konnte nicht gespeichert werden",
+    "decisionFailedUnreachable": "Ihre Entscheidung konnte nicht gespeichert werden — Server nicht erreichbar"
   },
   "settingsUsers": {
     "title": "Benutzer",
