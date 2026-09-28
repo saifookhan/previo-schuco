@@ -11,8 +11,8 @@ import {
 } from '@schuco/db'
 
 import { canGrantRole } from '../lib/role-hierarchy'
-import { createCognitoInvite } from '../lib/cognito-admin'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
+import { issueInviteToken } from './auth-service'
 import { recordAuditEvent } from './audit-service'
 
 /** The caller's role isn't allowed to grant the requested role (see `canGrantRole`). */
@@ -68,17 +68,17 @@ export interface InviteActor {
 /**
  * Invite a user into `companyId` (ADR 0004), or resume a still-pending
  * invite for the same email. The DB grant is created/updated and
- * committed first — it's authoritative; the Cognito call happens after,
- * separately, so a failure there only ever leaves "a DB grant with no
- * Cognito identity yet" (queryable as `status: 'invite_failed'`), never
- * an orphaned Cognito identity with no DB record.
+ * committed first — it's authoritative; the invite email (via Resend)
+ * happens after, separately, so a failure there only ever leaves "a DB
+ * grant with no invite email sent yet" (queryable as `status:
+ * 'invite_failed'`), never a sent email with no DB record.
  *
  * `email` is globally unique, so a second invite to the same address is
  * handled explicitly rather than left to hit the unique constraint: an
  * existing `'invited'`/`'invite_failed'` row in this company is a retry
- * (resend Cognito, no new row); anything else (already `'active'`, or a
- * different company entirely — which RLS would hide, surfacing as "not
- * found" here) is a conflict.
+ * (resend the invite email, no new row); anything else (already
+ * `'active'`, or a different company entirely — which RLS would hide,
+ * surfacing as "not found" here) is a conflict.
  *
  * Callers: the company-admin route forces `companyId` to the caller's
  * own company; the super-admin route takes it explicitly from the
@@ -125,7 +125,7 @@ export const inviteUser = async (
       if (existing.status !== 'invited' && existing.status !== 'invite_failed') {
         throw new InviteConflictError(`A user with email '${input.email}' already exists`)
       }
-      // Retry: resend Cognito for the existing pending row, no new insert.
+      // Retry: resend the invite email for the existing pending row, no new insert.
       const profile = await getUserProfileById(tx, existing.id)
       if (!profile) {
         throw new Error('Failed to load existing invited user profile')
@@ -156,13 +156,7 @@ export const inviteUser = async (
   })
 
   try {
-    const result = await createCognitoInvite(input.email)
-    if (result.outcome === 'skipped-dev-bypass') {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[usersService.inviteUser] Cognito not configured — DB row created for ${input.email}, no invite email sent (dev bypass).`,
-      )
-    }
+    await issueInviteToken(created.id, input.email, input.name ?? created.name)
     if (created.status === 'invite_failed') {
       await withTenantDb(ctx, (tx) => resetInvitePending(tx, created.id))
       return { ...created, status: 'invited' }
@@ -170,7 +164,7 @@ export const inviteUser = async (
     return created
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error(`[usersService.inviteUser] Cognito invite failed for ${input.email}:`, error)
+    console.error(`[usersService.inviteUser] Invite email failed for ${input.email}:`, error)
     await withTenantDb(ctx, (tx) => markInviteFailed(tx, created.id))
     return { ...created, status: 'invite_failed' }
   }

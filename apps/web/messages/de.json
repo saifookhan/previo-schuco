@@ -156,18 +156,16 @@
   },
   "login": {
     "title": "Bei PREVIO anmelden",
-    "subtitleDevAndCognito": "Dev-Login oder Cognito",
-    "subtitleDevOnly": "Lokaler Dev-Login (Testbenutzer)",
-    "subtitleCognitoOnly": "Mit Ihrem Firmenkonto anmelden",
-    "authFailedPrefix": "Authentifizierung fehlgeschlagen",
-    "errorCognitoNotConfigured": "Cognito ist für diese Umgebung nicht konfiguriert.",
-    "errorInvalidState": "Anmeldesitzung abgelaufen. Bitte erneut versuchen.",
-    "errorMissingVerifier": "Anmeldesitzung abgelaufen. Bitte erneut versuchen.",
-    "errorTokenExchange": "Anmeldung mit Cognito konnte nicht abgeschlossen werden.",
+    "subtitle": "Melden Sie sich mit Ihrer E-Mail und Ihrem Passwort an",
     "emailLabel": "E-Mail",
-    "devSignIn": "Dev-Anmeldung",
+    "passwordLabel": "Passwort",
+    "forgotPassword": "Passwort vergessen?",
+    "signIn": "Anmelden",
     "signingIn": "Anmeldung läuft…",
-    "continueWithCognito": "Mit Cognito fortfahren"
+    "errorLoginFailed": "Ungültige E-Mail oder Passwort",
+    "errorUnreachable": "Server nicht erreichbar",
+    "devSectionTitle": "Dev-Demo-Login",
+    "devSignIn": "Als Demo anmelden"
   },
   "productFamilies": {
     "title": "Produktfamilien",
@@ -380,5 +378,27 @@
     "edit": "Unternehmen bearbeiten",
     "activate": "Unternehmen aktivieren",
     "deactivate": "Unternehmen deaktivieren — sperrt alle seine Benutzer"
+  },
+  "setPassword": {
+    "title": "Passwort festlegen",
+    "subtitle": "Wählen Sie ein Passwort, um Ihr Konto zu aktivieren",
+    "missingToken": "Diesem Link fehlt das Token — bitte verwenden Sie den Link aus Ihrer E-Mail.",
+    "newPasswordLabel": "Neues Passwort",
+    "confirmPasswordLabel": "Passwort bestätigen",
+    "setPassword": "Passwort festlegen",
+    "saving": "Wird gespeichert…",
+    "errorTooShort": "Das Passwort muss mindestens 10 Zeichen lang sein",
+    "errorMismatch": "Die Passwörter stimmen nicht überein",
+    "errorFailed": "Dieser Link ist ungültig oder abgelaufen",
+    "errorUnreachable": "Server nicht erreichbar"
+  },
+  "forgotPassword": {
+    "title": "Passwort zurücksetzen",
+    "subtitle": "Wir senden Ihnen einen Link zum Festlegen eines neuen Passworts",
+    "emailLabel": "E-Mail",
+    "sendResetLink": "Reset-Link senden",
+    "sending": "Wird gesendet…",
+    "checkEmail": "Falls diese E-Mail ein Konto hat, ist ein Reset-Link unterwegs.",
+    "backToLogin": "Zurück zur Anmeldung"
   }
 }

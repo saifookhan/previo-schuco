@@ -156,18 +156,16 @@
   },
   "login": {
     "title": "Accedi a PREVIO",
-    "subtitleDevAndCognito": "Login dev o Cognito",
-    "subtitleDevOnly": "Login dev locale (utenti demo)",
-    "subtitleCognitoOnly": "Accedi con il tuo account aziendale",
-    "authFailedPrefix": "Autenticazione fallita",
-    "errorCognitoNotConfigured": "Cognito non è configurato per questo ambiente.",
-    "errorInvalidState": "Sessione di accesso scaduta. Riprova.",
-    "errorMissingVerifier": "Sessione di accesso scaduta. Riprova.",
-    "errorTokenExchange": "Impossibile completare l'accesso con Cognito.",
+    "subtitle": "Accedi con la tua email e password",
     "emailLabel": "Email",
-    "devSignIn": "Accesso dev",
+    "passwordLabel": "Password",
+    "forgotPassword": "Password dimenticata?",
+    "signIn": "Accedi",
     "signingIn": "Accesso in corso…",
-    "continueWithCognito": "Continua con Cognito"
+    "errorLoginFailed": "Email o password non validi",
+    "errorUnreachable": "Impossibile raggiungere il server",
+    "devSectionTitle": "Login dev demo",
+    "devSignIn": "Accedi come demo"
   },
   "productFamilies": {
     "title": "Famiglie di prodotto",
@@ -380,5 +378,27 @@
     "edit": "Modifica azienda",
     "activate": "Attiva azienda",
     "deactivate": "Disattiva azienda — blocca l'accesso a tutti i suoi utenti"
+  },
+  "setPassword": {
+    "title": "Imposta la tua password",
+    "subtitle": "Scegli una password per attivare il tuo account",
+    "missingToken": "A questo link manca il token — usa il link ricevuto via email.",
+    "newPasswordLabel": "Nuova password",
+    "confirmPasswordLabel": "Conferma password",
+    "setPassword": "Imposta password",
+    "saving": "Salvataggio…",
+    "errorTooShort": "La password deve avere almeno 10 caratteri",
+    "errorMismatch": "Le password non corrispondono",
+    "errorFailed": "Questo link non è valido o è scaduto",
+    "errorUnreachable": "Impossibile raggiungere il server"
+  },
+  "forgotPassword": {
+    "title": "Reimposta la password",
+    "subtitle": "Ti invieremo un link per impostarne una nuova",
+    "emailLabel": "Email",
+    "sendResetLink": "Invia link di reset",
+    "sending": "Invio in corso…",
+    "checkEmail": "Se quell'email ha un account, un link di reset è in arrivo.",
+    "backToLogin": "Torna al login"
   }
 }

@@ -156,18 +156,16 @@
   },
   "login": {
     "title": "Sign in to PREVIO",
-    "subtitleDevAndCognito": "Dev seed login or Cognito",
-    "subtitleDevOnly": "Local dev login (seed users)",
-    "subtitleCognitoOnly": "Sign in with your company account",
-    "authFailedPrefix": "Authentication failed",
-    "errorCognitoNotConfigured": "Cognito is not configured for this environment.",
-    "errorInvalidState": "Sign-in session expired. Please try again.",
-    "errorMissingVerifier": "Sign-in session expired. Please try again.",
-    "errorTokenExchange": "Could not complete sign-in with Cognito.",
+    "subtitle": "Sign in with your email and password",
     "emailLabel": "Email",
-    "devSignIn": "Dev sign in",
+    "passwordLabel": "Password",
+    "forgotPassword": "Forgot password?",
+    "signIn": "Sign in",
     "signingIn": "Signing in…",
-    "continueWithCognito": "Continue with Cognito"
+    "errorLoginFailed": "Invalid email or password",
+    "errorUnreachable": "Could not reach the server",
+    "devSectionTitle": "Dev seed login",
+    "devSignIn": "Dev sign in"
   },
   "productFamilies": {
     "title": "Product families",
@@ -380,5 +378,27 @@
     "edit": "Edit company",
     "activate": "Activate company",
     "deactivate": "Deactivate company — blocks all its users from logging in"
+  },
+  "setPassword": {
+    "title": "Set your password",
+    "subtitle": "Choose a password to activate your account",
+    "missingToken": "This link is missing its token — please use the link from your email.",
+    "newPasswordLabel": "New password",
+    "confirmPasswordLabel": "Confirm password",
+    "setPassword": "Set password",
+    "saving": "Saving…",
+    "errorTooShort": "Password must be at least 10 characters",
+    "errorMismatch": "Passwords don't match",
+    "errorFailed": "This link is invalid or has expired",
+    "errorUnreachable": "Could not reach the server"
+  },
+  "forgotPassword": {
+    "title": "Reset your password",
+    "subtitle": "We'll email you a link to set a new one",
+    "emailLabel": "Email",
+    "sendResetLink": "Send reset link",
+    "sending": "Sending…",
+    "checkEmail": "If that email has an account, a reset link is on its way.",
+    "backToLogin": "Back to sign in"
   }
 }

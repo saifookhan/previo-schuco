@@ -1,6 +1,6 @@
 # PREVIO — Schuco Platform
 
-Monorepo for the PREVIO quote/preventivo platform built with Next.js, Hono, AWS (Cognito, RDS, ECS), Redis/BullMQ, and Vercel.
+Monorepo for the PREVIO quote/preventivo platform built with Next.js, Hono, PostgreSQL/Redis/BullMQ, and our own email+password auth (JWT session — no external identity provider).
 
 See [docs/technical-overview.md](docs/technical-overview.md) for architecture diagrams and onboarding guide.  
 See [docs/project-context.md](docs/project-context.md) for domain model and roadmap.  
@@ -9,13 +9,12 @@ See [docs/adr/](docs/adr/) for the architecture decision records behind the mult
 
 ## Stack
 
-- **Frontend:** Next.js 15 on Vercel, shadcn/ui, Tailwind CSS v4, next-intl (IT/EN/DE)
-- **API:** Hono on AWS ECS Fargate (Docker)
-- **Auth:** AWS Cognito (identity only) + PostgreSQL RBAC + Row-Level Security (tenant isolation) — see [ADR 0002](docs/adr/0002-cognito-identity-only.md), [ADR 0006](docs/adr/0006-rls-request-scoped-transaction.md)
-- **Database:** PostgreSQL (RDS prod, Docker locally). The app always connects as a restricted, non-superuser role (`previo_app`) — never the migration/owner role — see [ADR 0007](docs/adr/0007-application-db-role.md)
+- **Frontend:** Next.js 15, shadcn/ui, Tailwind CSS v4, next-intl (IT/EN/DE)
+- **API:** Hono (Docker)
+- **Auth:** Our own email+password, hashed with bcrypt — no external identity provider. apps/web signs a session JWT (`AUTH_SECRET`, shared with apps/api) on login and forwards it as `Authorization: Bearer` on every server-side API call; apps/api verifies it with the same secret (see `apps/api/src/lib/session-jwt.ts`). Invite-accept and password-reset are one-time tokens emailed via [Resend](https://resend.com) (`RESEND_API_KEY` — unset in local dev, which just logs the link instead of sending). PostgreSQL RBAC + Row-Level Security still does tenant isolation — see [ADR 0006](docs/adr/0006-rls-request-scoped-transaction.md)
+- **Database:** PostgreSQL (Docker locally). The app always connects as a restricted, non-superuser role (`previo_app`) — never the migration/owner role — see [ADR 0007](docs/adr/0007-application-db-role.md)
 - **Background jobs:** BullMQ on Redis — see [ADR 0009](docs/adr/0009-bullmq-background-jobs.md)
 - **Testing:** Vitest — repository/DB/RLS integration tests run against a real Postgres (`previo_test`), never mocked — see [ADR 0012](docs/adr/0012-testing-strategy-and-service-layer.md)
-- **IaC:** Terraform (dev; stage/prod structured for later)
 
 ## Quick start (local) — setting this up on a brand-new machine
 
@@ -26,13 +25,19 @@ pnpm install
 cp .env.example .env.local        # NOT .env — see docs/environments.md and ADR 0005
 ```
 
-Now open `.env.local` and **generate a real `AUTH_SECRET`** — the file ships with it blank, and that's the #1 cause of "not authenticated" errors on a fresh setup (see Troubleshooting below):
+Now open `.env.local` and **generate a real `AUTH_SECRET`** — the file ships with it blank, and that's the #1 cause of "not authenticated" errors on a fresh setup (see Troubleshooting below). It's shared: apps/web signs session JWTs with it, apps/api verifies them with it — the same value must reach both.
 
 ```bash
 openssl rand -base64 32
 ```
 
-Paste the output as `AUTH_SECRET=...` in `.env.local`. Everything else in `.env.example` already has working local defaults (Cognito is deliberately left unconfigured — you get the dev/seed-user login instead, see below).
+Paste the output as `AUTH_SECRET=...` in **both** `.env.local` (which `pnpm dev`'s Node processes read) **and** a new `.env` file at the repo root next to `docker-compose.yml` (Compose's own auto-loaded file, a separate mechanism from `.env.local` — see ADR 0005):
+
+```bash
+echo "AUTH_SECRET=<the value you just generated>" > .env
+```
+
+Everything else in `.env.example` already has working local defaults.
 
 ```bash
 docker compose up -d              # Postgres + Redis + API + worker (waits for migrate+seed to finish)
@@ -43,7 +48,7 @@ pnpm dev                          # Web on :3000 — MUST be `pnpm dev`, not `pn
 - API: http://localhost:3001
 - Swagger UI: http://localhost:3001/docs
 - OpenAPI spec: http://localhost:3001/openapi.json
-- Login: go to `/login` and sign in as one of the seeded demo users (no password — this is dev-only, disabled once Cognito is configured):
+- Login: go to `/login` and sign in as one of the seeded demo users via the "dev seed login" shortcut (no password needed for these — real accounts go through email+password, invited from the admin panel and set via the `/set-password` link Resend would otherwise email):
 
   | Email | Role | Company |
   |---|---|---|
@@ -58,8 +63,9 @@ pnpm dev                          # Web on :3000 — MUST be `pnpm dev`, not `pn
 
 - **"Not authenticated" errors, especially right after upload/save actions** — almost always one of:
   1. `AUTH_SECRET` is still blank in `.env.local` (see above) — regenerate it and restart `pnpm dev`. Next.js only reads `.env.local` at process startup, so changing it requires a restart, not just a save.
-  2. You ran `pnpm build && pnpm start` instead of `pnpm dev`. Production mode marks the session cookie `Secure`, which browsers silently drop over plain `http://localhost` — the login screen appears to work but nothing after it does. Use `pnpm dev` for local work; production builds are for the Docker/self-host paths below, which set `COOKIE_SECURE` explicitly.
-  3. `docker compose up -d` hadn't finished yet — the `migrate` container (schema + seed data) must complete before the demo login users exist. Check with `docker compose ps` (everything should show `running`/`healthy`, and `migrate` should show `exited (0)` — that's success, it's a one-shot job) or `docker compose logs migrate`.
+  2. `AUTH_SECRET` is set in `.env.local` but **not** in the root `.env` file (or the two values don't match) — apps/web (host, reading `.env.local`) and the dockerized apps/api (reading `.env`) are then signing/verifying with different secrets, so every real (non-dev-login) session fails verification even though login itself appears to succeed. Dev-login is unaffected (it doesn't use a JWT at all — see below), which is why this one can look confusing: seed-user login keeps working while real email+password login doesn't.
+  3. You ran `pnpm build && pnpm start` instead of `pnpm dev`. Production mode marks the session cookie `Secure`, which browsers silently drop over plain `http://localhost` — the login screen appears to work but nothing after it does. Use `pnpm dev` for local work; production builds are for the Docker/self-host paths below, which set `COOKIE_SECURE` explicitly.
+  4. `docker compose up -d` hadn't finished yet — the `migrate` container (schema + seed data) must complete before the demo login users exist. Check with `docker compose ps` (everything should show `running`/`healthy`, and `migrate` should show `exited (0)` — that's success, it's a one-shot job) or `docker compose logs migrate`.
 - **Import/upload silently fails or times out** — confirm the `api` container is actually up: `curl http://localhost:3001/health` should return `{"status":"ok",...}`. If not, `docker compose logs api`.
 - **Nothing loads at all / 500 on every page** — usually a stale Next.js dev server from an earlier run still holding port 3000, or a stale `.next` cache after pulling changes that touched shared files (layout, middleware, i18n messages). Kill whatever's on :3000 and `rm -rf apps/web/.next` before `pnpm dev` again.
 
@@ -81,13 +87,15 @@ That's it — the whole app (Postgres, Redis, API, worker, web) comes up, and th
 
 | Var | Default | When to change it |
 |---|---|---|
-| `AUTH_SECRET` | *(insecure placeholder — always override this one)* | Always — `openssl rand -base64 32` |
+| `AUTH_SECRET` | *(insecure placeholder — always override this one)* | Always — `openssl rand -base64 32`. Shared by the `web` and `api` services (same var, same value — apps/web signs sessions, apps/api verifies them) |
 | `COOKIE_SECURE` | `false` | Set to `true` once this sits behind HTTPS (a reverse proxy with a real cert) — otherwise leave `false`, or logins won't persist over plain HTTP |
-| `APP_PUBLIC_URL` | `http://localhost:3000` | Set to `http://<server-ip>:3000` (or your domain) once you're not just hitting it from the same box |
-| `ALLOW_DEV_LOGIN` | `true` | Set to `false` once real Cognito is configured for this deployment |
+| `APP_PUBLIC_URL` | `http://localhost:3000` | Set to `http://<server-ip>:3000` (or your domain) once you're not just hitting it from the same box — also what invite/reset-password email links point at |
+| `ALLOW_DEV_LOGIN` | `true` | Set to `false` for a deployment real customers will use — leaves the password-less seed-user shortcut disabled |
 | `APP_DB_PASSWORD` | `previo_app` | Change for anything beyond a throwaway demo |
+| `RESEND_API_KEY` | *(unset)* | A [Resend](https://resend.com) API key — without it, invite/password-reset emails aren't actually sent, just logged (`docker compose logs api`) with the link |
+| `RESEND_FROM_EMAIL` | `PREVIO <onboarding@resend.dev>` | Resend's shared test sender works until you verify your own domain with them |
 
-This is a single-server convenience path, not the production architecture — real production is Next.js on Vercel + the API on ECS Fargate (see [docs/deployment.md](docs/deployment.md)).
+This is a single-server convenience path — see [docs/deployment.md](docs/deployment.md) for other options.
 
 ### Running everything locally (no Docker API/worker)
 

@@ -57,6 +57,13 @@
       "when": 1790580427346,
       "tag": "0008_companies_is_active",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790607087114,
+      "tag": "0009_auth_tokens_password_hash",
+      "breakpoints": true
     }
   ]
 }

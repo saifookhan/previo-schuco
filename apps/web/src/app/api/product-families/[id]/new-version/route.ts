@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { authConfig } from '@/lib/auth/config'
-import { getSession } from '@/lib/auth/session'
+import { getSession, getSessionToken } from '@/lib/auth/session'
 
 /**
  * Proxies an updated Excel upload to the core API's new-version endpoint.
@@ -18,10 +18,9 @@ export const POST = async (
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
-  const headers: Record<string, string> =
-    session.accessToken === 'dev-token'
-      ? { 'X-Dev-User-Sub': session.sub }
-      : { Authorization: `Bearer ${session.accessToken}` }
+  const headers: Record<string, string> = session.isDevLogin
+    ? { 'X-Dev-User-Sub': session.sub }
+    : { Authorization: `Bearer ${await getSessionToken()}` }
 
   const { id } = await params
   const formData = await request.formData()

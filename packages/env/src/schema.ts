@@ -7,10 +7,12 @@ export const apiEnvSchema = z.object({
   DATABASE_URL: z.string().url(),
   PORT: z.string().optional(),
   CORS_ORIGINS: z.string().optional(),
-  COGNITO_REGION: z.string().optional(),
-  COGNITO_USER_POOL_ID: z.string().optional(),
-  COGNITO_CLIENT_ID: z.string().optional(),
   REDIS_URL: z.string().url().optional(),
+  // Shared with apps/web — apps/api verifies the session JWT web mints
+  // with this same secret (see lib/session-jwt.ts). No default: a
+  // silent fallback here would let two processes disagree about the
+  // literal value on a real deployment.
+  AUTH_SECRET: z.string().min(16, 'AUTH_SECRET must be at least 16 characters'),
 })
 
 /** Validate the fully-resolved `process.env` for `apps/api`. Throws one formatted error listing every problem, not just the first. */
@@ -25,10 +27,6 @@ export const webEnvSchema = z.object({
   NEXT_PUBLIC_API_URL: z.string().url(),
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   AUTH_SECRET: z.string().min(16, 'AUTH_SECRET must be at least 16 characters'),
-  NEXT_PUBLIC_COGNITO_REGION: z.string().optional(),
-  NEXT_PUBLIC_COGNITO_USER_POOL_ID: z.string().optional(),
-  NEXT_PUBLIC_COGNITO_CLIENT_ID: z.string().optional(),
-  NEXT_PUBLIC_COGNITO_DOMAIN: z.string().optional(),
 })
 
 /** Validate the fully-resolved `process.env` for `apps/web`. Throws one formatted error listing every problem, not just the first. */

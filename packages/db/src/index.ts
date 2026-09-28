@@ -20,21 +20,32 @@ export {
 } from './demo-users'
 export {
   createInvitedUser,
+  getUserByEmail,
   getUserByEmailInCompany,
   getUserProfileByCognitoSub,
   getUserProfileById,
   listUsers,
   markInviteFailed,
   resetInvitePending,
+  setUserPassword,
   syncUserFromCognito,
   withRlsTransaction,
   withSystemTransaction,
   type BusinessUnitScope,
   type CreateInvitedUserInput,
   type ExistingInviteRow,
+  type UserAuthRow,
   type UserListRow,
   type UserProfile,
 } from './queries/users'
+export {
+  getValidAuthTokenByHash,
+  insertAuthToken,
+  invalidatePendingAuthTokens,
+  markAuthTokenUsed,
+  type InsertAuthTokenInput,
+  type ValidAuthToken,
+} from './queries/auth-tokens'
 export {
   getCompanyById,
   insertCompany,

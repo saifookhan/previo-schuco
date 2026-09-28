@@ -1,5 +1,5 @@
 import { authConfig } from '@/lib/auth/config'
-import { getSession } from '@/lib/auth/session'
+import { getSession, getSessionToken } from '@/lib/auth/session'
 
 /**
  * Build authenticated headers for server-side API requests.
@@ -14,10 +14,11 @@ export const buildAuthHeaders = async (): Promise<Record<string, string> | null>
     'Content-Type': 'application/json',
   }
 
-  if (session.accessToken === 'dev-token') {
+  if (session.isDevLogin) {
     headers['X-Dev-User-Sub'] = session.sub
   } else {
-    headers.Authorization = `Bearer ${session.accessToken}`
+    const token = await getSessionToken()
+    headers.Authorization = `Bearer ${token}`
   }
 
   return headers

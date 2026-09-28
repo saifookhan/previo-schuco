@@ -6,6 +6,7 @@ import type { AuthVariables } from './middleware/auth'
 import { adminCompanies } from './routes/admin/companies'
 import { adminInvites } from './routes/admin/invites'
 import { adminUsers } from './routes/admin/users'
+import { auth } from './routes/auth'
 import { calculate } from './routes/calculate'
 import { createDocsRoutes } from './routes/docs'
 import { health } from './routes/health'
@@ -28,6 +29,7 @@ const apiPublicUrl = process.env.API_PUBLIC_URL ?? `http://localhost:${port}`
 app.use('*', cors({ origin: corsOrigins, credentials: true }))
 
 app.route('/health', health)
+app.route('/api/auth', auth)
 app.route('/api/me', me)
 app.route('/api/users', users)
 app.route('/api/admin/users', adminUsers)

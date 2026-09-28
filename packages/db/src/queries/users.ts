@@ -298,6 +298,54 @@ export const resetInvitePending = async (db: DbLike, userId: string): Promise<vo
   await db.update(users).set({ status: 'invited', updatedAt: new Date() }).where(eq(users.id, userId))
 }
 
+export interface UserAuthRow {
+  id: string
+  email: string
+  passwordHash: string | null
+  status: 'invited' | 'invite_failed' | 'active' | 'inactive'
+}
+
+/**
+ * Look up a user by email, globally (not company-scoped) — needed for
+ * login, which by definition runs before the caller's company is known.
+ * Call inside `withSystemTransaction`, same as identity resolution in
+ * `requireAuth`. Returns the password hash so the caller can verify it
+ * without a second round trip; never return this row to a client as-is.
+ * @param db - System transaction
+ * @param email - Case-insensitive, matches storage
+ */
+export const getUserByEmail = async (db: DbLike, email: string): Promise<UserAuthRow | null> => {
+  const rows = await db
+    .select({ id: users.id, email: users.email, passwordHash: users.passwordHash, status: users.status })
+    .from(users)
+    .where(eq(users.email, email.toLowerCase()))
+    .limit(1)
+  return rows[0] ?? null
+}
+
+/**
+ * Sets a user's password hash — accepting an invite (first password) or
+ * completing a forgotten-password reset. Also flips a still-pending
+ * invite to `'active'`: setting a password *is* what accepting an invite
+ * means, so there's no separate "activate" step. Never touches an
+ * explicitly `'inactive'` user's status (a reset link doesn't undo an
+ * admin's deactivation).
+ * @param db - System transaction
+ * @param userId - Whose password this is
+ * @param passwordHash - Already-hashed (bcrypt) — never a plaintext password
+ */
+export const setUserPassword = async (db: DbLike, userId: string, passwordHash: string): Promise<void> => {
+  const [current] = await db.select({ status: users.status }).from(users).where(eq(users.id, userId)).limit(1)
+  await db
+    .update(users)
+    .set({
+      passwordHash,
+      updatedAt: new Date(),
+      ...(current?.status === 'invited' || current?.status === 'invite_failed' ? { status: 'active' as const } : {}),
+    })
+    .where(eq(users.id, userId))
+}
+
 /**
  * List users visible under current RLS context (tenant or cross-tenant for
  * super-admin). Pass `companyId` to additionally narrow to one company —

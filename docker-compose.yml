@@ -56,11 +56,20 @@ services:
       # Restricted, non-superuser role — subject to RLS. Never the owner/superuser (see ADR 0006).
       DATABASE_URL: postgresql://previo_app:${APP_DB_PASSWORD:-previo_app}@postgres:5432/previo
       REDIS_URL: redis://redis:6379
-      COGNITO_REGION: ${COGNITO_REGION:-eu-central-1}
-      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-}
       CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       API_PUBLIC_URL: http://localhost:3001
       LOCAL_STORAGE_DIR: /app/data/uploads
+      # MUST be the same value apps/web signs session JWTs with (see its
+      # AUTH_SECRET below) — Docker Compose auto-reads a plain `.env`
+      # file at the repo root for this `${...}` substitution (distinct
+      # from `.env.local`, which only `pnpm dev`'s Node processes read —
+      # see docs/environments.md/ADR 0005). Put the same generated value
+      # in both files, or the two processes disagree about every login.
+      AUTH_SECRET: ${AUTH_SECRET:-CHANGE-ME-insecure-default-see-README-selfhost-section}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:3000}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-true}
     volumes:
       - ./data/uploads:/app/data/uploads
     depends_on:
