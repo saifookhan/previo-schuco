@@ -62,7 +62,8 @@
     "signOut": "Sign out",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "quotes": "Quotes"
+    "quotes": "Quotes",
+    "adminCompanies": "Companies"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -341,5 +342,43 @@
     "summaryTitle": "Summary and closing",
     "fieldPaymentTerms": "Payment terms",
     "validityNote": "Quote valid for {days} days from issue date."
+  },
+  "adminCompanies": {
+    "title": "Companies",
+    "subtitle": "Create and manage every company on the platform — super-admin only",
+    "companiesCount": "{count} companies",
+    "name": "Name",
+    "type": "Type",
+    "vatNumber": "VAT number",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Deactivated",
+    "noCompaniesFound": "No companies found.",
+    "errorLoading": "Couldn't load companies — the server may be unreachable.",
+    "newCompany": "New company",
+    "newCompanyTitle": "New company",
+    "editCompanyTitle": "Edit company",
+    "createRequired": "Name and VAT number are required",
+    "createFailed": "Could not create company",
+    "createFailedUnreachable": "Could not create company — could not reach the server",
+    "saveFailed": "Could not save company",
+    "saveFailedUnreachable": "Could not save company — could not reach the server",
+    "fieldType": "Type",
+    "fieldName": "Name",
+    "fieldVatNumber": "VAT number",
+    "typeValue": {
+      "platform": "Platform",
+      "supplier": "Supplier",
+      "client": "Client"
+    },
+    "cancel": "Cancel",
+    "create": "Create",
+    "creating": "Creating…",
+    "save": "Save",
+    "saving": "Saving…",
+    "close": "Close",
+    "edit": "Edit company",
+    "activate": "Activate company",
+    "deactivate": "Deactivate company — blocks all its users from logging in"
   }
 }

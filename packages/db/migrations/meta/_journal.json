@@ -50,6 +50,13 @@
       "when": 1790136904773,
       "tag": "0007_quotes_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790580427346,
+      "tag": "0008_companies_is_active",
+      "breakpoints": true
     }
   ]
 }

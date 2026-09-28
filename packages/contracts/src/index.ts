@@ -1,5 +1,6 @@
 export * from './schemas/auth'
 export * from './schemas/common'
+export * from './schemas/companies'
 export * from './schemas/files'
 export * from './schemas/quote'
 export * from './schemas/users'

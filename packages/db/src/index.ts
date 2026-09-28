@@ -35,7 +35,17 @@ export {
   type UserListRow,
   type UserProfile,
 } from './queries/users'
-export { getCompanyById } from './queries/companies'
+export {
+  getCompanyById,
+  insertCompany,
+  listAllCompanies,
+  setCompanyActive,
+  updateCompany,
+  type CompanyRow,
+  type CompanySummary,
+  type InsertCompanyInput,
+  type UpdateCompanyInput,
+} from './queries/companies'
 export { filterBusinessUnitIdsByCompany } from './queries/business-units'
 export { writeAuditLog, type WriteAuditLogInput } from './queries/audit'
 export {

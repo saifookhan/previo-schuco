@@ -84,6 +84,51 @@ services:
       redis:
         condition: service_healthy
 
+  # The whole app for a single-server "just docker compose up -d and it's
+  # accessible" setup (e.g. a demo box reached by IP:port, no Vercel/ECS).
+  # The browser only ever talks to this container — every /api/* route
+  # under apps/web is a server-side proxy to the `api` service over the
+  # internal Docker network, so `api`/`postgres`/`redis` never need to be
+  # reachable from outside the host at all.
+  web:
+    # Opt-in: local dev (`docker compose up -d`, per the README's Quick
+    # start) runs web via `pnpm dev` on the host, not this container, and
+    # bare `docker compose up -d` shouldn't suddenly require AUTH_SECRET
+    # just because this service exists in the file. Start it explicitly
+    # with `docker compose --profile selfhost up -d` (see README).
+    profiles: ['selfhost']
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      # A `${VAR:?...}` (required, no default) here would make even a
+      # plain local-dev `docker compose up -d` (which never starts this
+      # opt-in `selfhost`-profile service) fail to parse at all — Compose
+      # interpolates the whole file regardless of which profiles are
+      # active. So: a default that only "works" insecurely — anyone
+      # actually running the `selfhost` profile MUST override this with
+      # a real secret (openssl rand -base64 32) in their shell env or a
+      # .env file next to this compose file, or every session is signed
+      # with a value that's sitting in plain text in this repo.
+      AUTH_SECRET: ${AUTH_SECRET:-CHANGE-ME-insecure-default-see-README-selfhost-section}
+      # Internal Docker network hostname — never the host's published port.
+      NEXT_PUBLIC_API_URL: http://api:3001
+      NEXT_PUBLIC_APP_URL: ${APP_PUBLIC_URL:-http://localhost:3000}
+      # Plain HTTP by default (no reverse-proxy TLS yet) — a `Secure`
+      # cookie would otherwise be silently dropped by the browser and
+      # every request would look unauthenticated. Set to "true" once
+      # this sits behind HTTPS.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # No real Cognito on a self-hosted demo box — enables the seeded
+      # demo-user login even though NODE_ENV=production.
+      ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-true}
+      NEXT_PUBLIC_ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-true}
+    depends_on:
+      - api
+
 volumes:
   previo_pg_data:
   previo_redis_data:

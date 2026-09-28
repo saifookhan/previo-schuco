@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 
 import type { AuthVariables } from './middleware/auth'
+import { adminCompanies } from './routes/admin/companies'
 import { adminInvites } from './routes/admin/invites'
 import { adminUsers } from './routes/admin/users'
 import { calculate } from './routes/calculate'
@@ -31,6 +32,7 @@ app.route('/api/me', me)
 app.route('/api/users', users)
 app.route('/api/admin/users', adminUsers)
 app.route('/api/admin/invites', adminInvites)
+app.route('/api/admin/companies', adminCompanies)
 app.route('/api/products', products)
 app.route('/api/product-families', productFamilies)
 app.route('/api/quotes', quotes)

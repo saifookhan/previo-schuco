@@ -17,20 +17,77 @@ See [docs/adr/](docs/adr/) for the architecture decision records behind the mult
 - **Testing:** Vitest — repository/DB/RLS integration tests run against a real Postgres (`previo_test`), never mocked — see [ADR 0012](docs/adr/0012-testing-strategy-and-service-layer.md)
 - **IaC:** Terraform (dev; stage/prod structured for later)
 
-## Quick start (local)
+## Quick start (local) — setting this up on a brand-new machine
+
+**Prerequisites:** Node 22 (see `.nvmrc`), [pnpm 9](https://pnpm.io) (`corepack enable` picks up the version pinned in `package.json`'s `packageManager`), and Docker Desktop (or another Docker Engine) running.
 
 ```bash
 pnpm install
 cp .env.example .env.local        # NOT .env — see docs/environments.md and ADR 0005
-docker compose up -d              # Postgres + Redis + API + worker
-pnpm dev                          # Web only on :3000 (API/worker run in Docker)
+```
+
+Now open `.env.local` and **generate a real `AUTH_SECRET`** — the file ships with it blank, and that's the #1 cause of "not authenticated" errors on a fresh setup (see Troubleshooting below):
+
+```bash
+openssl rand -base64 32
+```
+
+Paste the output as `AUTH_SECRET=...` in `.env.local`. Everything else in `.env.example` already has working local defaults (Cognito is deliberately left unconfigured — you get the dev/seed-user login instead, see below).
+
+```bash
+docker compose up -d              # Postgres + Redis + API + worker (waits for migrate+seed to finish)
+pnpm dev                          # Web on :3000 — MUST be `pnpm dev`, not `pnpm build && pnpm start` (see Troubleshooting)
 ```
 
 - Web: http://localhost:3000
 - API: http://localhost:3001
 - Swagger UI: http://localhost:3001/docs
 - OpenAPI spec: http://localhost:3001/openapi.json
-- Login: dev seed users on `/login` when Cognito is not configured
+- Login: go to `/login` and sign in as one of the seeded demo users (no password — this is dev-only, disabled once Cognito is configured):
+
+  | Email | Role | Company |
+  |---|---|---|
+  | `admin@schuco-demo.it` | super-admin | Schuco (platform) |
+  | `admin@suppli-demo.it` | company-admin | Suppli S.r.l. (supplier — use this one to test product-family import/quotes) |
+  | `admin@technometal-demo.it` | company-admin | Technometal S.p.A. (client) |
+  | `manager@technometal-demo.it` | super-user | Technometal S.p.A. |
+  | `sales@technometal-demo.it` | user | Technometal S.p.A. |
+  | `admin@fabbrikka-demo.it` | company-admin | Fabbrikka (client) |
+
+### Troubleshooting a fresh setup
+
+- **"Not authenticated" errors, especially right after upload/save actions** — almost always one of:
+  1. `AUTH_SECRET` is still blank in `.env.local` (see above) — regenerate it and restart `pnpm dev`. Next.js only reads `.env.local` at process startup, so changing it requires a restart, not just a save.
+  2. You ran `pnpm build && pnpm start` instead of `pnpm dev`. Production mode marks the session cookie `Secure`, which browsers silently drop over plain `http://localhost` — the login screen appears to work but nothing after it does. Use `pnpm dev` for local work; production builds are for the Docker/self-host paths below, which set `COOKIE_SECURE` explicitly.
+  3. `docker compose up -d` hadn't finished yet — the `migrate` container (schema + seed data) must complete before the demo login users exist. Check with `docker compose ps` (everything should show `running`/`healthy`, and `migrate` should show `exited (0)` — that's success, it's a one-shot job) or `docker compose logs migrate`.
+- **Import/upload silently fails or times out** — confirm the `api` container is actually up: `curl http://localhost:3001/health` should return `{"status":"ok",...}`. If not, `docker compose logs api`.
+- **Nothing loads at all / 500 on every page** — usually a stale Next.js dev server from an earlier run still holding port 3000, or a stale `.next` cache after pulling changes that touched shared files (layout, middleware, i18n messages). Kill whatever's on :3000 and `rm -rf apps/web/.next` before `pnpm dev` again.
+
+### Running the whole app with just `docker compose up -d` (self-hosted / demo server)
+
+For handing the app to someone via SSH on a bare server (no Node/pnpm needed on the host, no Vercel/AWS) — the `web` app is also containerized, opt-in via the `selfhost` [Compose profile](https://docs.docker.com/compose/how-tos/profiles/) so it doesn't interfere with the local-dev flow above:
+
+```bash
+export AUTH_SECRET=$(openssl rand -base64 32)   # required — see below
+docker compose --profile selfhost up -d --build
+```
+
+That's it — the whole app (Postgres, Redis, API, worker, web) comes up, and the browser only ever talks to the `web` container (every `/api/*` route in `apps/web` proxies to the `api` service over Docker's internal network — nothing but port 3000 needs to be reachable from outside).
+
+- App: `http://<server-ip>:3000`
+- Login: same seeded demo users as above (dev-login stays enabled in this profile even though it runs in production mode — see `ALLOW_DEV_LOGIN` below)
+
+**Env vars this profile reads** (all have sane defaults for an IP-only demo box; override by exporting them before `docker compose up`, or in a `.env` file next to `docker-compose.yml`):
+
+| Var | Default | When to change it |
+|---|---|---|
+| `AUTH_SECRET` | *(insecure placeholder — always override this one)* | Always — `openssl rand -base64 32` |
+| `COOKIE_SECURE` | `false` | Set to `true` once this sits behind HTTPS (a reverse proxy with a real cert) — otherwise leave `false`, or logins won't persist over plain HTTP |
+| `APP_PUBLIC_URL` | `http://localhost:3000` | Set to `http://<server-ip>:3000` (or your domain) once you're not just hitting it from the same box |
+| `ALLOW_DEV_LOGIN` | `true` | Set to `false` once real Cognito is configured for this deployment |
+| `APP_DB_PASSWORD` | `previo_app` | Change for anything beyond a throwaway demo |
+
+This is a single-server convenience path, not the production architecture — real production is Next.js on Vercel + the API on ECS Fargate (see [docs/deployment.md](docs/deployment.md)).
 
 ### Running everything locally (no Docker API/worker)
 

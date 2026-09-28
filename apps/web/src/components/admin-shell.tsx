@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 const adminNav = [
   { href: '/admin/dashboard', labelKey: 'adminDashboard', icon: LayoutDashboard },
   { href: '/admin/users', labelKey: 'adminUsers', icon: Users },
+  { href: '/admin/companies', labelKey: 'adminCompanies', icon: Building2 },
 ] as const
 
 interface AdminShellProps {

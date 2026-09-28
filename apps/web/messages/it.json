@@ -62,7 +62,8 @@
     "signOut": "Esci",
     "openMenu": "Apri menu",
     "closeMenu": "Chiudi menu",
-    "quotes": "Preventivi"
+    "quotes": "Preventivi",
+    "adminCompanies": "Aziende"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -341,5 +342,43 @@
     "summaryTitle": "Riepilogo e chiusura",
     "fieldPaymentTerms": "Termini di pagamento",
     "validityNote": "Preventivo valido per {days} giorni dalla data di emissione."
+  },
+  "adminCompanies": {
+    "title": "Aziende",
+    "subtitle": "Crea e gestisci ogni azienda della piattaforma — solo super-admin",
+    "companiesCount": "{count} aziende",
+    "name": "Nome",
+    "type": "Tipo",
+    "vatNumber": "Partita IVA",
+    "status": "Stato",
+    "active": "Attiva",
+    "inactive": "Disattivata",
+    "noCompaniesFound": "Nessuna azienda trovata.",
+    "errorLoading": "Impossibile caricare le aziende — il server potrebbe non essere raggiungibile.",
+    "newCompany": "Nuova azienda",
+    "newCompanyTitle": "Nuova azienda",
+    "editCompanyTitle": "Modifica azienda",
+    "createRequired": "Nome e partita IVA sono obbligatori",
+    "createFailed": "Impossibile creare l'azienda",
+    "createFailedUnreachable": "Impossibile creare l'azienda — server non raggiungibile",
+    "saveFailed": "Impossibile salvare l'azienda",
+    "saveFailedUnreachable": "Impossibile salvare l'azienda — server non raggiungibile",
+    "fieldType": "Tipo",
+    "fieldName": "Nome",
+    "fieldVatNumber": "Partita IVA",
+    "typeValue": {
+      "platform": "Piattaforma",
+      "supplier": "Fornitore",
+      "client": "Cliente"
+    },
+    "cancel": "Annulla",
+    "create": "Crea",
+    "creating": "Creazione…",
+    "save": "Salva",
+    "saving": "Salvataggio…",
+    "close": "Chiudi",
+    "edit": "Modifica azienda",
+    "activate": "Attiva azienda",
+    "deactivate": "Disattiva azienda — blocca l'accesso a tutti i suoi utenti"
   }
 }

@@ -51,6 +51,7 @@ export interface UserProfile {
     name: string
     type: 'platform' | 'supplier' | 'client'
     vatNumber: string
+    isActive: boolean
   }
   businessUnits: BusinessUnitScope[]
 }
@@ -78,6 +79,7 @@ const getUserProfileByWhere = async (
       companyName: companies.name,
       companyType: companies.type,
       companyVat: companies.vatNumber,
+      companyIsActive: companies.isActive,
     })
     .from(users)
     .innerJoin(roles, eq(users.roleId, roles.id))
@@ -116,6 +118,7 @@ const getUserProfileByWhere = async (
       name: row.companyName,
       type: row.companyType,
       vatNumber: row.companyVat,
+      isActive: row.companyIsActive,
     },
     businessUnits: buRows,
   }

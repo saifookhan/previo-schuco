@@ -19,6 +19,18 @@ const getSecretKey = (): Uint8Array =>
   new TextEncoder().encode(authConfig.authSecret)
 
 /**
+ * Whether the session/PKCE cookies get the `Secure` flag. Defaults to
+ * `NODE_ENV === 'production'`, but that default is wrong for a
+ * production-mode deployment served over plain HTTP (e.g. a self-hosted
+ * single server reached by IP, no reverse-proxy TLS yet) — a `Secure`
+ * cookie is silently dropped by the browser over HTTP, so login would
+ * appear to succeed but every subsequent request would look
+ * unauthenticated. Set `COOKIE_SECURE=false` explicitly in that case.
+ */
+const cookieSecure = (): boolean =>
+  process.env.COOKIE_SECURE === 'false' ? false : process.env.NODE_ENV === 'production'
+
+/**
  * Persist encrypted session in an HTTP-only cookie.
  * @param payload - Session claims and tokens
  */
@@ -31,7 +43,7 @@ export const setSession = async (payload: SessionPayload): Promise<void> => {
   const cookieStore = await cookies()
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecure(),
     sameSite: 'lax',
     path: '/',
     expires: new Date(payload.exp * 1000),
@@ -73,7 +85,7 @@ export const setPkceVerifier = async (verifier: string): Promise<void> => {
   const cookieStore = await cookies()
   cookieStore.set(VERIFIER_COOKIE, verifier, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecure(),
     sameSite: 'lax',
     path: '/',
     maxAge: 600,

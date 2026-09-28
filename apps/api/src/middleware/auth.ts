@@ -107,6 +107,9 @@ export const requireAuth = async (c: Context, next: Next): Promise<Response | vo
   if (profile.status !== 'active') {
     return c.json({ error: 'User account inactive' }, 403)
   }
+  if (!profile.company.isActive) {
+    return c.json({ error: 'Company account deactivated' }, 403)
+  }
 
   const isSuperAdmin = profile.role.id === 'super-admin'
   const tenantOverride = c.req.header(TENANT_OVERRIDE_HEADER)
