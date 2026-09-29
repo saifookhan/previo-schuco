@@ -40,7 +40,7 @@ echo "AUTH_SECRET=<the value you just generated>" > .env
 Everything else in `.env.example` already has working local defaults.
 
 ```bash
-docker compose up -d              # Postgres + Redis + API + worker (waits for migrate+seed to finish)
+docker compose up -d              # Postgres + Redis + Mailpit + API + worker (waits for migrate+seed to finish)
 pnpm dev                          # Web on :3000 — MUST be `pnpm dev`, not `pnpm build && pnpm start` (see Troubleshooting)
 ```
 
@@ -48,7 +48,8 @@ pnpm dev                          # Web on :3000 — MUST be `pnpm dev`, not `pn
 - API: http://localhost:3001
 - Swagger UI: http://localhost:3001/docs
 - OpenAPI spec: http://localhost:3001/openapi.json
-- Login: go to `/login` and sign in as one of the seeded demo users via the "dev seed login" shortcut (no password needed for these — real accounts go through email+password, invited from the admin panel and set via the `/set-password` link Resend would otherwise email):
+- **Mailpit (local email inbox):** http://localhost:8025 — invite and password-reset emails land here instead of a real inbox (no `RESEND_API_KEY` needed for local dev); apps/api is already pointed at it by default (see `.env.example`)
+- Login: go to `/login` and sign in as one of the seeded demo users via the "dev seed login" shortcut (no password needed for these — real accounts go through email+password, invited from the admin panel and set via the `/set-password` link that shows up in Mailpit):
 
   | Email | Role | Company |
   |---|---|---|
@@ -92,8 +93,9 @@ That's it — the whole app (Postgres, Redis, API, worker, web) comes up, and th
 | `APP_PUBLIC_URL` | `http://localhost:3000` | Set to `http://<server-ip>:3000` (or your domain) once you're not just hitting it from the same box — also what invite/reset-password email links point at |
 | `ALLOW_DEV_LOGIN` | `true` | Set to `false` for a deployment real customers will use — leaves the password-less seed-user shortcut disabled |
 | `APP_DB_PASSWORD` | `previo_app` | Change for anything beyond a throwaway demo |
-| `RESEND_API_KEY` | *(unset)* | A [Resend](https://resend.com) API key — without it, invite/password-reset emails aren't actually sent, just logged (`docker compose logs api`) with the link |
+| `RESEND_API_KEY` | *(unset)* | A [Resend](https://resend.com) API key for real outbound email — takes priority over the `mailpit` catcher below whenever it's set. Set this for any deployment real customers will use |
 | `RESEND_FROM_EMAIL` | `PREVIO <onboarding@resend.dev>` | Resend's shared test sender works until you verify your own domain with them |
+| `SMTP_HOST` | `mailpit` | Without `RESEND_API_KEY`, invite/reset emails go to the bundled `mailpit` container instead. Its web UI is bound to `127.0.0.1:8025` on the server (not public — it has no login of its own), so reach it via an SSH tunnel: `ssh -L 8025:localhost:8025 <server>`, then open `http://localhost:8025` locally. Blank `SMTP_HOST` out to fall back to just logging the link (`docker compose logs api`) |
 
 This is a single-server convenience path — see [docs/deployment.md](docs/deployment.md) for other options.
 

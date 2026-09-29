@@ -13,7 +13,7 @@ import {
 import { getDb } from '../lib/db'
 import { AUTH_TOKEN_TTL_MS, generateRawToken, hashToken } from '../lib/auth-tokens'
 import { hashPassword, isPasswordStrongEnough, verifyPassword } from '../lib/password'
-import { sendInviteEmail, sendPasswordResetEmail } from '../lib/resend'
+import { sendInviteEmail, sendPasswordResetEmail } from '../lib/email'
 
 /** Email/password didn't match a real, loggable-in account. Deliberately the same message for "no such email" and "wrong password" — never confirm which one it was. */
 export class InvalidCredentialsError extends Error {}

@@ -14,6 +14,29 @@ services:
       timeout: 5s
       retries: 10
 
+  # Local SMTP catcher for invite/password-reset emails — nothing leaves
+  # the machine. Web UI at http://localhost:8025 to actually read what
+  # got "sent" (not just the link logged to `docker compose logs api`).
+  # Always on (no `profiles:`) so it's there for both plain local dev and
+  # the `selfhost` profile; a real RESEND_API_KEY still takes priority
+  # over it either way (see apps/api/src/lib/email.ts).
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      # Bound to localhost only, deliberately — mailpit has no auth of its
+      # own, and every invite/reset-password link that's ever gone through
+      # it would otherwise be readable by anyone who can reach this port
+      # (a real concern once this is a `selfhost`-profile box on the
+      # public internet, not just a laptop). Reach it from a remote
+      # server via an SSH tunnel: `ssh -L 8025:localhost:8025 <server>`.
+      - '127.0.0.1:8025:8025' # web UI
+      - '127.0.0.1:1025:1025' # SMTP
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8025/livez']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -69,6 +92,13 @@ services:
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:3000}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      # Defaults to the `mailpit` service below — set RESEND_API_KEY
+      # instead (above) to send real email; that always takes priority
+      # over SMTP regardless of whether this is also set (see
+      # apps/api/src/lib/email.ts). Override/blank this out if you'd
+      # rather point at some other local SMTP catcher.
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
       ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-true}
     volumes:
       - ./data/uploads:/app/data/uploads
@@ -76,6 +106,8 @@ services:
       migrate:
         condition: service_completed_successfully
       redis:
+        condition: service_healthy
+      mailpit:
         condition: service_healthy
 
   worker:
