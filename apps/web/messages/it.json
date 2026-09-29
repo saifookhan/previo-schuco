@@ -124,7 +124,17 @@
     "name": "Nome",
     "email": "Email",
     "role": "Ruolo",
-    "status": "Stato"
+    "status": "Stato",
+    "addUserTitle": "Aggiungi utente",
+    "addUserHint": "In attesa dell'approvazione di un super-admin prima che venga inviata qualsiasi email di invito.",
+    "emailRequired": "L'email è obbligatoria",
+    "addUserFailed": "Impossibile aggiungere l'utente",
+    "addUserFailedUnreachable": "Impossibile aggiungere l'utente — server non raggiungibile",
+    "cancel": "Annulla",
+    "adding": "Aggiunta…",
+    "close": "Chiudi",
+    "errorLoading": "Impossibile caricare gli utenti — il server potrebbe non essere raggiungibile.",
+    "noUsersFound": "Nessun utente ancora."
   },
   "settingsRoles": {
     "title": "Ruoli",

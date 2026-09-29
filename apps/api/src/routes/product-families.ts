@@ -208,7 +208,11 @@ productFamilies.patch('/:id/publish', requireAuth, requireRoles(['company-admin'
     effectiveCompanyId: c.get('effectiveCompanyId'),
     isSuperAdmin: c.get('isSuperAdmin'),
   }
-  await setProductFamilyPublishedStatus(ctx, actorFrom(c), id, body.isPublished)
+  try {
+    await setProductFamilyPublishedStatus(ctx, actorFrom(c), id, body.isPublished)
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
   return c.json({ ok: true })
 })
 

@@ -67,8 +67,15 @@ export const insertQuotePositionCharacteristic = async (
 export type QuoteSummary = typeof quotes.$inferSelect
 
 /** Lists this caller's own quotes (RLS-scoped), most recent first. */
-export const listQuotes = (db: DbLike): Promise<QuoteSummary[]> =>
-  db.select().from(quotes).orderBy(desc(quotes.createdAt))
+/**
+ * Lists quotes for `companyId`, most recent first. Explicit filter, not
+ * RLS alone — `app_is_super_admin()` makes `quotes_tenant`'s
+ * `supplier_company_id = app_current_company_id()` a no-op for a
+ * super-admin, including one acting as a specific tenant via
+ * `X-Tenant-Id` (ADR 0006 / 0008; same reasoning as `listUsers`).
+ */
+export const listQuotes = (db: DbLike, companyId: string): Promise<QuoteSummary[]> =>
+  db.select().from(quotes).where(eq(quotes.supplierCompanyId, companyId)).orderBy(desc(quotes.createdAt))
 
 export type QuotePositionRow = typeof quotePositions.$inferSelect
 export type QuotePositionCharacteristicRow = typeof quotePositionCharacteristics.$inferSelect

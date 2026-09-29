@@ -265,7 +265,7 @@ export const importProductFamilyFromExcel = async (
 }
 
 export const listProductFamilies = (ctx: TenantContext): Promise<ProductFamilySummary[]> =>
-  withTenantDb(ctx, (tx) => listVisibleProductFamilies(tx))
+  withTenantDb(ctx, (tx) => listVisibleProductFamilies(tx, ctx.effectiveCompanyId))
 
 export const getProductFamilyDetail = (
   ctx: TenantContext,
@@ -441,6 +441,11 @@ export const duplicateProductFamily = async (
     return detail!.family
   })
 
+/**
+ * @throws {ProductFamilyNotFoundError} no such family, or RLS silently
+ *   blocked the UPDATE (visible-but-not-owned, e.g. a linked client) —
+ *   both surface as "not found", never a silent no-op success.
+ */
 export const setProductFamilyPublishedStatus = async (
   ctx: TenantContext,
   actor: ProductFamilyActor,
@@ -448,7 +453,10 @@ export const setProductFamilyPublishedStatus = async (
   isPublished: boolean,
 ): Promise<void> =>
   withTenantDb(ctx, async (tx) => {
-    await setProductFamilyPublished(tx, familyId, isPublished)
+    const updated = await setProductFamilyPublished(tx, familyId, isPublished)
+    if (!updated) {
+      throw new ProductFamilyNotFoundError()
+    }
     await recordAuditEvent(
       tx,
       {
@@ -457,7 +465,10 @@ export const setProductFamilyPublishedStatus = async (
         actorCompanyId: actor.actorCompanyId,
         requestId: actor.requestId,
       },
-      ctx.effectiveCompanyId,
+      // The family's own supplierCompanyId, not ctx.effectiveCompanyId —
+      // so a super-admin publish/unpublish is attributed to the actual
+      // supplier tenant, not the super-admin's own platform company.
+      updated.supplierCompanyId,
       {
         action: isPublished ? 'product_family.publish' : 'product_family.unpublish',
         resourceType: 'product_family',

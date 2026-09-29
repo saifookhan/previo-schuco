@@ -82,10 +82,26 @@ export const createQuote = async (
   }
 
   return withTenantDb(ctx, async (tx) => {
+    // Insert from an explicit allowlist, never `...input` — `input` is the
+    // raw request body (no Zod parse on this route), and spreading it
+    // after supplierCompanyId/createdByUserId would let those (plus
+    // status/totalPrice/id, none of which CreateQuoteInput even declares)
+    // be overridden by whatever the caller sent. RLS would reject a
+    // mismatched supplierCompanyId for a normal company-admin, but not for
+    // a super-admin — this must be safe unconditionally, not "usually
+    // caught by RLS".
     const quoteId = await insertQuote(tx, {
       supplierCompanyId: ctx.effectiveCompanyId,
       createdByUserId: actor.actorUserId,
-      ...input,
+      reference: input.reference,
+      customerName: input.customerName,
+      customerFiscalCode: input.customerFiscalCode,
+      customerAddress: input.customerAddress,
+      customerCity: input.customerCity,
+      projectLocation: input.projectLocation,
+      introText: input.introText,
+      paymentTerms: input.paymentTerms,
+      validityDays: input.validityDays,
     })
     await recordAuditEvent(
       tx,
@@ -98,7 +114,8 @@ export const createQuote = async (
   })
 }
 
-export const listMyQuotes = (ctx: TenantContext): Promise<QuoteSummary[]> => withTenantDb(ctx, (tx) => listQuotes(tx))
+export const listMyQuotes = (ctx: TenantContext): Promise<QuoteSummary[]> =>
+  withTenantDb(ctx, (tx) => listQuotes(tx, ctx.effectiveCompanyId))
 
 export const getQuote = (ctx: TenantContext, quoteId: string): Promise<QuoteDetailWithValidity | null> =>
   withTenantDb(ctx, (tx) => finalizeQuoteDetail(tx, quoteId))
@@ -163,8 +180,13 @@ export const addQuotePosition = async (
     // supplier's own catalog published to a linked client: product_families_select
     // grants that client SELECT via app_can_view_product_family, which is far
     // broader than ownership; without this check that client could quote off
-    // another company's catalog under its own quote).
-    if (!family || (family.family.supplierCompanyId !== ctx.effectiveCompanyId && !ctx.isSuperAdmin)) {
+    // another company's catalog under its own quote). No isSuperAdmin exception:
+    // isSuperAdmin stays true while acting as another tenant via X-Tenant-Id
+    // (ADR 0008), so a bypass here would let a super-admin acting as company A
+    // still attach company B's family to a quote owned by A. A super-admin
+    // must set X-Tenant-Id to the supplier itself and pass this same check,
+    // same as everyone else.
+    if (!family || family.family.supplierCompanyId !== ctx.effectiveCompanyId) {
       throw new QuoteValidationError('Product family not found or not visible')
     }
     const line = family.lines.find((l) => l.id === input.productLineId)

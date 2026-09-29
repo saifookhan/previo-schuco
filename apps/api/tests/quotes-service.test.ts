@@ -32,6 +32,7 @@ import {
   createQuote,
   duplicatePosition,
   getQuote,
+  listMyQuotes,
   removeQuotePosition,
   reorderPositions,
 } from '../src/services/quotes-service'
@@ -252,6 +253,53 @@ describe('createQuote + addQuotePosition', () => {
     ).rejects.toThrow(QuoteValidationError)
   })
 
+  it('a super-admin acting as another tenant (X-Tenant-Id) cannot price from a family that tenant does not own', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+
+    // Super-admin acting AS linkedClientCompanyId — isSuperAdmin stays true (ADR 0008),
+    // but effectiveCompanyId is the client, not the supplier who owns `family`.
+    const superAdminActingAsClient = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: true }
+    const superAdminActor = { actorUserId, actorCompanyId: linkedClientCompanyId, requestId: 'test-request' }
+
+    const quote = await createQuote(superAdminActingAsClient, superAdminActor, {
+      reference: 'TEST-Q-SVC-SUPERADMIN-CROSS-TENANT',
+      customerName: 'Test Customer',
+    })
+
+    await expect(
+      addQuotePosition(superAdminActingAsClient, superAdminActor, quote.id, {
+        productFamilyId: family.id,
+        productLineId: line.id,
+        quantity: 1,
+        widthMm: 1000,
+        heightMm: 800,
+        characteristicSelections: [],
+      }),
+    ).rejects.toThrow(QuoteValidationError)
+  })
+
+  it('createQuote ignores server-owned fields in the input instead of letting them override the caller/company', async () => {
+    const maliciousInput = {
+      reference: 'TEST-Q-SVC-ALLOWLIST',
+      customerName: 'Test Customer',
+      // None of these are declared on CreateQuoteInput, but nothing stops
+      // a raw request body from including them (the route does no Zod
+      // parse) — insertQuote must never let them win over the safe values.
+      supplierCompanyId: '00000000-0000-0000-0000-000000000000',
+      createdByUserId: '00000000-0000-0000-0000-000000000000',
+      status: 'accepted',
+      totalPrice: '999999.99',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+
+    const quote = await createQuote(ctx(), actor, maliciousInput)
+    expect(quote.supplierCompanyId).toBe(supplierCompanyId)
+    expect(quote.createdByUserId).toBe(actorUserId)
+    expect(quote.status).toBe('draft')
+    expect(quote.totalPrice).toBe('0.00')
+  })
+
   it('removeQuotePosition recalculates the quote total', async () => {
     const family = await importFreshFamily()
     const line = await matrixLineOf(family.id)
@@ -387,5 +435,26 @@ describe('createQuote + addQuotePosition', () => {
     const afterUnpublish = await getQuote(ctx(), quote.id)
     expect(afterUnpublish!.positions[0].isValid).toBe(false)
     expect(afterUnpublish!.positions[0].finalPrice).toBe(priceBefore)
+  })
+})
+
+describe('listMyQuotes', () => {
+  it("is scoped by effectiveCompanyId even for a super-admin — never every tenant's quotes", async () => {
+    await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-LIST-SUPPLIER', customerName: 'Test Customer' })
+
+    const clientCtx = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: false }
+    const clientActor = { actorUserId, actorCompanyId: linkedClientCompanyId, requestId: 'test-request' }
+    await createQuote(clientCtx, clientActor, { reference: 'TEST-Q-SVC-LIST-CLIENT', customerName: 'Test Customer' })
+
+    // A super-admin acting AS the supplier (X-Tenant-Id) must see only the supplier's quotes.
+    const superAdminAsSupplier = { effectiveCompanyId: supplierCompanyId, isSuperAdmin: true }
+    const supplierQuotes = await listMyQuotes(superAdminAsSupplier)
+    expect(supplierQuotes.every((q) => q.supplierCompanyId === supplierCompanyId)).toBe(true)
+    expect(supplierQuotes.some((q) => q.supplierCompanyId === linkedClientCompanyId)).toBe(false)
+
+    // Acting as the client instead must see only the client's quotes.
+    const superAdminAsClient = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: true }
+    const clientQuotes = await listMyQuotes(superAdminAsClient)
+    expect(clientQuotes.every((q) => q.supplierCompanyId === linkedClientCompanyId)).toBe(true)
   })
 })

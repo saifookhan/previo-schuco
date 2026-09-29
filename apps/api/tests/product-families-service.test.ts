@@ -167,6 +167,23 @@ describe('duplicateProductFamily + setProductFamilyPublishedStatus', () => {
     const originalAfter = await getProductFamilyDetail(ctx, original.id)
     expect(originalAfter!.family.isPublished).toBe(false)
   })
+
+  it("throws (never silently succeeds) publishing a family the caller doesn't own — RLS blocks the UPDATE, zero rows changed", async () => {
+    const ctx = { effectiveCompanyId: supplierCompanyId, isSuperAdmin: false }
+    const family = await importProductFamilyFromExcel(ctx, actor, supplierCompanyId, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+
+    const otherCtx = { effectiveCompanyId: '00000000-0000-0000-0000-000000000000', isSuperAdmin: false }
+    await expect(setProductFamilyPublishedStatus(otherCtx, actor, family.id, true)).rejects.toThrow(
+      ProductFamilyNotFoundError,
+    )
+
+    // Untouched, under the real owner's context.
+    const stillOwn = await getProductFamilyDetail(ctx, family.id)
+    expect(stillOwn!.family.isPublished).toBe(false)
+  })
 })
 
 describe('deleteProductFamily', () => {
@@ -401,5 +418,43 @@ describe('pricing edits (matrix, line, characteristic)', () => {
 
     await setProductFamilyPublishedStatus(ctx(), actor, family.id, false)
     await updateProductLine(ctx(), actor, family.id, line.id, { value: 4 })
+  })
+})
+
+describe('listProductFamilies', () => {
+  it('is scoped by effectiveCompanyId even for a super-admin — never every tenant\'s families', async () => {
+    const ownCtx = { effectiveCompanyId: supplierCompanyId, isSuperAdmin: false }
+    const ownFamily = await importProductFamilyFromExcel(ownCtx, actor, supplierCompanyId, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+
+    const [otherCompany] = await withSystemTransaction(db, (tx) =>
+      tx
+        .insert(companies)
+        .values({ type: 'supplier', name: 'PF Service Test Other Supplier', vatNumber: 'PFSVC-OTHER' })
+        .returning({ id: companies.id }),
+    )
+    const otherCtx = { effectiveCompanyId: otherCompany.id, isSuperAdmin: false }
+    const otherFamily = await importProductFamilyFromExcel(otherCtx, actor, otherCompany.id, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+
+    try {
+      // A super-admin acting AS supplierCompanyId (X-Tenant-Id) must see only that
+      // tenant's families — not otherCompany's too, even though isSuperAdmin is true.
+      const superAdminAsSupplier = { effectiveCompanyId: supplierCompanyId, isSuperAdmin: true }
+      const visible = await listProductFamilies(superAdminAsSupplier)
+      expect(visible.some((f) => f.id === ownFamily.id)).toBe(true)
+      expect(visible.some((f) => f.id === otherFamily.id)).toBe(false)
+    } finally {
+      const superuserUrl = process.env.TEST_DB_SUPERUSER_URL ?? 'postgresql://previo:previo@localhost:5434/previo'
+      const superuserDb = createDb(superuserUrl.replace(/\/[^/]+$/, '/previo_test'))
+      await superuserDb.delete(auditLog).where(inArray(auditLog.effectiveCompanyId, [otherCompany.id]))
+      await withSystemTransaction(db, async (tx) => {
+        await tx.delete(companies).where(inArray(companies.id, [otherCompany.id]))
+      })
+    }
   })
 })

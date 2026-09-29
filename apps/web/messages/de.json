@@ -124,7 +124,17 @@
     "name": "Name",
     "email": "E-Mail",
     "role": "Rolle",
-    "status": "Status"
+    "status": "Status",
+    "addUserTitle": "Benutzer hinzufügen",
+    "addUserHint": "Wartet auf die Genehmigung eines Super-Admins, bevor eine Einladungs-E-Mail gesendet wird.",
+    "emailRequired": "E-Mail ist erforderlich",
+    "addUserFailed": "Benutzer konnte nicht hinzugefügt werden",
+    "addUserFailedUnreachable": "Benutzer konnte nicht hinzugefügt werden — Server nicht erreichbar",
+    "cancel": "Abbrechen",
+    "adding": "Wird hinzugefügt…",
+    "close": "Schließen",
+    "errorLoading": "Benutzer konnten nicht geladen werden — der Server ist möglicherweise nicht erreichbar.",
+    "noUsersFound": "Noch keine Benutzer."
   },
   "settingsRoles": {
     "title": "Rollen",

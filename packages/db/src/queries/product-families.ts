@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm'
+import { and, desc, eq, exists, inArray, isNotNull, or } from 'drizzle-orm'
 
 import type { DbLike } from '../client'
 import {
@@ -8,6 +8,7 @@ import {
   productFamilyImages,
   productLineCharacteristics,
   productLines,
+  supplierClientLinks,
 } from '../schema'
 
 export interface InsertProductFamilyInput {
@@ -126,8 +127,40 @@ export interface ProductFamilySummary {
  * "belongs to my company."
  * @param db - RLS-scoped transaction
  */
-export const listVisibleProductFamilies = (db: DbLike): Promise<ProductFamilySummary[]> =>
-  db.select().from(productFamilies).orderBy(desc(productFamilies.createdAt))
+/**
+ * Lists families visible to `companyId`: its own, plus published
+ * families of suppliers it's linked to as a client. Explicit filter, not
+ * RLS alone — `app_is_super_admin()` makes `product_families_select`'s
+ * scoping a no-op for a super-admin, including one acting as a specific
+ * tenant via `X-Tenant-Id` (ADR 0006 / 0008); mirrors that policy's own
+ * `own OR published+linked` condition (minus its super-admin bypass) so
+ * a super-admin acting as `companyId` sees exactly what `companyId`
+ * itself would.
+ */
+export const listVisibleProductFamilies = (db: DbLike, companyId: string): Promise<ProductFamilySummary[]> =>
+  db
+    .select()
+    .from(productFamilies)
+    .where(
+      or(
+        eq(productFamilies.supplierCompanyId, companyId),
+        and(
+          eq(productFamilies.isPublished, true),
+          exists(
+            db
+              .select({ one: supplierClientLinks.supplierCompanyId })
+              .from(supplierClientLinks)
+              .where(
+                and(
+                  eq(supplierClientLinks.supplierCompanyId, productFamilies.supplierCompanyId),
+                  eq(supplierClientLinks.clientCompanyId, companyId),
+                ),
+              ),
+          ),
+        ),
+      ),
+    )
+    .orderBy(desc(productFamilies.createdAt))
 
 export interface ProductFamilyDetail {
   family: ProductFamilySummary & {
@@ -217,15 +250,25 @@ export const findLatestProductFamilyVersion = async (
   return latest
 }
 
+/**
+ * Publishes/unpublishes a family. Returns the updated row's id and
+ * `supplierCompanyId` (for attributing the audit event to the actual
+ * owner, not the caller), or `null` if nothing matched — e.g. RLS
+ * silently blocked the UPDATE (a linked client can SELECT a supplier's
+ * published family but not update it), which the caller must treat as
+ * "not found", not a silent no-op success.
+ */
 export const setProductFamilyPublished = async (
   db: DbLike,
   familyId: string,
   isPublished: boolean,
-): Promise<void> => {
-  await db
+): Promise<{ id: string; supplierCompanyId: string } | null> => {
+  const [updated] = await db
     .update(productFamilies)
     .set({ isPublished, updatedAt: new Date() })
     .where(eq(productFamilies.id, familyId))
+    .returning({ id: productFamilies.id, supplierCompanyId: productFamilies.supplierCompanyId })
+  return updated ?? null
 }
 
 /**

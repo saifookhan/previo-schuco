@@ -124,7 +124,17 @@
     "name": "Name",
     "email": "Email",
     "role": "Role",
-    "status": "Status"
+    "status": "Status",
+    "addUserTitle": "Add user",
+    "addUserHint": "Awaits a super-admin's approval before any invite email goes out.",
+    "emailRequired": "Email is required",
+    "addUserFailed": "Could not add user",
+    "addUserFailedUnreachable": "Could not add user — could not reach the server",
+    "cancel": "Cancel",
+    "adding": "Adding…",
+    "close": "Close",
+    "errorLoading": "Couldn't load users — the server may be unreachable.",
+    "noUsersFound": "No users yet."
   },
   "settingsRoles": {
     "title": "Roles",
