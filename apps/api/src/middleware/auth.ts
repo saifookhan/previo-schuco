@@ -1,8 +1,9 @@
 import type { Context, Next } from 'hono'
 import {
+  getCompanyById,
   getUserProfileByCognitoSub,
-  setRlsContext,
   syncUserFromCognito,
+  withSystemTransaction,
   type UserProfile,
 } from '@schuco/db'
 
@@ -11,9 +12,18 @@ import { getDb } from '../lib/db'
 
 export type AuthVariables = {
   user: UserProfile
+  actorUserId: string
+  effectiveCompanyId: string
+  isSuperAdmin: boolean
+  isActingAsTenant: boolean
+  /** Correlates this request's audit entries/logs back to it (ADR 0010) — cheap to add now, expensive to retrofit later. */
+  requestId: string
 }
 
 const DEV_SUB_HEADER = 'x-dev-user-sub'
+const TENANT_OVERRIDE_HEADER = 'x-tenant-id'
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * Resolve dev-mode user sub when Cognito is not configured.
@@ -28,7 +38,19 @@ const resolveDevSub = (c: Context): string | null => {
 }
 
 /**
- * Require authenticated user via Cognito JWT or dev header.
+ * Require authenticated user via Cognito JWT or dev header. Resolves
+ * identity and tenant context onto the Hono context as plain data —
+ * `actorUserId`, `effectiveCompanyId`, `isSuperAdmin`, `isActingAsTenant`
+ * — and holds NO database transaction across `next()`. Route handlers open
+ * their own short, tenant-scoped transaction via `withTenantDb(c, fn)`
+ * (see `../lib/tenant-db`) for whatever DB work they actually need; a
+ * transaction's lifetime must never be tied to the request's lifetime (see
+ * ADR 0006 — a Cognito call, file upload, or PDF render inside a
+ * request-long transaction would hold a pooled connection for however long
+ * that non-DB work takes).
+ *
+ * A super-admin may act on behalf of another company via the `X-Tenant-Id`
+ * header; any other caller sending it is rejected (see ADR 0008).
  */
 export const requireAuth = async (c: Context, next: Next): Promise<Response | void> => {
   const cognitoConfig = getCognitoConfig()
@@ -58,11 +80,25 @@ export const requireAuth = async (c: Context, next: Next): Promise<Response | vo
   }
 
   const db = getDb()
-  let profile = await getUserProfileByCognitoSub(db, cognitoSub)
+  const resolvedCognitoSub = cognitoSub
 
-  if (!profile && email) {
-    profile = await syncUserFromCognito(db, { cognitoSub, email, name })
-  }
+  // Identity resolution (cognito_sub -> profile) necessarily runs before we
+  // know the caller's company_id, so it can't be scoped by that company's
+  // RLS policy yet. This is a genuine system-level operation (see ADR
+  // 0007), not the caller's own tenant-scoped work — a short,
+  // self-contained transaction, not the request transaction (there isn't
+  // one anymore) and not the raw pooled `db` (which the restricted app DB
+  // role can't read from at all under RLS with no GUCs set).
+  const profile = await withSystemTransaction(db, async (tx) => {
+    const existing = await getUserProfileByCognitoSub(tx, resolvedCognitoSub)
+    if (existing) {
+      return existing
+    }
+    if (email) {
+      return syncUserFromCognito(tx, { cognitoSub: resolvedCognitoSub, email, name })
+    }
+    return null
+  })
 
   if (!profile) {
     return c.json({ error: 'User not provisioned in PREVIO' }, 403)
@@ -72,18 +108,42 @@ export const requireAuth = async (c: Context, next: Next): Promise<Response | vo
     return c.json({ error: 'User account inactive' }, 403)
   }
 
-  await setRlsContext(
-    db,
-    profile.company.id,
-    profile.role.id === 'super-admin',
-  )
+  const isSuperAdmin = profile.role.id === 'super-admin'
+  const tenantOverride = c.req.header(TENANT_OVERRIDE_HEADER)
+
+  if (tenantOverride) {
+    // Role check first — a non-super-admin gets the same 403 whether the
+    // value is well-formed or not, so the response never confirms/denies
+    // whether a given company id exists.
+    if (!isSuperAdmin) {
+      return c.json({ error: `Forbidden — ${TENANT_OVERRIDE_HEADER} is restricted to super-admin` }, 403)
+    }
+    if (!UUID_RE.test(tenantOverride)) {
+      return c.json({ error: `Invalid ${TENANT_OVERRIDE_HEADER}` }, 400)
+    }
+
+    const target = await withSystemTransaction(db, (tx) => getCompanyById(tx, tenantOverride))
+    if (!target) {
+      return c.json({ error: `Unknown company for ${TENANT_OVERRIDE_HEADER}` }, 404)
+    }
+  }
 
   c.set('user', profile)
+  c.set('actorUserId', profile.id)
+  c.set('effectiveCompanyId', tenantOverride ?? profile.company.id)
+  c.set('isSuperAdmin', isSuperAdmin)
+  c.set('isActingAsTenant', Boolean(tenantOverride))
+  c.set('requestId', crypto.randomUUID())
+
   await next()
 }
 
 /**
- * Require minimum role level for protected routes.
+ * Require minimum role level for protected routes. Runs after
+ * `requireAuth` and before any route handler's DB access — RBAC/action
+ * authorization is a separate concern from RLS tenant isolation, checked
+ * here, not folded into or inferred from what RLS happens to allow a query
+ * to return (see ADR 0006).
  * @param allowedRoles - Role IDs permitted to access the route
  */
 export const requireRoles = (allowedRoles: string[]) =>

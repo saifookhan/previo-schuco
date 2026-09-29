@@ -4,6 +4,13 @@ resource "aws_cognito_user_pool" "main" {
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
+  # ADR 0004: admin-invite-only onboarding — no public self-registration.
+  # Without this, syncUserFromCognito's email-match backfill (ADR 0004) lets
+  # anyone self-register on an invited email and claim that DB grant.
+  admin_create_user_config {
+    allow_admin_create_user_only = true
+  }
+
   password_policy {
     minimum_length    = 10
     require_lowercase = true

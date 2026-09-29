@@ -9,6 +9,8 @@ dist
 *.db-wal
 .env
 .env.local
+.env.*.local
+*.tsbuildinfo
 .DS_Store
 .terraform
 *.tfstate

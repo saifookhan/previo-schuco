@@ -33,23 +33,29 @@ module "network" {
 }
 
 module "cognito" {
-  source          = "../../modules/cognito"
-  project         = var.project
-  environment     = var.environment
-  domain_prefix   = var.cognito_domain_prefix
-  callback_urls   = var.callback_urls
-  logout_urls     = var.logout_urls
+  source        = "../../modules/cognito"
+  project       = var.project
+  environment   = var.environment
+  domain_prefix = var.cognito_domain_prefix
+  callback_urls = var.callback_urls
+  logout_urls   = var.logout_urls
 }
 
 module "rds" {
-  source                    = "../../modules/rds"
-  project                   = var.project
-  environment               = var.environment
-  vpc_id                    = module.network.vpc_id
-  subnet_ids                = module.network.private_subnet_ids
+  source      = "../../modules/rds"
+  project     = var.project
+  environment = var.environment
+  vpc_id      = module.network.vpc_id
+  # Public subnets (the ALB's), not private — required for
+  # publicly_accessible to actually route from the internet (a private
+  # subnet's route table has no Internet Gateway route, so the flag alone
+  # does nothing there). Dev-only tradeoff, see the module variable's doc.
+  subnet_ids                = module.network.public_subnet_ids
   allowed_security_group_id = aws_security_group.api_tasks.id
   db_username               = var.db_username
   db_name                   = var.db_name
+  publicly_accessible       = true
+  db_port                   = 54329
 }
 
 module "ecs" {
@@ -60,7 +66,7 @@ module "ecs" {
   public_subnet_ids      = module.network.public_subnet_ids
   private_subnet_ids     = module.network.private_subnet_ids
   aws_region             = var.aws_region
-  db_secret_arn          = module.rds.secret_arn
+  app_db_secret_arn      = module.rds.app_secret_arn # restricted app-role secret — never the master (ADR 0007, ADR 0011)
   cognito_user_pool_id   = module.cognito.user_pool_id
   cors_origins           = join(",", var.cors_origins)
   api_image              = var.api_image
@@ -74,4 +80,22 @@ module "s3" {
   source      = "../../modules/s3"
   project     = var.project
   environment = var.environment
+}
+
+# apps/web (Vercel) consumes this for session-cookie signing — not the API.
+# Secrets Manager is the source of truth (ADR 0011); an operator fetches
+# it and sets it as a Vercel env var (see docs/deployment.md), since
+# Vercel isn't Terraform-managed infra here.
+resource "random_password" "auth_secret" {
+  length  = 44
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "auth_secret" {
+  name = "${var.project}/${var.environment}/auth-secret"
+}
+
+resource "aws_secretsmanager_secret_version" "auth_secret" {
+  secret_id     = aws_secretsmanager_secret.auth_secret.id
+  secret_string = random_password.auth_secret.result
 }

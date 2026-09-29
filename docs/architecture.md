@@ -19,12 +19,14 @@ How the monorepo is organized today and how it evolves toward separate deployabl
 previo-schuco/
 ├── apps/
 │   ├── web/                 # Next.js → Vercel
-│   └── api/                 # Hono BFF → ECS (dev) / Docker (local)
+│   └── api/                 # Hono BFF → ECS (dev) / Docker (local); also the BullMQ worker entrypoint
 ├── packages/
 │   ├── calculation/         # Pure quote pricing (imported by API)
 │   ├── contracts/           # Shared Zod schemas + OpenAPI spec
-│   └── db/                  # Drizzle schema, migrations, RBAC queries
-├── docs/                    # Markdown (project context, deployment, architecture)
+│   ├── db/                  # Drizzle schema, migrations, RBAC queries, RLS policies
+│   ├── env/                 # Per-environment env resolution (ADR 0005)
+│   └── queue/                # BullMQ job/worker helpers (ADR 0009)
+├── docs/                    # Markdown (project context, deployment, architecture, adr/)
 ├── infra/terraform/         # AWS dev (VPC, RDS, Cognito, ECS, S3)
 └── .github/workflows/       # CI, API deploy, Terraform plan
 ```
@@ -197,7 +199,7 @@ Each new ECS app gets:
 ## Communication between services (when split)
 
 1. **Sync (now):** `import from '@schuco/calculation'`
-2. **Async (Phase 5+):** SQS for reports, notifications, bulk import
+2. **Async (Phase 5+):** BullMQ (Redis-backed) for reports, notifications, bulk import — see [ADR 0008](./adr/0008-bullmq-background-jobs.md); supersedes the SQS approach previously sketched here
 3. **HTTP (Phase 3–4):** REST + `@schuco/contracts` request/response types
 4. **Auth:** service-to-service via internal network; user JWT validated only at `apps/api`
 

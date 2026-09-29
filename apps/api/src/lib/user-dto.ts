@@ -1,5 +1,5 @@
 import type { AdminUserDto, RoleId, UserDto } from '@schuco/contracts'
-import type { UserListRow } from '@schuco/db'
+import type { UserListRow, UserProfile } from '@schuco/db'
 
 /**
  * Map a DB user row to a tenant-scoped UserDto (no cognitoSub or cross-company data).
@@ -15,6 +15,24 @@ export const toUserDto = (row: UserListRow): UserDto => ({
     name: row.role.name,
   },
   businessUnits: row.businessUnits,
+})
+
+/**
+ * Map a freshly-created/loaded user profile (e.g. from an invite) to a
+ * UserDto — same shape as `toUserDto`, but `UserProfile` (no
+ * createdAt/updatedAt) rather than the list query's `UserListRow`.
+ * @param profile - User profile
+ */
+export const profileToUserDto = (profile: UserProfile): UserDto => ({
+  id: profile.id,
+  email: profile.email,
+  name: profile.name,
+  status: profile.status,
+  role: {
+    id: profile.role.id as RoleId,
+    name: profile.role.name,
+  },
+  businessUnits: profile.businessUnits,
 })
 
 /**
