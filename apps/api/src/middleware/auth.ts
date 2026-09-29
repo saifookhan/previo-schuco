@@ -1,14 +1,8 @@
 import type { Context, Next } from 'hono'
-import {
-  getCompanyById,
-  getUserProfileByCognitoSub,
-  syncUserFromCognito,
-  withSystemTransaction,
-  type UserProfile,
-} from '@schuco/db'
+import { getCompanyById, getUserProfileByCognitoSub, getUserProfileById, withSystemTransaction, type UserProfile } from '@schuco/db'
 
-import { getCognitoConfig, parseBearerToken, verifyCognitoToken } from '../lib/cognito'
 import { getDb } from '../lib/db'
+import { parseBearerToken, verifySessionJwt } from '../lib/session-jwt'
 
 export type AuthVariables = {
   user: UserProfile
@@ -26,11 +20,13 @@ const TENANT_OVERRIDE_HEADER = 'x-tenant-id'
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
- * Resolve dev-mode user sub when Cognito is not configured.
+ * Resolve dev-mode user sub (the seeded demo users — see demo-users.ts).
+ * Gated the same way apps/web's own dev-login UI is: never in production
+ * unless explicitly opted into (see docker-compose's `selfhost` profile).
  * @param c - Hono context
  */
 const resolveDevSub = (c: Context): string | null => {
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_LOGIN !== 'true') {
     return null
   }
 
@@ -38,67 +34,48 @@ const resolveDevSub = (c: Context): string | null => {
 }
 
 /**
- * Require authenticated user via Cognito JWT or dev header. Resolves
- * identity and tenant context onto the Hono context as plain data —
- * `actorUserId`, `effectiveCompanyId`, `isSuperAdmin`, `isActingAsTenant`
- * — and holds NO database transaction across `next()`. Route handlers open
- * their own short, tenant-scoped transaction via `withTenantDb(c, fn)`
- * (see `../lib/tenant-db`) for whatever DB work they actually need; a
- * transaction's lifetime must never be tied to the request's lifetime (see
- * ADR 0006 — a Cognito call, file upload, or PDF render inside a
- * request-long transaction would hold a pooled connection for however long
- * that non-DB work takes).
+ * Require authenticated user via our own session JWT (see
+ * apps/web's lib/auth/session.ts — same `AUTH_SECRET`, verified here
+ * with `verifySessionJwt`) or the dev header. Resolves identity and
+ * tenant context onto the Hono context as plain data — `actorUserId`,
+ * `effectiveCompanyId`, `isSuperAdmin`, `isActingAsTenant` — and holds NO
+ * database transaction across `next()`. Route handlers open their own
+ * short, tenant-scoped transaction via `withTenantDb(c, fn)` (see
+ * `../lib/tenant-db`) for whatever DB work they actually need; a
+ * transaction's lifetime must never be tied to the request's lifetime
+ * (see ADR 0006 — a Resend call, file upload, or PDF render inside a
+ * request-long transaction would hold a pooled connection for however
+ * long that non-DB work takes).
  *
  * A super-admin may act on behalf of another company via the `X-Tenant-Id`
  * header; any other caller sending it is rejected (see ADR 0008).
  */
 export const requireAuth = async (c: Context, next: Next): Promise<Response | void> => {
-  const cognitoConfig = getCognitoConfig()
-  let cognitoSub: string | null = null
-  let email: string | undefined
-  let name: string | undefined
+  const db = getDb()
+  let profile: UserProfile | null = null
 
-  if (cognitoConfig) {
-    const token = parseBearerToken(c.req.header('Authorization'))
-    if (!token) {
-      return c.json({ error: 'Unauthorized' }, 401)
-    }
-
-    try {
-      const payload = await verifyCognitoToken(token)
-      cognitoSub = payload.sub
-      email = typeof payload.email === 'string' ? payload.email : undefined
-      name = typeof payload.name === 'string' ? payload.name : undefined
-    } catch {
+  const bearerToken = parseBearerToken(c.req.header('Authorization'))
+  if (bearerToken) {
+    const payload = await verifySessionJwt(bearerToken)
+    if (!payload) {
       return c.json({ error: 'Invalid token' }, 401)
     }
+    // Identity resolution (JWT sub -> profile) necessarily runs before we
+    // know the caller's company_id, so it can't be scoped by that
+    // company's RLS policy yet. This is a genuine system-level operation
+    // (see ADR 0007), not the caller's own tenant-scoped work — a short,
+    // self-contained transaction, not the request transaction (there
+    // isn't one anymore) and not the raw pooled `db` (which the
+    // restricted app DB role can't read from at all under RLS with no
+    // GUCs set).
+    profile = await withSystemTransaction(db, (tx) => getUserProfileById(tx, payload.sub))
   } else {
-    cognitoSub = resolveDevSub(c)
-    if (!cognitoSub) {
+    const devSub = resolveDevSub(c)
+    if (!devSub) {
       return c.json({ error: 'Unauthorized — set Authorization Bearer or X-Dev-User-Sub' }, 401)
     }
+    profile = await withSystemTransaction(db, (tx) => getUserProfileByCognitoSub(tx, devSub))
   }
-
-  const db = getDb()
-  const resolvedCognitoSub = cognitoSub
-
-  // Identity resolution (cognito_sub -> profile) necessarily runs before we
-  // know the caller's company_id, so it can't be scoped by that company's
-  // RLS policy yet. This is a genuine system-level operation (see ADR
-  // 0007), not the caller's own tenant-scoped work — a short,
-  // self-contained transaction, not the request transaction (there isn't
-  // one anymore) and not the raw pooled `db` (which the restricted app DB
-  // role can't read from at all under RLS with no GUCs set).
-  const profile = await withSystemTransaction(db, async (tx) => {
-    const existing = await getUserProfileByCognitoSub(tx, resolvedCognitoSub)
-    if (existing) {
-      return existing
-    }
-    if (email) {
-      return syncUserFromCognito(tx, { cognitoSub: resolvedCognitoSub, email, name })
-    }
-    return null
-  })
 
   if (!profile) {
     return c.json({ error: 'User not provisioned in PREVIO' }, 403)
@@ -106,6 +83,9 @@ export const requireAuth = async (c: Context, next: Next): Promise<Response | vo
 
   if (profile.status !== 'active') {
     return c.json({ error: 'User account inactive' }, 403)
+  }
+  if (!profile.company.isActive) {
+    return c.json({ error: 'Company account deactivated' }, 403)
   }
 
   const isSuperAdmin = profile.role.id === 'super-admin'

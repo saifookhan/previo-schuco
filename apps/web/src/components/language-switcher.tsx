@@ -23,7 +23,12 @@ export const LanguageSwitcher = () => {
   const router = useRouter()
 
   const switchLocale = (nextLocale: Locale) => {
+    // localePrefix is 'never' — the URL doesn't change on a locale switch,
+    // so Next's router treats replace() as a no-op and never re-fetches
+    // the server-rendered (translated) content. refresh() forces that
+    // re-fetch now that the locale cookie has been updated.
     router.replace(pathname, { locale: nextLocale })
+    router.refresh()
   }
 
   return (

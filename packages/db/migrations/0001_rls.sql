@@ -68,6 +68,161 @@ CREATE POLICY audit_log_tenant ON audit_log
     OR effective_company_id = app_current_company_id()
   );
 
+-- Product families (Phase 2, project-context.md) and everything under
+-- them. Two helper functions capture the shared rule so it's written
+-- once, not five times:
+--   - "owns" (write access): the supplier company itself, or super-admin.
+--   - "can view" (read access): owns it, OR the family is published AND
+--     the caller's company is a linked client of that supplier
+--     (supplier_client_links) — a client never sees a supplier's
+--     unpublished/draft work.
+-- Tables must already exist — created by an earlier-numbered drizzle
+-- migration, which always runs before this file (see apply-migrations.ts).
+CREATE OR REPLACE FUNCTION app_owns_product_family(family_id uuid) RETURNS boolean AS $$
+  SELECT app_is_super_admin() OR EXISTS (
+    SELECT 1 FROM product_families pf
+    WHERE pf.id = family_id AND pf.supplier_company_id = app_current_company_id()
+  );
+$$ LANGUAGE sql STABLE;
+
+CREATE OR REPLACE FUNCTION app_can_view_product_family(family_id uuid) RETURNS boolean AS $$
+  SELECT app_owns_product_family(family_id) OR EXISTS (
+    SELECT 1 FROM product_families pf
+    JOIN supplier_client_links scl ON scl.supplier_company_id = pf.supplier_company_id
+    WHERE pf.id = family_id
+      AND pf.is_published
+      AND scl.client_company_id = app_current_company_id()
+  );
+$$ LANGUAGE sql STABLE;
+
+-- product_lines/characteristics hang off a product_line_id, not a
+-- product_family_id directly — these two just resolve the line's family
+-- and delegate, so callers never need to know the extra hop exists.
+CREATE OR REPLACE FUNCTION app_owns_product_line(line_id uuid) RETURNS boolean AS $$
+  SELECT app_owns_product_family((SELECT product_family_id FROM product_lines WHERE id = line_id));
+$$ LANGUAGE sql STABLE;
+
+CREATE OR REPLACE FUNCTION app_can_view_product_line(line_id uuid) RETURNS boolean AS $$
+  SELECT app_can_view_product_family((SELECT product_family_id FROM product_lines WHERE id = line_id));
+$$ LANGUAGE sql STABLE;
+
+ALTER TABLE product_families ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_lines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE characteristics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pricing_matrices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_line_characteristics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_family_images ENABLE ROW LEVEL SECURITY;
+
+-- product_families: split SELECT (broader — includes a linked client
+-- reading a published family) from write (supplier-only, always) —
+-- unlike most other tables here, "can view" and "can write" are
+-- genuinely different sets of callers, so one FOR ALL policy would be
+-- wrong (it would let a client mutate a supplier's published family).
+-- These four policies check `supplier_company_id` directly (same style
+-- as `companies`/`business_units` above), NOT via `app_owns_product_family`/
+-- `app_can_view_product_family` — those helpers do a SELECT back on
+-- product_families itself to find the row by id, which on THIS table is
+-- self-referential: evaluating product_families' own SELECT policy would
+-- re-invoke the same helper, which re-queries product_families, which is
+-- itself subject to the SELECT policy being evaluated. It doesn't
+-- infinite-loop, but it does reliably fail ("new row violates row-level
+-- security policy") including on plain INSERT ... RETURNING, since
+-- Postgres also checks the SELECT policy for the returned row. The
+-- helpers are still correct and necessary for the CHILD tables below,
+-- where "look up the parent family" is a genuine cross-table join, not
+-- a self-reference.
+DROP POLICY IF EXISTS product_families_select ON product_families;
+CREATE POLICY product_families_select ON product_families
+  FOR SELECT
+  USING (
+    app_is_super_admin()
+    OR supplier_company_id = app_current_company_id()
+    OR (is_published AND EXISTS (
+      SELECT 1 FROM supplier_client_links scl
+      WHERE scl.supplier_company_id = product_families.supplier_company_id
+        AND scl.client_company_id = app_current_company_id()
+    ))
+  );
+
+DROP POLICY IF EXISTS product_families_insert ON product_families;
+CREATE POLICY product_families_insert ON product_families
+  FOR INSERT
+  WITH CHECK (app_is_super_admin() OR supplier_company_id = app_current_company_id());
+
+DROP POLICY IF EXISTS product_families_update ON product_families;
+CREATE POLICY product_families_update ON product_families
+  FOR UPDATE
+  USING (app_is_super_admin() OR supplier_company_id = app_current_company_id())
+  WITH CHECK (app_is_super_admin() OR supplier_company_id = app_current_company_id());
+
+DROP POLICY IF EXISTS product_families_delete ON product_families;
+CREATE POLICY product_families_delete ON product_families
+  FOR DELETE
+  USING (app_is_super_admin() OR supplier_company_id = app_current_company_id());
+
+-- product_lines, characteristics, pricing_matrices,
+-- product_line_characteristics: same split, delegated to the helpers
+-- above so a client can read what they're allowed to see but never
+-- write into a supplier's catalog.
+DROP POLICY IF EXISTS product_lines_select ON product_lines;
+CREATE POLICY product_lines_select ON product_lines
+  FOR SELECT USING (app_can_view_product_family(product_family_id));
+DROP POLICY IF EXISTS product_lines_insert ON product_lines;
+CREATE POLICY product_lines_insert ON product_lines
+  FOR INSERT WITH CHECK (app_owns_product_family(product_family_id));
+DROP POLICY IF EXISTS product_lines_update ON product_lines;
+CREATE POLICY product_lines_update ON product_lines
+  FOR UPDATE USING (app_owns_product_family(product_family_id)) WITH CHECK (app_owns_product_family(product_family_id));
+DROP POLICY IF EXISTS product_lines_delete ON product_lines;
+CREATE POLICY product_lines_delete ON product_lines
+  FOR DELETE USING (app_owns_product_family(product_family_id));
+
+DROP POLICY IF EXISTS characteristics_select ON characteristics;
+CREATE POLICY characteristics_select ON characteristics
+  FOR SELECT USING (app_can_view_product_family(product_family_id));
+DROP POLICY IF EXISTS characteristics_insert ON characteristics;
+CREATE POLICY characteristics_insert ON characteristics
+  FOR INSERT WITH CHECK (app_owns_product_family(product_family_id));
+DROP POLICY IF EXISTS characteristics_update ON characteristics;
+CREATE POLICY characteristics_update ON characteristics
+  FOR UPDATE USING (app_owns_product_family(product_family_id)) WITH CHECK (app_owns_product_family(product_family_id));
+DROP POLICY IF EXISTS characteristics_delete ON characteristics;
+CREATE POLICY characteristics_delete ON characteristics
+  FOR DELETE USING (app_owns_product_family(product_family_id));
+
+DROP POLICY IF EXISTS pricing_matrices_select ON pricing_matrices;
+CREATE POLICY pricing_matrices_select ON pricing_matrices
+  FOR SELECT USING (app_can_view_product_family(product_family_id));
+DROP POLICY IF EXISTS pricing_matrices_insert ON pricing_matrices;
+CREATE POLICY pricing_matrices_insert ON pricing_matrices
+  FOR INSERT WITH CHECK (app_owns_product_family(product_family_id));
+DROP POLICY IF EXISTS pricing_matrices_update ON pricing_matrices;
+CREATE POLICY pricing_matrices_update ON pricing_matrices
+  FOR UPDATE USING (app_owns_product_family(product_family_id)) WITH CHECK (app_owns_product_family(product_family_id));
+DROP POLICY IF EXISTS pricing_matrices_delete ON pricing_matrices;
+CREATE POLICY pricing_matrices_delete ON pricing_matrices
+  FOR DELETE USING (app_owns_product_family(product_family_id));
+
+DROP POLICY IF EXISTS product_line_characteristics_select ON product_line_characteristics;
+CREATE POLICY product_line_characteristics_select ON product_line_characteristics
+  FOR SELECT USING (app_can_view_product_line(product_line_id));
+DROP POLICY IF EXISTS product_line_characteristics_insert ON product_line_characteristics;
+CREATE POLICY product_line_characteristics_insert ON product_line_characteristics
+  FOR INSERT WITH CHECK (app_owns_product_line(product_line_id));
+DROP POLICY IF EXISTS product_line_characteristics_delete ON product_line_characteristics;
+CREATE POLICY product_line_characteristics_delete ON product_line_characteristics
+  FOR DELETE USING (app_owns_product_line(product_line_id));
+
+DROP POLICY IF EXISTS product_family_images_select ON product_family_images;
+CREATE POLICY product_family_images_select ON product_family_images
+  FOR SELECT USING (app_can_view_product_family(product_family_id));
+DROP POLICY IF EXISTS product_family_images_insert ON product_family_images;
+CREATE POLICY product_family_images_insert ON product_family_images
+  FOR INSERT WITH CHECK (app_owns_product_family(product_family_id));
+DROP POLICY IF EXISTS product_family_images_delete ON product_family_images;
+CREATE POLICY product_family_images_delete ON product_family_images
+  FOR DELETE USING (app_owns_product_family(product_family_id));
+
 -- Application role: this is what the API connects as at runtime. It must
 -- NOT be a table owner or a Postgres superuser — both bypass RLS entirely
 -- and unconditionally, regardless of ENABLE/FORCE ROW LEVEL SECURITY (see
@@ -95,3 +250,48 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 -- audit record — only INSERT (and SELECT to read it back). Revoked after
 -- the blanket grant above so this table is the one deliberate exception.
 REVOKE UPDATE, DELETE ON audit_log FROM previo_app;
+
+-- Quotes (Phase 3): a supplier's quotes to their own end customers.
+-- Unlike product_families, quotes are never shared/published — visibility
+-- is a straight "belongs to my company" check, same shape as companies'
+-- own policy. Child tables (quote_positions, quote_position_characteristics)
+-- delegate via a join back to quotes, mirroring the product-families
+-- child-table pattern above.
+ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_positions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_position_characteristics ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION app_owns_quote(target_quote_id uuid) RETURNS boolean AS $$
+  SELECT app_is_super_admin() OR EXISTS (
+    SELECT 1 FROM quotes q
+    WHERE q.id = target_quote_id AND q.supplier_company_id = app_current_company_id()
+  );
+$$ LANGUAGE sql STABLE;
+
+DROP POLICY IF EXISTS quotes_tenant ON quotes;
+CREATE POLICY quotes_tenant ON quotes
+  FOR ALL
+  USING (app_is_super_admin() OR supplier_company_id = app_current_company_id())
+  WITH CHECK (app_is_super_admin() OR supplier_company_id = app_current_company_id());
+
+DROP POLICY IF EXISTS quote_positions_tenant ON quote_positions;
+CREATE POLICY quote_positions_tenant ON quote_positions
+  FOR ALL
+  USING (app_owns_quote(quote_id))
+  WITH CHECK (app_owns_quote(quote_id));
+
+DROP POLICY IF EXISTS quote_position_characteristics_tenant ON quote_position_characteristics;
+CREATE POLICY quote_position_characteristics_tenant ON quote_position_characteristics
+  FOR ALL
+  USING (
+    app_is_super_admin() OR EXISTS (
+      SELECT 1 FROM quote_positions qp
+      WHERE qp.id = quote_position_id AND app_owns_quote(qp.quote_id)
+    )
+  )
+  WITH CHECK (
+    app_is_super_admin() OR EXISTS (
+      SELECT 1 FROM quote_positions qp
+      WHERE qp.id = quote_position_id AND app_owns_quote(qp.quote_id)
+    )
+  );

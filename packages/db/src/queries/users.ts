@@ -9,6 +9,8 @@ import {
   users,
 } from '../schema'
 
+export type UserStatus = 'pending_approval' | 'invited' | 'invite_failed' | 'active' | 'inactive'
+
 export interface BusinessUnitScope {
   id: string
   name: string
@@ -20,7 +22,7 @@ export interface UserListRow {
   cognitoSub: string | null
   email: string
   name: string | null
-  status: 'invited' | 'invite_failed' | 'active' | 'inactive'
+  status: UserStatus
   role: {
     id: string
     name: string
@@ -40,7 +42,7 @@ export interface UserProfile {
   cognitoSub: string | null
   email: string
   name: string | null
-  status: 'invited' | 'invite_failed' | 'active' | 'inactive'
+  status: UserStatus
   role: {
     id: string
     name: string
@@ -51,6 +53,7 @@ export interface UserProfile {
     name: string
     type: 'platform' | 'supplier' | 'client'
     vatNumber: string
+    isActive: boolean
   }
   businessUnits: BusinessUnitScope[]
 }
@@ -78,6 +81,7 @@ const getUserProfileByWhere = async (
       companyName: companies.name,
       companyType: companies.type,
       companyVat: companies.vatNumber,
+      companyIsActive: companies.isActive,
     })
     .from(users)
     .innerJoin(roles, eq(users.roleId, roles.id))
@@ -116,6 +120,7 @@ const getUserProfileByWhere = async (
       name: row.companyName,
       type: row.companyType,
       vatNumber: row.companyVat,
+      isActive: row.companyIsActive,
     },
     businessUnits: buRows,
   }
@@ -196,15 +201,23 @@ export interface CreateInvitedUserInput {
   companyId: string
   roleId: string
   businessUnitIds?: string[]
+  /**
+   * 'invited' (default) — an invite-accept email goes out immediately
+   * (super-admin invites, and any invite that doesn't need approval).
+   * 'pending_approval' — a company-admin's own invite (Stage 3): the row
+   * exists, but no email is sent and no password can be set until a
+   * super-admin approves it (see approveUser/deletePendingUser below).
+   */
+  initialStatus?: 'invited' | 'pending_approval'
 }
 
 /**
- * Create the DB grant for an admin-invited user (ADR 0004) — status
- * 'invited', cognito_sub NULL. This is the authoritative step; the
- * Cognito call happens after and separately (see
- * `../../apps/api/src/lib/cognito-admin.ts`), never before — a failure
- * there only ever leaves "a DB grant with no matching Cognito identity
- * yet," never an orphaned Cognito identity with no DB record.
+ * Create the DB grant for an admin-invited (or pending-approval) user
+ * (ADR 0004), cognito_sub NULL. This is the authoritative step; the
+ * invite email happens after and separately (see auth-service.ts's
+ * `issueInviteToken`), never before — a failure there only ever leaves
+ * "a DB grant with no invite email sent yet," never a sent email with
+ * no DB record.
  * @param db - RLS-scoped transaction (the caller's own company, or the
  *   super-admin cross-tenant path)
  * @param input - Invitee details
@@ -221,7 +234,7 @@ export const createInvitedUser = async (
       name: input.name ?? null,
       companyId: input.companyId,
       roleId: input.roleId,
-      status: 'invited',
+      status: input.initialStatus ?? 'invited',
     })
     .returning({ id: users.id })
 
@@ -256,9 +269,48 @@ export const markInviteFailed = async (db: DbLike, userId: string): Promise<void
     .where(eq(users.id, userId))
 }
 
+/**
+ * Approves a pending-approval user — transitions `'pending_approval'` ->
+ * `'invited'`, clearing the way for `issueInviteToken` to actually send
+ * the invite email. A no-op (returns null) if the row isn't currently
+ * `'pending_approval'` — an already-approved or already-active user
+ * can't be "approved" again.
+ * @param db - System transaction (super-admin action, cross-tenant)
+ * @param userId - The pending user's internal id
+ */
+export const approveUser = async (db: DbLike, userId: string): Promise<UserProfile | null> => {
+  const [updated] = await db
+    .update(users)
+    .set({ status: 'invited', updatedAt: new Date() })
+    .where(and(eq(users.id, userId), eq(users.status, 'pending_approval')))
+    .returning({ id: users.id })
+  if (!updated) {
+    return null
+  }
+  return getUserProfileById(db, updated.id)
+}
+
+/**
+ * Rejects a pending-approval user by deleting the row outright — there's
+ * nothing worth keeping (no password, no invite ever sent, no activity
+ * possible). Scoped to `status = 'pending_approval'` in the WHERE
+ * itself so this can never delete an active/invited/inactive user by
+ * mistake, however it's called.
+ * @param db - System transaction (super-admin action, cross-tenant)
+ * @param userId - The pending user's internal id
+ * @returns Whether a row was actually deleted
+ */
+export const deletePendingUser = async (db: DbLike, userId: string): Promise<boolean> => {
+  const deleted = await db
+    .delete(users)
+    .where(and(eq(users.id, userId), eq(users.status, 'pending_approval')))
+    .returning({ id: users.id })
+  return deleted.length > 0
+}
+
 export interface ExistingInviteRow {
   id: string
-  status: 'invited' | 'invite_failed' | 'active' | 'inactive'
+  status: UserStatus
 }
 
 /**
@@ -285,14 +337,62 @@ export const getUserByEmailInCompany = async (
 }
 
 /**
- * Reset a user's status back to `'invited'` — used when retrying a Cognito
- * invite for a row that's already `'invited'` or `'invite_failed'`, after
- * `createCognitoInvite` succeeds.
+ * Reset a user's status back to `'invited'` — used when retrying the
+ * invite email for a row that's already `'invited'` or `'invite_failed'`,
+ * after `issueInviteToken` succeeds.
  * @param db - RLS-scoped transaction
  * @param userId - The invited user's internal id
  */
 export const resetInvitePending = async (db: DbLike, userId: string): Promise<void> => {
   await db.update(users).set({ status: 'invited', updatedAt: new Date() }).where(eq(users.id, userId))
+}
+
+export interface UserAuthRow {
+  id: string
+  email: string
+  passwordHash: string | null
+  status: UserStatus
+}
+
+/**
+ * Look up a user by email, globally (not company-scoped) — needed for
+ * login, which by definition runs before the caller's company is known.
+ * Call inside `withSystemTransaction`, same as identity resolution in
+ * `requireAuth`. Returns the password hash so the caller can verify it
+ * without a second round trip; never return this row to a client as-is.
+ * @param db - System transaction
+ * @param email - Case-insensitive, matches storage
+ */
+export const getUserByEmail = async (db: DbLike, email: string): Promise<UserAuthRow | null> => {
+  const rows = await db
+    .select({ id: users.id, email: users.email, passwordHash: users.passwordHash, status: users.status })
+    .from(users)
+    .where(eq(users.email, email.toLowerCase()))
+    .limit(1)
+  return rows[0] ?? null
+}
+
+/**
+ * Sets a user's password hash — accepting an invite (first password) or
+ * completing a forgotten-password reset. Also flips a still-pending
+ * invite to `'active'`: setting a password *is* what accepting an invite
+ * means, so there's no separate "activate" step. Never touches an
+ * explicitly `'inactive'` user's status (a reset link doesn't undo an
+ * admin's deactivation).
+ * @param db - System transaction
+ * @param userId - Whose password this is
+ * @param passwordHash - Already-hashed (bcrypt) — never a plaintext password
+ */
+export const setUserPassword = async (db: DbLike, userId: string, passwordHash: string): Promise<void> => {
+  const [current] = await db.select({ status: users.status }).from(users).where(eq(users.id, userId)).limit(1)
+  await db
+    .update(users)
+    .set({
+      passwordHash,
+      updatedAt: new Date(),
+      ...(current?.status === 'invited' || current?.status === 'invite_failed' ? { status: 'active' as const } : {}),
+    })
+    .where(eq(users.id, userId))
 }
 
 /**
@@ -305,7 +405,7 @@ export const resetInvitePending = async (db: DbLike, userId: string): Promise<vo
  * @param db - Drizzle client or RLS-scoped transaction
  * @param companyId - Optional explicit company filter, on top of RLS
  */
-export const listUsers = async (db: DbLike, companyId?: string): Promise<UserListRow[]> => {
+export const listUsers = async (db: DbLike, companyId?: string, status?: UserStatus): Promise<UserListRow[]> => {
   const userRows = await db
     .select({
       userId: users.id,
@@ -324,7 +424,12 @@ export const listUsers = async (db: DbLike, companyId?: string): Promise<UserLis
     .from(users)
     .innerJoin(roles, eq(users.roleId, roles.id))
     .innerJoin(companies, eq(users.companyId, companies.id))
-    .where(companyId ? eq(users.companyId, companyId) : undefined)
+    .where(
+      and(
+        companyId ? eq(users.companyId, companyId) : undefined,
+        status ? eq(users.status, status) : undefined,
+      ),
+    )
     .orderBy(asc(users.email))
 
   if (userRows.length === 0) {

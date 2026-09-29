@@ -35,10 +35,13 @@ users.get('/', requireAuth, requireRoles(['company-admin', 'super-admin']), asyn
 })
 
 /**
- * Invite a user into the caller's own company (ADR 0004). Self-scoped —
- * a company-admin can never invite into another company; `companyId` in
- * the request body, if present, is ignored in favor of the caller's own
- * company (the cross-tenant path is POST /api/admin/invites instead).
+ * Request a new user in the caller's own company (ADR 0004). Self-scoped
+ * — a company-admin can never invite into another company; `companyId`
+ * in the request body, if present, is ignored in favor of the caller's
+ * own company (the cross-tenant path is POST /api/admin/invites
+ * instead). Stage 3: this always requires approval — the created user
+ * starts `'pending_approval'`, and no invite email goes out until a
+ * super-admin calls POST /api/admin/users/:id/approve.
  */
 users.post('/', requireAuth, requireRoles(['company-admin']), async (c) => {
   const body = await c.req.json().catch(() => null)
@@ -64,6 +67,7 @@ users.post('/', requireAuth, requireRoles(['company-admin']), async (c) => {
       },
       ctx.effectiveCompanyId,
       parsedBody.data,
+      true, // requiresApproval — a company-admin's own invite always needs a super-admin's sign-off (Stage 3)
     )
   } catch (error) {
     if (error instanceof RoleNotGrantableError) {

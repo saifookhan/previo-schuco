@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { authConfig } from '@/lib/auth/config'
-import { getSession } from '@/lib/auth/session'
+import { getSession, getSessionToken } from '@/lib/auth/session'
 
 /**
  * Return current session user profile from API /api/me.
@@ -16,10 +16,11 @@ export const GET = async (): Promise<NextResponse> => {
     'Content-Type': 'application/json',
   }
 
-  if (session.accessToken === 'dev-token') {
+  if (session.isDevLogin) {
     headers['X-Dev-User-Sub'] = session.sub
   } else {
-    headers.Authorization = `Bearer ${session.accessToken}`
+    const token = await getSessionToken()
+    headers.Authorization = `Bearer ${token}`
   }
 
   try {

@@ -1,38 +1,57 @@
+import { AlertTriangle } from 'lucide-react'
+import { getTranslations } from 'next-intl/server'
+
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { fetchFromApi } from '@/lib/api/server-client'
+import { fetchFromApiResult } from '@/lib/api/server-client'
+import { PendingApprovalsCard } from '@/components/pending-approvals-card'
 import type { AdminUsersListResponse } from '@schuco/contracts'
 
 /**
- * Super-admin users table listing all platform users across companies.
+ * Super-admin users table listing all platform users across companies,
+ * plus a pending-approvals section (Stage 3) for company-admin-requested
+ * users still awaiting a decision.
  */
 const AdminUsersPage = async () => {
-  const data = await fetchFromApi<AdminUsersListResponse>('/api/admin/users')
-  const users = data?.users ?? []
+  const t = await getTranslations('adminUsers')
+  const [result, pendingResult] = await Promise.all([
+    fetchFromApiResult<AdminUsersListResponse>('/api/admin/users'),
+    fetchFromApiResult<AdminUsersListResponse>('/api/admin/users/pending'),
+  ])
+  const users = result.data?.users ?? []
+  const pending = pendingResult.data?.users ?? []
+  const loadFailed = result.status === 'error'
 
   return (
     <div className="p-6 md:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">All users</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Cross-tenant user directory — super-admin only
-        </p>
+        <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+        <p className="mt-1 text-sm text-slate-400">{t('subtitle')}</p>
       </div>
+
+      <PendingApprovalsCard pending={pending} />
+
+      {loadFailed ? (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-300">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          {t('errorLoading')}
+        </div>
+      ) : null}
 
       <Card className="border-slate-800 bg-slate-900">
         <CardHeader>
-          <CardTitle className="text-white">{users.length} users</CardTitle>
+          <CardTitle className="text-white">{t('usersCount', { count: users.length })}</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full min-w-[960px] text-sm">
             <thead>
               <tr className="border-b border-slate-800 text-left text-slate-400">
-                <th className="px-6 py-3 font-medium">Name</th>
-                <th className="px-6 py-3 font-medium">Email</th>
-                <th className="px-6 py-3 font-medium">Company</th>
-                <th className="px-6 py-3 font-medium">Role</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-                <th className="px-6 py-3 font-medium">Cognito sub</th>
+                <th className="px-6 py-3 font-medium">{t('name')}</th>
+                <th className="px-6 py-3 font-medium">{t('email')}</th>
+                <th className="px-6 py-3 font-medium">{t('company')}</th>
+                <th className="px-6 py-3 font-medium">{t('role')}</th>
+                <th className="px-6 py-3 font-medium">{t('status')}</th>
+                <th className="px-6 py-3 font-medium">{t('cognitoSub')}</th>
               </tr>
             </thead>
             <tbody>
@@ -48,7 +67,15 @@ const AdminUsersPage = async () => {
                     <Badge>{user.role.name}</Badge>
                   </td>
                   <td className="px-6 py-4">
-                    <Badge variant={user.status === 'active' ? 'success' : 'muted'}>
+                    <Badge
+                      variant={
+                        user.status === 'active'
+                          ? 'success'
+                          : user.status === 'pending_approval'
+                            ? 'warning'
+                            : 'muted'
+                      }
+                    >
                       {user.status}
                     </Badge>
                   </td>
@@ -58,7 +85,7 @@ const AdminUsersPage = async () => {
             </tbody>
           </table>
           {users.length === 0 ? (
-            <p className="px-6 py-8 text-sm text-slate-500">No users found.</p>
+            <p className="px-6 py-8 text-sm text-slate-500">{t('noUsersFound')}</p>
           ) : null}
         </CardContent>
       </Card>

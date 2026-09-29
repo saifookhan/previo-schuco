@@ -1,5 +1,5 @@
 import { authConfig } from '@/lib/auth/config'
-import { getSession } from '@/lib/auth/session'
+import { getSession, getSessionToken } from '@/lib/auth/session'
 
 /**
  * Build authenticated headers for server-side API requests.
@@ -14,10 +14,11 @@ export const buildAuthHeaders = async (): Promise<Record<string, string> | null>
     'Content-Type': 'application/json',
   }
 
-  if (session.accessToken === 'dev-token') {
+  if (session.isDevLogin) {
     headers['X-Dev-User-Sub'] = session.sub
   } else {
-    headers.Authorization = `Bearer ${session.accessToken}`
+    const token = await getSessionToken()
+    headers.Authorization = `Bearer ${token}`
   }
 
   return headers
@@ -28,9 +29,26 @@ export const buildAuthHeaders = async (): Promise<Record<string, string> | null>
  * @param path - API path including leading slash
  */
 export const fetchFromApi = async <T>(path: string): Promise<T | null> => {
+  const result = await fetchFromApiResult<T>(path)
+  return result.data
+}
+
+export type ApiFetchResult<T> =
+  | { data: T; status: 'ok' }
+  | { data: null; status: 'unauthenticated' | 'not_found' | 'error' }
+
+/**
+ * Same as {@link fetchFromApi}, but distinguishes "not authenticated",
+ * "API returned an error/not-found status", and "request itself failed"
+ * (network down, API unreachable) instead of collapsing all three into
+ * `null` — callers that need to tell a real error apart from a
+ * legitimately empty result should use this.
+ * @param path - API path including leading slash
+ */
+export const fetchFromApiResult = async <T>(path: string): Promise<ApiFetchResult<T>> => {
   const headers = await buildAuthHeaders()
   if (!headers) {
-    return null
+    return { data: null, status: 'unauthenticated' }
   }
 
   try {
@@ -40,11 +58,11 @@ export const fetchFromApi = async <T>(path: string): Promise<T | null> => {
     })
 
     if (!response.ok) {
-      return null
+      return { data: null, status: response.status === 404 ? 'not_found' : 'error' }
     }
 
-    return (await response.json()) as T
+    return { data: (await response.json()) as T, status: 'ok' }
   } catch {
-    return null
+    return { data: null, status: 'error' }
   }
 }

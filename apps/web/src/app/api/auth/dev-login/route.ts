@@ -6,7 +6,9 @@ import { isDevLoginAllowed } from '@/lib/auth/config'
 import { setSession } from '@/lib/auth/session'
 
 /**
- * Dev-only login for local testing without Cognito.
+ * Dev-only login for the seeded demo users — bypasses password auth
+ * entirely, gated by `isDevLoginAllowed()` (never in production unless
+ * explicitly opted into, e.g. the self-host Compose profile).
  */
 export const POST = async (request: Request): Promise<NextResponse> => {
   if (!isDevLoginAllowed()) {
@@ -24,14 +26,11 @@ export const POST = async (request: Request): Promise<NextResponse> => {
     return NextResponse.json({ error: 'Unknown dev user email' }, { status: 400 })
   }
 
-  const exp = Math.floor(Date.now() / 1000) + 86400
   await setSession({
     sub: match.cognitoSub,
     email: match.email,
     name: match.name,
-    accessToken: 'dev-token',
-    idToken: 'dev-token',
-    exp,
+    isDevLogin: true,
   })
 
   return NextResponse.json({ ok: true })

@@ -17,8 +17,8 @@ export { apiEnvSchema, validateApiEnv, validateWebEnv, webEnvSchema } from './sc
  * Resolve and validate `apps/api`'s environment (ADR 0005). Call this
  * before anything else reads `process.env` — first line of the process
  * entrypoint, before any other import that touches env at module-eval
- * time. Mutates `process.env` in place; downstream code (`lib/db.ts`,
- * `lib/cognito.ts`) is unchanged.
+ * time. Mutates `process.env` in place; downstream code (`lib/db.ts`) is
+ * unchanged.
  *
  * Safe to call in every environment as-is: if `DATABASE_URL` etc. are
  * already set directly (Docker/ECS env injection, a legacy flat `.env`),
@@ -29,26 +29,9 @@ export const bootstrapApiEnv = (): void => {
   const repoRoot = findRepoRoot()
   loadLocalEnvFile(repoRoot)
 
-  if (!process.env.COGNITO_TARGET) {
-    process.env.COGNITO_TARGET = process.env.API_TARGET ?? 'local'
-  }
-
   resolveEnvVars(repoRoot, [
     { targetVar: 'DB_TARGET', outputVar: 'DATABASE_URL', sourcePrefix: 'DATABASE_URL' },
     { targetVar: 'REDIS_TARGET', outputVar: 'REDIS_URL', sourcePrefix: 'REDIS_URL', required: false },
-    { targetVar: 'COGNITO_TARGET', outputVar: 'COGNITO_REGION', sourcePrefix: 'COGNITO_REGION', required: false },
-    {
-      targetVar: 'COGNITO_TARGET',
-      outputVar: 'COGNITO_USER_POOL_ID',
-      sourcePrefix: 'COGNITO_USER_POOL_ID',
-      required: false,
-    },
-    {
-      targetVar: 'COGNITO_TARGET',
-      outputVar: 'COGNITO_CLIENT_ID',
-      sourcePrefix: 'COGNITO_CLIENT_ID',
-      required: false,
-    },
   ])
 
   validateApiEnv()

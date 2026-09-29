@@ -1,67 +1,78 @@
-'use client'
-
-import { Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
+import { getTranslations } from 'next-intl/server'
 
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { DEMO_ROLES, DEMO_USERS, type Role, type User } from '@/types/settings'
+import { fetchFromApiResult } from '@/lib/api/server-client'
+import { UserInviteButton } from '@/components/user-invite-button'
+import type { UsersListResponse } from '@schuco/contracts'
+
+const statusVariant = (status: string): 'success' | 'warning' | 'muted' => {
+  if (status === 'active') return 'success'
+  if (status === 'pending_approval' || status === 'invited' || status === 'invite_failed') return 'warning'
+  return 'muted'
+}
 
 /**
- * Demo users list with role badges.
+ * Real, company-scoped user directory. "Add user" lands the invitee as
+ * `pending_approval` — no invite email goes out until a super-admin
+ * approves it from the platform admin panel (Stage 3).
  */
-const UsersPage = () => {
-  const [users] = useState<User[]>(DEMO_USERS)
-  const roleMap = useMemo(
-    () => Object.fromEntries(DEMO_ROLES.map((r) => [r.id, r.name])),
-    [],
-  )
+const UsersPage = async () => {
+  const t = await getTranslations('settingsUsers')
+  const result = await fetchFromApiResult<UsersListResponse>('/api/users')
+  const users = result.data?.users ?? []
+  const loadFailed = result.status === 'error'
 
   return (
     <div className="p-6 md:p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Users</h1>
-          <p className="mt-1 text-sm text-slate-500">Manage platform users and assignments</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t('title')}</h1>
+          <p className="mt-1 text-sm text-slate-500">{t('subtitle')}</p>
         </div>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add user
-        </Button>
+        <UserInviteButton />
       </div>
+
+      {loadFailed ? (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          {t('errorLoading')}
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>{users.length} users</CardTitle>
+          <CardTitle>{t('usersCount', { count: users.length })}</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <table className="w-full text-sm">
+        <CardContent className="overflow-x-auto p-0">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-slate-500">
-                <th className="px-6 py-3 font-medium">Name</th>
-                <th className="px-6 py-3 font-medium">Email</th>
-                <th className="px-6 py-3 font-medium">Role</th>
-                <th className="px-6 py-3 font-medium">Status</th>
+                <th className="px-6 py-3 font-medium">{t('name')}</th>
+                <th className="px-6 py-3 font-medium">{t('email')}</th>
+                <th className="px-6 py-3 font-medium">{t('role')}</th>
+                <th className="px-6 py-3 font-medium">{t('status')}</th>
               </tr>
             </thead>
             <tbody>
               {users.map((user) => (
                 <tr key={user.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                  <td className="px-6 py-4 font-medium text-slate-900">{user.name}</td>
+                  <td className="px-6 py-4 font-medium text-slate-900">{user.name ?? '—'}</td>
                   <td className="px-6 py-4 text-slate-600">{user.email}</td>
                   <td className="px-6 py-4">
-                    <Badge>{roleMap[user.roleId] ?? user.roleId}</Badge>
+                    <Badge>{user.role.name}</Badge>
                   </td>
                   <td className="px-6 py-4">
-                    <Badge variant={user.status === 'active' ? 'success' : 'muted'}>
-                      {user.status}
-                    </Badge>
+                    <Badge variant={statusVariant(user.status)}>{user.status}</Badge>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {users.length === 0 ? (
+            <p className="px-6 py-8 text-center text-sm text-slate-400">{t('noUsersFound')}</p>
+          ) : null}
         </CardContent>
       </Card>
     </div>
