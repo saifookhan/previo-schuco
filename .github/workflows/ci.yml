@@ -62,3 +62,9 @@ jobs:
 
       - name: Docker build API
         run: docker build -f apps/api/Dockerfile .
+
+      - name: Docker build web
+        # Catches a break in the self-host path (docker-compose's
+        # `selfhost` profile — see README) before it reaches a real
+        # deploy; there's no separate Vercel build check anymore.
+        run: docker build -f apps/web/Dockerfile .
