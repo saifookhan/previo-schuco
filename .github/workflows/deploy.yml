@@ -1,0 +1,30 @@
+name: Deploy
+
+# Runs after CI finishes successfully on main — never deploys code that
+# hasn't passed build+test+docker-build first (see ci.yml).
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Deploy to Hetzner
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: root
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          # Self-host profile only (apps/web + apps/api + worker — see
+          # README's self-host section); pulls whatever just landed on
+          # main and rebuilds only what changed.
+          script: |
+            cd /root/previo-schuco
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose --profile selfhost up -d --build
+            docker image prune -f

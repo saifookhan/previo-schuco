@@ -22,15 +22,22 @@ services:
   # over it either way (see apps/api/src/lib/email.ts).
   mailpit:
     image: axllent/mailpit:latest
+    environment:
+      # Empty by default (mailpit ignores the flag entirely when the file
+      # path is unset) — the port stays bound to localhost-only below
+      # instead (reach it via an SSH tunnel: `ssh -L 8025:localhost:8025
+      # <server>`). Set MAILPIT_UI_AUTH="user:pass" (and MAILPIT_BIND=
+      # 0.0.0.0 below) to instead expose it publicly, protected by this
+      # HTTP Basic Auth login — see README.
+      MP_UI_AUTH_FILE: ${MAILPIT_UI_AUTH:+/mailpit-ui-auth}
+    configs:
+      - source: mailpit_ui_auth
+        target: /mailpit-ui-auth
     ports:
-      # Bound to localhost only, deliberately — mailpit has no auth of its
-      # own, and every invite/reset-password link that's ever gone through
-      # it would otherwise be readable by anyone who can reach this port
-      # (a real concern once this is a `selfhost`-profile box on the
-      # public internet, not just a laptop). Reach it from a remote
-      # server via an SSH tunnel: `ssh -L 8025:localhost:8025 <server>`.
-      - '127.0.0.1:8025:8025' # web UI
-      - '127.0.0.1:1025:1025' # SMTP
+      # See the comment above: 127.0.0.1 (not reachable off the box) unless
+      # MAILPIT_BIND=0.0.0.0 is explicitly set alongside a real password.
+      - '${MAILPIT_BIND:-127.0.0.1}:8025:8025' # web UI
+      - '${MAILPIT_BIND:-127.0.0.1}:1025:1025' # SMTP
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:8025/livez']
       interval: 5s
@@ -173,3 +180,14 @@ services:
 volumes:
   previo_pg_data:
   previo_redis_data:
+
+configs:
+  # Inline (not a real file on disk) — content is just MAILPIT_UI_AUTH,
+  # empty by default. Mailpit only reads this when MP_UI_AUTH_FILE above
+  # actually points at it (i.e. MAILPIT_UI_AUTH is set), so an empty file
+  # here the rest of the time is harmless.
+  mailpit_ui_auth:
+    # Trailing newline is required — Mailpit's auth-file parser silently
+    # loads zero credentials (auth still logs as "enabled" but lets
+    # everyone in) if the last/only line isn't newline-terminated.
+    content: "${MAILPIT_UI_AUTH:-}\n"

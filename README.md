@@ -72,14 +72,41 @@ pnpm dev                          # Web on :3000 — MUST be `pnpm dev`, not `pn
 
 ### Running the whole app with just `docker compose up -d` (self-hosted / demo server)
 
-For handing the app to someone via SSH on a bare server (no Node/pnpm needed on the host, no Vercel/AWS) — the `web` app is also containerized, opt-in via the `selfhost` [Compose profile](https://docs.docker.com/compose/how-tos/profiles/) so it doesn't interfere with the local-dev flow above:
+For handing the app to someone via SSH on a bare server (no Node/pnpm needed on the host, no Vercel/AWS) — the `web` app is also containerized, opt-in via the `selfhost` [Compose profile](https://docs.docker.com/compose/how-tos/profiles/) so it doesn't interfere with the local-dev flow above.
+
+**On a completely fresh server** (verified against a fresh Ubuntu 26.04 Hetzner box):
 
 ```bash
-export AUTH_SECRET=$(openssl rand -base64 32)   # required — see below
+# 1. Docker — apt's own docker.io package lags behind new Ubuntu releases;
+#    the official convenience script handles this more reliably:
+curl -fsSL https://get.docker.com | sh
+
+# 2. Clone the repo. It's private, so a plain `git clone https://...` needs
+#    credentials — the clean way is a repo-scoped, READ-ONLY deploy key:
+#    GitHub repo → Settings → Deploy keys → Add deploy key (don't check
+#    "Allow write access"). Generate the key pair on the server first:
+ssh-keygen -t ed25519 -f ~/.ssh/github_deploy_key -N ""
+cat ~/.ssh/github_deploy_key.pub   # paste this into GitHub's "Add deploy key" form
+cat >> ~/.ssh/config << 'EOF'
+Host github.com
+  IdentityFile ~/.ssh/github_deploy_key
+  IdentitiesOnly yes
+EOF
+git clone git@github.com:<owner>/previo-schuco.git
+cd previo-schuco
+
+# 3. Env — same idea as local dev's root .env (see above), but with a
+#    server-specific AUTH_SECRET and the server's real address:
+cat > .env << EOF
+AUTH_SECRET=$(openssl rand -base64 32)
+APP_PUBLIC_URL=http://<server-ip>:3000
+EOF
+
+# 4. Up
 docker compose --profile selfhost up -d --build
 ```
 
-That's it — the whole app (Postgres, Redis, API, worker, web) comes up, and the browser only ever talks to the `web` container (every `/api/*` route in `apps/web` proxies to the `api` service over Docker's internal network — nothing but port 3000 needs to be reachable from outside).
+That's it — the whole app (Postgres, Redis, Mailpit, API, worker, web) comes up, and the browser only ever talks to the `web` container (every `/api/*` route in `apps/web` proxies to the `api` service over Docker's internal network — nothing but port 3000 needs to be reachable from outside).
 
 - App: `http://<server-ip>:3000`
 - Login: same seeded demo users as above (dev-login stays enabled in this profile even though it runs in production mode — see `ALLOW_DEV_LOGIN` below)
@@ -95,7 +122,22 @@ That's it — the whole app (Postgres, Redis, API, worker, web) comes up, and th
 | `APP_DB_PASSWORD` | `previo_app` | Change for anything beyond a throwaway demo |
 | `RESEND_API_KEY` | *(unset)* | A [Resend](https://resend.com) API key for real outbound email — takes priority over the `mailpit` catcher below whenever it's set. Set this for any deployment real customers will use |
 | `RESEND_FROM_EMAIL` | `PREVIO <onboarding@resend.dev>` | Resend's shared test sender works until you verify your own domain with them |
-| `SMTP_HOST` | `mailpit` | Without `RESEND_API_KEY`, invite/reset emails go to the bundled `mailpit` container instead. Its web UI is bound to `127.0.0.1:8025` on the server (not public — it has no login of its own), so reach it via an SSH tunnel: `ssh -L 8025:localhost:8025 <server>`, then open `http://localhost:8025` locally. Blank `SMTP_HOST` out to fall back to just logging the link (`docker compose logs api`) |
+| `SMTP_HOST` | `mailpit` | Without `RESEND_API_KEY`, invite/reset emails go to the bundled `mailpit` container instead — see below for how to read them. Blank `SMTP_HOST` out to fall back to just logging the link (`docker compose logs api`) |
+| `MAILPIT_UI_AUTH` | *(unset)* | Set to `user:pass` to protect Mailpit's web UI with HTTP Basic Auth, as an alternative to the SSH tunnel below — only takes effect together with `MAILPIT_BIND=0.0.0.0` |
+| `MAILPIT_BIND` | `127.0.0.1` | Set to `0.0.0.0` to publish Mailpit's ports (8025 web UI, 1025 SMTP) off the box — only do this alongside a real `MAILPIT_UI_AUTH`, or anyone can read every invite/reset-password email |
+
+**Reading Mailpit's inbox** — its web UI is bound to `127.0.0.1:8025` on the server by default (not reachable off the box), so pick one:
+
+- **SSH tunnel (default, no config needed):**
+  ```bash
+  # Foreground (keeps your terminal attached — Ctrl+C to close it):
+  ssh -L 8025:localhost:8025 <server>
+  # Background (detaches immediately; kill it later with the PID it prints,
+  # or `pkill -f 'L 8025:localhost:8025'`):
+  ssh -f -N -L 8025:localhost:8025 <server>
+  ```
+  Then open `http://localhost:8025` locally.
+- **Expose it publicly, behind a login:** set both `MAILPIT_UI_AUTH=admin:<a-real-password>` and `MAILPIT_BIND=0.0.0.0` (in your `.env` file or exported before `docker compose up`), then `docker compose --profile selfhost up -d --force-recreate mailpit`. Mailpit then serves `http://<server-ip>:8025` directly, asking for that `user:pass` over HTTP Basic Auth — convenient, but still plain HTTP (no TLS) unless this sits behind a reverse proxy, so don't reuse a password that matters elsewhere.
 
 This is a single-server convenience path — see [docs/deployment.md](docs/deployment.md) for other options.
 
