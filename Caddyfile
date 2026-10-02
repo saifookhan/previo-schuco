@@ -6,3 +6,13 @@
 {$DOMAIN:-:80} {
 	reverse_proxy web:3000
 }
+
+# Mailpit's web UI, behind its own HTTPS cert on a subdomain — set
+# MAILPIT_DOMAIN (e.g. mail.188-245-28-215.sslip.io) to enable. Falls
+# back to :8080, an unpublished container-internal port (nothing to
+# break) when unset — MAILPIT_DOMAIN is opt-in, unlike DOMAIN above.
+# Mailpit's own MAILPIT_UI_AUTH Basic Auth (see README) still applies —
+# Caddy only adds TLS in front of it, doesn't replace it.
+{$MAILPIT_DOMAIN:-:8080} {
+	reverse_proxy mailpit:8025
+}

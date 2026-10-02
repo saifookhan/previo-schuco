@@ -191,6 +191,10 @@ services:
       # Unset/empty falls back to the Caddyfile's plain-:80 default (no
       # TLS) — set this once you have a domain pointed at the box.
       DOMAIN: ${DOMAIN:-}
+      # Optional — routes Mailpit's web UI through Caddy on its own
+      # subdomain (e.g. mail.188-245-28-215.sslip.io) instead of a
+      # directly-published port. See README's Mailpit section.
+      MAILPIT_DOMAIN: ${MAILPIT_DOMAIN:-}
     ports:
       - '80:80'
       - '443:443'
