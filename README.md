@@ -125,6 +125,7 @@ That's it — the whole app (Postgres, Redis, Mailpit, API, worker, web) comes u
 | `SMTP_HOST` | `mailpit` | Without `RESEND_API_KEY`, invite/reset emails go to the bundled `mailpit` container instead — see below for how to read them. Blank `SMTP_HOST` out to fall back to just logging the link (`docker compose logs api`) |
 | `MAILPIT_UI_AUTH` | *(unset)* | Set to `user:pass` to protect Mailpit's web UI with HTTP Basic Auth, as an alternative to the SSH tunnel below — only takes effect together with `MAILPIT_BIND=0.0.0.0` |
 | `MAILPIT_BIND` | `127.0.0.1` | Set to `0.0.0.0` to publish Mailpit's ports (8025 web UI, 1025 SMTP) off the box — only do this alongside a real `MAILPIT_UI_AUTH`, or anyone can read every invite/reset-password email |
+| `DOMAIN` | *(unset)* | Set to enable automatic HTTPS via the bundled `caddy` reverse proxy — see below |
 
 **Reading Mailpit's inbox** — its web UI is bound to `127.0.0.1:8025` on the server by default (not reachable off the box), so pick one:
 
@@ -138,6 +139,27 @@ That's it — the whole app (Postgres, Redis, Mailpit, API, worker, web) comes u
   ```
   Then open `http://localhost:8025` locally.
 - **Expose it publicly, behind a login:** set both `MAILPIT_UI_AUTH=admin:<a-real-password>` and `MAILPIT_BIND=0.0.0.0` (in your `.env` file or exported before `docker compose up`), then `docker compose --profile selfhost up -d --force-recreate mailpit`. Mailpit then serves `http://<server-ip>:8025` directly, asking for that `user:pass` over HTTP Basic Auth — convenient, but still plain HTTP (no TLS) unless this sits behind a reverse proxy, so don't reuse a password that matters elsewhere.
+
+**HTTPS (optional but recommended for anything beyond your own testing)** — by default everything above is plain HTTP, which means login cookies and Mailpit's password (if you turned that on) cross the network unencrypted. A bundled `caddy` service gets you real, auto-renewing HTTPS with essentially no config, via [Let's Encrypt](https://letsencrypt.org) — but Let's Encrypt only issues certificates for a **domain name**, never a bare IP, so you need one first:
+
+- **Free, instant, no signup** — [sslip.io](https://sslip.io) maps `<ip-with-dashes>.sslip.io` straight back to that IP automatically. For `188.245.28.215` that's `188-245-28-215.sslip.io` — no DNS setup needed, it just works.
+- **Free, a name you choose** — [duckdns.org](https://www.duckdns.org): sign in (GitHub/Google), pick a subdomain like `previo-schuco.duckdns.org`, point it at your server's IP.
+- **A real domain** — any registrar (~$10–12/yr for `.com`), pointed at the server via an `A` record. The right choice once this isn't just a demo box anymore.
+
+Once you have one:
+
+```bash
+# In your server's .env (alongside AUTH_SECRET etc.):
+cat >> .env << EOF
+DOMAIN=188-245-28-215.sslip.io
+APP_PUBLIC_URL=https://188-245-28-215.sslip.io
+COOKIE_SECURE=true
+EOF
+
+docker compose --profile selfhost up -d --build
+```
+
+Open ports **80** and **443** to the internet first (Let's Encrypt validates over port 80; Caddy then serves everything over 443) — on Hetzner that's a Cloud Firewall inbound rule, same as the one you added for 22/3000/3001/8025. Caddy requests and renews the certificate itself on first start; nothing else to do. The app is then reachable at `https://<your-domain>` — plain `http://<server-ip>:3000` still works directly (Caddy just fronts it), but isn't encrypted, so prefer the HTTPS URL once it's up.
 
 This is a single-server convenience path — see [docs/deployment.md](docs/deployment.md) for other options.
 

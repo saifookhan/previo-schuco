@@ -177,9 +177,35 @@ services:
     depends_on:
       - api
 
+  # Reverse proxy fronting `web` with automatic HTTPS — Caddy requests and
+  # auto-renews a real Let's Encrypt certificate for DOMAIN the first time
+  # it starts, zero manual cert handling. See README's self-host section
+  # for how to get a free DOMAIN (sslip.io/DuckDNS) or use a real one.
+  # Needs ports 80 (Let's Encrypt's HTTP-01 challenge + plain-HTTP
+  # redirect) and 443 reachable from the internet — open both in your
+  # firewall (Hetzner Cloud Firewall, ufw, etc.) alongside port 22.
+  caddy:
+    profiles: ['selfhost']
+    image: caddy:2-alpine
+    environment:
+      # Unset/empty falls back to the Caddyfile's plain-:80 default (no
+      # TLS) — set this once you have a domain pointed at the box.
+      DOMAIN: ${DOMAIN:-}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
 volumes:
   previo_pg_data:
   previo_redis_data:
+  caddy_data:
+  caddy_config:
 
 configs:
   # Inline (not a real file on disk) — content is just MAILPIT_UI_AUTH,

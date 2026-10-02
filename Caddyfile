@@ -1,0 +1,8 @@
+# Reverse proxy + automatic HTTPS (Let's Encrypt) for the selfhost profile.
+# {$DOMAIN} is substituted from the DOMAIN env var (see docker-compose.yml's
+# caddy service / README's self-host section) — e.g. a free sslip.io name
+# like 188-245-28-215.sslip.io, or a real domain once one exists. Falls
+# back to :80 (plain HTTP, no cert — DOMAIN unset means local/no-TLS use).
+{$DOMAIN:-:80} {
+	reverse_proxy web:3000
+}
