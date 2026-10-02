@@ -60,11 +60,27 @@ jobs:
           TEST_DB_SUPERUSER_URL: postgresql://previo:previo@localhost:5434/previo
         run: pnpm test
 
+      - uses: docker/setup-buildx-action@v3
+
       - name: Docker build API
-        run: docker build -f apps/api/Dockerfile .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          # GitHub Actions' own remote cache — persists between runs
+          # (a plain `docker build` on this always-fresh runner would
+          # otherwise rebuild every layer, including pnpm install, from
+          # scratch every single time).
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
 
       - name: Docker build web
         # Catches a break in the self-host path (docker-compose's
         # `selfhost` profile — see README) before it reaches a real
         # deploy; there's no separate Vercel build check anymore.
-        run: docker build -f apps/web/Dockerfile .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
