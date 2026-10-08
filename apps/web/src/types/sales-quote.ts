@@ -19,6 +19,8 @@ export interface QuoteSummary {
   updatedAt: string
 }
 
+export type PricingMode = 'auto' | 'manual'
+
 export interface QuotePositionCharacteristic {
   id: string
   quotePositionId: string
@@ -27,6 +29,8 @@ export interface QuotePositionCharacteristic {
   characteristicName: string
   subCharacteristicName: string
   price: string
+  pricingMode: PricingMode
+  manualUnitPrice: string | null
 }
 
 export interface QuotePosition {
@@ -45,6 +49,8 @@ export interface QuotePosition {
   unitSymbol: string
   discountPct: string
   extraMarkupPct: string
+  pricingMode: PricingMode
+  lineManualUnitPrice: string | null
   totalM2: string
   basePrice: string
   finalPrice: string
@@ -78,8 +84,15 @@ export interface AddQuotePositionInput {
   quantity: number
   widthMm: number
   heightMm: number
-  characteristicSelections: { characteristicId: string; subCharacteristicId: string }[]
+  characteristicSelections: {
+    characteristicId: string
+    subCharacteristicId: string
+    pricingMode?: PricingMode
+    manualUnitPrice?: number
+  }[]
   discountPct?: number
   extraMarkupPct?: number
   description?: string
+  pricingMode?: PricingMode
+  manualUnitPrice?: number
 }

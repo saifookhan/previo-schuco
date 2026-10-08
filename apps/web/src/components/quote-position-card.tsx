@@ -153,12 +153,25 @@ export const QuotePositionCard = ({
             <span>
               {t('fieldDiscount')}/{t('fieldMarkup')}: {Number(position.discountPct)}% / {Number(position.extraMarkupPct)}%
             </span>
+            {position.pricingMode === 'manual' ? (
+              <span
+                className="inline-flex w-fit items-center rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700"
+                title={t('pricingModeManualLabel')}
+              >
+                {t('pricingModeManual')} · {t('fieldLineValue')}
+              </span>
+            ) : null}
           </div>
           {position.characteristics.length > 0 ? (
             <div className="flex flex-wrap gap-1.5 pt-1">
               {position.characteristics.map((c) => (
                 <span key={c.id} className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-600">
                   {c.characteristicName}: {c.subCharacteristicName}
+                  {c.pricingMode === 'manual' ? (
+                    <span className="ml-1 font-semibold text-amber-600" title={t('pricingModeManualLabel')}>
+                      ({t('pricingModeManual')})
+                    </span>
+                  ) : null}
                 </span>
               ))}
             </div>

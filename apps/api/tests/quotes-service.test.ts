@@ -177,6 +177,119 @@ describe('createQuote + addQuotePosition', () => {
     expect(Number(position.basePrice)).toBeGreaterThan(555 * 2)
   })
 
+  it('pricingMode "manual" on the line replaces the formula/matrix price with manualUnitPrice (the reference app\'s "A"/"M" toggle)', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-MANUAL-1', customerName: 'Test Customer' })
+    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 1,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [],
+      pricingMode: 'manual',
+      manualUnitPrice: 999,
+      discountPct: 0,
+      extraMarkupPct: 100,
+    })
+
+    const position = afterAdd.positions[0]
+    // 999, NOT the matrix's 555 — manual bypasses the formula/matrix entirely.
+    expect(position.basePrice).toBe('999.00')
+    expect(position.finalPrice).toBe('999.00')
+    expect(position.pricingMode).toBe('manual')
+    expect(position.lineManualUnitPrice).toBe('999.0000')
+  })
+
+  it('pricingMode "manual" on one characteristic selection overrides only that selection\'s price, independent of the line\'s own (still auto) price', async () => {
+    const family = await importFreshFamily()
+    const familyDetail = await getProductFamilyDetail(ctx(), family.id)
+    const line = await matrixLineOf(family.id)
+    const main = familyDetail!.characteristics.find((c) => !c.parentId)!
+    const sub = familyDetail!.characteristics.find((c) => c.parentId === main.id)!
+
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-MANUAL-2', customerName: 'Test Customer' })
+    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 1,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [
+        { characteristicId: main.id, subCharacteristicId: sub.id, pricingMode: 'manual', manualUnitPrice: 50 },
+      ],
+      discountPct: 0,
+      extraMarkupPct: 100,
+    })
+
+    const position = afterAdd.positions[0]
+    expect(position.characteristics[0].pricingMode).toBe('manual')
+    expect(position.characteristics[0].price).toBe('50.00')
+    // Line stays auto-priced at the matrix's 555; only the characteristic was overridden.
+    expect(position.basePrice).toBe('605.00')
+  })
+
+  it('rejects pricingMode "manual" without a manualUnitPrice, or with a negative one, instead of silently falling back to 0', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-MANUAL-3', customerName: 'Test Customer' })
+
+    await expect(
+      addQuotePosition(ctx(), actor, quote.id, {
+        productFamilyId: family.id,
+        productLineId: line.id,
+        quantity: 1,
+        widthMm: 1000,
+        heightMm: 800,
+        characteristicSelections: [],
+        pricingMode: 'manual',
+      }),
+    ).rejects.toThrow(QuoteValidationError)
+
+    await expect(
+      addQuotePosition(ctx(), actor, quote.id, {
+        productFamilyId: family.id,
+        productLineId: line.id,
+        quantity: 1,
+        widthMm: 1000,
+        heightMm: 800,
+        characteristicSelections: [],
+        pricingMode: 'manual',
+        manualUnitPrice: -10,
+      }),
+    ).rejects.toThrow(QuoteValidationError)
+  })
+
+  it('duplicatePosition preserves manual pricing (line and characteristic) on the copy', async () => {
+    const family = await importFreshFamily()
+    const familyDetail = await getProductFamilyDetail(ctx(), family.id)
+    const line = await matrixLineOf(family.id)
+    const main = familyDetail!.characteristics.find((c) => !c.parentId)!
+    const sub = familyDetail!.characteristics.find((c) => c.parentId === main.id)!
+
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-MANUAL-4', customerName: 'Test Customer' })
+    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 1,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [
+        { characteristicId: main.id, subCharacteristicId: sub.id, pricingMode: 'manual', manualUnitPrice: 50 },
+      ],
+      pricingMode: 'manual',
+      manualUnitPrice: 999,
+    })
+
+    const afterDuplicate = await duplicatePosition(ctx(), actor, quote.id, afterAdd.positions[0].id)
+    const copy = afterDuplicate.positions[1]
+    expect(copy.pricingMode).toBe('manual')
+    expect(copy.lineManualUnitPrice).toBe('999.0000')
+    expect(copy.characteristics[0].pricingMode).toBe('manual')
+  })
+
   it('rejects an out-of-range size instead of silently mispricing', async () => {
     const family = await importFreshFamily()
     const line = await matrixLineOf(family.id)

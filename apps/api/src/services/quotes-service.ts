@@ -126,16 +126,26 @@ export interface AddQuotePositionInput {
   quantity: number
   widthMm: number
   heightMm: number
-  /** {mainCharacteristicId, subCharacteristicId} — one per characteristic the caller is choosing a value for; a characteristic not listed here just isn't part of this position's price/description. */
-  characteristicSelections: { characteristicId: string; subCharacteristicId: string }[]
+  /** {mainCharacteristicId, subCharacteristicId} — one per characteristic the caller is choosing a value for; a characteristic not listed here just isn't part of this position's price/description. Each selection has its own independent auto/manual pricing toggle (pricingMode), same shape as the position's own line pricing below. */
+  characteristicSelections: {
+    characteristicId: string
+    subCharacteristicId: string
+    pricingMode?: 'auto' | 'manual'
+    manualUnitPrice?: number
+  }[]
   /** Overrides the line's own catalog discount/markup as the position's starting point (still independently editable afterward). Omit to use the line's own values. */
   discountPct?: number
   extraMarkupPct?: number
   /** Overrides the auto-built description (line name + selected characteristic names). */
   description?: string
+  /** 'manual' (the reference app's per-row "A"/"M" toggle) replaces the formula/matrix-computed line price with manualUnitPrice below. Defaults to 'auto'. */
+  pricingMode?: 'auto' | 'manual'
+  /** Required when pricingMode is 'manual' — the line's own €/unit price, typed in directly instead of computed. */
+  manualUnitPrice?: number
 }
 
 const isPositiveFinite = (n: number): boolean => Number.isFinite(n) && n > 0
+const isNonNegativeFinite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0
 
 const asMatrix = (widths: number[], heights: number[], matrix: (number | null)[][]): PricingMatrix => ({
   widths,
@@ -195,27 +205,38 @@ export const addQuotePosition = async (
     }
 
     const matrixById = new Map(family.matrices.map((m) => [m.id, m]))
-    const lineMatrix = line.pricingMatrixId ? matrixById.get(line.pricingMatrixId) : undefined
-    if (line.pricingMatrixId && !lineMatrix) {
-      throw new QuoteValidationError('Line references a pricing matrix that no longer exists')
-    }
 
-    let lineResult
-    try {
-      lineResult = computeLinePrice(
-        {
-          value: Number(line.value),
-          formula: line.formula,
-          pricingMatrix: lineMatrix ? asMatrix(lineMatrix.widths, lineMatrix.heights, lineMatrix.matrix) : null,
-          installationHoursPerUnit: Number(line.installationHoursPerUnit),
-          discountPct: 0,
-          markupPct: 100,
-        },
-        input.widthMm,
-        input.heightMm,
-      )
-    } catch (error) {
-      throw new QuoteValidationError(`Could not price this line at ${input.widthMm}x${input.heightMm}mm: ${(error as Error).message}`)
+    const linePricingMode = input.pricingMode === 'manual' ? 'manual' : 'auto'
+    let lineBasePrice: number
+    if (linePricingMode === 'manual') {
+      // Manual mode never reads the line's matrix/formula — a deleted/invalid
+      // matrix on this line must not block a manual override that doesn't
+      // need it at all (checked only in the 'auto' branch below).
+      if (!isNonNegativeFinite(input.manualUnitPrice)) {
+        throw new QuoteValidationError('manualUnitPrice must be a non-negative number when pricingMode is "manual"')
+      }
+      lineBasePrice = input.manualUnitPrice
+    } else {
+      const lineMatrix = line.pricingMatrixId ? matrixById.get(line.pricingMatrixId) : undefined
+      if (line.pricingMatrixId && !lineMatrix) {
+        throw new QuoteValidationError('Line references a pricing matrix that no longer exists')
+      }
+      try {
+        lineBasePrice = computeLinePrice(
+          {
+            value: Number(line.value),
+            formula: line.formula,
+            pricingMatrix: lineMatrix ? asMatrix(lineMatrix.widths, lineMatrix.heights, lineMatrix.matrix) : null,
+            installationHoursPerUnit: Number(line.installationHoursPerUnit),
+            discountPct: 0,
+            markupPct: 100,
+          },
+          input.widthMm,
+          input.heightMm,
+        ).basePrice
+      } catch (error) {
+        throw new QuoteValidationError(`Could not price this line at ${input.widthMm}x${input.heightMm}mm: ${(error as Error).message}`)
+      }
     }
 
     const descriptionParts = [line.name]
@@ -226,6 +247,8 @@ export const addQuotePosition = async (
       characteristicName: string
       subCharacteristicName: string
       price: number
+      pricingMode: 'auto' | 'manual'
+      manualUnitPrice: number | null
     }[] = []
 
     for (const selection of input.characteristicSelections) {
@@ -239,33 +262,44 @@ export const addQuotePosition = async (
         )
       }
 
-      const subMatrix = sub.pricingMatrixId ? matrixById.get(sub.pricingMatrixId) : undefined
-      if (sub.pricingMatrixId && !subMatrix) {
-        throw new QuoteValidationError('Selected option references a pricing matrix that no longer exists')
-      }
-
-      let subPrice = 0
-      // A characteristic sub-value with no formula/value and no matrix is a
-      // free/included option (e.g. a default color) — costs nothing, same as
-      // the reference workbook's blank-price rows.
-      if (subMatrix || sub.formula) {
-        try {
-          const result = computeCharacteristicPrice(
-            {
-              value: sub.value == null ? 0 : Number(sub.value),
-              formula: sub.formula ?? 'valore',
-              pricingMatrix: subMatrix ? asMatrix(subMatrix.widths, subMatrix.heights, subMatrix.matrix) : null,
-              installationHoursPerUnit: Number(line.installationHoursPerUnit),
-              discountPct: 0,
-              markupPct: 100,
-            },
-            input.widthMm,
-            input.heightMm,
-            lineResult.basePrice,
+      const subPricingMode = selection.pricingMode === 'manual' ? 'manual' : 'auto'
+      let subPrice: number
+      if (subPricingMode === 'manual') {
+        if (!isNonNegativeFinite(selection.manualUnitPrice)) {
+          throw new QuoteValidationError(
+            `manualUnitPrice must be a non-negative number for "${main.name}: ${sub.name}" when its pricingMode is "manual"`,
           )
-          subPrice = result.basePrice
-        } catch (error) {
-          throw new QuoteValidationError(`Could not price "${main.name}: ${sub.name}": ${(error as Error).message}`)
+        }
+        subPrice = selection.manualUnitPrice
+      } else {
+        const subMatrix = sub.pricingMatrixId ? matrixById.get(sub.pricingMatrixId) : undefined
+        if (sub.pricingMatrixId && !subMatrix) {
+          throw new QuoteValidationError('Selected option references a pricing matrix that no longer exists')
+        }
+
+        subPrice = 0
+        // A characteristic sub-value with no formula/value and no matrix is a
+        // free/included option (e.g. a default color) — costs nothing, same as
+        // the reference workbook's blank-price rows.
+        if (subMatrix || sub.formula) {
+          try {
+            const result = computeCharacteristicPrice(
+              {
+                value: sub.value == null ? 0 : Number(sub.value),
+                formula: sub.formula ?? 'valore',
+                pricingMatrix: subMatrix ? asMatrix(subMatrix.widths, subMatrix.heights, subMatrix.matrix) : null,
+                installationHoursPerUnit: Number(line.installationHoursPerUnit),
+                discountPct: 0,
+                markupPct: 100,
+              },
+              input.widthMm,
+              input.heightMm,
+              lineBasePrice,
+            )
+            subPrice = result.basePrice
+          } catch (error) {
+            throw new QuoteValidationError(`Could not price "${main.name}: ${sub.name}": ${(error as Error).message}`)
+          }
         }
       }
 
@@ -276,12 +310,14 @@ export const addQuotePosition = async (
         characteristicName: main.name,
         subCharacteristicName: sub.name,
         price: subPrice,
+        pricingMode: subPricingMode,
+        manualUnitPrice: subPricingMode === 'manual' ? (selection.manualUnitPrice as number) : null,
       })
       descriptionParts.push(`${main.name}: ${sub.name}`)
     }
 
     const totalM2 = (input.widthMm * input.heightMm * input.quantity) / 1_000_000
-    const basePricePerUnit = lineResult.basePrice + characteristicsBasePrice
+    const basePricePerUnit = lineBasePrice + characteristicsBasePrice
     const basePrice = basePricePerUnit * input.quantity
 
     const discountPct = input.discountPct ?? Number(line.discountPct)
@@ -316,6 +352,8 @@ export const addQuotePosition = async (
       unitSymbol: line.unitSymbol,
       discountPct: String(discountPct),
       extraMarkupPct: String(extraMarkupPct),
+      pricingMode: linePricingMode,
+      lineManualUnitPrice: linePricingMode === 'manual' ? String(input.manualUnitPrice) : null,
       totalM2: totalM2.toFixed(4),
       basePrice: basePrice.toFixed(2),
       finalPrice: finalPrice.toFixed(2),
@@ -330,6 +368,8 @@ export const addQuotePosition = async (
         characteristicName: row.characteristicName,
         subCharacteristicName: row.subCharacteristicName,
         price: (row.price * input.quantity).toFixed(2),
+        pricingMode: row.pricingMode,
+        manualUnitPrice: row.manualUnitPrice == null ? null : String(row.manualUnitPrice),
       })
     }
 
@@ -442,6 +482,8 @@ export const duplicatePosition = async (
       unitSymbol: source.unitSymbol,
       discountPct: source.discountPct,
       extraMarkupPct: source.extraMarkupPct,
+      pricingMode: source.pricingMode,
+      lineManualUnitPrice: source.lineManualUnitPrice,
       totalM2: source.totalM2,
       basePrice: source.basePrice,
       finalPrice: source.finalPrice,
@@ -455,6 +497,8 @@ export const duplicatePosition = async (
         characteristicName: characteristic.characteristicName,
         subCharacteristicName: characteristic.subCharacteristicName,
         price: characteristic.price,
+        pricingMode: characteristic.pricingMode,
+        manualUnitPrice: characteristic.manualUnitPrice,
       })
     }
 

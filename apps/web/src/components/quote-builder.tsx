@@ -12,9 +12,33 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { QuotePositionCard } from '@/components/quote-position-card'
 import type { ProductFamilyDetail, ProductFamilySummary } from '@/types/product-family'
-import type { AddQuotePositionInput, QuoteDetail } from '@/types/sales-quote'
+import type { AddQuotePositionInput, PricingMode, QuoteDetail } from '@/types/sales-quote'
 
 const EUR = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' })
+
+/** The reference app's per-row "A"/"M" toggle: Automatic (formula/matrix-computed) vs Manual (typed-in €/unit value). Reused for both a position's own line price and each selected characteristic's price — same shape, independent state. */
+const PricingModeToggle = ({
+  mode,
+  onChange,
+  autoLabel,
+  manualLabel,
+}: {
+  mode: PricingMode
+  onChange: (mode: PricingMode) => void
+  autoLabel: string
+  manualLabel: string
+}) => (
+  <div className="flex gap-2 text-xs">
+    <label className="flex items-center gap-1 text-slate-600">
+      <input type="radio" checked={mode === 'auto'} onChange={() => onChange('auto')} title={autoLabel} />
+      {autoLabel}
+    </label>
+    <label className="flex items-center gap-1 text-slate-600">
+      <input type="radio" checked={mode === 'manual'} onChange={() => onChange('manual')} title={manualLabel} />
+      {manualLabel}
+    </label>
+  </div>
+)
 
 interface QuoteBuilderProps {
   initialDetail: QuoteDetail
@@ -46,6 +70,9 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
   const [selections, setSelections] = useState<Record<string, string>>({})
   const [discountPct, setDiscountPct] = useState('')
   const [extraMarkupPct, setExtraMarkupPct] = useState('')
+  const [linePricingMode, setLinePricingMode] = useState<PricingMode>('auto')
+  const [lineManualValue, setLineManualValue] = useState('')
+  const [charPricing, setCharPricing] = useState<Record<string, { mode: PricingMode; manualValue: string }>>({})
 
   const [adding, setAdding] = useState(false)
   const [busyPositionId, setBusyPositionId] = useState<string | null>(null)
@@ -68,6 +95,9 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
     setSelections({})
     setDiscountPct('')
     setExtraMarkupPct('')
+    setLinePricingMode('auto')
+    setLineManualValue('')
+    setCharPricing({})
   }
 
   const onFamilyChange = async (id: string) => {
@@ -96,6 +126,9 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
   const onLineChange = (id: string) => {
     setLineId(id)
     setSelections({})
+    setLinePricingMode('auto')
+    setLineManualValue('')
+    setCharPricing({})
     const selectedLine = family?.lines.find((l) => l.id === id)
     setDiscountPct(selectedLine ? tidy(selectedLine.discountPct) : '')
     setExtraMarkupPct(selectedLine ? tidy(selectedLine.markupPct) : '')
@@ -117,6 +150,24 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
       setError(t('invalidQuantity'))
       return
     }
+    // isFinite (not just "< 0") catches non-numeric input too (e.g. "abc")
+    // — Number("abc") is NaN, and every comparison against NaN is false, so
+    // a "< 0" check alone would silently accept it; JSON.stringify(NaN)
+    // then serializes to null, reaching the server as a confusing generic
+    // error instead of this friendly one.
+    const isValidManualValue = (v: string) => Number.isFinite(Number(v)) && Number(v) >= 0
+    if (linePricingMode === 'manual' && (lineManualValue.trim() === '' || !isValidManualValue(lineManualValue))) {
+      setError(t('manualValueRequired'))
+      return
+    }
+    const selectedCharIds = Object.entries(selections).filter(([, subId]) => subId)
+    for (const [characteristicId] of selectedCharIds) {
+      const pricing = charPricing[characteristicId]
+      if (pricing?.mode === 'manual' && (pricing.manualValue.trim() === '' || !isValidManualValue(pricing.manualValue))) {
+        setError(t('manualValueRequired'))
+        return
+      }
+    }
 
     const body: AddQuotePositionInput = {
       productFamilyId: familyId,
@@ -124,11 +175,21 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
       quantity: qty,
       widthMm: width,
       heightMm: height,
-      characteristicSelections: Object.entries(selections)
-        .filter(([, subId]) => subId)
-        .map(([characteristicId, subCharacteristicId]) => ({ characteristicId, subCharacteristicId })),
+      characteristicSelections: selectedCharIds.map(([characteristicId, subCharacteristicId]) => {
+        const pricing = charPricing[characteristicId]
+        return {
+          characteristicId,
+          subCharacteristicId,
+          ...(pricing?.mode === 'manual'
+            ? { pricingMode: 'manual' as const, manualUnitPrice: Number(pricing.manualValue) }
+            : {}),
+        }
+      }),
       ...(discountPct.trim() !== '' ? { discountPct: Number(discountPct) } : {}),
       ...(extraMarkupPct.trim() !== '' ? { extraMarkupPct: Number(extraMarkupPct) } : {}),
+      ...(linePricingMode === 'manual'
+        ? { pricingMode: 'manual' as const, manualUnitPrice: Number(lineManualValue) }
+        : {}),
     }
 
     setAdding(true)
@@ -150,6 +211,9 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
       setHeightMm('')
       setQuantity('1')
       setSelections({})
+      setLinePricingMode('auto')
+      setLineManualValue('')
+      setCharPricing({})
     } catch {
       setError(t('addPositionFailedUnreachable'))
     } finally {
@@ -376,28 +440,76 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                     </div>
                   </div>
 
+                  <div className="space-y-1">
+                    <Label>{t('fieldLineValue')}</Label>
+                    <div className="flex items-center gap-3">
+                      <PricingModeToggle
+                        mode={linePricingMode}
+                        onChange={setLinePricingMode}
+                        autoLabel={t('pricingModeAuto')}
+                        manualLabel={t('pricingModeManual')}
+                      />
+                      {linePricingMode === 'manual' ? (
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          className="h-8 w-32"
+                          value={lineManualValue}
+                          onChange={(e) => setLineManualValue(e.target.value)}
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+
                   {mainCharacteristics.length > 0 ? (
                     <div className="grid gap-4 sm:grid-cols-2">
-                      {mainCharacteristics.map((main) => (
-                        <div className="space-y-1" key={main.id}>
-                          <Label htmlFor={`qb-char-${main.id}`}>{main.name}</Label>
-                          <select
-                            id={`qb-char-${main.id}`}
-                            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
-                            value={selections[main.id] ?? ''}
-                            onChange={(e) => setSelections((s) => ({ ...s, [main.id]: e.target.value }))}
-                          >
-                            <option value="">{t('noSelection')}</option>
-                            {family!.characteristics
-                              .filter((c) => c.parentId === main.id)
-                              .map((sub) => (
-                                <option key={sub.id} value={sub.id}>
-                                  {sub.name}
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-                      ))}
+                      {mainCharacteristics.map((main) => {
+                        const pricing = charPricing[main.id] ?? { mode: 'auto' as PricingMode, manualValue: '' }
+                        const isSelected = Boolean(selections[main.id])
+                        return (
+                          <div className="space-y-1" key={main.id}>
+                            <Label htmlFor={`qb-char-${main.id}`}>{main.name}</Label>
+                            <select
+                              id={`qb-char-${main.id}`}
+                              className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
+                              value={selections[main.id] ?? ''}
+                              onChange={(e) => setSelections((s) => ({ ...s, [main.id]: e.target.value }))}
+                            >
+                              <option value="">{t('noSelection')}</option>
+                              {family!.characteristics
+                                .filter((c) => c.parentId === main.id)
+                                .map((sub) => (
+                                  <option key={sub.id} value={sub.id}>
+                                    {sub.name}
+                                  </option>
+                                ))}
+                            </select>
+                            {isSelected ? (
+                              <div className="flex items-center gap-3 pt-1">
+                                <PricingModeToggle
+                                  mode={pricing.mode}
+                                  onChange={(mode) => setCharPricing((s) => ({ ...s, [main.id]: { ...pricing, mode } }))}
+                                  autoLabel={t('pricingModeAuto')}
+                                  manualLabel={t('pricingModeManual')}
+                                />
+                                {pricing.mode === 'manual' ? (
+                                  <Input
+                                    type="number"
+                                    inputMode="decimal"
+                                    min="0"
+                                    className="h-8 w-32"
+                                    value={pricing.manualValue}
+                                    onChange={(e) =>
+                                      setCharPricing((s) => ({ ...s, [main.id]: { ...pricing, manualValue: e.target.value } }))
+                                    }
+                                  />
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        )
+                      })}
                     </div>
                   ) : null}
 

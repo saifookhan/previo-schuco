@@ -71,6 +71,13 @@
       "when": 1790609075616,
       "tag": "0010_pending_approval_status",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791456116937,
+      "tag": "0011_quote_pricing_mode",
+      "breakpoints": true
     }
   ]
 }

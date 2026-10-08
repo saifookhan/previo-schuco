@@ -7,6 +7,16 @@ import { users } from './users'
 export const quoteStatusEnum = pgEnum('quote_status', ['draft', 'sent', 'accepted', 'rejected'])
 
 /**
+ * 'auto' = computed from the catalog's formula/matrix (the normal path);
+ * 'manual' = the sales user typed a €/unit value directly, bypassing the
+ * formula entirely — the reference app's per-row "A"/"M" toggle. Applies
+ * independently to a position's own line price and to each selected
+ * characteristic's price (see quotePositions.pricingMode /
+ * quotePositionCharacteristics.pricingMode below).
+ */
+export const pricingModeEnum = pgEnum('pricing_mode', ['auto', 'manual'])
+
+/**
  * A supplier's quote (preventivo) to an end customer — the actual
  * business output of a product-family catalog (see `product-families.ts`).
  * The customer is free-text (name/fiscal code/address), NOT a
@@ -74,6 +84,10 @@ export const quotePositions = pgTable('quote_positions', {
   /** Position-level override on top of the line's own discount/markup (the PDF's "Extra markup %"). */
   discountPct: numeric('discount_pct', { precision: 8, scale: 4 }).notNull().default('0'),
   extraMarkupPct: numeric('extra_markup_pct', { precision: 8, scale: 4 }).notNull().default('100'),
+  /** 'manual' means lineManualUnitPrice replaces the formula/matrix result for the product line's own €/unit price — see pricingModeEnum above. Never affects characteristic rows, each of which has its own mode (quotePositionCharacteristics.pricingMode). */
+  pricingMode: pricingModeEnum('pricing_mode').notNull().default('auto'),
+  /** Only meaningful when pricingMode = 'manual' — the line's own €/unit value the user typed in place of the computed one. */
+  lineManualUnitPrice: numeric('line_manual_unit_price', { precision: 14, scale: 4 }),
   totalM2: numeric('total_m2', { precision: 12, scale: 4 }).notNull(),
   /** Line price + every selected characteristic's price, before discount/markup. */
   basePrice: numeric('base_price', { precision: 14, scale: 2 }).notNull(),
@@ -110,6 +124,10 @@ export const quotePositionCharacteristics = pgTable('quote_position_characterist
   subCharacteristicName: text('sub_characteristic_name').notNull(),
   /** This selection's own price at save time (0 for a no-cost option) — summed into the position's basePrice. */
   price: numeric('price', { precision: 14, scale: 2 }).notNull().default('0'),
+  /** Same 'auto'/'manual' toggle as quotePositions.pricingMode, but scoped to this one characteristic row — independent of the position's own line price and of every other characteristic row on the same position. */
+  pricingMode: pricingModeEnum('pricing_mode').notNull().default('auto'),
+  /** Only meaningful when pricingMode = 'manual' — this characteristic's own €/unit value the user typed in place of the computed one (pre-quantity, same basis as the formula path — see quotes-service.ts). */
+  manualUnitPrice: numeric('manual_unit_price', { precision: 14, scale: 4 }),
 }, (table) => ({
   // getQuoteDetail fetches this table once per position on every quote read.
   quotePositionIdIdx: index('quote_position_characteristics_quote_position_id_idx').on(table.quotePositionId),

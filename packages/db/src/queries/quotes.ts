@@ -37,6 +37,9 @@ export interface InsertQuotePositionInput {
   unitSymbol: string
   discountPct: string
   extraMarkupPct: string
+  /** Omit for the normal formula/matrix-computed path — see schema's pricingModeEnum comment. */
+  pricingMode?: 'auto' | 'manual'
+  lineManualUnitPrice?: string | null
   totalM2: string
   basePrice: string
   finalPrice: string
@@ -55,6 +58,8 @@ export interface InsertQuotePositionCharacteristicInput {
   characteristicName: string
   subCharacteristicName: string
   price: string
+  pricingMode?: 'auto' | 'manual'
+  manualUnitPrice?: string | null
 }
 
 export const insertQuotePositionCharacteristic = async (
