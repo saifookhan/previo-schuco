@@ -96,3 +96,18 @@ export interface AddQuotePositionInput {
   pricingMode?: PricingMode
   manualUnitPrice?: number
 }
+
+/**
+ * Dry-run pricing result from POST .../positions/preview — same shape
+ * addPosition/updatePosition compute, nothing persisted. Plain numbers
+ * here (not the numeric-as-string shape a stored QuotePosition has) —
+ * this never round-trips through a Postgres numeric column.
+ */
+export interface QuotePositionPreview {
+  totalM2: number
+  basePrice: number
+  finalPrice: number
+  discountPct: number
+  extraMarkupPct: number
+  characteristics: { characteristicId: string; subCharacteristicId: string; price: number }[]
+}

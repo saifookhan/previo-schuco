@@ -8,8 +8,10 @@ import {
   duplicatePosition,
   getQuote,
   listMyQuotes,
+  previewQuotePosition,
   removeQuotePosition,
   reorderPositions,
+  updateQuotePosition,
   type QuoteActor,
 } from '../services/quotes-service'
 import { renderQuotePdf } from '../lib/quote-pdf'
@@ -75,6 +77,22 @@ salesQuotes.get('/:id', requireAuth, async (c) => {
   return c.json(detail)
 })
 
+// Different path depth than '/:id/positions' below (3 segments vs 2), so —
+// unlike the PATCH .../reorder vs .../:positionId case — registration
+// order here genuinely doesn't matter to Hono's router. Still placed
+// first on principle: a static-vs-param ambiguity is a mistake to let
+// happen again, not one to rely on being harmless this time.
+/** Dry-run pricing for the add/edit position form — same computation, writes nothing. */
+salesQuotes.post('/:id/positions/preview', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+  const body = await c.req.json().catch(() => null)
+  try {
+    const preview = await previewQuotePosition(ctxFrom(c), body ?? {})
+    return c.json(preview)
+  } catch (error) {
+    return quoteErrorResponse(c, error)
+  }
+})
+
 /** Adds one priced line item to a draft quote (picks a product line + characteristic values, computes the price). */
 salesQuotes.post('/:id/positions', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
   const id = c.req.param('id')
@@ -114,6 +132,31 @@ salesQuotes.patch('/:id/positions/reorder', requireAuth, requireRoles([...EDIT_R
   const body = (await c.req.json().catch(() => null)) as { positionIds?: unknown } | null
   try {
     const detail = await reorderPositions(ctxFrom(c), actorFrom(c), id, (body?.positionIds ?? []) as string[])
+    return c.json(detail)
+  } catch (error) {
+    return quoteErrorResponse(c, error)
+  }
+})
+
+// IMPORTANT: this generic `:positionId` PATCH must stay registered AFTER
+// the static `/reorder` PATCH route above — Hono resolves an ambiguous
+// static-vs-param conflict by registration order, not specificity, so
+// registering this one first would swallow every `PATCH .../reorder`
+// call as `positionId: "reorder"` (confirmed: this exact bug shipped
+// once already and silently broke the move-up/move-down buttons).
+/** Re-prices an existing position in place (same width/height/qty/characteristic fields as adding one). */
+salesQuotes.patch('/:id/positions/:positionId', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+  const id = c.req.param('id')
+  const positionId = c.req.param('positionId')
+  if (!id || !positionId) {
+    return c.json({ error: 'Missing id' }, 400)
+  }
+  if (positionId === 'reorder') {
+    return c.json({ error: 'Not found' }, 404)
+  }
+  const body = await c.req.json().catch(() => null)
+  try {
+    const detail = await updateQuotePosition(ctxFrom(c), actorFrom(c), id, positionId, body ?? {})
     return c.json(detail)
   } catch (error) {
     return quoteErrorResponse(c, error)

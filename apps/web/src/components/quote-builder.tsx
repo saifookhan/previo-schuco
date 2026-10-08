@@ -1,20 +1,31 @@
-'use client'
+"use client";
 
-import { Eye, FileDown, Loader2, Plus } from 'lucide-react'
-import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { Eye, FileDown, Loader2, Plus, X } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useEffect, useRef, useState } from "react";
 
-import { CollapsibleSection } from '@/components/collapsible-section'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { QuotePositionCard } from '@/components/quote-position-card'
-import type { ProductFamilyDetail, ProductFamilySummary } from '@/types/product-family'
-import type { AddQuotePositionInput, PricingMode, QuoteDetail } from '@/types/sales-quote'
+import { CollapsibleSection } from "@/components/collapsible-section";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { QuotePositionCard } from "@/components/quote-position-card";
+import type {
+  ProductFamilyDetail,
+  ProductFamilySummary,
+} from "@/types/product-family";
+import type {
+  AddQuotePositionInput,
+  PricingMode,
+  QuoteDetail,
+  QuotePositionPreview,
+} from "@/types/sales-quote";
 
-const EUR = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' })
+const EUR = new Intl.NumberFormat("it-IT", {
+  style: "currency",
+  currency: "EUR",
+});
 
 /** The reference app's per-row "A"/"M" toggle: Automatic (formula/matrix-computed) vs Manual (typed-in €/unit value). Reused for both a position's own line price and each selected characteristic's price — same shape, independent state. */
 const PricingModeToggle = ({
@@ -23,30 +34,40 @@ const PricingModeToggle = ({
   autoLabel,
   manualLabel,
 }: {
-  mode: PricingMode
-  onChange: (mode: PricingMode) => void
-  autoLabel: string
-  manualLabel: string
+  mode: PricingMode;
+  onChange: (mode: PricingMode) => void;
+  autoLabel: string;
+  manualLabel: string;
 }) => (
   <div className="flex gap-2 text-xs">
     <label className="flex items-center gap-1 text-slate-600">
-      <input type="radio" checked={mode === 'auto'} onChange={() => onChange('auto')} title={autoLabel} />
+      <input
+        type="radio"
+        checked={mode === "auto"}
+        onChange={() => onChange("auto")}
+        title={autoLabel}
+      />
       {autoLabel}
     </label>
     <label className="flex items-center gap-1 text-slate-600">
-      <input type="radio" checked={mode === 'manual'} onChange={() => onChange('manual')} title={manualLabel} />
+      <input
+        type="radio"
+        checked={mode === "manual"}
+        onChange={() => onChange("manual")}
+        title={manualLabel}
+      />
       {manualLabel}
     </label>
   </div>
-)
+);
 
 interface QuoteBuilderProps {
-  initialDetail: QuoteDetail
-  families: ProductFamilySummary[]
+  initialDetail: QuoteDetail;
+  families: ProductFamilySummary[];
 }
 
 /** Trailing zeros from Postgres numerics ("12.5000") are noise in a display or an edit box. */
-const tidy = (v: string): string => String(Number(v))
+const tidy = (v: string): string => String(Number(v));
 
 /**
  * The real quote builder: pick a product family + line from the caller's
@@ -56,228 +77,470 @@ const tidy = (v: string): string => String(Number(v))
  * The position list is presented as sortable cards (reorder, duplicate,
  * expand for detail) matching the reference preventivo layout.
  */
-export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => {
-  const t = useTranslations('quotes')
-  const [detail, setDetail] = useState(initialDetail)
-  const [familyCache, setFamilyCache] = useState<Record<string, ProductFamilyDetail>>({})
-  const [familyLoading, setFamilyLoading] = useState(false)
+export const QuoteBuilder = ({
+  initialDetail,
+  families,
+}: QuoteBuilderProps) => {
+  const t = useTranslations("quotes");
+  const [detail, setDetail] = useState(initialDetail);
+  const [familyCache, setFamilyCache] = useState<
+    Record<string, ProductFamilyDetail>
+  >({});
+  const [familyLoading, setFamilyLoading] = useState(false);
 
-  const [familyId, setFamilyId] = useState('')
-  const [lineId, setLineId] = useState('')
-  const [widthMm, setWidthMm] = useState('')
-  const [heightMm, setHeightMm] = useState('')
-  const [quantity, setQuantity] = useState('1')
-  const [selections, setSelections] = useState<Record<string, string>>({})
-  const [discountPct, setDiscountPct] = useState('')
-  const [extraMarkupPct, setExtraMarkupPct] = useState('')
-  const [linePricingMode, setLinePricingMode] = useState<PricingMode>('auto')
-  const [lineManualValue, setLineManualValue] = useState('')
-  const [charPricing, setCharPricing] = useState<Record<string, { mode: PricingMode; manualValue: string }>>({})
+  const [familyId, setFamilyId] = useState("");
+  const [lineId, setLineId] = useState("");
+  const [widthMm, setWidthMm] = useState("");
+  const [heightMm, setHeightMm] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [selections, setSelections] = useState<Record<string, string>>({});
+  const [discountPct, setDiscountPct] = useState("");
+  const [extraMarkupPct, setExtraMarkupPct] = useState("");
+  const [linePricingMode, setLinePricingMode] = useState<PricingMode>("auto");
+  const [lineManualValue, setLineManualValue] = useState("");
+  const [charPricing, setCharPricing] = useState<
+    Record<string, { mode: PricingMode; manualValue: string }>
+  >({});
 
-  const [adding, setAdding] = useState(false)
-  const [busyPositionId, setBusyPositionId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false);
+  const [busyPositionId, setBusyPositionId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  /** Set while editing an existing position instead of adding a new one — the same form below is reused, pre-filled from this position, submitting a PATCH instead of a POST. */
+  const [editingPositionId, setEditingPositionId] = useState<string | null>(
+    null,
+  );
+  /** Live "what would this cost" readout, recomputed server-side (debounced) as the form's fields change — see the effect below. null = no estimate yet / current inputs aren't priceable. */
+  const [preview, setPreview] = useState<QuotePositionPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const previewRequestId = useRef(0);
 
-  const family = familyCache[familyId]
-  const line = family?.lines.find((l) => l.id === lineId)
+  const family = familyCache[familyId];
+  const line = family?.lines.find((l) => l.id === lineId);
   const mainCharacteristics = family
     ? family.relations
         .filter((rel) => rel.productLineId === lineId)
-        .map((rel) => family.characteristics.find((c) => c.id === rel.characteristicId && !c.parentId))
+        .map((rel) =>
+          family.characteristics.find(
+            (c) => c.id === rel.characteristicId && !c.parentId,
+          ),
+        )
         .filter((c): c is NonNullable<typeof c> => Boolean(c))
-    : []
+    : [];
 
   const resetPositionForm = () => {
-    setLineId('')
-    setWidthMm('')
-    setHeightMm('')
-    setQuantity('1')
-    setSelections({})
-    setDiscountPct('')
-    setExtraMarkupPct('')
-    setLinePricingMode('auto')
-    setLineManualValue('')
-    setCharPricing({})
-  }
+    setLineId("");
+    setWidthMm("");
+    setHeightMm("");
+    setQuantity("1");
+    setSelections({});
+    setDiscountPct("");
+    setExtraMarkupPct("");
+    setLinePricingMode("auto");
+    setLineManualValue("");
+    setCharPricing({});
+  };
 
   const onFamilyChange = async (id: string) => {
-    setFamilyId(id)
-    resetPositionForm()
-    setError(null)
+    setFamilyId(id);
+    resetPositionForm();
+    setError(null);
     if (!id || familyCache[id]) {
-      return
+      return;
     }
-    setFamilyLoading(true)
+    setFamilyLoading(true);
     try {
-      const response = await fetch(`/api/product-families/${id}`)
+      const response = await fetch(`/api/product-families/${id}`);
       if (!response.ok) {
-        setError(t('familyLoadFailed'))
-        return
+        setError(t("familyLoadFailed"));
+        return;
       }
-      const data = (await response.json()) as ProductFamilyDetail
-      setFamilyCache((cache) => ({ ...cache, [id]: data }))
+      const data = (await response.json()) as ProductFamilyDetail;
+      setFamilyCache((cache) => ({ ...cache, [id]: data }));
     } catch {
-      setError(t('familyLoadFailedUnreachable'))
+      setError(t("familyLoadFailedUnreachable"));
     } finally {
-      setFamilyLoading(false)
+      setFamilyLoading(false);
     }
-  }
+  };
 
   const onLineChange = (id: string) => {
-    setLineId(id)
-    setSelections({})
-    setLinePricingMode('auto')
-    setLineManualValue('')
-    setCharPricing({})
-    const selectedLine = family?.lines.find((l) => l.id === id)
-    setDiscountPct(selectedLine ? tidy(selectedLine.discountPct) : '')
-    setExtraMarkupPct(selectedLine ? tidy(selectedLine.markupPct) : '')
-  }
+    setLineId(id);
+    setSelections({});
+    setLinePricingMode("auto");
+    setLineManualValue("");
+    setCharPricing({});
+    const selectedLine = family?.lines.find((l) => l.id === id);
+    setDiscountPct(selectedLine ? tidy(selectedLine.discountPct) : "");
+    setExtraMarkupPct(selectedLine ? tidy(selectedLine.markupPct) : "");
+  };
 
-  const addPosition = async () => {
-    if (!familyId || !lineId) {
-      setError(t('selectFamilyAndLine'))
-      return
+  const cancelEdit = () => {
+    setEditingPositionId(null);
+    setFamilyId("");
+    resetPositionForm();
+    setError(null);
+  };
+
+  /** Loads an existing position's data into the same add/edit form below — see `editingPositionId`. */
+  const startEdit = async (positionId: string) => {
+    const position = detail.positions.find((p) => p.id === positionId);
+    if (!position) {
+      return;
     }
-    const width = Number(widthMm)
-    const height = Number(heightMm)
-    const qty = Number(quantity)
-    if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
-      setError(t('invalidDimensions'))
-      return
-    }
-    if (!Number.isInteger(qty) || qty <= 0) {
-      setError(t('invalidQuantity'))
-      return
-    }
-    // isFinite (not just "< 0") catches non-numeric input too (e.g. "abc")
-    // — Number("abc") is NaN, and every comparison against NaN is false, so
-    // a "< 0" check alone would silently accept it; JSON.stringify(NaN)
-    // then serializes to null, reaching the server as a confusing generic
-    // error instead of this friendly one.
-    const isValidManualValue = (v: string) => Number.isFinite(Number(v)) && Number(v) >= 0
-    if (linePricingMode === 'manual' && (lineManualValue.trim() === '' || !isValidManualValue(lineManualValue))) {
-      setError(t('manualValueRequired'))
-      return
-    }
-    const selectedCharIds = Object.entries(selections).filter(([, subId]) => subId)
-    for (const [characteristicId] of selectedCharIds) {
-      const pricing = charPricing[characteristicId]
-      if (pricing?.mode === 'manual' && (pricing.manualValue.trim() === '' || !isValidManualValue(pricing.manualValue))) {
-        setError(t('manualValueRequired'))
-        return
+    setError(null);
+    if (!familyCache[position.productFamilyId]) {
+      setFamilyLoading(true);
+      try {
+        const response = await fetch(
+          `/api/product-families/${position.productFamilyId}`,
+        );
+        if (!response.ok) {
+          setError(t("familyLoadFailed"));
+          return;
+        }
+        const data = (await response.json()) as ProductFamilyDetail;
+        setFamilyCache((cache) => ({
+          ...cache,
+          [position.productFamilyId]: data,
+        }));
+      } catch {
+        setError(t("familyLoadFailedUnreachable"));
+        return;
+      } finally {
+        setFamilyLoading(false);
       }
     }
 
-    const body: AddQuotePositionInput = {
+    setFamilyId(position.productFamilyId);
+    setLineId(position.productLineId);
+    setWidthMm(tidy(position.widthMm));
+    setHeightMm(tidy(position.heightMm));
+    setQuantity(String(position.quantity));
+    setDiscountPct(tidy(position.discountPct));
+    setExtraMarkupPct(tidy(position.extraMarkupPct));
+    setLinePricingMode(position.pricingMode);
+    setLineManualValue(
+      position.lineManualUnitPrice != null
+        ? tidy(position.lineManualUnitPrice)
+        : "",
+    );
+    setSelections(
+      Object.fromEntries(
+        position.characteristics.map((c) => [
+          c.characteristicId,
+          c.subCharacteristicId,
+        ]),
+      ),
+    );
+    setCharPricing(
+      Object.fromEntries(
+        position.characteristics.map((c) => [
+          c.characteristicId,
+          {
+            mode: c.pricingMode,
+            manualValue:
+              c.manualUnitPrice != null ? tidy(c.manualUnitPrice) : "",
+          },
+        ]),
+      ),
+    );
+    setEditingPositionId(positionId);
+  };
+
+  // isFinite (not just "< 0") catches non-numeric input too (e.g. "abc") —
+  // Number("abc") is NaN, and every comparison against NaN is false, so a
+  // "< 0" check alone would silently accept it; JSON.stringify(NaN) then
+  // serializes to null, reaching the server as a confusing generic error
+  // instead of a friendly one.
+  const isValidManualValue = (v: string) =>
+    Number.isFinite(Number(v)) && Number(v) >= 0;
+
+  /**
+   * Builds the request body for add/update/preview from the form's current
+   * state. `onInvalid`, when given, is called with the i18n'd reason and
+   * building stops (used by `savePosition`, which shows it as an error);
+   * omitted, invalid input just silently yields `null` (used by the live
+   * preview below, which has nowhere good to show a validation error for
+   * input the user is still in the middle of typing).
+   */
+  const buildPositionInput = (
+    onInvalid?: (message: string) => void,
+  ): AddQuotePositionInput | null => {
+    if (!familyId || !lineId) {
+      onInvalid?.(t("selectFamilyAndLine"));
+      return null;
+    }
+    const width = Number(widthMm);
+    const height = Number(heightMm);
+    const qty = Number(quantity);
+    if (
+      !Number.isFinite(width) ||
+      width <= 0 ||
+      !Number.isFinite(height) ||
+      height <= 0
+    ) {
+      onInvalid?.(t("invalidDimensions"));
+      return null;
+    }
+    if (!Number.isInteger(qty) || qty <= 0) {
+      onInvalid?.(t("invalidQuantity"));
+      return null;
+    }
+    if (
+      linePricingMode === "manual" &&
+      (lineManualValue.trim() === "" || !isValidManualValue(lineManualValue))
+    ) {
+      onInvalid?.(t("manualValueRequired"));
+      return null;
+    }
+    const selectedCharIds = Object.entries(selections).filter(
+      ([, subId]) => subId,
+    );
+    for (const [characteristicId] of selectedCharIds) {
+      const pricing = charPricing[characteristicId];
+      if (
+        pricing?.mode === "manual" &&
+        (pricing.manualValue.trim() === "" ||
+          !isValidManualValue(pricing.manualValue))
+      ) {
+        onInvalid?.(t("manualValueRequired"));
+        return null;
+      }
+    }
+
+    return {
       productFamilyId: familyId,
       productLineId: lineId,
       quantity: qty,
       widthMm: width,
       heightMm: height,
-      characteristicSelections: selectedCharIds.map(([characteristicId, subCharacteristicId]) => {
-        const pricing = charPricing[characteristicId]
-        return {
-          characteristicId,
-          subCharacteristicId,
-          ...(pricing?.mode === 'manual'
-            ? { pricingMode: 'manual' as const, manualUnitPrice: Number(pricing.manualValue) }
-            : {}),
-        }
-      }),
-      ...(discountPct.trim() !== '' ? { discountPct: Number(discountPct) } : {}),
-      ...(extraMarkupPct.trim() !== '' ? { extraMarkupPct: Number(extraMarkupPct) } : {}),
-      ...(linePricingMode === 'manual'
-        ? { pricingMode: 'manual' as const, manualUnitPrice: Number(lineManualValue) }
+      characteristicSelections: selectedCharIds.map(
+        ([characteristicId, subCharacteristicId]) => {
+          const pricing = charPricing[characteristicId];
+          return {
+            characteristicId,
+            subCharacteristicId,
+            ...(pricing?.mode === "manual"
+              ? {
+                  pricingMode: "manual" as const,
+                  manualUnitPrice: Number(pricing.manualValue),
+                }
+              : {}),
+          };
+        },
+      ),
+      ...(discountPct.trim() !== ""
+        ? { discountPct: Number(discountPct) }
         : {}),
+      ...(extraMarkupPct.trim() !== ""
+        ? { extraMarkupPct: Number(extraMarkupPct) }
+        : {}),
+      ...(linePricingMode === "manual"
+        ? {
+            pricingMode: "manual" as const,
+            manualUnitPrice: Number(lineManualValue),
+          }
+        : {}),
+    };
+  };
+
+  // Live "estimated price" — debounced so it doesn't fire a request on
+  // every keystroke, and guarded by a request-id ref so a slow earlier
+  // response can never overwrite a newer one (classic race: type "1000"
+  // then "800" quickly, the "1000" request can resolve after the "800"
+  // one). Silent on invalid/incomplete input or a request failure — this
+  // is a convenience readout, not validation (savePosition still
+  // validates for real on submit).
+  useEffect(() => {
+    const body = buildPositionInput();
+    if (!body) {
+      setPreview(null);
+      setPreviewLoading(false);
+      return;
+    }
+    const requestId = ++previewRequestId.current;
+    setPreviewLoading(true);
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const response = await fetch(
+            `/api/sales-quotes/${detail.quote.id}/positions/preview`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            },
+          );
+          if (requestId !== previewRequestId.current) {
+            return;
+          }
+          if (!response.ok) {
+            setPreview(null);
+            return;
+          }
+          setPreview((await response.json()) as QuotePositionPreview);
+        } catch {
+          if (requestId === previewRequestId.current) {
+            setPreview(null);
+          }
+        } finally {
+          if (requestId === previewRequestId.current) {
+            setPreviewLoading(false);
+          }
+        }
+      })();
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildPositionInput closes over every field below already; listing the function itself would re-run on every render instead of only on real input changes.
+  }, [
+    detail.quote.id,
+    familyId,
+    lineId,
+    widthMm,
+    heightMm,
+    quantity,
+    selections,
+    discountPct,
+    extraMarkupPct,
+    linePricingMode,
+    lineManualValue,
+    charPricing,
+  ]);
+
+  /** Adds a new position, or — when `editingPositionId` is set — saves changes to that existing one instead (same form, same validation). */
+  const savePosition = async () => {
+    const body = buildPositionInput((message) => setError(message));
+    if (!body) {
+      return;
     }
 
-    setAdding(true)
-    setError(null)
+    const isEditing = Boolean(editingPositionId);
+    const url = isEditing
+      ? `/api/sales-quotes/${detail.quote.id}/positions/${editingPositionId}`
+      : `/api/sales-quotes/${detail.quote.id}/positions`;
+    const failMessage = isEditing
+      ? t("editPositionFailed")
+      : t("addPositionFailed");
+    const failMessageUnreachable = isEditing
+      ? t("editPositionFailedUnreachable")
+      : t("addPositionFailedUnreachable");
+
+    setAdding(true);
+    setError(null);
     try {
-      const response = await fetch(`/api/sales-quotes/${detail.quote.id}/positions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch(url, {
+        method: isEditing ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-      })
-      const data = (await response.json().catch(() => ({}))) as QuoteDetail & { error?: string }
+      });
+      const data = (await response.json().catch(() => ({}))) as QuoteDetail & {
+        error?: string;
+      };
       if (!response.ok) {
-        setError((data as { error?: string }).error ? `${t('addPositionFailed')}: ${data.error}` : t('addPositionFailed'))
-        return
+        setError(
+          (data as { error?: string }).error
+            ? `${failMessage}: ${data.error}`
+            : failMessage,
+        );
+        return;
       }
-      setDetail(data)
+      setDetail(data);
+      if (isEditing) {
+        // Editing is a one-shot action on a specific position — fully reset,
+        // unlike adding (below), which keeps family+line for fast repeat entry.
+        cancelEdit();
+        return;
+      }
       // keep family+line selected for fast repeated entry, just clear sizing
-      setWidthMm('')
-      setHeightMm('')
-      setQuantity('1')
-      setSelections({})
-      setLinePricingMode('auto')
-      setLineManualValue('')
-      setCharPricing({})
+      setWidthMm("");
+      setHeightMm("");
+      setQuantity("1");
+      setSelections({});
+      setLinePricingMode("auto");
+      setLineManualValue("");
+      setCharPricing({});
     } catch {
-      setError(t('addPositionFailedUnreachable'))
+      setError(failMessageUnreachable);
     } finally {
-      setAdding(false)
+      setAdding(false);
     }
-  }
+  };
 
-  const withPositionBusy = async (positionId: string, action: () => Promise<Response>, failMessage: string, failMessageUnreachable: string) => {
-    setBusyPositionId(positionId)
-    setError(null)
+  const withPositionBusy = async (
+    positionId: string,
+    action: () => Promise<Response>,
+    failMessage: string,
+    failMessageUnreachable: string,
+  ) => {
+    setBusyPositionId(positionId);
+    setError(null);
     try {
-      const response = await action()
-      const data = (await response.json().catch(() => ({}))) as QuoteDetail & { error?: string }
+      const response = await action();
+      const data = (await response.json().catch(() => ({}))) as QuoteDetail & {
+        error?: string;
+      };
       if (!response.ok) {
-        setError((data as { error?: string }).error ? `${failMessage}: ${data.error}` : failMessage)
-        return
+        setError(
+          (data as { error?: string }).error
+            ? `${failMessage}: ${data.error}`
+            : failMessage,
+        );
+        return;
       }
-      setDetail(data)
+      setDetail(data);
     } catch {
-      setError(failMessageUnreachable)
+      setError(failMessageUnreachable);
     } finally {
-      setBusyPositionId(null)
+      setBusyPositionId(null);
     }
-  }
+  };
 
   const removePosition = (positionId: string) =>
     withPositionBusy(
       positionId,
-      () => fetch(`/api/sales-quotes/${detail.quote.id}/positions/${positionId}`, { method: 'DELETE' }),
-      t('removePositionFailed'),
-      t('removePositionFailedUnreachable'),
-    )
+      () =>
+        fetch(`/api/sales-quotes/${detail.quote.id}/positions/${positionId}`, {
+          method: "DELETE",
+        }),
+      t("removePositionFailed"),
+      t("removePositionFailedUnreachable"),
+    );
 
   const duplicatePosition = (positionId: string) =>
     withPositionBusy(
       positionId,
-      () => fetch(`/api/sales-quotes/${detail.quote.id}/positions/${positionId}/duplicate`, { method: 'POST' }),
-      t('duplicatePositionFailed'),
-      t('duplicatePositionFailedUnreachable'),
-    )
+      () =>
+        fetch(
+          `/api/sales-quotes/${detail.quote.id}/positions/${positionId}/duplicate`,
+          { method: "POST" },
+        ),
+      t("duplicatePositionFailed"),
+      t("duplicatePositionFailedUnreachable"),
+    );
 
   const reorder = (positionIds: string[], busyId: string) =>
     withPositionBusy(
       busyId,
       () =>
         fetch(`/api/sales-quotes/${detail.quote.id}/positions/reorder`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ positionIds }),
         }),
-      t('reorderFailed'),
-      t('reorderFailedUnreachable'),
-    )
+      t("reorderFailed"),
+      t("reorderFailedUnreachable"),
+    );
 
-  const movePosition = (positionId: string, direction: 'up' | 'down') => {
-    const index = detail.positions.findIndex((p) => p.id === positionId)
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
+  const movePosition = (positionId: string, direction: "up" | "down") => {
+    const index = detail.positions.findIndex((p) => p.id === positionId);
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
     if (index === -1 || swapIndex < 0 || swapIndex >= detail.positions.length) {
-      return
+      return;
     }
-    const ids = detail.positions.map((p) => p.id)
-    ;[ids[index], ids[swapIndex]] = [ids[swapIndex], ids[index]]
-    void reorder(ids, positionId)
-  }
+    const ids = detail.positions.map((p) => p.id);
+    [ids[index], ids[swapIndex]] = [ids[swapIndex], ids[index]];
+    void reorder(ids, positionId);
+  };
 
   return (
     <div className="min-h-[100dvh] bg-slate-50 pb-10">
@@ -290,7 +553,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
             <span className="hidden h-5 w-px flex-shrink-0 bg-slate-200 md:block" />
             <div className="hidden min-w-0 flex-col md:flex">
               <span className="mb-0.5 text-[11px] font-medium uppercase leading-none tracking-wider text-slate-400">
-                {t('clientLabel')}
+                {t("clientLabel")}
               </span>
               <span className="max-w-[220px] truncate text-[14px] font-semibold text-slate-800">
                 {detail.quote.customerName}
@@ -301,7 +564,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                 <span className="hidden h-5 w-px flex-shrink-0 bg-slate-200 lg:block" />
                 <div className="hidden min-w-0 flex-col lg:flex">
                   <span className="mb-0.5 text-[11px] font-medium uppercase leading-none tracking-wider text-slate-400">
-                    {t('projectLabel')}
+                    {t("projectLabel")}
                   </span>
                   <span className="max-w-[260px] truncate text-[14px] font-medium text-slate-600">
                     {detail.quote.projectLocation}
@@ -317,16 +580,35 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                 {EUR.format(Number(detail.quote.totalPrice))}
               </div>
               <div className="mt-0.5 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-                {t('totalLabel')}
+                {t("totalLabel")}
               </div>
             </div>
-            <a href={`/api/sales-quotes/${detail.quote.id}/pdf`} target="_blank" rel="noreferrer">
-              <Button variant="icon" size="icon" title={t('previewPdf')} aria-label={t('previewPdf')}>
+            <a
+              href={`/api/sales-quotes/${detail.quote.id}/pdf`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Button
+                variant="icon"
+                size="icon"
+                title={t("previewPdf")}
+                aria-label={t("previewPdf")}
+              >
                 <Eye className="h-4 w-4" />
               </Button>
             </a>
-            <a href={`/api/sales-quotes/${detail.quote.id}/pdf`} target="_blank" rel="noreferrer" download>
-              <Button variant="icon" size="icon" title={t('downloadPdf')} aria-label={t('downloadPdf')}>
+            <a
+              href={`/api/sales-quotes/${detail.quote.id}/pdf`}
+              target="_blank"
+              rel="noreferrer"
+              download
+            >
+              <Button
+                variant="icon"
+                size="icon"
+                title={t("downloadPdf")}
+                aria-label={t("downloadPdf")}
+              >
                 <FileDown className="h-4 w-4" />
               </Button>
             </a>
@@ -337,7 +619,11 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
       <main className="mx-auto max-w-[1200px] px-4 md:px-6">
         <div className="mt-4 flex flex-col gap-3">
           {detail.quote.introText ? (
-            <CollapsibleSection title={t('introTitle')} preview={detail.quote.introText} ariaLabel={t('introTitle')}>
+            <CollapsibleSection
+              title={t("introTitle")}
+              preview={detail.quote.introText}
+              ariaLabel={t("introTitle")}
+            >
               <p className="whitespace-pre-line">{detail.quote.introText}</p>
             </CollapsibleSection>
           ) : null}
@@ -350,34 +636,51 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                 isFirst={index === 0}
                 isLast={index === detail.positions.length - 1}
                 busy={busyPositionId === position.id}
-                onMoveUp={(id) => movePosition(id, 'up')}
-                onMoveDown={(id) => movePosition(id, 'down')}
+                onMoveUp={(id) => movePosition(id, "up")}
+                onMoveDown={(id) => movePosition(id, "down")}
+                onEdit={(id) => void startEdit(id)}
                 onDuplicate={duplicatePosition}
                 onDelete={removePosition}
               />
             ))}
             {detail.positions.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-400">
-                {t('noPositions')}
+                {t("noPositions")}
               </div>
             ) : null}
           </div>
 
           <Card>
-            <CardHeader>
-              <CardTitle>{t('addPositionTitle')}</CardTitle>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle>
+                {editingPositionId
+                  ? t("editPositionTitle")
+                  : t("addPositionTitle")}
+              </CardTitle>
+              {editingPositionId ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={cancelEdit}
+                >
+                  <X className="h-3.5 w-3.5" />
+                  {t("cancelEdit")}
+                </Button>
+              ) : null}
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <Label htmlFor="qb-family">{t('fieldFamily')}</Label>
+                  <Label htmlFor="qb-family">{t("fieldFamily")}</Label>
                   <select
                     id="qb-family"
                     className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
                     value={familyId}
                     onChange={(e) => void onFamilyChange(e.target.value)}
                   >
-                    <option value="">{t('selectFamily')}</option>
+                    <option value="">{t("selectFamily")}</option>
                     {families.map((f) => (
                       <option key={f.id} value={f.id}>
                         {f.name}
@@ -387,7 +690,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="qb-line">{t('fieldLine')}</Label>
+                  <Label htmlFor="qb-line">{t("fieldLine")}</Label>
                   <select
                     id="qb-line"
                     className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 disabled:bg-slate-50"
@@ -395,7 +698,9 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                     disabled={!family || familyLoading}
                     onChange={(e) => onLineChange(e.target.value)}
                   >
-                    <option value="">{familyLoading ? t('loadingFamily') : t('selectLine')}</option>
+                    <option value="">
+                      {familyLoading ? t("loadingFamily") : t("selectLine")}
+                    </option>
                     {family?.lines.map((l) => (
                       <option key={l.id} value={l.id}>
                         {l.name}
@@ -409,7 +714,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                 <>
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-1">
-                      <Label htmlFor="qb-width">{t('fieldWidth')}</Label>
+                      <Label htmlFor="qb-width">{t("fieldWidth")}</Label>
                       <Input
                         id="qb-width"
                         type="number"
@@ -419,7 +724,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="qb-height">{t('fieldHeight')}</Label>
+                      <Label htmlFor="qb-height">{t("fieldHeight")}</Label>
                       <Input
                         id="qb-height"
                         type="number"
@@ -429,7 +734,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="qb-qty">{t('fieldQuantity')}</Label>
+                      <Label htmlFor="qb-qty">{t("fieldQuantity")}</Label>
                       <Input
                         id="qb-qty"
                         type="number"
@@ -441,42 +746,56 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                   </div>
 
                   <div className="space-y-1">
-                    <Label>{t('fieldLineValue')}</Label>
+                    <Label>{t("fieldLineValue")}</Label>
                     <div className="flex items-center gap-3">
                       <PricingModeToggle
                         mode={linePricingMode}
                         onChange={setLinePricingMode}
-                        autoLabel={t('pricingModeAuto')}
-                        manualLabel={t('pricingModeManual')}
+                        autoLabel={t("pricingModeAuto")}
+                        manualLabel={t("pricingModeManual")}
                       />
-                      {linePricingMode === 'manual' ? (
-                        <Input
-                          type="number"
-                          inputMode="decimal"
-                          min="0"
-                          className="h-8 w-32"
-                          value={lineManualValue}
-                          onChange={(e) => setLineManualValue(e.target.value)}
-                        />
-                      ) : null}
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        className="h-8 w-32"
+                        disabled={linePricingMode !== "manual"}
+                        placeholder={
+                          linePricingMode === "manual"
+                            ? undefined
+                            : t("autoComputedPlaceholder")
+                        }
+                        value={lineManualValue}
+                        onChange={(e) => setLineManualValue(e.target.value)}
+                      />
                     </div>
                   </div>
 
                   {mainCharacteristics.length > 0 ? (
                     <div className="grid gap-4 sm:grid-cols-2">
                       {mainCharacteristics.map((main) => {
-                        const pricing = charPricing[main.id] ?? { mode: 'auto' as PricingMode, manualValue: '' }
-                        const isSelected = Boolean(selections[main.id])
+                        const pricing = charPricing[main.id] ?? {
+                          mode: "auto" as PricingMode,
+                          manualValue: "",
+                        };
+                        const isSelected = Boolean(selections[main.id]);
                         return (
                           <div className="space-y-1" key={main.id}>
-                            <Label htmlFor={`qb-char-${main.id}`}>{main.name}</Label>
+                            <Label htmlFor={`qb-char-${main.id}`}>
+                              {main.name}
+                            </Label>
                             <select
                               id={`qb-char-${main.id}`}
                               className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
-                              value={selections[main.id] ?? ''}
-                              onChange={(e) => setSelections((s) => ({ ...s, [main.id]: e.target.value }))}
+                              value={selections[main.id] ?? ""}
+                              onChange={(e) =>
+                                setSelections((s) => ({
+                                  ...s,
+                                  [main.id]: e.target.value,
+                                }))
+                              }
                             >
-                              <option value="">{t('noSelection')}</option>
+                              <option value="">{t("noSelection")}</option>
                               {family!.characteristics
                                 .filter((c) => c.parentId === main.id)
                                 .map((sub) => (
@@ -489,33 +808,48 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                               <div className="flex items-center gap-3 pt-1">
                                 <PricingModeToggle
                                   mode={pricing.mode}
-                                  onChange={(mode) => setCharPricing((s) => ({ ...s, [main.id]: { ...pricing, mode } }))}
-                                  autoLabel={t('pricingModeAuto')}
-                                  manualLabel={t('pricingModeManual')}
+                                  onChange={(mode) =>
+                                    setCharPricing((s) => ({
+                                      ...s,
+                                      [main.id]: { ...pricing, mode },
+                                    }))
+                                  }
+                                  autoLabel={t("pricingModeAuto")}
+                                  manualLabel={t("pricingModeManual")}
                                 />
-                                {pricing.mode === 'manual' ? (
-                                  <Input
-                                    type="number"
-                                    inputMode="decimal"
-                                    min="0"
-                                    className="h-8 w-32"
-                                    value={pricing.manualValue}
-                                    onChange={(e) =>
-                                      setCharPricing((s) => ({ ...s, [main.id]: { ...pricing, manualValue: e.target.value } }))
-                                    }
-                                  />
-                                ) : null}
+                                <Input
+                                  type="number"
+                                  inputMode="decimal"
+                                  min="0"
+                                  className="h-8 w-32"
+                                  disabled={pricing.mode !== "manual"}
+                                  placeholder={
+                                    pricing.mode === "manual"
+                                      ? undefined
+                                      : t("autoComputedPlaceholder")
+                                  }
+                                  value={pricing.manualValue}
+                                  onChange={(e) =>
+                                    setCharPricing((s) => ({
+                                      ...s,
+                                      [main.id]: {
+                                        ...pricing,
+                                        manualValue: e.target.value,
+                                      },
+                                    }))
+                                  }
+                                />
                               </div>
                             ) : null}
                           </div>
-                        )
+                        );
                       })}
                     </div>
                   ) : null}
 
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1">
-                      <Label htmlFor="qb-discount">{t('fieldDiscount')}</Label>
+                      <Label htmlFor="qb-discount">{t("fieldDiscount")}</Label>
                       <Input
                         id="qb-discount"
                         type="number"
@@ -525,7 +859,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="qb-markup">{t('fieldMarkup')}</Label>
+                      <Label htmlFor="qb-markup">{t("fieldMarkup")}</Label>
                       <Input
                         id="qb-markup"
                         type="number"
@@ -536,11 +870,52 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                     </div>
                   </div>
 
-                  <div className="flex justify-end">
-                    <Button type="button" disabled={adding} className="gap-2" onClick={() => void addPosition()}>
-                      {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                      {adding ? t('adding') : t('addPosition')}
-                    </Button>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      {previewLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                      ) : preview ? (
+                        <>
+                          <span className="text-slate-500">
+                            {t("estimatedPrice")}:
+                          </span>
+                          <span className="font-mono font-semibold tabular-nums text-brand">
+                            {EUR.format(preview.finalPrice)}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {editingPositionId ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          disabled={adding}
+                          className="gap-1.5"
+                          onClick={cancelEdit}
+                        >
+                          <X className="h-4 w-4" />
+                          {t("cancelEdit")}
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        disabled={adding}
+                        className="gap-2"
+                        onClick={() => void savePosition()}
+                      >
+                        {adding ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : editingPositionId ? null : (
+                          <Plus className="h-4 w-4" />
+                        )}
+                        {adding
+                          ? t("saving")
+                          : editingPositionId
+                            ? t("saveChanges")
+                            : t("addPosition")}
+                      </Button>
+                    </div>
                   </div>
                 </>
               ) : null}
@@ -550,13 +925,13 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
           </Card>
 
           <CollapsibleSection
-            title={t('summaryTitle')}
+            title={t("summaryTitle")}
             rightContent={
               <span className="ml-2 font-mono text-[13px] tabular-nums text-slate-400">
                 {EUR.format(Number(detail.quote.totalPrice))}
               </span>
             }
-            ariaLabel={t('summaryTitle')}
+            ariaLabel={t("summaryTitle")}
           >
             <div className="space-y-2">
               {detail.positions.map((p) => (
@@ -564,29 +939,37 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                   <span>
                     {p.positionCode} — {p.productLineName}
                   </span>
-                  <span className="font-mono tabular-nums">{EUR.format(Number(p.finalPrice))}</span>
+                  <span className="font-mono tabular-nums">
+                    {EUR.format(Number(p.finalPrice))}
+                  </span>
                 </div>
               ))}
               <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold text-brand">
-                <span>{t('total')}</span>
-                <span className="font-mono tabular-nums">{EUR.format(Number(detail.quote.totalPrice))}</span>
+                <span>{t("total")}</span>
+                <span className="font-mono tabular-nums">
+                  {EUR.format(Number(detail.quote.totalPrice))}
+                </span>
               </div>
               {detail.quote.paymentTerms ? (
                 <p className="border-t border-slate-100 pt-2 text-xs text-slate-500">
-                  {t('fieldPaymentTerms')}: {detail.quote.paymentTerms}
+                  {t("fieldPaymentTerms")}: {detail.quote.paymentTerms}
                 </p>
               ) : null}
-              <p className="text-xs text-slate-400">{t('validityNote', { days: detail.quote.validityDays })}</p>
+              <p className="text-xs text-slate-400">
+                {t("validityNote", { days: detail.quote.validityDays })}
+              </p>
             </div>
           </CollapsibleSection>
         </div>
       </main>
 
-      {detail.quote.status !== 'draft' ? (
+      {detail.quote.status !== "draft" ? (
         <div className="mx-auto mt-4 max-w-[1200px] px-4 md:px-6">
-          <Badge variant="muted">{t(`statusValue.${detail.quote.status}`)}</Badge>
+          <Badge variant="muted">
+            {t(`statusValue.${detail.quote.status}`)}
+          </Badge>
         </div>
       ) : null}
     </div>
-  )
-}
+  );
+};

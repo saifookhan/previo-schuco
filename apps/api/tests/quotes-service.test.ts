@@ -35,6 +35,7 @@ import {
   listMyQuotes,
   removeQuotePosition,
   reorderPositions,
+  updateQuotePosition,
 } from '../src/services/quotes-service'
 
 /**
@@ -496,6 +497,97 @@ describe('createQuote + addQuotePosition', () => {
     await expect(reorderPositions(ctx(), actor, quote.id, [p1.id, p2.id])).rejects.toThrow(QuoteValidationError)
     await expect(
       reorderPositions(ctx(), actor, quote.id, [p1.id, p2.id, '00000000-0000-0000-0000-000000000000']),
+    ).rejects.toThrow(QuoteValidationError)
+  })
+
+  it('updateQuotePosition re-prices an existing position in place, keeping its positionCode/sortOrder, and recalculates the quote total', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-UPD-1', customerName: 'Test Customer' })
+
+    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 1,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [],
+    })
+    const original = afterAdd.positions[0]
+    expect(original.basePrice).toBe('555.00') // matrix lookup at 1000x800
+
+    const afterUpdate = await updateQuotePosition(ctx(), actor, quote.id, original.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 2, // was 1
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [],
+    })
+
+    expect(afterUpdate.positions).toHaveLength(1)
+    const updated = afterUpdate.positions[0]
+    expect(updated.id).toBe(original.id)
+    expect(updated.positionCode).toBe(original.positionCode)
+    expect(updated.sortOrder).toBe(original.sortOrder)
+    expect(updated.quantity).toBe(2)
+    expect(updated.basePrice).toBe('1110.00') // 555 * 2
+    expect(afterUpdate.quote.totalPrice).toBe(updated.finalPrice)
+  })
+
+  it('updateQuotePosition replaces characteristic selections rather than merging — a deselected one leaves no stale row', async () => {
+    const family = await importFreshFamily()
+    const familyDetail = await getProductFamilyDetail(ctx(), family.id)
+    const line = await matrixLineOf(family.id)
+    const main = familyDetail!.characteristics.find((c) => !c.parentId)!
+    const sub = familyDetail!.characteristics.find((c) => c.parentId === main.id)!
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-UPD-2', customerName: 'Test Customer' })
+
+    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 1,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [{ characteristicId: main.id, subCharacteristicId: sub.id }],
+    })
+    expect(afterAdd.positions[0].characteristics).toHaveLength(1)
+
+    const afterUpdate = await updateQuotePosition(ctx(), actor, quote.id, afterAdd.positions[0].id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 1,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [], // deselected
+    })
+
+    expect(afterUpdate.positions[0].characteristics).toHaveLength(0)
+  })
+
+  it('updateQuotePosition rejects a positionId from a different quote, instead of silently updating the wrong one', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quoteA = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-UPD-3A', customerName: 'Test Customer' })
+    const quoteB = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-UPD-3B', customerName: 'Test Customer' })
+    const afterAdd = await addQuotePosition(ctx(), actor, quoteA.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 1,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [],
+    })
+
+    await expect(
+      updateQuotePosition(ctx(), actor, quoteB.id, afterAdd.positions[0].id, {
+        productFamilyId: family.id,
+        productLineId: line.id,
+        quantity: 5,
+        widthMm: 1000,
+        heightMm: 800,
+        characteristicSelections: [],
+      }),
     ).rejects.toThrow(QuoteValidationError)
   })
 

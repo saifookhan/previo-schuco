@@ -148,6 +148,50 @@ export const deleteQuotePosition = async (db: DbLike, quoteId: string, positionI
   return row?.quoteId ?? null
 }
 
+export interface UpdateQuotePositionInput {
+  productFamilyId: string
+  productLineId: string
+  productFamilyName: string
+  productLineName: string
+  quantity: number
+  widthMm: string
+  heightMm: string
+  description: string
+  unitName: string
+  unitSymbol: string
+  discountPct: string
+  extraMarkupPct: string
+  pricingMode?: 'auto' | 'manual'
+  lineManualUnitPrice?: string | null
+  totalM2: string
+  basePrice: string
+  finalPrice: string
+}
+
+/**
+ * Updates an existing position's fields in place — positionCode and
+ * sortOrder are deliberately not touched (editing never reorders or
+ * renumbers). Scoped by `quoteId` in the WHERE itself, same as
+ * `deleteQuotePosition`, so a positionId from another quote is a no-op,
+ * never a cross-quote write.
+ */
+export const updateQuotePosition = async (
+  db: DbLike,
+  quoteId: string,
+  positionId: string,
+  input: UpdateQuotePositionInput,
+): Promise<void> => {
+  await db
+    .update(quotePositions)
+    .set({ ...input, updatedAt: new Date() })
+    .where(and(eq(quotePositions.id, positionId), eq(quotePositions.quoteId, quoteId)))
+}
+
+/** Deletes every characteristic row for one position — used by an edit (update position) to clear old selections before inserting the new set. */
+export const deleteQuotePositionCharacteristics = async (db: DbLike, quotePositionId: string): Promise<void> => {
+  await db.delete(quotePositionCharacteristics).where(eq(quotePositionCharacteristics.quotePositionId, quotePositionId))
+}
+
 /**
  * Rewrites sortOrder to match `orderedPositionIds`' order (index = new
  * sortOrder). Every update is scoped by `quoteId` too, so an id from

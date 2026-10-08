@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronDown, ChevronUp, Copy, Loader2, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Copy, Loader2, Pencil, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
@@ -16,6 +16,7 @@ interface QuotePositionCardProps {
   busy: boolean
   onMoveUp: (id: string) => void
   onMoveDown: (id: string) => void
+  onEdit: (id: string) => void
   onDuplicate: (id: string) => void
   onDelete: (id: string) => void
 }
@@ -32,6 +33,7 @@ export const QuotePositionCard = ({
   busy,
   onMoveUp,
   onMoveDown,
+  onEdit,
   onDuplicate,
   onDelete,
 }: QuotePositionCardProps) => {
@@ -96,6 +98,16 @@ export const QuotePositionCard = ({
           <div className="mr-1 hidden text-[14px] font-bold tabular-nums text-brand sm:mr-2 sm:block">
             {EUR.format(Number(position.finalPrice))}
           </div>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onEdit(position.id)}
+            className="rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50"
+            aria-label={t('editPosition')}
+            title={t('editPosition')}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
           <button
             type="button"
             disabled={busy}

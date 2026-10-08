@@ -96,6 +96,7 @@ export {
 } from './queries/product-families'
 export {
   deleteQuotePosition,
+  deleteQuotePositionCharacteristics,
   getQuoteDetail,
   insertQuote,
   insertQuotePosition,
@@ -103,6 +104,7 @@ export {
   listQuotes,
   recalculateQuoteTotal,
   reorderQuotePositions,
+  updateQuotePosition,
   type InsertQuoteInput,
   type InsertQuotePositionCharacteristicInput,
   type InsertQuotePositionInput,
@@ -110,5 +112,6 @@ export {
   type QuotePositionCharacteristicRow,
   type QuotePositionRow,
   type QuoteSummary,
+  type UpdateQuotePositionInput,
 } from './queries/quotes'
 export * from './schema'
