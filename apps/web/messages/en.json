@@ -313,6 +313,8 @@
     "loadingFamily": "Loading…",
     "familyLoadFailed": "Could not load this product family",
     "familyLoadFailedUnreachable": "Could not load this product family — could not reach the server",
+    "fieldPositionCode": "Position name/code",
+    "fieldPositionCodePlaceholder": "Auto (P01, P02, ...) — or type your own",
     "fieldWidth": "Width (mm)",
     "fieldHeight": "Height (mm)",
     "fieldQuantity": "Quantity",

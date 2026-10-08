@@ -95,6 +95,8 @@ export interface AddQuotePositionInput {
   description?: string
   pricingMode?: PricingMode
   manualUnitPrice?: number
+  /** Overrides the auto-assigned "P01"/"P02"/... code. Omit/blank to keep the usual auto-numbered one (add) or leave an existing one unchanged (edit). */
+  positionCode?: string
 }
 
 /**

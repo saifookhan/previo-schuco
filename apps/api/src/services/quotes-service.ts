@@ -154,10 +154,53 @@ export interface AddQuotePositionInput {
   pricingMode?: 'auto' | 'manual'
   /** Required when pricingMode is 'manual' — the line's own €/unit price, typed in directly instead of computed. */
   manualUnitPrice?: number
+  /** Overrides the auto-assigned "P01"/"P02"/... code (the reference app's "Add POS" naming dialog) — free text, must be unique within the quote. Omit/blank for the usual auto-numbered code. */
+  positionCode?: string
 }
 
 const isPositiveFinite = (n: number): boolean => Number.isFinite(n) && n > 0
 const isNonNegativeFinite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0
+
+/**
+ * Resolves this position's code: `requestedCode` (trimmed) when the
+ * caller named one (the reference app's "Add POS" dialog), otherwise the
+ * usual auto-numbered "P01"/"P02"/... derived from the max of what's
+ * actually there, not positions.length (a remove-then-add must not
+ * reissue an already-used code — see the comment this replaced). A named
+ * code must be unique within the quote; `excludePositionId` lets an edit
+ * keep its own current code without tripping that check against itself.
+ * @throws {QuoteValidationError} the requested code is already used by a different position in this quote
+ */
+/**
+ * True for a Postgres unique_violation (error code 23505). `resolvePositionCode`'s
+ * uniqueness check is only a read-then-check against this transaction's own
+ * snapshot (default READ COMMITTED, no row lock) — two concurrent requests
+ * choosing the same custom code could both pass it. The DB's own unique
+ * index (`quote_positions_quote_id_position_code_idx`) is what actually
+ * prevents the duplicate from committing; this just turns its violation
+ * into the same QuoteValidationError the pre-check would have thrown,
+ * instead of a raw 500.
+ */
+const isPositionCodeConflict = (error: unknown): boolean =>
+  typeof error === 'object' && error !== null && 'code' in error && (error as { code: unknown }).code === '23505'
+
+const resolvePositionCode = (
+  existingPositions: { id: string; positionCode: string }[],
+  requestedCode: string | undefined,
+  excludePositionId?: string,
+): string => {
+  const trimmed = requestedCode?.trim()
+  if (trimmed) {
+    const clash = existingPositions.some((p) => p.id !== excludePositionId && p.positionCode === trimmed)
+    if (clash) {
+      throw new QuoteValidationError(`Position code "${trimmed}" is already used by another position in this quote`)
+    }
+    return trimmed
+  }
+  const nextPositionNumber =
+    existingPositions.reduce((max, p) => Math.max(max, Number(p.positionCode.replace(/\D/g, '')) || 0), 0) + 1
+  return `P${String(nextPositionNumber).padStart(2, '0')}`
+}
 
 const asMatrix = (widths: number[], heights: number[], matrix: (number | null)[][]): PricingMatrix => ({
   widths,
@@ -437,35 +480,42 @@ export const addQuotePosition = async (
 
     const priced = await priceQuotePosition(ctx, tx, input)
 
-    // Derived from the max of what's actually there, not positions.length — a
-    // remove-then-add would otherwise reissue an already-used code/sortOrder
-    // (e.g. P01,P02,P03 -> remove P02 -> next add becomes "P03" again).
-    const nextPositionNumber =
-      existingQuote.positions.reduce((max, p) => Math.max(max, Number(p.positionCode.replace(/\D/g, '')) || 0), 0) + 1
+    const positionCode = resolvePositionCode(existingQuote.positions, input.positionCode)
+    // Derived from the max of what's actually there, not positions.length —
+    // a remove-then-add must not reissue an already-used sortOrder.
     const nextSortOrder = existingQuote.positions.reduce((max, p) => Math.max(max, p.sortOrder), -1) + 1
-    const positionCode = `P${String(nextPositionNumber).padStart(2, '0')}`
-    const positionId = await insertQuotePosition(tx, {
-      quoteId,
-      productFamilyId: input.productFamilyId,
-      productLineId: input.productLineId,
-      productFamilyName: priced.family.family.name,
-      productLineName: priced.line.name,
-      positionCode,
-      quantity: input.quantity,
-      widthMm: String(input.widthMm),
-      heightMm: String(input.heightMm),
-      description: priced.description,
-      unitName: priced.line.unitName,
-      unitSymbol: priced.line.unitSymbol,
-      discountPct: String(priced.discountPct),
-      extraMarkupPct: String(priced.extraMarkupPct),
-      pricingMode: priced.linePricingMode,
-      lineManualUnitPrice: priced.lineManualUnitPrice == null ? null : String(priced.lineManualUnitPrice),
-      totalM2: priced.totalM2.toFixed(4),
-      basePrice: priced.basePrice.toFixed(2),
-      finalPrice: priced.finalPrice.toFixed(2),
-      sortOrder: nextSortOrder,
-    })
+    let positionId: string
+    try {
+      positionId = await insertQuotePosition(tx, {
+        quoteId,
+        productFamilyId: input.productFamilyId,
+        productLineId: input.productLineId,
+        productFamilyName: priced.family.family.name,
+        productLineName: priced.line.name,
+        positionCode,
+        quantity: input.quantity,
+        widthMm: String(input.widthMm),
+        heightMm: String(input.heightMm),
+        description: priced.description,
+        unitName: priced.line.unitName,
+        unitSymbol: priced.line.unitSymbol,
+        discountPct: String(priced.discountPct),
+        extraMarkupPct: String(priced.extraMarkupPct),
+        pricingMode: priced.linePricingMode,
+        lineManualUnitPrice: priced.lineManualUnitPrice == null ? null : String(priced.lineManualUnitPrice),
+        totalM2: priced.totalM2.toFixed(4),
+        basePrice: priced.basePrice.toFixed(2),
+        finalPrice: priced.finalPrice.toFixed(2),
+        sortOrder: nextSortOrder,
+      })
+    } catch (error) {
+      if (isPositionCodeConflict(error)) {
+        throw new QuoteValidationError(
+          `Position code "${positionCode}" is already used by another position in this quote`,
+        )
+      }
+      throw error
+    }
 
     for (const row of priced.characteristicRows) {
       await insertQuotePositionCharacteristic(tx, {
@@ -527,26 +577,44 @@ export const updateQuotePosition = async (
     }
 
     const priced = await priceQuotePosition(ctx, tx, input)
+    // Blank/omitted positionCode means "leave it alone" here (unlike
+    // addQuotePosition, where blank means "auto-assign the next one") —
+    // an edit must never silently renumber a position the caller didn't
+    // ask to rename. Only resolvePositionCode (uniqueness check) when an
+    // actual rename was requested.
+    const positionCode = input.positionCode?.trim()
+      ? resolvePositionCode(existingQuote.positions, input.positionCode, positionId)
+      : existingPosition.positionCode
 
-    await updateQuotePositionQuery(tx, quoteId, positionId, {
-      productFamilyId: input.productFamilyId,
-      productLineId: input.productLineId,
-      productFamilyName: priced.family.family.name,
-      productLineName: priced.line.name,
-      quantity: input.quantity,
-      widthMm: String(input.widthMm),
-      heightMm: String(input.heightMm),
-      description: priced.description,
-      unitName: priced.line.unitName,
-      unitSymbol: priced.line.unitSymbol,
-      discountPct: String(priced.discountPct),
-      extraMarkupPct: String(priced.extraMarkupPct),
-      pricingMode: priced.linePricingMode,
-      lineManualUnitPrice: priced.lineManualUnitPrice == null ? null : String(priced.lineManualUnitPrice),
-      totalM2: priced.totalM2.toFixed(4),
-      basePrice: priced.basePrice.toFixed(2),
-      finalPrice: priced.finalPrice.toFixed(2),
-    })
+    try {
+      await updateQuotePositionQuery(tx, quoteId, positionId, {
+        productFamilyId: input.productFamilyId,
+        productLineId: input.productLineId,
+        productFamilyName: priced.family.family.name,
+        productLineName: priced.line.name,
+        positionCode,
+        quantity: input.quantity,
+        widthMm: String(input.widthMm),
+        heightMm: String(input.heightMm),
+        description: priced.description,
+        unitName: priced.line.unitName,
+        unitSymbol: priced.line.unitSymbol,
+        discountPct: String(priced.discountPct),
+        extraMarkupPct: String(priced.extraMarkupPct),
+        pricingMode: priced.linePricingMode,
+        lineManualUnitPrice: priced.lineManualUnitPrice == null ? null : String(priced.lineManualUnitPrice),
+        totalM2: priced.totalM2.toFixed(4),
+        basePrice: priced.basePrice.toFixed(2),
+        finalPrice: priced.finalPrice.toFixed(2),
+      })
+    } catch (error) {
+      if (isPositionCodeConflict(error)) {
+        throw new QuoteValidationError(
+          `Position code "${positionCode}" is already used by another position in this quote`,
+        )
+      }
+      throw error
+    }
 
     // Replace, not merge — simplest way to guarantee stale selections from
     // before this edit never linger (e.g. a characteristic the user
@@ -690,33 +758,43 @@ export const duplicatePosition = async (
       throw new QuoteValidationError('Position not found in this quote')
     }
 
-    const nextPositionNumber =
-      existingQuote.positions.reduce((max, p) => Math.max(max, Number(p.positionCode.replace(/\D/g, '')) || 0), 0) + 1
+    // Always auto-numbered, never the source's own code — a custom name is
+    // unique to one position, copying it onto a duplicate would collide.
+    const positionCode = resolvePositionCode(existingQuote.positions, undefined)
     const nextSortOrder = existingQuote.positions.reduce((max, p) => Math.max(max, p.sortOrder), -1) + 1
-    const positionCode = `P${String(nextPositionNumber).padStart(2, '0')}`
 
-    const newPositionId = await insertQuotePosition(tx, {
-      quoteId,
-      productFamilyId: source.productFamilyId,
-      productLineId: source.productLineId,
-      productFamilyName: source.productFamilyName,
-      productLineName: source.productLineName,
-      positionCode,
-      quantity: source.quantity,
-      widthMm: source.widthMm,
-      heightMm: source.heightMm,
-      description: source.description,
-      unitName: source.unitName,
-      unitSymbol: source.unitSymbol,
-      discountPct: source.discountPct,
-      extraMarkupPct: source.extraMarkupPct,
-      pricingMode: source.pricingMode,
-      lineManualUnitPrice: source.lineManualUnitPrice,
-      totalM2: source.totalM2,
-      basePrice: source.basePrice,
-      finalPrice: source.finalPrice,
-      sortOrder: nextSortOrder,
-    })
+    let newPositionId: string
+    try {
+      newPositionId = await insertQuotePosition(tx, {
+        quoteId,
+        productFamilyId: source.productFamilyId,
+        productLineId: source.productLineId,
+        productFamilyName: source.productFamilyName,
+        productLineName: source.productLineName,
+        positionCode,
+        quantity: source.quantity,
+        widthMm: source.widthMm,
+        heightMm: source.heightMm,
+        description: source.description,
+        unitName: source.unitName,
+        unitSymbol: source.unitSymbol,
+        discountPct: source.discountPct,
+        extraMarkupPct: source.extraMarkupPct,
+        pricingMode: source.pricingMode,
+        lineManualUnitPrice: source.lineManualUnitPrice,
+        totalM2: source.totalM2,
+        basePrice: source.basePrice,
+        finalPrice: source.finalPrice,
+        sortOrder: nextSortOrder,
+      })
+    } catch (error) {
+      if (isPositionCodeConflict(error)) {
+        throw new QuoteValidationError(
+          `Position code "${positionCode}" is already used by another position in this quote`,
+        )
+      }
+      throw error
+    }
     for (const characteristic of source.characteristics) {
       await insertQuotePositionCharacteristic(tx, {
         quotePositionId: newPositionId,

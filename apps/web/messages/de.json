@@ -313,6 +313,8 @@
     "loadingFamily": "Wird geladen…",
     "familyLoadFailed": "Diese Produktfamilie konnte nicht geladen werden",
     "familyLoadFailedUnreachable": "Diese Produktfamilie konnte nicht geladen werden — Server nicht erreichbar",
+    "fieldPositionCode": "Positionsname/-code",
+    "fieldPositionCodePlaceholder": "Automatisch (P01, P02, ...) — oder eigenen eingeben",
     "fieldWidth": "Breite (mm)",
     "fieldHeight": "Höhe (mm)",
     "fieldQuantity": "Menge",

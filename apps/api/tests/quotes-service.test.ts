@@ -500,6 +500,84 @@ describe('createQuote + addQuotePosition', () => {
     ).rejects.toThrow(QuoteValidationError)
   })
 
+  it("addQuotePosition honors a custom positionCode instead of auto-numbering, and rejects a duplicate one (the reference app's \"Add POS\" naming dialog)", async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-POSCODE-1', customerName: 'Test Customer' })
+
+    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 1,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [],
+      positionCode: 'Frame A',
+    })
+    expect(afterAdd.positions[0].positionCode).toBe('Frame A')
+
+    // Second position with no code -> still auto-numbers from P01 (ignores the custom name already used).
+    const afterSecond = await addQuotePosition(ctx(), actor, quote.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 1,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [],
+    })
+    expect(afterSecond.positions[1].positionCode).toBe('P01')
+
+    await expect(
+      addQuotePosition(ctx(), actor, quote.id, {
+        productFamilyId: family.id,
+        productLineId: line.id,
+        quantity: 1,
+        widthMm: 1000,
+        heightMm: 800,
+        characteristicSelections: [],
+        positionCode: 'Frame A', // already used above
+      }),
+    ).rejects.toThrow(QuoteValidationError)
+  })
+
+  it('updateQuotePosition leaves positionCode unchanged when none is given, but renames it (with the same uniqueness check) when one is', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-POSCODE-2', customerName: 'Test Customer' })
+    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 1,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [],
+    })
+    const original = afterAdd.positions[0]
+    expect(original.positionCode).toBe('P01')
+
+    const unchangedEdit = await updateQuotePosition(ctx(), actor, quote.id, original.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 2,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [],
+      // positionCode omitted — must NOT be renumbered as a side effect of editing.
+    })
+    expect(unchangedEdit.positions[0].positionCode).toBe('P01')
+
+    const renamedEdit = await updateQuotePosition(ctx(), actor, quote.id, original.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 2,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [],
+      positionCode: 'Main Door',
+    })
+    expect(renamedEdit.positions[0].positionCode).toBe('Main Door')
+  })
+
   it('updateQuotePosition re-prices an existing position in place, keeping its positionCode/sortOrder, and recalculates the quote total', async () => {
     const family = await importFreshFamily()
     const line = await matrixLineOf(family.id)

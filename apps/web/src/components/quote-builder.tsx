@@ -67,6 +67,8 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
 
   const [familyId, setFamilyId] = useState('')
   const [lineId, setLineId] = useState('')
+  /** The position's own code ("P01", "P02", ...) — blank means "auto-assign" (add) / "leave unchanged" (edit). See the reference app's "Add POS" naming dialog. */
+  const [positionCode, setPositionCode] = useState('')
   const [widthMm, setWidthMm] = useState('')
   const [heightMm, setHeightMm] = useState('')
   const [quantity, setQuantity] = useState('1')
@@ -98,6 +100,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
 
   const resetPositionForm = () => {
     setLineId('')
+    setPositionCode('')
     setWidthMm('')
     setHeightMm('')
     setQuantity('1')
@@ -180,6 +183,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
 
     setFamilyId(position.productFamilyId)
     setLineId(position.productLineId)
+    setPositionCode(position.positionCode)
     setWidthMm(tidy(position.widthMm))
     setHeightMm(tidy(position.heightMm))
     setQuantity(String(position.quantity))
@@ -252,6 +256,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
     return {
       productFamilyId: familyId,
       productLineId: lineId,
+      ...(positionCode.trim() !== '' ? { positionCode: positionCode.trim() } : {}),
       quantity: qty,
       widthMm: width,
       heightMm: height,
@@ -376,6 +381,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
         return
       }
       // keep family+line selected for fast repeated entry, just clear sizing
+      setPositionCode('')
       setWidthMm('')
       setHeightMm('')
       setQuantity('1')
@@ -587,6 +593,17 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
 
               {line ? (
                 <>
+                  <div className="space-y-1 sm:max-w-[220px]">
+                    <Label htmlFor="qb-position-code">{t('fieldPositionCode')}</Label>
+                    <Input
+                      id="qb-position-code"
+                      type="text"
+                      placeholder={t('fieldPositionCodePlaceholder')}
+                      value={positionCode}
+                      onChange={(e) => setPositionCode(e.target.value)}
+                    />
+                  </div>
+
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-1">
                       <Label htmlFor="qb-width">{t('fieldWidth')}</Label>

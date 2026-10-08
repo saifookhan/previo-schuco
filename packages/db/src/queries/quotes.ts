@@ -156,6 +156,7 @@ export interface UpdateQuotePositionInput {
   productLineId: string
   productFamilyName: string
   productLineName: string
+  positionCode: string
   quantity: number
   widthMm: string
   heightMm: string
@@ -172,9 +173,12 @@ export interface UpdateQuotePositionInput {
 }
 
 /**
- * Updates an existing position's fields in place — positionCode and
- * sortOrder are deliberately not touched (editing never reorders or
- * renumbers). Scoped by `quoteId` in the WHERE itself, same as
+ * Updates an existing position's fields in place — sortOrder is
+ * deliberately not touched (editing never reorders). positionCode IS
+ * written on every call (the caller, quotes-service.ts's
+ * updateQuotePosition, resolves it beforehand — either the position's own
+ * current code when the edit didn't rename it, or the newly-requested one
+ * when it did). Scoped by `quoteId` in the WHERE itself, same as
  * `deleteQuotePosition`, so a positionId from another quote is a no-op,
  * never a cross-quote write.
  */

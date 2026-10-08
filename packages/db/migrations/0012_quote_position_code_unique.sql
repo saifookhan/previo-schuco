@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "quote_positions_quote_id_position_code_idx" ON "quote_positions" USING btree ("quote_id","position_code");
