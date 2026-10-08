@@ -136,7 +136,10 @@ export const recalculateQuoteTotal = async (db: DbLike, quoteId: string): Promis
     .from(quotePositions)
     .where(eq(quotePositions.quoteId, quoteId))
   const total = positionRows.reduce((sum, row) => sum + Number(row.finalPrice), 0)
-  await db.update(quotes).set({ totalPrice: total.toFixed(2), updatedAt: new Date() }).where(eq(quotes.id, quoteId))
+  await db
+    .update(quotes)
+    .set({ totalPrice: total.toFixed(2), updatedAt: new Date() })
+    .where(eq(quotes.id, quoteId))
 }
 
 /** Deletes a position, but only if it belongs to `quoteId` — scoped in the WHERE itself, not just checked after the fact. */

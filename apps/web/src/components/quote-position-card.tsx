@@ -163,7 +163,8 @@ export const QuotePositionCard = ({
               {t('columnQty')}: {position.quantity}
             </span>
             <span>
-              {t('fieldDiscount')}/{t('fieldMarkup')}: {Number(position.discountPct)}% / {Number(position.extraMarkupPct)}%
+              {t('fieldDiscount')}/{t('fieldMarkup')}: {Number(position.discountPct)}% /{' '}
+              {Number(position.extraMarkupPct)}%
             </span>
             {position.pricingMode === 'manual' ? (
               <span

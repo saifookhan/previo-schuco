@@ -109,5 +109,6 @@ export interface QuotePositionPreview {
   finalPrice: number
   discountPct: number
   extraMarkupPct: number
+  lineUnitPrice: number
   characteristics: { characteristicId: string; subCharacteristicId: string; price: number }[]
 }
