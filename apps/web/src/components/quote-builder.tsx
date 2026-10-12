@@ -587,7 +587,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
             <CardHeader>
               <CardTitle>{editingPositionId ? t('editPositionTitle') : t('addPositionTitle')}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-5">
+            <CardContent>
               <FormSection title={t('sectionProduct')}>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -712,7 +712,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                             id="qb-discount"
                             type="number"
                             inputMode="decimal"
-                            className="pr-7"
+                            className="pr-7 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             value={discountPct}
                             onChange={(e) => setDiscountPct(e.target.value)}
                           />
@@ -728,7 +728,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                             id="qb-markup"
                             type="number"
                             inputMode="decimal"
-                            className="pr-7"
+                            className="pr-7 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             value={extraMarkupPct}
                             onChange={(e) => setExtraMarkupPct(e.target.value)}
                           />
@@ -828,7 +828,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                     </FormSection>
                   ) : null}
 
-                  <div className="-mx-6 -mb-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+                  <div className="-mx-6 -mb-4 mt-5 flex flex-wrap items-center justify-between gap-3 rounded-b-xl border-t border-slate-100 bg-slate-50/70 px-6 py-4">
                     <div className="flex items-baseline gap-2">
                       {previewLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
@@ -869,7 +869,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                 </>
               ) : null}
 
-              {error ? <p className="text-sm text-red-600">{error}</p> : null}
+              {error ? <p className="mt-5 text-sm text-red-600">{error}</p> : null}
             </CardContent>
           </Card>
 
