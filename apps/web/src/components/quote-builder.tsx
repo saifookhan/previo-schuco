@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { QuotePositionCard } from '@/components/quote-position-card'
+import { cn } from '@/lib/utils'
 import type { ProductFamilyDetail, ProductFamilySummary } from '@/types/product-family'
 import type { AddQuotePositionInput, PricingMode, QuoteDetail, QuotePositionPreview } from '@/types/sales-quote'
 
@@ -19,7 +20,26 @@ const EUR = new Intl.NumberFormat('it-IT', {
   currency: 'EUR',
 })
 
-/** The reference app's per-row "A"/"M" toggle: Automatic (formula/matrix-computed) vs Manual (typed-in €/unit value). Reused for both a position's own line price and each selected characteristic's price — same shape, independent state. */
+/** Matches Input's own recipe (ui/input.tsx) so a native <select> sits flush with every text field around it. */
+const selectClassName =
+  'h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-50'
+
+/** A labeled section of the form, set off by a hairline rule — real grouping (product vs. size vs. pricing vs. characteristics), not decoration. */
+const FormSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="space-y-4 border-t border-slate-100 pt-5 first:border-t-0 first:pt-0">
+    <h3 className="text-sm font-medium text-slate-700">{title}</h3>
+    {children}
+  </div>
+)
+
+/**
+ * The reference app's per-row "A"/"M" toggle, as a two-segment pill
+ * control: Automatic (formula/matrix-computed) vs Manual (typed-in €/unit
+ * value). Reused for both a position's own line price and each selected
+ * characteristic's price — same shape, independent state. Manual reads
+ * amber, matching the "manual price" badge shown on a saved position
+ * (quote-position-card.tsx) — one color means the same thing everywhere.
+ */
 const PricingModeToggle = ({
   mode,
   onChange,
@@ -31,15 +51,29 @@ const PricingModeToggle = ({
   autoLabel: string
   manualLabel: string
 }) => (
-  <div className="flex gap-2 text-xs">
-    <label className="flex items-center gap-1 text-slate-600">
-      <input type="radio" checked={mode === 'auto'} onChange={() => onChange('auto')} title={autoLabel} />
+  <div className="inline-flex shrink-0 rounded-md bg-slate-100 p-0.5 text-xs font-medium">
+    <button
+      type="button"
+      onClick={() => onChange('auto')}
+      aria-pressed={mode === 'auto'}
+      className={cn(
+        'rounded px-2.5 py-1 transition-colors',
+        mode === 'auto' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+      )}
+    >
       {autoLabel}
-    </label>
-    <label className="flex items-center gap-1 text-slate-600">
-      <input type="radio" checked={mode === 'manual'} onChange={() => onChange('manual')} title={manualLabel} />
+    </button>
+    <button
+      type="button"
+      onClick={() => onChange('manual')}
+      aria-pressed={mode === 'manual'}
+      className={cn(
+        'rounded px-2.5 py-1 transition-colors',
+        mode === 'manual' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700',
+      )}
+    >
       {manualLabel}
-    </label>
+    </button>
   </div>
 )
 
@@ -553,104 +587,114 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
             <CardHeader>
               <CardTitle>{editingPositionId ? t('editPositionTitle') : t('addPositionTitle')}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <Label htmlFor="qb-family">{t('fieldFamily')}</Label>
-                  <select
-                    id="qb-family"
-                    className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
-                    value={familyId}
-                    onChange={(e) => void onFamilyChange(e.target.value)}
-                  >
-                    <option value="">{t('selectFamily')}</option>
-                    {families.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            <CardContent className="space-y-5">
+              <FormSection title={t('sectionProduct')}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="qb-family">{t('fieldFamily')}</Label>
+                    <select
+                      id="qb-family"
+                      className={selectClassName}
+                      value={familyId}
+                      onChange={(e) => void onFamilyChange(e.target.value)}
+                    >
+                      <option value="">{t('selectFamily')}</option>
+                      {families.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="qb-line">{t('fieldLine')}</Label>
-                  <select
-                    id="qb-line"
-                    className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 disabled:bg-slate-50"
-                    value={lineId}
-                    disabled={!family || familyLoading}
-                    onChange={(e) => onLineChange(e.target.value)}
-                  >
-                    <option value="">{familyLoading ? t('loadingFamily') : t('selectLine')}</option>
-                    {family?.lines.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="qb-line">{t('fieldLine')}</Label>
+                    <select
+                      id="qb-line"
+                      className={selectClassName}
+                      value={lineId}
+                      disabled={!family || familyLoading}
+                      onChange={(e) => onLineChange(e.target.value)}
+                    >
+                      <option value="">{familyLoading ? t('loadingFamily') : t('selectLine')}</option>
+                      {family?.lines.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
+              </FormSection>
 
               {line ? (
                 <>
-                  <div className="space-y-1 sm:max-w-[220px]">
-                    <Label htmlFor="qb-position-code">{t('fieldPositionCode')}</Label>
-                    <Input
-                      id="qb-position-code"
-                      type="text"
-                      placeholder={t('fieldPositionCodePlaceholder')}
-                      value={positionCode}
-                      onChange={(e) => setPositionCode(e.target.value)}
-                    />
-                  </div>
+                  <FormSection title={t('sectionSizePosition')}>
+                    <div className="grid gap-4 sm:grid-cols-4">
+                      <div className="space-y-1.5 sm:col-span-1">
+                        <Label htmlFor="qb-position-code">{t('fieldPositionCode')}</Label>
+                        <Input
+                          id="qb-position-code"
+                          type="text"
+                          placeholder={t('fieldPositionCodePlaceholder')}
+                          value={positionCode}
+                          onChange={(e) => setPositionCode(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="qb-width">{t('fieldWidth')}</Label>
+                        <Input
+                          id="qb-width"
+                          type="number"
+                          inputMode="decimal"
+                          value={widthMm}
+                          onChange={(e) => setWidthMm(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="qb-height">{t('fieldHeight')}</Label>
+                        <Input
+                          id="qb-height"
+                          type="number"
+                          inputMode="decimal"
+                          value={heightMm}
+                          onChange={(e) => setHeightMm(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="qb-qty">{t('fieldQuantity')}</Label>
+                        <Input
+                          id="qb-qty"
+                          type="number"
+                          inputMode="numeric"
+                          value={quantity}
+                          onChange={(e) => setQuantity(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </FormSection>
 
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="qb-width">{t('fieldWidth')}</Label>
-                      <Input
-                        id="qb-width"
-                        type="number"
-                        inputMode="decimal"
-                        value={widthMm}
-                        onChange={(e) => setWidthMm(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="qb-height">{t('fieldHeight')}</Label>
-                      <Input
-                        id="qb-height"
-                        type="number"
-                        inputMode="decimal"
-                        value={heightMm}
-                        onChange={(e) => setHeightMm(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="qb-qty">{t('fieldQuantity')}</Label>
-                      <Input
-                        id="qb-qty"
-                        type="number"
-                        inputMode="numeric"
-                        value={quantity}
-                        onChange={(e) => setQuantity(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label>{t('fieldLineValue')}</Label>
-                    <div className="flex items-center gap-3">
-                      <PricingModeToggle
-                        mode={linePricingMode}
-                        onChange={setLinePricingMode}
-                        autoLabel={t('pricingModeAuto')}
-                        manualLabel={t('pricingModeManual')}
-                      />
+                  <FormSection title={t('sectionPricing')}>
+                    <div
+                      className={cn(
+                        'rounded-lg border p-3 transition-colors',
+                        linePricingMode === 'manual' ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200',
+                      )}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <Label className="text-slate-700">{t('fieldLineValue')}</Label>
+                        <PricingModeToggle
+                          mode={linePricingMode}
+                          onChange={setLinePricingMode}
+                          autoLabel={t('pricingModeAuto')}
+                          manualLabel={t('pricingModeManual')}
+                        />
+                      </div>
                       <Input
                         type="number"
                         inputMode="decimal"
                         min="0"
-                        className="h-8 w-32"
+                        className="mt-2 w-full sm:w-40"
                         disabled={linePricingMode !== 'manual'}
                         placeholder={linePricingMode === 'manual' ? undefined : t('autoComputedPlaceholder')}
                         value={
@@ -659,119 +703,145 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                         onChange={(e) => setLineManualValue(e.target.value)}
                       />
                     </div>
-                  </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="qb-discount">{t('fieldDiscount')}</Label>
+                        <div className="relative">
+                          <Input
+                            id="qb-discount"
+                            type="number"
+                            inputMode="decimal"
+                            className="pr-7"
+                            value={discountPct}
+                            onChange={(e) => setDiscountPct(e.target.value)}
+                          />
+                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-400">
+                            %
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="qb-markup">{t('fieldMarkup')}</Label>
+                        <div className="relative">
+                          <Input
+                            id="qb-markup"
+                            type="number"
+                            inputMode="decimal"
+                            className="pr-7"
+                            value={extraMarkupPct}
+                            onChange={(e) => setExtraMarkupPct(e.target.value)}
+                          />
+                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-400">
+                            %
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </FormSection>
 
                   {mainCharacteristics.length > 0 ? (
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {mainCharacteristics.map((main) => {
-                        const pricing = charPricing[main.id] ?? {
-                          mode: 'auto' as PricingMode,
-                          manualValue: '',
-                        }
-                        const isSelected = Boolean(selections[main.id])
-                        return (
-                          <div className="space-y-1" key={main.id}>
-                            <Label htmlFor={`qb-char-${main.id}`}>{main.name}</Label>
-                            <select
-                              id={`qb-char-${main.id}`}
-                              className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
-                              value={selections[main.id] ?? ''}
-                              onChange={(e) =>
-                                setSelections((s) => ({
-                                  ...s,
-                                  [main.id]: e.target.value,
-                                }))
-                              }
+                    <FormSection title={t('sectionCharacteristics')}>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {mainCharacteristics.map((main) => {
+                          const pricing = charPricing[main.id] ?? {
+                            mode: 'auto' as PricingMode,
+                            manualValue: '',
+                          }
+                          const isSelected = Boolean(selections[main.id])
+                          return (
+                            <div
+                              className={cn(
+                                'space-y-2 rounded-lg border p-3 transition-colors',
+                                isSelected && pricing.mode === 'manual'
+                                  ? 'border-amber-200 bg-amber-50/40'
+                                  : 'border-slate-200',
+                              )}
+                              key={main.id}
                             >
-                              <option value="">{t('noSelection')}</option>
-                              {family!.characteristics
-                                .filter((c) => c.parentId === main.id)
-                                .map((sub) => (
-                                  <option key={sub.id} value={sub.id}>
-                                    {sub.name}
-                                  </option>
-                                ))}
-                            </select>
-                            {isSelected ? (
-                              <div className="flex items-center gap-3 pt-1">
-                                <PricingModeToggle
-                                  mode={pricing.mode}
-                                  onChange={(mode) =>
-                                    setCharPricing((s) => ({
-                                      ...s,
-                                      [main.id]: { ...pricing, mode },
-                                    }))
-                                  }
-                                  autoLabel={t('pricingModeAuto')}
-                                  manualLabel={t('pricingModeManual')}
-                                />
-                                <Input
-                                  type="number"
-                                  inputMode="decimal"
-                                  min="0"
-                                  className="h-8 w-32"
-                                  disabled={pricing.mode !== 'manual'}
-                                  placeholder={pricing.mode === 'manual' ? undefined : t('autoComputedPlaceholder')}
-                                  value={
-                                    pricing.mode === 'manual'
-                                      ? pricing.manualValue
-                                      : (preview?.characteristics
-                                          .find((c) => c.characteristicId === main.id)
-                                          ?.price.toFixed(2) ?? '')
-                                  }
-                                  onChange={(e) =>
-                                    setCharPricing((s) => ({
-                                      ...s,
-                                      [main.id]: {
-                                        ...pricing,
-                                        manualValue: e.target.value,
-                                      },
-                                    }))
-                                  }
-                                />
-                              </div>
-                            ) : null}
-                          </div>
-                        )
-                      })}
-                    </div>
+                              <Label htmlFor={`qb-char-${main.id}`} className="text-slate-700">
+                                {main.name}
+                              </Label>
+                              <select
+                                id={`qb-char-${main.id}`}
+                                className={selectClassName}
+                                value={selections[main.id] ?? ''}
+                                onChange={(e) =>
+                                  setSelections((s) => ({
+                                    ...s,
+                                    [main.id]: e.target.value,
+                                  }))
+                                }
+                              >
+                                <option value="">{t('noSelection')}</option>
+                                {family!.characteristics
+                                  .filter((c) => c.parentId === main.id)
+                                  .map((sub) => (
+                                    <option key={sub.id} value={sub.id}>
+                                      {sub.name}
+                                    </option>
+                                  ))}
+                              </select>
+                              {isSelected ? (
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/70 pt-2">
+                                  <PricingModeToggle
+                                    mode={pricing.mode}
+                                    onChange={(mode) =>
+                                      setCharPricing((s) => ({
+                                        ...s,
+                                        [main.id]: { ...pricing, mode },
+                                      }))
+                                    }
+                                    autoLabel={t('pricingModeAuto')}
+                                    manualLabel={t('pricingModeManual')}
+                                  />
+                                  <Input
+                                    type="number"
+                                    inputMode="decimal"
+                                    min="0"
+                                    className="h-8 w-28"
+                                    disabled={pricing.mode !== 'manual'}
+                                    placeholder={pricing.mode === 'manual' ? undefined : t('autoComputedPlaceholder')}
+                                    value={
+                                      pricing.mode === 'manual'
+                                        ? pricing.manualValue
+                                        : (preview?.characteristics
+                                            .find((c) => c.characteristicId === main.id)
+                                            ?.price.toFixed(2) ?? '')
+                                    }
+                                    onChange={(e) =>
+                                      setCharPricing((s) => ({
+                                        ...s,
+                                        [main.id]: {
+                                          ...pricing,
+                                          manualValue: e.target.value,
+                                        },
+                                      }))
+                                    }
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </FormSection>
                   ) : null}
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="qb-discount">{t('fieldDiscount')}</Label>
-                      <Input
-                        id="qb-discount"
-                        type="number"
-                        inputMode="decimal"
-                        value={discountPct}
-                        onChange={(e) => setDiscountPct(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="qb-markup">{t('fieldMarkup')}</Label>
-                      <Input
-                        id="qb-markup"
-                        type="number"
-                        inputMode="decimal"
-                        value={extraMarkupPct}
-                        onChange={(e) => setExtraMarkupPct(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 text-sm">
+                  <div className="-mx-6 -mb-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+                    <div className="flex items-baseline gap-2">
                       {previewLoading ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
                       ) : preview ? (
                         <>
-                          <span className="text-slate-500">{t('estimatedPrice')}:</span>
-                          <span className="font-mono font-semibold tabular-nums text-brand">
+                          <span className="text-sm text-slate-500">{t('estimatedPrice')}</span>
+                          <span className="font-mono text-lg font-semibold tabular-nums text-brand">
                             {EUR.format(preview.finalPrice)}
                           </span>
                         </>
-                      ) : null}
+                      ) : (
+                        <span className="text-sm text-slate-400">{t('estimatedPricePending')}</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       {editingPositionId ? (
@@ -799,7 +869,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                 </>
               ) : null}
 
-              {error ? <p className="text-xs text-red-600">{error}</p> : null}
+              {error ? <p className="text-sm text-red-600">{error}</p> : null}
             </CardContent>
           </Card>
 
