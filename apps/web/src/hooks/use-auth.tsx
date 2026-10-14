@@ -10,7 +10,7 @@ import {
 } from 'react'
 
 import type { RoleId } from '@/types/settings'
-import { computePermissions, type CompanyCapabilities, type Permission } from '@schuco/contracts'
+import type { CompanyCapabilities, Permission } from '@schuco/contracts'
 
 export interface AuthUser {
   id: string
@@ -24,6 +24,8 @@ export interface AuthUser {
   }
   /** Every role the user holds, highest rank first; includes the primary. */
   roles: Array<{ id: RoleId; name: string; description: string }>
+  /** Effective permissions computed by the API from the saved role matrix and the company's capabilities. */
+  permissions: Permission[]
   company: {
     id: string
     name: string
@@ -84,8 +86,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   )
 
   const can = useCallback(
-    (permission: Permission) =>
-      user ? computePermissions(user.roles.map((r) => r.id), user.company.capabilities).includes(permission) : false,
+    (permission: Permission) => (user ? (user.permissions ?? []).includes(permission) : false),
     [user],
   )
 

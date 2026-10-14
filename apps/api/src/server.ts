@@ -6,6 +6,7 @@ import type { AuthVariables } from './middleware/auth'
 import { adminCompanies } from './routes/admin/companies'
 import { adminInvites } from './routes/admin/invites'
 import { adminLinks } from './routes/admin/links'
+import { adminRolePermissions } from './routes/admin/role-permissions'
 import { adminUsers } from './routes/admin/users'
 import { auth } from './routes/auth'
 import { calculate } from './routes/calculate'
@@ -37,6 +38,7 @@ app.route('/api/admin/users', adminUsers)
 app.route('/api/admin/invites', adminInvites)
 app.route('/api/admin/companies', adminCompanies)
 app.route('/api/admin/links', adminLinks)
+app.route('/api/admin/role-permissions', adminRolePermissions)
 app.route('/api/products', products)
 app.route('/api/product-families', productFamilies)
 app.route('/api/quotes', quotes)

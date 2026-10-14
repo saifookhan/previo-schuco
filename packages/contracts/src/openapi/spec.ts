@@ -506,6 +506,11 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
               type: 'array',
               items: { $ref: '#/components/schemas/BusinessUnitScope' },
             },
+            permissions: {
+              type: 'array',
+              description: 'Effective permissions (saved role matrix intersected with company capabilities).',
+              items: { type: 'string' },
+            },
           },
         },
         BusinessUnitScope: {

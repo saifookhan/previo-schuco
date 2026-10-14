@@ -3,6 +3,7 @@ import { computePermissions, type Permission } from '@schuco/contracts'
 import { getCompanyById, getUserProfileByCognitoSub, getUserProfileById, withSystemTransaction, type UserProfile } from '@schuco/db'
 
 import { getDb } from '../lib/db'
+import { getEffectiveRolePermissions } from '../services/role-permissions-service'
 import { parseBearerToken, verifySessionJwt } from '../lib/session-jwt'
 
 export type AuthVariables = {
@@ -146,7 +147,11 @@ export const requireRoles = (allowedRoles: string[]) =>
 export const requirePermission = (permission: Permission) =>
   async (c: Context, next: Next): Promise<Response | void> => {
     const user = c.get('user') as UserProfile | undefined
-    if (!user || !computePermissions(user.roles.map((r) => r.id), user.company.capabilities).includes(permission)) {
+    if (!user) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+    const matrix = await getEffectiveRolePermissions()
+    if (!computePermissions(user.roles.map((r) => r.id), user.company.capabilities, matrix).includes(permission)) {
       return c.json({ error: 'Forbidden' }, 403)
     }
     await next()

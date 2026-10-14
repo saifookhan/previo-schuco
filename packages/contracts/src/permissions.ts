@@ -1,6 +1,10 @@
 import type { CompanyCapabilities } from './schemas/companies'
 
-/** Every action the API and UI gate on. */
+/**
+ * Every action the API and UI gate on. Once a super-admin has saved a custom
+ * matrix, the database is the source of truth — so a permission added here
+ * later must ship with a migration that inserts its default grants.
+ */
 export const PERMISSIONS = [
   'catalog.view',
   'catalog.edit',
@@ -12,8 +16,14 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number]
 
-/** What each role may do, regardless of which company it belongs to. */
-export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
+/** Which permission set each role grants (role id → permissions). */
+export type RolePermissionMatrix = Record<string, readonly Permission[]>
+
+/** Permissions that may only ever belong to super-admin (cross-tenant). */
+export const SUPER_ADMIN_ONLY_PERMISSIONS: readonly Permission[] = ['links.manage']
+
+/** Default role → permissions, used until a super-admin saves a custom matrix. */
+export const ROLE_PERMISSIONS: RolePermissionMatrix = {
   'super-admin': PERMISSIONS,
   'company-admin': ['catalog.view', 'catalog.edit', 'quote.view', 'quote.edit', 'users.manage'],
   'super-user': ['catalog.view', 'catalog.edit', 'quote.view', 'quote.edit'],
@@ -40,10 +50,14 @@ export const CAPABILITY_PERMISSIONS: Record<keyof CompanyCapabilities, readonly 
  * (union of the company's capabilities' permissions). Super-admin is
  * cross-tenant and bypasses the capability filter.
  */
-export const computePermissions = (roleIds: readonly string[], capabilities: CompanyCapabilities): Permission[] => {
-  const fromRoles = new Set<Permission>(roleIds.flatMap((id) => ROLE_PERMISSIONS[id] ?? []))
+export const computePermissions = (
+  roleIds: readonly string[],
+  capabilities: CompanyCapabilities,
+  matrix: RolePermissionMatrix = ROLE_PERMISSIONS,
+): Permission[] => {
+  const fromRoles = new Set<Permission>(roleIds.flatMap((id) => matrix[id] ?? []))
   if (roleIds.includes('super-admin')) {
-    return [...fromRoles]
+    return [...PERMISSIONS] // super-admin is cross-tenant and always holds everything, whatever the matrix says
   }
   const fromCapabilities = new Set<Permission>(
     (Object.keys(CAPABILITY_PERMISSIONS) as Array<keyof CompanyCapabilities>)
@@ -52,3 +66,31 @@ export const computePermissions = (roleIds: readonly string[], capabilities: Com
   )
   return [...fromRoles].filter((permission) => fromCapabilities.has(permission))
 }
+
+export type PermissionLock = 'super-admin' | 'super-admin-only' | 'company-admin-users'
+
+/**
+ * Cells of the role × permission matrix that cannot be changed, and why.
+ * Shared by the API's validation and the editor UI so they never disagree.
+ * - super-admin always holds everything
+ * - super-admin-only permissions never belong to another role
+ * - company-admin always keeps `users.manage` (a company can't lock itself out)
+ */
+export const permissionLock = (roleId: string, permission: Permission): PermissionLock | null => {
+  if (roleId === 'super-admin') {
+    return 'super-admin'
+  }
+  if (SUPER_ADMIN_ONLY_PERMISSIONS.includes(permission)) {
+    return 'super-admin-only'
+  }
+  if (roleId === 'company-admin' && permission === 'users.manage') {
+    return 'company-admin-users'
+  }
+  return null
+}
+
+/** `edit` is useless (and surprising) without `view`: the matrix must grant view wherever it grants edit. */
+export const IMPLIED_PERMISSIONS: ReadonlyArray<readonly [Permission, Permission]> = [
+  ['catalog.edit', 'catalog.view'],
+  ['quote.edit', 'quote.view'],
+]

@@ -151,11 +151,39 @@
   },
   "settingsAccessRights": {
     "title": "Diritti di accesso",
-    "subtitle": "Configura l'accesso ai moduli per ruolo — clicca le celle per attivare/disattivare",
+    "subtitle": "Scegli cosa può fare ogni ruolo. Le funzioni dell'azienda (produttore, fornitore, cliente) limitano comunque ciò che i suoi utenti possono usare.",
     "permissionMatrix": "Matrice dei permessi",
-    "moduleHeader": "Modulo",
+    "permissionHeader": "Permesso",
     "allowed": "consentito",
-    "denied": "negato"
+    "denied": "negato",
+    "usingDefaults": "Sono mostrati i valori predefiniti — non è stato ancora salvato nulla.",
+    "capabilityNote": "Un permesso ha effetto solo se anche l'azienda dell'utente ha la funzione corrispondente.",
+    "saveChanges": "Salva modifiche",
+    "saving": "Salvataggio…",
+    "discard": "Annulla modifiche",
+    "saved": "Salvato",
+    "saveFailed": "Impossibile salvare",
+    "saveFailedUnreachable": "Impossibile salvare — server non raggiungibile",
+    "errorLoading": "Impossibile caricare la matrice dei permessi — il server potrebbe non essere raggiungibile.",
+    "lockSuperAdmin": "Il super-admin ha sempre tutti i permessi",
+    "lockSuperAdminOnly": "Solo il super-admin può avere questo permesso",
+    "lockCompanyAdminUsers": "Gli amministratori aziendali devono mantenere la gestione utenti",
+    "permissionLabels": {
+      "catalog.view": "Vedere il catalogo",
+      "catalog.edit": "Modificare il catalogo",
+      "quote.view": "Vedere i preventivi",
+      "quote.edit": "Creare e modificare preventivi",
+      "users.manage": "Gestire gli utenti dell'azienda",
+      "links.manage": "Gestire i collegamenti al catalogo"
+    },
+    "permissionHints": {
+      "catalog.view": "Consultare le famiglie di prodotti e i prezzi",
+      "catalog.edit": "Importare, modificare, pubblicare ed eliminare famiglie di prodotti",
+      "quote.view": "Aprire i preventivi e scaricare i PDF",
+      "quote.edit": "Creare preventivi e modificarne le posizioni",
+      "users.manage": "Invitare e gestire gli utenti della propria azienda",
+      "links.manage": "Scegliere quali fornitori e clienti vedono il catalogo di un produttore"
+    }
   },
   "settingsCompany": {
     "title": "Azienda",

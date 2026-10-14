@@ -68,6 +68,13 @@ export {
   type UpdateCompanyInput,
 } from './queries/companies'
 export {
+  listAllRoles,
+  listRolePermissionPairs,
+  lockRolePermissions,
+  replaceRolePermissionPairs,
+  type RoleRow,
+} from './queries/role-permissions'
+export {
   deleteCatalogLink,
   insertCatalogLink,
   isCatalogLinked,

@@ -151,11 +151,39 @@
   },
   "settingsAccessRights": {
     "title": "Zugriffsrechte",
-    "subtitle": "Modulzugriff pro Rolle konfigurieren — Zellen anklicken zum Umschalten",
+    "subtitle": "Legen Sie fest, was jede Rolle darf. Die Funktionen eines Unternehmens (Hersteller, Lieferant, Kunde) begrenzen weiterhin, was dessen Benutzer tatsächlich nutzen können.",
     "permissionMatrix": "Berechtigungsmatrix",
-    "moduleHeader": "Modul",
+    "permissionHeader": "Berechtigung",
     "allowed": "erlaubt",
-    "denied": "verweigert"
+    "denied": "verweigert",
+    "usingDefaults": "Es werden die Standardwerte angezeigt — noch nichts wurde gespeichert.",
+    "capabilityNote": "Eine Berechtigung wirkt nur, wenn auch das Unternehmen des Benutzers die passende Funktion hat.",
+    "saveChanges": "Änderungen speichern",
+    "saving": "Wird gespeichert…",
+    "discard": "Verwerfen",
+    "saved": "Gespeichert",
+    "saveFailed": "Speichern fehlgeschlagen",
+    "saveFailedUnreachable": "Speichern fehlgeschlagen — Server nicht erreichbar",
+    "errorLoading": "Die Berechtigungsmatrix konnte nicht geladen werden — der Server ist möglicherweise nicht erreichbar.",
+    "lockSuperAdmin": "Super-Admin hat immer alle Berechtigungen",
+    "lockSuperAdminOnly": "Nur Super-Admin darf diese Berechtigung haben",
+    "lockCompanyAdminUsers": "Firmenadministratoren müssen die Benutzerverwaltung behalten",
+    "permissionLabels": {
+      "catalog.view": "Katalog ansehen",
+      "catalog.edit": "Katalog bearbeiten",
+      "quote.view": "Angebote ansehen",
+      "quote.edit": "Angebote erstellen und bearbeiten",
+      "users.manage": "Firmenbenutzer verwalten",
+      "links.manage": "Katalogverknüpfungen verwalten"
+    },
+    "permissionHints": {
+      "catalog.view": "Produktfamilien und Preise durchsuchen",
+      "catalog.edit": "Produktfamilien importieren, bearbeiten, veröffentlichen und löschen",
+      "quote.view": "Angebote öffnen und PDFs herunterladen",
+      "quote.edit": "Angebote erstellen und deren Positionen bearbeiten",
+      "users.manage": "Benutzer des eigenen Unternehmens einladen und verwalten",
+      "links.manage": "Festlegen, welche Lieferanten und Kunden den Katalog eines Herstellers sehen"
+    }
   },
   "settingsCompany": {
     "title": "Firma",

@@ -99,6 +99,13 @@
       "when": 1791968628342,
       "tag": "0014_user_additional_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791976307139,
+      "tag": "0015_role_permissions",
+      "breakpoints": true
     }
   ]
 }

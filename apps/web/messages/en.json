@@ -151,11 +151,39 @@
   },
   "settingsAccessRights": {
     "title": "Access Rights",
-    "subtitle": "Configure module access per role — click cells to toggle",
+    "subtitle": "Choose what each role may do. A company's capabilities (manufacturer, supplier, client) still limit what its users can actually use.",
     "permissionMatrix": "Permission matrix",
-    "moduleHeader": "Module",
+    "permissionHeader": "Permission",
     "allowed": "allowed",
-    "denied": "denied"
+    "denied": "denied",
+    "usingDefaults": "Showing the built-in defaults — nothing has been saved yet.",
+    "capabilityNote": "A permission only takes effect if the user's company also has the matching capability.",
+    "saveChanges": "Save changes",
+    "saving": "Saving…",
+    "discard": "Discard",
+    "saved": "Saved",
+    "saveFailed": "Could not save",
+    "saveFailedUnreachable": "Could not save — could not reach the server",
+    "errorLoading": "Couldn't load the permission matrix — the server may be unreachable.",
+    "lockSuperAdmin": "Super-admin always has every permission",
+    "lockSuperAdminOnly": "Only super-admin can hold this permission",
+    "lockCompanyAdminUsers": "Company admins must keep user management",
+    "permissionLabels": {
+      "catalog.view": "View catalog",
+      "catalog.edit": "Edit catalog",
+      "quote.view": "View quotes",
+      "quote.edit": "Create and edit quotes",
+      "users.manage": "Manage company users",
+      "links.manage": "Manage catalog links"
+    },
+    "permissionHints": {
+      "catalog.view": "Browse product families and their prices",
+      "catalog.edit": "Import, edit, publish and delete product families",
+      "quote.view": "Open quotes and download PDFs",
+      "quote.edit": "Create quotes and edit their positions",
+      "users.manage": "Invite and manage users of their own company",
+      "links.manage": "Choose which suppliers and clients see a manufacturer's catalog"
+    }
   },
   "settingsCompany": {
     "title": "Company",

@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { roleIdSchema } from './common'
 import { companyCapabilitiesSchema } from './companies'
+import { permissionSchema } from './role-permissions'
 
 /** Business unit scope returned with user profile. */
 export const businessUnitScopeSchema = z.object({
@@ -40,6 +41,8 @@ export const userProfileSchema = z.object({
     vatNumber: z.string(),
   }),
   businessUnits: z.array(businessUnitScopeSchema),
+  /** Effective permissions (saved role matrix ∩ company capabilities). Returned by /api/me. */
+  permissions: z.array(permissionSchema).optional(),
 })
 
 export type UserProfile = z.infer<typeof userProfileSchema>
