@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Building2, LayoutDashboard, LogOut, Menu, Users, X } from 'lucide-react'
+import { Building2, LayoutDashboard, Link2, LogOut, Menu, Users, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
@@ -15,6 +15,7 @@ const adminNav = [
   { href: '/admin/dashboard', labelKey: 'adminDashboard', icon: LayoutDashboard },
   { href: '/admin/users', labelKey: 'adminUsers', icon: Users },
   { href: '/admin/companies', labelKey: 'adminCompanies', icon: Building2 },
+  { href: '/admin/links', labelKey: 'adminLinks', icon: Link2 },
 ] as const
 
 interface AdminShellProps {

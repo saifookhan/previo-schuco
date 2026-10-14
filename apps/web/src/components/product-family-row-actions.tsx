@@ -6,7 +6,7 @@ import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/confirm-dialog'
-import { hasMinimumRole, useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
 
@@ -27,11 +27,11 @@ export const ProductFamilyRowActions = ({
 }: ProductFamilyRowActionsProps) => {
   const t = useTranslations('productFamilyActions')
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const [busyAction, setBusyAction] = useState<'publish' | 'duplicate' | 'delete' | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
-  if (!user || !hasMinimumRole(user.role.id, 'super-user')) {
+  if (!user || !can('catalog.edit')) {
     return null
   }
 

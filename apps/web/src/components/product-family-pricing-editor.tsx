@@ -7,7 +7,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { hasMinimumRole, useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
 
@@ -51,13 +51,13 @@ const tidy = (v: string | null): string => (v === null ? '' : String(Number(v)))
 export const ProductFamilyPricingEditor = (props: Props) => {
   const t = useTranslations('productFamilyEdit')
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, string>>({})
 
-  if (!props.editable || !user || !hasMinimumRole(user.role.id, 'super-user')) {
+  if (!props.editable || !user || !can('catalog.edit')) {
     return null
   }
 

@@ -63,7 +63,8 @@
     "openMenu": "Apri menu",
     "closeMenu": "Chiudi menu",
     "quotes": "Preventivi",
-    "adminCompanies": "Aziende"
+    "adminCompanies": "Aziende",
+    "adminLinks": "Collegamenti catalogo"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -448,5 +449,21 @@
     "sending": "Invio in corso…",
     "checkEmail": "Se quell'email ha un account, un link di reset è in arrivo.",
     "backToLogin": "Torna al login"
+  },
+  "adminLinks": {
+    "title": "Collegamenti catalogo",
+    "subtitle": "Scegli quali fornitori e clienti possono vedere e preventivare dal catalogo pubblicato di un produttore",
+    "manufacturer": "Produttore",
+    "partner": "Fornitore o cliente",
+    "choose": "Seleziona un'azienda",
+    "addLink": "Aggiungi collegamento",
+    "adding": "Aggiunta…",
+    "selectBoth": "Seleziona un produttore e un fornitore o cliente",
+    "addFailed": "Impossibile aggiungere il collegamento",
+    "addFailedUnreachable": "Impossibile aggiungere il collegamento — server non raggiungibile",
+    "removeFailed": "Impossibile rimuovere il collegamento",
+    "remove": "Rimuovi collegamento",
+    "empty": "Nessun collegamento al catalogo.",
+    "errorLoading": "Impossibile caricare i collegamenti — il server potrebbe non essere raggiungibile."
   }
 }

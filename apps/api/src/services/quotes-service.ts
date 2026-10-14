@@ -7,6 +7,7 @@ import {
   insertQuote,
   insertQuotePosition,
   insertQuotePositionCharacteristic,
+  isCatalogLinked,
   listQuotes,
   recalculateQuoteTotal,
   reorderQuotePositions as reorderQuotePositionsQuery,
@@ -259,18 +260,20 @@ export const priceQuotePosition = async (
   }
 
   const family = await getProductFamilyDetail(tx, input.productFamilyId)
-  // A quote belongs to the supplier issuing it — it must be priced from that
-  // supplier's own catalog, never a family merely visible to them (e.g. a
-  // supplier's own catalog published to a linked client: product_families_select
-  // grants that client SELECT via app_can_view_product_family, which is far
-  // broader than ownership; without this check that client could quote off
-  // another company's catalog under its own quote). No isSuperAdmin exception:
-  // isSuperAdmin stays true while acting as another tenant via X-Tenant-Id
-  // (ADR 0008), so a bypass here would let a super-admin acting as company A
-  // still attach company B's family to a quote owned by A. A super-admin
-  // must set X-Tenant-Id to the supplier itself and pass this same check,
-  // same as everyone else.
-  if (!family || family.family.supplierCompanyId !== ctx.effectiveCompanyId) {
+  // A quote belongs to the supplier issuing it. It may be priced from that
+  // company's own catalog, or from a PUBLISHED family of a manufacturer that
+  // has linked its catalog to the company (supplier_client_links). A family
+  // merely visible for another reason is not enough. No isSuperAdmin
+  // exception: isSuperAdmin stays true while acting as another tenant via
+  // X-Tenant-Id (ADR 0008), so a bypass here would let a super-admin acting
+  // as company A attach an arbitrary company's family to a quote owned by A;
+  // they must act as the supplier itself and pass this same check.
+  const isUsableFamily =
+    !!family &&
+    (family.family.supplierCompanyId === ctx.effectiveCompanyId ||
+      (family.family.isPublished &&
+        (await isCatalogLinked(tx, family.family.supplierCompanyId, ctx.effectiveCompanyId))))
+  if (!family || !isUsableFamily) {
     throw new QuoteValidationError('Product family not found or not visible')
   }
   const line = family.lines.find((l) => l.id === input.productLineId)

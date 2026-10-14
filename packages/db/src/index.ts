@@ -67,6 +67,13 @@ export {
   type InsertCompanyInput,
   type UpdateCompanyInput,
 } from './queries/companies'
+export {
+  deleteCatalogLink,
+  insertCatalogLink,
+  isCatalogLinked,
+  listCatalogLinks,
+  type CatalogLinkRow,
+} from './queries/supplier-client-links'
 export { filterBusinessUnitIdsByCompany } from './queries/business-units'
 export { writeAuditLog, type WriteAuditLogInput } from './queries/audit'
 export {

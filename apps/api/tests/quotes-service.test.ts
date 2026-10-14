@@ -49,6 +49,7 @@ import {
 let db: Db
 let supplierCompanyId: string
 let actorUserId: string
+const extraCompanyIds: string[] = []
 let linkedClientCompanyId: string
 const fixtureBuffer = readFileSync(join(__dirname, 'fixtures/product-family-sample.xlsx'))
 const actor = { actorUserId: '', actorCompanyId: '', requestId: 'test-request' }
@@ -109,16 +110,16 @@ afterAll(async () => {
   const superuserDb = createDb(superuserUrl.replace(/\/[^/]+$/, '/previo_test'))
   await superuserDb
     .delete(auditLog)
-    .where(inArray(auditLog.effectiveCompanyId, [supplierCompanyId, linkedClientCompanyId]))
+    .where(inArray(auditLog.effectiveCompanyId, [supplierCompanyId, linkedClientCompanyId, ...extraCompanyIds]))
 
   await withSystemTransaction(db, async (tx) => {
     // Quotes must go first: quote_positions.product_family_id is RESTRICT, and a
     // single company delete fires the quotes-cascade and product_families-cascade
     // in an order Postgres doesn't guarantee, so deleting quotes explicitly here
     // avoids a transient FK violation during company cleanup.
-    await tx.delete(quotes).where(inArray(quotes.supplierCompanyId, [supplierCompanyId, linkedClientCompanyId]))
+    await tx.delete(quotes).where(inArray(quotes.supplierCompanyId, [supplierCompanyId, linkedClientCompanyId, ...extraCompanyIds]))
     await tx.delete(users).where(inArray(users.id, [actorUserId]))
-    await tx.delete(companies).where(inArray(companies.id, [supplierCompanyId, linkedClientCompanyId]))
+    await tx.delete(companies).where(inArray(companies.id, [supplierCompanyId, linkedClientCompanyId, ...extraCompanyIds]))
   })
 })
 
@@ -338,33 +339,62 @@ describe('createQuote + addQuotePosition', () => {
     expect(new Set(sortOrders).size).toBe(sortOrders.length)
   })
 
-  it("rejects quoting from a product family owned by a different company, even one the caller can SELECT via RLS as a linked client", async () => {
+  it("lets a linked supplier quote from a manufacturer's PUBLISHED family, under the supplier's own quote", async () => {
     const family = await importFreshFamily()
     const line = await matrixLineOf(family.id)
-    // Publish it so the linked client's RLS visibility (app_can_view_product_family) actually grants SELECT —
-    // this is the exact condition addQuotePosition's ownership check must still reject.
     await setProductFamilyPublishedStatus(ctx(), actor, family.id, true)
 
-    const clientCtx = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: false }
-    const clientActor = { actorUserId, actorCompanyId: linkedClientCompanyId, requestId: 'test-request' }
-    // Confirm RLS does grant this company SELECT on the supplier's published family (otherwise this test wouldn't exercise the gap).
-    expect(await getProductFamilyDetail(clientCtx, family.id)).not.toBeNull()
+    const linkedCtx = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: false }
+    const linkedActor = { actorUserId, actorCompanyId: linkedClientCompanyId, requestId: 'test-request' }
+    expect(await getProductFamilyDetail(linkedCtx, family.id)).not.toBeNull()
 
-    const clientQuote = await createQuote(clientCtx, clientActor, {
-      reference: 'TEST-Q-SVC-CROSS-TENANT',
+    const linkedQuote = await createQuote(linkedCtx, linkedActor, {
+      reference: 'TEST-Q-SVC-LINKED-CATALOG',
       customerName: 'Test Customer',
     })
+    const detail = await addQuotePosition(linkedCtx, linkedActor, linkedQuote.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 1,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [],
+    })
+    expect(linkedQuote.supplierCompanyId).toBe(linkedClientCompanyId)
+    expect(detail.positions).toHaveLength(1)
+  })
 
-    await expect(
-      addQuotePosition(clientCtx, clientActor, clientQuote.id, {
-        productFamilyId: family.id,
-        productLineId: line.id,
-        quantity: 1,
-        widthMm: 1000,
-        heightMm: 800,
-        characteristicSelections: [],
-      }),
-    ).rejects.toThrow(QuoteValidationError)
+  it("rejects quoting from a manufacturer's family when the catalog is not linked to the caller", async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    await setProductFamilyPublishedStatus(ctx(), actor, family.id, true)
+
+    const [stranger] = await withSystemTransaction(db, (tx) =>
+      tx
+        .insert(companies)
+        .values({ isSupplier: true, name: 'Quote Service Test Unlinked Supplier', vatNumber: 'QSVC-UNLINKED' })
+        .returning({ id: companies.id }),
+    )
+    try {
+      const strangerCtx = { effectiveCompanyId: stranger.id, isSuperAdmin: false }
+      const strangerActor = { actorUserId, actorCompanyId: stranger.id, requestId: 'test-request' }
+      const strangerQuote = await createQuote(strangerCtx, strangerActor, {
+        reference: 'TEST-Q-SVC-UNLINKED',
+        customerName: 'Test Customer',
+      })
+      await expect(
+        addQuotePosition(strangerCtx, strangerActor, strangerQuote.id, {
+          productFamilyId: family.id,
+          productLineId: line.id,
+          quantity: 1,
+          widthMm: 1000,
+          heightMm: 800,
+          characteristicSelections: [],
+        }),
+      ).rejects.toThrow(QuoteValidationError)
+    } finally {
+      extraCompanyIds.push(stranger.id) // audit_log is append-only for the app role — afterAll cleans up with the superuser
+    }
   })
 
   it('a super-admin acting as another tenant (X-Tenant-Id) cannot price from a family that tenant does not own', async () => {

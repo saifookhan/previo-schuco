@@ -63,7 +63,8 @@
     "openMenu": "Menü öffnen",
     "closeMenu": "Menü schließen",
     "quotes": "Angebote",
-    "adminCompanies": "Unternehmen"
+    "adminCompanies": "Unternehmen",
+    "adminLinks": "Katalogverknüpfungen"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -448,5 +449,21 @@
     "sending": "Wird gesendet…",
     "checkEmail": "Falls diese E-Mail ein Konto hat, ist ein Reset-Link unterwegs.",
     "backToLogin": "Zurück zur Anmeldung"
+  },
+  "adminLinks": {
+    "title": "Katalogverknüpfungen",
+    "subtitle": "Legen Sie fest, welche Lieferanten und Kunden den veröffentlichten Katalog eines Herstellers sehen und daraus Angebote erstellen dürfen",
+    "manufacturer": "Hersteller",
+    "partner": "Lieferant oder Kunde",
+    "choose": "Unternehmen auswählen",
+    "addLink": "Verknüpfung hinzufügen",
+    "adding": "Wird hinzugefügt…",
+    "selectBoth": "Hersteller und Lieferant oder Kunde auswählen",
+    "addFailed": "Verknüpfung konnte nicht hinzugefügt werden",
+    "addFailedUnreachable": "Verknüpfung konnte nicht hinzugefügt werden — Server nicht erreichbar",
+    "removeFailed": "Verknüpfung konnte nicht entfernt werden",
+    "remove": "Verknüpfung entfernen",
+    "empty": "Noch keine Katalogverknüpfungen.",
+    "errorLoading": "Verknüpfungen konnten nicht geladen werden — der Server ist möglicherweise nicht erreichbar."
   }
 }

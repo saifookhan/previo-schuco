@@ -24,6 +24,7 @@ import { Toaster } from '@/components/toaster'
 import { hasMinimumRole, useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import type { RoleId } from '@/types/settings'
+import type { Permission } from '@schuco/contracts'
 
 const mainNav = [
   { href: '/app/dashboard', labelKey: 'dashboard', icon: LayoutDashboard, minRole: 'user' as RoleId },
@@ -33,8 +34,15 @@ const mainNav = [
     labelKey: 'productFamilies',
     icon: Package,
     minRole: 'user' as RoleId,
+    permission: 'catalog.view' as Permission,
   },
-  { href: '/app/quotes', labelKey: 'quotes', icon: FileSpreadsheet, minRole: 'user' as RoleId },
+  {
+    href: '/app/quotes',
+    labelKey: 'quotes',
+    icon: FileSpreadsheet,
+    minRole: 'user' as RoleId,
+    permission: 'quote.view' as Permission,
+  },
 ]
 
 const settingsNav = [
@@ -62,7 +70,7 @@ interface AppShellProps {
  */
 export const AppShell = ({ children }: AppShellProps) => {
   const pathname = usePathname()
-  const { user, loading, signOut } = useAuth()
+  const { user, loading, signOut, can } = useAuth()
   const t = useTranslations('nav')
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -70,11 +78,11 @@ export const AppShell = ({ children }: AppShellProps) => {
     setMobileOpen(false)
   }, [pathname])
 
-  const filterNav = <T extends { minRole: RoleId }>(items: T[]): T[] => {
+  const filterNav = <T extends { minRole: RoleId; permission?: Permission }>(items: T[]): T[] => {
     if (!user) {
       return []
     }
-    return items.filter((item) => hasMinimumRole(user.role.id, item.minRole))
+    return items.filter((item) => (item.permission ? can(item.permission) : hasMinimumRole(user.role.id, item.minRole)))
   }
 
   return (

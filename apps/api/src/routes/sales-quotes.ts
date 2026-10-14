@@ -16,7 +16,7 @@ import {
 } from '../services/quotes-service'
 import { renderQuotePdf } from '../lib/quote-pdf'
 import type { AuthVariables } from '../middleware/auth'
-import { requireAuth, requireRoles } from '../middleware/auth'
+import { requireAuth, requirePermission } from '../middleware/auth'
 
 /**
  * Real, catalog-backed sales quotes (not the unrelated legacy in-memory
@@ -26,8 +26,6 @@ import { requireAuth, requireRoles } from '../middleware/auth'
  * it, priced against its own product-family catalog.
  */
 export const salesQuotes = new Hono<{ Variables: AuthVariables }>()
-
-const EDIT_ROLES = ['company-admin', 'super-user', 'super-admin', 'user'] as const
 
 const actorFrom = (c: Context<{ Variables: AuthVariables }>): QuoteActor => ({
   actorUserId: c.get('actorUserId'),
@@ -48,7 +46,7 @@ const quoteErrorResponse = (c: Context<{ Variables: AuthVariables }>, error: unk
 }
 
 /** Creates a new draft quote (customer details, no positions yet). */
-salesQuotes.post('/', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+salesQuotes.post('/', requireAuth, requirePermission('quote.edit'), async (c) => {
   const body = await c.req.json().catch(() => null)
   try {
     const quote = await createQuote(ctxFrom(c), actorFrom(c), body ?? {})
@@ -59,13 +57,13 @@ salesQuotes.post('/', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
 })
 
 /** Lists this caller's own quotes. */
-salesQuotes.get('/', requireAuth, async (c) => {
+salesQuotes.get('/', requireAuth, requirePermission('quote.view'), async (c) => {
   const quoteList = await listMyQuotes(ctxFrom(c))
   return c.json({ quotes: quoteList })
 })
 
 /** Full detail: quote header + every position + each position's selected characteristics. */
-salesQuotes.get('/:id', requireAuth, async (c) => {
+salesQuotes.get('/:id', requireAuth, requirePermission('quote.view'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -83,7 +81,7 @@ salesQuotes.get('/:id', requireAuth, async (c) => {
 // first on principle: a static-vs-param ambiguity is a mistake to let
 // happen again, not one to rely on being harmless this time.
 /** Dry-run pricing for the add/edit position form — same computation, writes nothing. */
-salesQuotes.post('/:id/positions/preview', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+salesQuotes.post('/:id/positions/preview', requireAuth, requirePermission('quote.edit'), async (c) => {
   const body = await c.req.json().catch(() => null)
   try {
     const preview = await previewQuotePosition(ctxFrom(c), body ?? {})
@@ -94,7 +92,7 @@ salesQuotes.post('/:id/positions/preview', requireAuth, requireRoles([...EDIT_RO
 })
 
 /** Adds one priced line item to a draft quote (picks a product line + characteristic values, computes the price). */
-salesQuotes.post('/:id/positions', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+salesQuotes.post('/:id/positions', requireAuth, requirePermission('quote.edit'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -109,7 +107,7 @@ salesQuotes.post('/:id/positions', requireAuth, requireRoles([...EDIT_ROLES]), a
 })
 
 /** Removes a position from a quote. */
-salesQuotes.delete('/:id/positions/:positionId', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+salesQuotes.delete('/:id/positions/:positionId', requireAuth, requirePermission('quote.edit'), async (c) => {
   const id = c.req.param('id')
   const positionId = c.req.param('positionId')
   if (!id || !positionId) {
@@ -124,7 +122,7 @@ salesQuotes.delete('/:id/positions/:positionId', requireAuth, requireRoles([...E
 })
 
 /** Reorders a quote's positions (body: { positionIds: string[] }, must list every current position id exactly once). */
-salesQuotes.patch('/:id/positions/reorder', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+salesQuotes.patch('/:id/positions/reorder', requireAuth, requirePermission('quote.edit'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -145,7 +143,7 @@ salesQuotes.patch('/:id/positions/reorder', requireAuth, requireRoles([...EDIT_R
 // call as `positionId: "reorder"` (confirmed: this exact bug shipped
 // once already and silently broke the move-up/move-down buttons).
 /** Re-prices an existing position in place (same width/height/qty/characteristic fields as adding one). */
-salesQuotes.patch('/:id/positions/:positionId', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+salesQuotes.patch('/:id/positions/:positionId', requireAuth, requirePermission('quote.edit'), async (c) => {
   const id = c.req.param('id')
   const positionId = c.req.param('positionId')
   if (!id || !positionId) {
@@ -164,7 +162,7 @@ salesQuotes.patch('/:id/positions/:positionId', requireAuth, requireRoles([...ED
 })
 
 /** Duplicates a position as a new one appended to the end of the quote. */
-salesQuotes.post('/:id/positions/:positionId/duplicate', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+salesQuotes.post('/:id/positions/:positionId/duplicate', requireAuth, requirePermission('quote.edit'), async (c) => {
   const id = c.req.param('id')
   const positionId = c.req.param('positionId')
   if (!id || !positionId) {
@@ -179,7 +177,7 @@ salesQuotes.post('/:id/positions/:positionId/duplicate', requireAuth, requireRol
 })
 
 /** Streams the quote as a PDF document. */
-salesQuotes.get('/:id/pdf', requireAuth, async (c) => {
+salesQuotes.get('/:id/pdf', requireAuth, requirePermission('quote.view'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)

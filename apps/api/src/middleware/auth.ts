@@ -1,4 +1,5 @@
 import type { Context, Next } from 'hono'
+import { computePermissions, type Permission } from '@schuco/contracts'
 import { getCompanyById, getUserProfileByCognitoSub, getUserProfileById, withSystemTransaction, type UserProfile } from '@schuco/db'
 
 import { getDb } from '../lib/db'
@@ -131,6 +132,21 @@ export const requireRoles = (allowedRoles: string[]) =>
   async (c: Context, next: Next): Promise<Response | void> => {
     const user = c.get('user') as UserProfile | undefined
     if (!user || !user.roles.some((r) => allowedRoles.includes(r.id))) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+    await next()
+  }
+
+/**
+ * Require an effective permission (role grants it AND the company's
+ * capabilities unlock it — see `computePermissions`). Preferred over
+ * `requireRoles` for anything gated by what a company can do.
+ * @param permission - The permission the route needs
+ */
+export const requirePermission = (permission: Permission) =>
+  async (c: Context, next: Next): Promise<Response | void> => {
+    const user = c.get('user') as UserProfile | undefined
+    if (!user || !computePermissions(user.roles.map((r) => r.id), user.company.capabilities).includes(permission)) {
       return c.json({ error: 'Forbidden' }, 403)
     }
     await next()

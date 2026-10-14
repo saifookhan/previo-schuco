@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
-import { hasMinimumRole, useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from '@/i18n/navigation'
 import { fromDraft, sanitizeMatrix, toDraft, type MatrixDraft } from '@/lib/pricing-matrix'
 import { showToast } from '@/lib/toast'
@@ -38,13 +38,13 @@ export const ProductFamilyMatrixPreview = ({
 }: ProductFamilyMatrixPreviewProps) => {
   const t = useTranslations('productFamilyEdit')
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<MatrixDraft | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const canEdit = editable && !!user && hasMinimumRole(user.role.id, 'super-user')
+  const canEdit = editable && !!user && can('catalog.edit')
   const clean = sanitizeMatrix(matrix)
 
   const close = () => {

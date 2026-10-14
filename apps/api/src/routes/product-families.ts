@@ -24,7 +24,7 @@ import {
   isProductFamilyEditable,
 } from '../lib/product-family-edit'
 import type { AuthVariables } from '../middleware/auth'
-import { requireAuth, requireRoles } from '../middleware/auth'
+import { requireAuth, requirePermission } from '../middleware/auth'
 
 /** Product family catalog: import from Excel, list/detail, duplicate, publish toggle (Phase 2). */
 export const productFamilies = new Hono<{ Variables: AuthVariables }>()
@@ -41,7 +41,7 @@ const actorFrom = (c: Context<{ Variables: AuthVariables }>): ProductFamilyActor
  * Only a company-admin/super-user manages their own catalog; a client
  * company never imports into a supplier's.
  */
-productFamilies.post('/import', requireAuth, requireRoles(['company-admin', 'super-user', 'super-admin']), async (c) => {
+productFamilies.post('/import', requireAuth, requirePermission('catalog.edit'), async (c) => {
   const body = await c.req.parseBody()
   const file = body.file
   if (!(file instanceof File)) {
@@ -76,7 +76,7 @@ productFamilies.post('/import', requireAuth, requireRoles(['company-admin', 'sup
 productFamilies.post(
   '/:id/new-version',
   requireAuth,
-  requireRoles(['company-admin', 'super-user', 'super-admin']),
+  requirePermission('catalog.edit'),
   async (c) => {
     const id = c.req.param('id')
     if (!id) {
@@ -114,7 +114,7 @@ productFamilies.post(
 )
 
 /** Lists product families visible to the caller (own company's, plus published families of linked suppliers). */
-productFamilies.get('/', requireAuth, async (c) => {
+productFamilies.get('/', requireAuth, requirePermission('catalog.view'), async (c) => {
   const ctx = {
     effectiveCompanyId: c.get('effectiveCompanyId'),
     isSuperAdmin: c.get('isSuperAdmin'),
@@ -124,7 +124,7 @@ productFamilies.get('/', requireAuth, async (c) => {
 })
 
 /** Full detail (lines, characteristics, matrices, relations, images) for one family. */
-productFamilies.get('/:id', requireAuth, async (c) => {
+productFamilies.get('/:id', requireAuth, requirePermission('catalog.view'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -150,7 +150,7 @@ const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
 }
 
 /** Streams one embedded image — RLS-scoped the same way the rest of the family's detail is (via getProductFamilyDetail's own image list). */
-productFamilies.get('/:id/images/:imageId', requireAuth, async (c) => {
+productFamilies.get('/:id/images/:imageId', requireAuth, requirePermission('catalog.view'), async (c) => {
   const id = c.req.param('id')
   const imageId = c.req.param('imageId')
   if (!id || !imageId) {
@@ -180,7 +180,7 @@ productFamilies.get('/:id/images/:imageId', requireAuth, async (c) => {
 })
 
 /** Deep-copies a family into a new, unpublished draft ("Duplicate"). */
-productFamilies.post('/:id/duplicate', requireAuth, requireRoles(['company-admin', 'super-user', 'super-admin']), async (c) => {
+productFamilies.post('/:id/duplicate', requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -194,7 +194,7 @@ productFamilies.post('/:id/duplicate', requireAuth, requireRoles(['company-admin
 })
 
 /** Toggles client visibility ("allowing a user to see/no-see"). */
-productFamilies.patch('/:id/publish', requireAuth, requireRoles(['company-admin', 'super-user', 'super-admin']), async (c) => {
+productFamilies.patch('/:id/publish', requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -217,7 +217,7 @@ productFamilies.patch('/:id/publish', requireAuth, requireRoles(['company-admin'
 })
 
 /** Permanently deletes a family and everything under it (lines, characteristics, matrices, images). */
-productFamilies.delete('/:id', requireAuth, requireRoles(['company-admin', 'super-user', 'super-admin']), async (c) => {
+productFamilies.delete('/:id', requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -233,8 +233,6 @@ productFamilies.delete('/:id', requireAuth, requireRoles(['company-admin', 'supe
   }
   return c.json({ ok: true })
 })
-
-const EDIT_ROLES = ['company-admin', 'super-user', 'super-admin'] as const
 
 /** Maps the edit-flow errors to HTTP statuses; anything else is a real 500. */
 const editErrorResponse = (c: Context<{ Variables: AuthVariables }>, error: unknown) => {
@@ -256,7 +254,7 @@ const editContext = (c: Context<{ Variables: AuthVariables }>) => ({
 })
 
 /** Replaces a pricing matrix's widths/heights/cells. */
-productFamilies.patch('/:id/matrices/:matrixId', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+productFamilies.patch('/:id/matrices/:matrixId', requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id')
   const matrixId = c.req.param('matrixId')
   if (!id || !matrixId) {
@@ -272,7 +270,7 @@ productFamilies.patch('/:id/matrices/:matrixId', requireAuth, requireRoles([...E
 })
 
 /** Edits a product line's pricing fields (value, formula, discount, markup, installation hours). */
-productFamilies.patch('/:id/lines/:lineId', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+productFamilies.patch('/:id/lines/:lineId', requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id')
   const lineId = c.req.param('lineId')
   if (!id || !lineId) {
@@ -288,7 +286,7 @@ productFamilies.patch('/:id/lines/:lineId', requireAuth, requireRoles([...EDIT_R
 })
 
 /** Edits a sub-characteristic's price (value / formula). */
-productFamilies.patch('/:id/characteristics/:characteristicId', requireAuth, requireRoles([...EDIT_ROLES]), async (c) => {
+productFamilies.patch('/:id/characteristics/:characteristicId', requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id')
   const characteristicId = c.req.param('characteristicId')
   if (!id || !characteristicId) {

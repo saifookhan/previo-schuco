@@ -10,7 +10,7 @@ import {
 } from 'react'
 
 import type { RoleId } from '@/types/settings'
-import type { CompanyCapabilities } from '@schuco/contracts'
+import { computePermissions, type CompanyCapabilities, type Permission } from '@schuco/contracts'
 
 export interface AuthUser {
   id: string
@@ -38,6 +38,8 @@ interface AuthContextValue {
   refresh: () => Promise<void>
   signOut: () => Promise<void>
   hasRole: (...roles: RoleId[]) => boolean
+  /** Whether the user's roles grant `permission` AND their company's capabilities unlock it. */
+  can: (permission: Permission) => boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -81,9 +83,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     [user],
   )
 
+  const can = useCallback(
+    (permission: Permission) =>
+      user ? computePermissions(user.roles.map((r) => r.id), user.company.capabilities).includes(permission) : false,
+    [user],
+  )
+
   const value = useMemo(
-    () => ({ user, loading, refresh, signOut, hasRole }),
-    [user, loading, refresh, signOut, hasRole],
+    () => ({ user, loading, refresh, signOut, hasRole, can }),
+    [user, loading, refresh, signOut, hasRole, can],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -63,7 +63,8 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "quotes": "Quotes",
-    "adminCompanies": "Companies"
+    "adminCompanies": "Companies",
+    "adminLinks": "Catalog links"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -448,5 +449,21 @@
     "sending": "Sending…",
     "checkEmail": "If that email has an account, a reset link is on its way.",
     "backToLogin": "Back to sign in"
+  },
+  "adminLinks": {
+    "title": "Catalog links",
+    "subtitle": "Choose which suppliers and clients can see and quote from a manufacturer's published catalog",
+    "manufacturer": "Manufacturer",
+    "partner": "Supplier or client",
+    "choose": "Select a company",
+    "addLink": "Add link",
+    "adding": "Adding…",
+    "selectBoth": "Select a manufacturer and a supplier or client",
+    "addFailed": "Could not add link",
+    "addFailedUnreachable": "Could not add link — could not reach the server",
+    "removeFailed": "Could not remove link",
+    "remove": "Remove link",
+    "empty": "No catalog links yet.",
+    "errorLoading": "Couldn't load links — the server may be unreachable."
   }
 }

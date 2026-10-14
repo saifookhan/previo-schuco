@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
-import { hasMinimumRole, useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
 
@@ -22,11 +22,11 @@ interface ProductFamilyNewVersionButtonProps {
 export const ProductFamilyNewVersionButton = ({ familyId }: ProductFamilyNewVersionButtonProps) => {
   const t = useTranslations('productFamilyVersion')
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
 
-  if (!user || !hasMinimumRole(user.role.id, 'super-user')) {
+  if (!user || !can('catalog.edit')) {
     return null
   }
 
