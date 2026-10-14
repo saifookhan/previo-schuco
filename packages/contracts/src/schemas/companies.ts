@@ -1,11 +1,23 @@
 import { z } from 'zod'
 
-export const companyTypeSchema = z.enum(['platform', 'supplier', 'client'])
+/** What a company can do. Any combination, but at least one. */
+export const companyCapabilitiesSchema = z
+  .object({
+    platform: z.boolean(),
+    manufacturer: z.boolean(),
+    supplier: z.boolean(),
+    client: z.boolean(),
+  })
+  .refine((c) => c.platform || c.manufacturer || c.supplier || c.client, {
+    message: 'A company needs at least one capability',
+  })
+
+export type CompanyCapabilities = z.infer<typeof companyCapabilitiesSchema>
 
 /** One company row for the super-admin companies CRUD panel. */
 export const companyDtoSchema = z.object({
   id: z.string().uuid(),
-  type: companyTypeSchema,
+  capabilities: companyCapabilitiesSchema,
   name: z.string(),
   vatNumber: z.string(),
   isActive: z.boolean(),
@@ -24,7 +36,7 @@ export type CompaniesListResponse = z.infer<typeof companiesListResponseSchema>
 
 /** POST /api/admin/companies request body. */
 export const createCompanyRequestSchema = z.object({
-  type: companyTypeSchema,
+  capabilities: companyCapabilitiesSchema,
   name: z.string().min(1),
   vatNumber: z.string().min(1),
 })
@@ -40,7 +52,7 @@ export type CreateCompanyResponse = z.infer<typeof createCompanyResponseSchema>
 
 /** PATCH /api/admin/companies/:id request body — every field optional, only given ones change. */
 export const updateCompanyRequestSchema = z.object({
-  type: companyTypeSchema.optional(),
+  capabilities: companyCapabilitiesSchema.optional(),
   name: z.string().min(1).optional(),
   vatNumber: z.string().min(1).optional(),
 })

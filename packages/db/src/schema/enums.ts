@@ -1,12 +1,5 @@
 import { pgEnum } from 'drizzle-orm/pg-core'
 
-/** Company type in the PREVIO platform. */
-export const companyTypeEnum = pgEnum('company_type', [
-  'platform',
-  'supplier',
-  'client',
-])
-
 /**
  * User account status. 'pending_approval' = a company-admin requested
  * this user, but no invite email has gone out yet — a super-admin must

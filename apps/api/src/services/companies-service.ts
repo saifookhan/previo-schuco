@@ -3,6 +3,7 @@ import {
   listAllCompanies,
   setCompanyActive,
   updateCompany,
+  type CompanyCapabilities,
   type CompanyRow,
 } from '@schuco/db'
 
@@ -18,7 +19,7 @@ export interface CompanyActor {
 }
 
 export interface CreateCompanyInput {
-  type: 'platform' | 'supplier' | 'client'
+  capabilities: CompanyCapabilities
   name: string
   vatNumber: string
 }
@@ -35,7 +36,7 @@ export const createCompany = async (
       tx,
       { actorType: 'user', actorUserId: actor.actorUserId, actorCompanyId: actor.actorCompanyId, requestId: actor.requestId },
       actor.actorCompanyId,
-      { action: 'company.create', resourceType: 'company', resourceId: company.id, metadata: { name: input.name, type: input.type } },
+      { action: 'company.create', resourceType: 'company', resourceId: company.id, metadata: { name: input.name, capabilities: input.capabilities } },
     )
     return company
   })
@@ -44,7 +45,7 @@ export const createCompany = async (
 export const listCompanies = (ctx: TenantContext): Promise<CompanyRow[]> => withTenantDb(ctx, (tx) => listAllCompanies(tx))
 
 export interface UpdateCompanyInput {
-  type?: 'platform' | 'supplier' | 'client'
+  capabilities?: CompanyCapabilities
   name?: string
   vatNumber?: string
 }

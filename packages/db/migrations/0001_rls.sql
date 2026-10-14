@@ -13,6 +13,15 @@ CREATE OR REPLACE FUNCTION app_current_company_id() RETURNS uuid AS $$
   SELECT nullif(current_setting('app.current_company_id', true), '')::uuid;
 $$ LANGUAGE sql STABLE;
 
+-- Capability checks for the caller's own company (it can always read its own row via companies_tenant).
+CREATE OR REPLACE FUNCTION app_company_is_manufacturer() RETURNS boolean AS $$
+  SELECT coalesce((SELECT is_manufacturer FROM companies WHERE id = app_current_company_id()), false);
+$$ LANGUAGE sql STABLE;
+
+CREATE OR REPLACE FUNCTION app_company_is_supplier() RETURNS boolean AS $$
+  SELECT coalesce((SELECT is_supplier FROM companies WHERE id = app_current_company_id()), false);
+$$ LANGUAGE sql STABLE;
+
 DROP POLICY IF EXISTS companies_tenant ON companies;
 CREATE POLICY companies_tenant ON companies
   FOR ALL
@@ -147,7 +156,10 @@ CREATE POLICY product_families_select ON product_families
 DROP POLICY IF EXISTS product_families_insert ON product_families;
 CREATE POLICY product_families_insert ON product_families
   FOR INSERT
-  WITH CHECK (app_is_super_admin() OR supplier_company_id = app_current_company_id());
+  WITH CHECK (
+    app_is_super_admin()
+    OR (supplier_company_id = app_current_company_id() AND app_company_is_manufacturer())
+  );
 
 DROP POLICY IF EXISTS product_families_update ON product_families;
 CREATE POLICY product_families_update ON product_families
@@ -272,7 +284,10 @@ DROP POLICY IF EXISTS quotes_tenant ON quotes;
 CREATE POLICY quotes_tenant ON quotes
   FOR ALL
   USING (app_is_super_admin() OR supplier_company_id = app_current_company_id())
-  WITH CHECK (app_is_super_admin() OR supplier_company_id = app_current_company_id());
+  WITH CHECK (
+    app_is_super_admin()
+    OR (supplier_company_id = app_current_company_id() AND app_company_is_supplier())
+  );
 
 DROP POLICY IF EXISTS quote_positions_tenant ON quote_positions;
 CREATE POLICY quote_positions_tenant ON quote_positions

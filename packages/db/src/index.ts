@@ -50,11 +50,13 @@ export {
   type ValidAuthToken,
 } from './queries/auth-tokens'
 export {
+  capabilitiesOf,
   getCompanyById,
   insertCompany,
   listAllCompanies,
   setCompanyActive,
   updateCompany,
+  type CompanyCapabilities,
   type CompanyRow,
   type CompanySummary,
   type InsertCompanyInput,

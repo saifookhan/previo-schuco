@@ -3,23 +3,53 @@ import { desc, eq } from 'drizzle-orm'
 import type { DbLike } from '../client'
 import { companies } from '../schema'
 
+/** What a company can do — independent flags, any combination (but at least one, enforced by a DB CHECK). */
+export interface CompanyCapabilities {
+  platform: boolean
+  manufacturer: boolean
+  supplier: boolean
+  client: boolean
+}
+
+export const capabilitiesOf = (row: {
+  isPlatform: boolean
+  isManufacturer: boolean
+  isSupplier: boolean
+  isClient: boolean
+}): CompanyCapabilities => ({
+  platform: row.isPlatform,
+  manufacturer: row.isManufacturer,
+  supplier: row.isSupplier,
+  client: row.isClient,
+})
+
+const capabilityColumns = (c: Partial<CompanyCapabilities>) => ({
+  ...(c.platform === undefined ? {} : { isPlatform: c.platform }),
+  ...(c.manufacturer === undefined ? {} : { isManufacturer: c.manufacturer }),
+  ...(c.supplier === undefined ? {} : { isSupplier: c.supplier }),
+  ...(c.client === undefined ? {} : { isClient: c.client }),
+})
+
 export interface CompanySummary {
   id: string
   name: string
-  type: 'platform' | 'supplier' | 'client'
+  capabilities: CompanyCapabilities
 }
 
 export type CompanyRow = typeof companies.$inferSelect
 
 export interface InsertCompanyInput {
-  type: 'platform' | 'supplier' | 'client'
+  capabilities: CompanyCapabilities
   name: string
   vatNumber: string
 }
 
 /** Creates a company (starts active). Super-admin only — enforced at the route, not here (see ADR 0012). */
 export const insertCompany = async (db: DbLike, input: InsertCompanyInput): Promise<CompanyRow> => {
-  const [row] = await db.insert(companies).values(input).returning()
+  const [row] = await db
+    .insert(companies)
+    .values({ name: input.name, vatNumber: input.vatNumber, ...capabilityColumns(input.capabilities) })
+    .returning()
   return row
 }
 
@@ -28,7 +58,7 @@ export const listAllCompanies = (db: DbLike): Promise<CompanyRow[]> =>
   db.select().from(companies).orderBy(desc(companies.createdAt))
 
 export interface UpdateCompanyInput {
-  type?: 'platform' | 'supplier' | 'client'
+  capabilities?: CompanyCapabilities
   name?: string
   vatNumber?: string
 }
@@ -38,9 +68,10 @@ export const updateCompany = async (
   id: string,
   input: UpdateCompanyInput,
 ): Promise<CompanyRow | null> => {
+  const { capabilities, ...rest } = input
   const [row] = await db
     .update(companies)
-    .set({ ...input, updatedAt: new Date() })
+    .set({ ...rest, ...(capabilities ? capabilityColumns(capabilities) : {}), updatedAt: new Date() })
     .where(eq(companies.id, id))
     .returning()
   return row ?? null
@@ -66,10 +97,11 @@ export const setCompanyActive = async (db: DbLike, id: string, isActive: boolean
  */
 export const getCompanyById = async (db: DbLike, id: string): Promise<CompanySummary | null> => {
   const rows = await db
-    .select({ id: companies.id, name: companies.name, type: companies.type })
+    .select()
     .from(companies)
     .where(eq(companies.id, id))
     .limit(1)
 
-  return rows[0] ?? null
+  const row = rows[0]
+  return row ? { id: row.id, name: row.name, capabilities: capabilitiesOf(row) } : null
 }

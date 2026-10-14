@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 
 import type { Db, DbLike } from '../client'
+import { capabilitiesOf, type CompanyCapabilities } from './companies'
 import {
   businessUnits,
   companies,
@@ -30,7 +31,7 @@ export interface UserListRow {
   company: {
     id: string
     name: string
-    type: 'platform' | 'supplier' | 'client'
+    capabilities: CompanyCapabilities
   }
   businessUnits: BusinessUnitScope[]
   createdAt: Date
@@ -51,7 +52,7 @@ export interface UserProfile {
   company: {
     id: string
     name: string
-    type: 'platform' | 'supplier' | 'client'
+    capabilities: CompanyCapabilities
     vatNumber: string
     isActive: boolean
   }
@@ -79,7 +80,10 @@ const getUserProfileByWhere = async (
       roleDescription: roles.description,
       companyId: companies.id,
       companyName: companies.name,
-      companyType: companies.type,
+      companyIsPlatform: companies.isPlatform,
+      companyIsManufacturer: companies.isManufacturer,
+      companyIsSupplier: companies.isSupplier,
+      companyIsClient: companies.isClient,
       companyVat: companies.vatNumber,
       companyIsActive: companies.isActive,
     })
@@ -118,7 +122,12 @@ const getUserProfileByWhere = async (
     company: {
       id: row.companyId,
       name: row.companyName,
-      type: row.companyType,
+      capabilities: capabilitiesOf({
+        isPlatform: row.companyIsPlatform,
+        isManufacturer: row.companyIsManufacturer,
+        isSupplier: row.companyIsSupplier,
+        isClient: row.companyIsClient,
+      }),
       vatNumber: row.companyVat,
       isActive: row.companyIsActive,
     },
@@ -417,7 +426,10 @@ export const listUsers = async (db: DbLike, companyId?: string, status?: UserSta
       roleName: roles.name,
       companyId: companies.id,
       companyName: companies.name,
-      companyType: companies.type,
+      companyIsPlatform: companies.isPlatform,
+      companyIsManufacturer: companies.isManufacturer,
+      companyIsSupplier: companies.isSupplier,
+      companyIsClient: companies.isClient,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
     })
@@ -468,7 +480,12 @@ export const listUsers = async (db: DbLike, companyId?: string, status?: UserSta
     company: {
       id: row.companyId,
       name: row.companyName,
-      type: row.companyType,
+      capabilities: capabilitiesOf({
+        isPlatform: row.companyIsPlatform,
+        isManufacturer: row.companyIsManufacturer,
+        isSupplier: row.companyIsSupplier,
+        isClient: row.companyIsClient,
+      }),
     },
     businessUnits: businessUnitsByUser.get(row.userId) ?? [],
     createdAt: row.createdAt,

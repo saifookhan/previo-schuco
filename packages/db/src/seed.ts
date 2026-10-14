@@ -37,14 +37,17 @@ export const CANONICAL_ROLES = [
 
 const COMPANY_SEEDS: Array<{
   key: DemoCompanyKey
-  type: 'platform' | 'supplier' | 'client'
+  isPlatform?: boolean
+  isManufacturer?: boolean
+  isSupplier?: boolean
+  isClient?: boolean
   name: string
   vatNumber: string
 }> = [
-  { key: 'schuco', type: 'platform', name: 'Schüco / PREVIO Platform', vatNumber: 'IT00000000001' },
-  { key: 'suppli', type: 'supplier', name: 'Suppli S.r.l.', vatNumber: 'IT12345678901' },
-  { key: 'technometal', type: 'client', name: 'Technometal S.p.A.', vatNumber: 'IT98765432109' },
-  { key: 'fabbrikka', type: 'client', name: 'Fabbrikka S.r.l.', vatNumber: 'IT11223344556' },
+  { key: 'schuco', isPlatform: true, name: 'Schüco / PREVIO Platform', vatNumber: 'IT00000000001' },
+  { key: 'suppli', isManufacturer: true, isSupplier: true, name: 'Suppli S.r.l.', vatNumber: 'IT12345678901' },
+  { key: 'technometal', isClient: true, name: 'Technometal S.p.A.', vatNumber: 'IT98765432109' },
+  { key: 'fabbrikka', isClient: true, name: 'Fabbrikka S.r.l.', vatNumber: 'IT11223344556' },
 ]
 
 const BUSINESS_UNIT_SEEDS: Array<{
@@ -85,7 +88,10 @@ export const seedDatabase = async (db: Db): Promise<void> => {
     const [created] = await db
       .insert(companies)
       .values({
-        type: company.type,
+        isPlatform: company.isPlatform ?? false,
+        isManufacturer: company.isManufacturer ?? false,
+        isSupplier: company.isSupplier ?? false,
+        isClient: company.isClient ?? false,
         name: company.name,
         vatNumber: company.vatNumber,
       })
