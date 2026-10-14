@@ -86,7 +86,7 @@ export const AdminShell = ({ children }: AdminShellProps) => {
         {!loading && user ? (
           <div className="border-b border-slate-800 px-5 py-3 text-xs text-slate-400">
             <p className="font-medium text-slate-200">{user.name ?? user.email}</p>
-            <p>{user.role.name}</p>
+            <p>{user.roles.map((role) => role.name).join(', ')}</p>
           </div>
         ) : null}
 

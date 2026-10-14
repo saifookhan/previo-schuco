@@ -11,7 +11,7 @@ import { useRouter } from '@/i18n/navigation'
 import type { UserDto } from '@schuco/contracts'
 
 /**
- * Roles a company-admin may grant, matching apps/api's canGrantRole
+ * Roles a company-admin may grant, matching apps/api's canGrantRoles
  * (company-admin can't grant super-admin — that's the platform operator
  * role). Kept in sync by hand since there's no roles endpoint yet.
  */
@@ -32,10 +32,10 @@ export const UserInviteButton = () => {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [form, setForm] = useState({ email: '', name: '', roleId: 'user' as (typeof GRANTABLE_ROLES)[number]['id'] })
+  const [form, setForm] = useState<{ email: string; name: string; roleIds: string[] }>({ email: '', name: '', roleIds: ['user'] })
 
   const openDialog = () => {
-    setForm({ email: '', name: '', roleId: 'user' })
+    setForm({ email: '', name: '', roleIds: ['user'] })
     setError(null)
     setOpen(true)
   }
@@ -45,13 +45,17 @@ export const UserInviteButton = () => {
       setError(t('emailRequired'))
       return
     }
+    if (form.roleIds.length === 0) {
+      setError(t('rolesRequired'))
+      return
+    }
     setSaving(true)
     setError(null)
     try {
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email, name: form.name || undefined, roleId: form.roleId }),
+        body: JSON.stringify({ email: form.email, name: form.name || undefined, roleIds: form.roleIds }),
       })
       const data = (await response.json().catch(() => ({}))) as { user?: UserDto; error?: string }
       if (!response.ok || !data.user) {
@@ -119,21 +123,26 @@ export const UserInviteButton = () => {
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="invite-role">{t('role')}</Label>
-                <select
-                  id="invite-role"
-                  className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
-                  value={form.roleId}
-                  onChange={(e) => setForm((f) => ({ ...f, roleId: e.target.value as typeof f.roleId }))}
-                >
-                  {GRANTABLE_ROLES.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium text-slate-700">{t('role')}</legend>
+                {GRANTABLE_ROLES.map((role) => (
+                  <label key={role.id} htmlFor={`invite-role-${role.id}`} className="flex cursor-pointer items-center gap-2.5">
+                    <input
+                      id={`invite-role-${role.id}`}
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300 accent-brand"
+                      checked={form.roleIds.includes(role.id)}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          roleIds: e.target.checked ? [...f.roleIds, role.id] : f.roleIds.filter((id) => id !== role.id),
+                        }))
+                      }
+                    />
+                    <span className="text-sm text-slate-900">{role.label}</span>
+                  </label>
+                ))}
+              </fieldset>
             </div>
 
             {error ? <p className="mt-3 text-xs text-red-600">{error}</p> : null}

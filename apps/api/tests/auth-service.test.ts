@@ -57,7 +57,7 @@ beforeAll(async () => {
 
     const [company] = await tx
       .insert(companies)
-      .values({ type: 'client', name: 'Auth Service Test Co', vatNumber: 'AUTHSVC-1' })
+      .values({ isClient: true, name: 'Auth Service Test Co', vatNumber: 'AUTHSVC-1' })
       .returning({ id: companies.id })
     companyId = company.id
 
@@ -98,7 +98,7 @@ describe('login', () => {
 
   it('rejects an invited user who has no password set yet', async () => {
     const invited = await withSystemTransaction(db, (tx) =>
-      createInvitedUser(tx, { email: 'authsvc-invited@example.com', companyId, roleId: 'company-admin' }),
+      createInvitedUser(tx, { email: 'authsvc-invited@example.com', companyId, roleIds: ['company-admin'] }),
     )
     createdUserIds.push(invited.id)
     await expect(login('authsvc-invited@example.com', 'anything')).rejects.toThrow(InvalidCredentialsError)
@@ -120,7 +120,7 @@ describe('login', () => {
 describe('consumeAuthToken (invite-accept / password-reset)', () => {
   it('lets a fresh invite token set a password, activates the account, and cannot be reused', async () => {
     const invited = await withSystemTransaction(db, (tx) =>
-      createInvitedUser(tx, { email: 'authsvc-accept@example.com', companyId, roleId: 'company-admin' }),
+      createInvitedUser(tx, { email: 'authsvc-accept@example.com', companyId, roleIds: ['company-admin'] }),
     )
     createdUserIds.push(invited.id)
     expect(invited.status).toBe('invited')
@@ -149,7 +149,7 @@ describe('consumeAuthToken (invite-accept / password-reset)', () => {
 
   it('rejects an expired token', async () => {
     const invited = await withSystemTransaction(db, (tx) =>
-      createInvitedUser(tx, { email: 'authsvc-expired@example.com', companyId, roleId: 'company-admin' }),
+      createInvitedUser(tx, { email: 'authsvc-expired@example.com', companyId, roleIds: ['company-admin'] }),
     )
     createdUserIds.push(invited.id)
 
@@ -197,7 +197,7 @@ describe('POST /api/auth/login and /api/auth/set-password (HTTP layer)', () => {
 
   it('POST /set-password returns a full user profile too', async () => {
     const invited = await withSystemTransaction(db, (tx) =>
-      createInvitedUser(tx, { email: 'authsvc-http-accept@example.com', companyId, roleId: 'company-admin' }),
+      createInvitedUser(tx, { email: 'authsvc-http-accept@example.com', companyId, roleIds: ['company-admin'] }),
     )
     createdUserIds.push(invited.id)
     const rawToken = await mintTestToken(invited.id, 'invite')

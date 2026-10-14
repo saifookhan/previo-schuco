@@ -1,10 +1,10 @@
 import type { CompanyDto } from '@schuco/contracts'
-import type { CompanyRow } from '@schuco/db'
+import { capabilitiesOf, type CompanyRow } from '@schuco/db'
 
 /** Map a DB company row to the admin-panel CompanyDto. */
 export const toCompanyDto = (row: CompanyRow): CompanyDto => ({
   id: row.id,
-  type: row.type,
+  capabilities: capabilitiesOf(row),
   name: row.name,
   vatNumber: row.vatNumber,
   isActive: row.isActive,

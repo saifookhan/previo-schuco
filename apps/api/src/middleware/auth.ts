@@ -88,7 +88,7 @@ export const requireAuth = async (c: Context, next: Next): Promise<Response | vo
     return c.json({ error: 'Company account deactivated' }, 403)
   }
 
-  const isSuperAdmin = profile.role.id === 'super-admin'
+  const isSuperAdmin = profile.roles.some((r) => r.id === 'super-admin')
   const tenantOverride = c.req.header(TENANT_OVERRIDE_HEADER)
 
   if (tenantOverride) {
@@ -124,12 +124,13 @@ export const requireAuth = async (c: Context, next: Next): Promise<Response | vo
  * authorization is a separate concern from RLS tenant isolation, checked
  * here, not folded into or inferred from what RLS happens to allow a query
  * to return (see ADR 0006).
+ * A user holding several roles passes if ANY of them is allowed.
  * @param allowedRoles - Role IDs permitted to access the route
  */
 export const requireRoles = (allowedRoles: string[]) =>
   async (c: Context, next: Next): Promise<Response | void> => {
     const user = c.get('user') as UserProfile | undefined
-    if (!user || !allowedRoles.includes(user.role.id)) {
+    if (!user || !user.roles.some((r) => allowedRoles.includes(r.id))) {
       return c.json({ error: 'Forbidden' }, 403)
     }
     await next()

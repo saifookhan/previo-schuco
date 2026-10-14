@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useRouter } from '@/i18n/navigation'
 import type { CompanyDto } from '@schuco/contracts'
-
-const COMPANY_TYPES = ['platform', 'supplier', 'client'] as const
+import { CompanyCapabilitiesField } from '@/components/company-capabilities-field'
+import { hasAnyCapability } from '@/lib/company-capabilities'
 
 interface CompanyRowActionsProps {
   company: CompanyDto
@@ -24,10 +24,10 @@ export const CompanyRowActions = ({ company }: CompanyRowActionsProps) => {
   const [saving, setSaving] = useState(false)
   const [togglingActive, setTogglingActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [form, setForm] = useState({ type: company.type, name: company.name, vatNumber: company.vatNumber })
+  const [form, setForm] = useState({ capabilities: company.capabilities, name: company.name, vatNumber: company.vatNumber })
 
   const openEdit = () => {
-    setForm({ type: company.type, name: company.name, vatNumber: company.vatNumber })
+    setForm({ capabilities: company.capabilities, name: company.name, vatNumber: company.vatNumber })
     setError(null)
     setEditOpen(true)
   }
@@ -35,6 +35,10 @@ export const CompanyRowActions = ({ company }: CompanyRowActionsProps) => {
   const save = async () => {
     if (!form.name.trim() || !form.vatNumber.trim()) {
       setError(t('createRequired'))
+      return
+    }
+    if (!hasAnyCapability(form.capabilities)) {
+      setError(t('capabilityRequired'))
       return
     }
     setSaving(true)
@@ -121,21 +125,11 @@ export const CompanyRowActions = ({ company }: CompanyRowActionsProps) => {
             </div>
 
             <div className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor={`company-edit-type-${company.id}`}>{t('fieldType')}</Label>
-                <select
-                  id={`company-edit-type-${company.id}`}
-                  className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
-                  value={form.type}
-                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as (typeof COMPANY_TYPES)[number] }))}
-                >
-                  {COMPANY_TYPES.map((type) => (
-                    <option key={type} value={type}>
-                      {t(`typeValue.${type}`)}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CompanyCapabilitiesField
+                idPrefix={`company-edit-cap-${company.id}`}
+                value={form.capabilities}
+                onChange={(capabilities) => setForm((f) => ({ ...f, capabilities }))}
+              />
               <div className="space-y-1">
                 <Label htmlFor={`company-edit-name-${company.id}`}>{t('fieldName')}</Label>
                 <Input

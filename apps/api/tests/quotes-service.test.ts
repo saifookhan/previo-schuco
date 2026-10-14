@@ -16,7 +16,7 @@ import {
   withSystemTransaction,
   type Db,
 } from '@schuco/db'
-import { inArray } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { getDb } from '../src/lib/db'
@@ -74,7 +74,7 @@ beforeAll(async () => {
 
     const [company] = await tx
       .insert(companies)
-      .values({ type: 'supplier', name: 'Quote Service Test Supplier', vatNumber: 'QSVC-SUP' })
+      .values({ isManufacturer: true, isSupplier: true, name: 'Quote Service Test Supplier', vatNumber: 'QSVC-SUP' })
       .returning({ id: companies.id })
     supplierCompanyId = company.id
     actor.actorCompanyId = supplierCompanyId
@@ -97,7 +97,7 @@ beforeAll(async () => {
     // is exactly the gap addQuotePosition's ownership check guards against.
     const [linkedClient] = await tx
       .insert(companies)
-      .values({ type: 'client', name: 'Quote Service Test Linked Client', vatNumber: 'QSVC-CLIENT' })
+      .values({ isClient: true, isSupplier: true, name: 'Quote Service Test Linked Client', vatNumber: 'QSVC-CLIENT' })
       .returning({ id: companies.id })
     linkedClientCompanyId = linkedClient.id
     await tx.insert(supplierClientLinks).values({ supplierCompanyId, clientCompanyId: linkedClientCompanyId })
@@ -718,6 +718,26 @@ describe('createQuote + addQuotePosition', () => {
     const afterUnpublish = await getQuote(ctx(), quote.id)
     expect(afterUnpublish!.positions[0].isValid).toBe(false)
     expect(afterUnpublish!.positions[0].finalPrice).toBe(priceBefore)
+  })
+})
+
+describe('capability gate', () => {
+  it('rejects creating a quote from a company that is not a supplier', async () => {
+    const [clientOnly] = await withSystemTransaction(db, (tx) =>
+      tx
+        .insert(companies)
+        .values({ isClient: true, name: 'Quote Service Test Client Only', vatNumber: 'QSVC-CLIENT-ONLY' })
+        .returning({ id: companies.id }),
+    )
+    try {
+      const clientCtx = { effectiveCompanyId: clientOnly.id, isSuperAdmin: false }
+      const clientActor = { actorUserId, actorCompanyId: clientOnly.id, requestId: 'test-request' }
+      await expect(
+        createQuote(clientCtx, clientActor, { reference: 'TEST-Q-SVC-CLIENT-ONLY', customerName: 'Test Customer' }),
+      ).rejects.toThrow()
+    } finally {
+      await withSystemTransaction(db, (tx) => tx.delete(companies).where(eq(companies.id, clientOnly.id)))
+    }
   })
 })
 

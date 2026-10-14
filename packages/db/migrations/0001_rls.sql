@@ -43,6 +43,19 @@ CREATE POLICY users_tenant ON users
     OR company_id = app_current_company_id()
   );
 
+ALTER TABLE user_additional_roles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS user_additional_roles_tenant ON user_additional_roles;
+CREATE POLICY user_additional_roles_tenant ON user_additional_roles
+  FOR ALL
+  USING (
+    app_is_super_admin()
+    OR EXISTS (
+      SELECT 1 FROM users u
+      WHERE u.id = user_additional_roles.user_id
+        AND u.company_id = app_current_company_id()
+    )
+  );
+
 DROP POLICY IF EXISTS user_bu_tenant ON user_business_units;
 CREATE POLICY user_bu_tenant ON user_business_units
   FOR ALL

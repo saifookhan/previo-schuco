@@ -123,7 +123,7 @@
     "usersCount": "{count} utenti",
     "name": "Nome",
     "email": "Email",
-    "role": "Ruolo",
+    "role": "Ruoli",
     "status": "Stato",
     "addUserTitle": "Aggiungi utente",
     "addUserHint": "In attesa dell'approvazione di un super-admin prima che venga inviata qualsiasi email di invito.",
@@ -134,7 +134,8 @@
     "adding": "Aggiunta…",
     "close": "Chiudi",
     "errorLoading": "Impossibile caricare gli utenti — il server potrebbe non essere raggiungibile.",
-    "noUsersFound": "Nessun utente ancora."
+    "noUsersFound": "Nessun utente ancora.",
+    "rolesRequired": "Seleziona almeno un ruolo"
   },
   "settingsRoles": {
     "title": "Ruoli",
@@ -385,7 +386,7 @@
     "subtitle": "Crea e gestisci ogni azienda della piattaforma — solo super-admin",
     "companiesCount": "{count} aziende",
     "name": "Nome",
-    "type": "Tipo",
+    "type": "Funzioni",
     "vatNumber": "Partita IVA",
     "status": "Stato",
     "active": "Attiva",
@@ -400,13 +401,14 @@
     "createFailedUnreachable": "Impossibile creare l'azienda — server non raggiungibile",
     "saveFailed": "Impossibile salvare l'azienda",
     "saveFailedUnreachable": "Impossibile salvare l'azienda — server non raggiungibile",
-    "fieldType": "Tipo",
+    "fieldType": "Funzioni",
     "fieldName": "Nome",
     "fieldVatNumber": "Partita IVA",
     "typeValue": {
-      "platform": "Piattaforma",
+      "manufacturer": "Produttore",
       "supplier": "Fornitore",
-      "client": "Cliente"
+      "client": "Cliente",
+      "platform": "Piattaforma"
     },
     "cancel": "Annulla",
     "create": "Crea",
@@ -416,7 +418,14 @@
     "close": "Chiudi",
     "edit": "Modifica azienda",
     "activate": "Attiva azienda",
-    "deactivate": "Disattiva azienda — blocca l'accesso a tutti i suoi utenti"
+    "deactivate": "Disattiva azienda — blocca l'accesso a tutti i suoi utenti",
+    "capabilityRequired": "Seleziona almeno una funzione",
+    "typeHint": {
+      "manufacturer": "Crea e gestisce un catalogo prodotti",
+      "supplier": "Vende: crea preventivi dai cataloghi dei produttori collegati",
+      "client": "Acquista dai fornitori collegati",
+      "platform": "Operatore della piattaforma PREVIO / Schüco"
+    }
   },
   "setPassword": {
     "title": "Imposta la tua password",

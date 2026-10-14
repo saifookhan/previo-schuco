@@ -45,7 +45,7 @@ adminInvites.post('/', requireAuth, requireRoles(['super-admin']), async (c) => 
       {
         actorUserId: c.get('actorUserId'),
         actorCompanyId: c.get('user').company.id,
-        callerRoleId: c.get('user').role.id,
+        callerRoleIds: c.get('user').roles.map((r) => r.id),
         requestId: c.get('requestId'),
       },
       parsedBody.data.companyId,

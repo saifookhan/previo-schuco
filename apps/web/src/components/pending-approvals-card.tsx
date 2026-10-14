@@ -59,7 +59,11 @@ export const PendingApprovalsCard = ({ pending }: PendingApprovalsCardProps) => 
               <p className="text-sm text-slate-400">{user.email}</p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <Badge variant="muted">{user.company.name}</Badge>
-                <Badge>{user.role.name}</Badge>
+                {user.roles.map((role) => (
+                  <Badge key={role.id} className="mr-1">
+                    {role.name}
+                  </Badge>
+                ))}
               </div>
             </div>
             <div className="flex flex-shrink-0 items-center gap-2">

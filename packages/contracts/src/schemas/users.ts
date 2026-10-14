@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { businessUnitScopeSchema } from './auth'
 import { roleIdSchema } from './common'
+import { companyCapabilitiesSchema } from './companies'
 
 /** Tenant-scoped user row for company-admin user management. */
 export const userDtoSchema = z.object({
@@ -9,10 +10,13 @@ export const userDtoSchema = z.object({
   email: z.string().email(),
   name: z.string().nullable(),
   status: z.enum(['pending_approval', 'invited', 'invite_failed', 'active', 'inactive']),
+  /** Primary (highest-ranked) role. */
   role: z.object({
     id: roleIdSchema,
     name: z.string(),
   }),
+  /** Every role the user holds, highest rank first; includes the primary. */
+  roles: z.array(z.object({ id: roleIdSchema, name: z.string() })),
   businessUnits: z.array(businessUnitScopeSchema),
 })
 
@@ -24,7 +28,7 @@ export const adminUserDtoSchema = userDtoSchema.extend({
   company: z.object({
     id: z.string().uuid(),
     name: z.string(),
-    type: z.enum(['platform', 'supplier', 'client']),
+    capabilities: companyCapabilitiesSchema,
   }),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -56,7 +60,10 @@ export type AdminUsersListResponse = z.infer<typeof adminUsersListResponseSchema
 export const inviteUserRequestSchema = z.object({
   email: z.string().email(),
   name: z.string().optional(),
-  roleId: roleIdSchema,
+  roleIds: z
+    .array(roleIdSchema)
+    .min(1)
+    .transform((ids) => [...new Set(ids)]),
   companyId: z.string().uuid().optional(),
   businessUnitIds: z.array(z.string().uuid()).optional(),
 })

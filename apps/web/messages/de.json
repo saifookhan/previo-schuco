@@ -123,7 +123,7 @@
     "usersCount": "{count} Benutzer",
     "name": "Name",
     "email": "E-Mail",
-    "role": "Rolle",
+    "role": "Rollen",
     "status": "Status",
     "addUserTitle": "Benutzer hinzufügen",
     "addUserHint": "Wartet auf die Genehmigung eines Super-Admins, bevor eine Einladungs-E-Mail gesendet wird.",
@@ -134,7 +134,8 @@
     "adding": "Wird hinzugefügt…",
     "close": "Schließen",
     "errorLoading": "Benutzer konnten nicht geladen werden — der Server ist möglicherweise nicht erreichbar.",
-    "noUsersFound": "Noch keine Benutzer."
+    "noUsersFound": "Noch keine Benutzer.",
+    "rolesRequired": "Mindestens eine Rolle auswählen"
   },
   "settingsRoles": {
     "title": "Rollen",
@@ -385,7 +386,7 @@
     "subtitle": "Jedes Unternehmen der Plattform erstellen und verwalten — nur Super-Admin",
     "companiesCount": "{count} Unternehmen",
     "name": "Name",
-    "type": "Typ",
+    "type": "Funktionen",
     "vatNumber": "USt-IdNr.",
     "status": "Status",
     "active": "Aktiv",
@@ -400,13 +401,14 @@
     "createFailedUnreachable": "Unternehmen konnte nicht erstellt werden — Server nicht erreichbar",
     "saveFailed": "Unternehmen konnte nicht gespeichert werden",
     "saveFailedUnreachable": "Unternehmen konnte nicht gespeichert werden — Server nicht erreichbar",
-    "fieldType": "Typ",
+    "fieldType": "Funktionen",
     "fieldName": "Name",
     "fieldVatNumber": "USt-IdNr.",
     "typeValue": {
-      "platform": "Plattform",
+      "manufacturer": "Hersteller",
       "supplier": "Lieferant",
-      "client": "Kunde"
+      "client": "Kunde",
+      "platform": "Plattform"
     },
     "cancel": "Abbrechen",
     "create": "Erstellen",
@@ -416,7 +418,14 @@
     "close": "Schließen",
     "edit": "Unternehmen bearbeiten",
     "activate": "Unternehmen aktivieren",
-    "deactivate": "Unternehmen deaktivieren — sperrt alle seine Benutzer"
+    "deactivate": "Unternehmen deaktivieren — sperrt alle seine Benutzer",
+    "capabilityRequired": "Mindestens eine Funktion auswählen",
+    "typeHint": {
+      "manufacturer": "Erstellt und besitzt einen Produktkatalog",
+      "supplier": "Verkauft – erstellt Angebote aus Katalogen verknüpfter Hersteller",
+      "client": "Kauft bei verknüpften Lieferanten",
+      "platform": "Betreiber der PREVIO-/Schüco-Plattform"
+    }
   },
   "setPassword": {
     "title": "Passwort festlegen",

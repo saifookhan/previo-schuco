@@ -47,7 +47,7 @@ beforeAll(async () => {
 
     const [platform] = await tx
       .insert(companies)
-      .values({ type: 'platform', name: 'Companies Service Test Platform', vatNumber: 'CSVC-PLAT' })
+      .values({ isPlatform: true, name: 'Companies Service Test Platform', vatNumber: 'CSVC-PLAT' })
       .returning({ id: companies.id })
     superAdminCtx.effectiveCompanyId = platform.id
     actor.actorCompanyId = platform.id
@@ -83,12 +83,13 @@ afterAll(async () => {
 describe('createCompany + listCompanies', () => {
   it('creates a company active by default, and it shows up in the unscoped platform list', async () => {
     const company = await createCompany(superAdminCtx, actor, {
-      type: 'supplier',
+      capabilities: { platform: false, manufacturer: true, supplier: true, client: false },
       name: 'CSVC Test Supplier',
       vatNumber: 'CSVC-SUP',
     })
     createdCompanyIds.push(company.id)
     expect(company.isActive).toBe(true)
+    expect([company.isManufacturer, company.isSupplier, company.isClient]).toEqual([true, true, false])
 
     const all = await listCompanies(superAdminCtx)
     expect(all.map((c) => c.id)).toContain(company.id)
@@ -98,7 +99,7 @@ describe('createCompany + listCompanies', () => {
 describe('updateCompanyDetails', () => {
   it("updates a company's own fields and rejects an unknown id", async () => {
     const company = await createCompany(superAdminCtx, actor, {
-      type: 'client',
+      capabilities: { platform: false, manufacturer: false, supplier: false, client: true },
       name: 'CSVC Test Client',
       vatNumber: 'CSVC-CLI',
     })
@@ -107,6 +108,12 @@ describe('updateCompanyDetails', () => {
     const updated = await updateCompanyDetails(superAdminCtx, actor, company.id, { name: 'CSVC Test Client Renamed' })
     expect(updated.name).toBe('CSVC Test Client Renamed')
     expect(updated.vatNumber).toBe('CSVC-CLI') // untouched fields survive a partial update
+    expect(updated.isClient).toBe(true) // capabilities untouched when not passed
+
+    const both = await updateCompanyDetails(superAdminCtx, actor, company.id, {
+      capabilities: { platform: false, manufacturer: true, supplier: false, client: true },
+    })
+    expect([both.isManufacturer, both.isClient]).toEqual([true, true]) // one company can hold several capabilities
 
     await expect(
       updateCompanyDetails(superAdminCtx, actor, '00000000-0000-0000-0000-000000000000', { name: 'x' }),
@@ -117,7 +124,7 @@ describe('updateCompanyDetails', () => {
 describe('setCompanyActiveStatus', () => {
   it('deactivating a company is reflected in its users\' profile — the exact flag requireAuth blocks logins on', async () => {
     const company = await createCompany(superAdminCtx, actor, {
-      type: 'client',
+      capabilities: { platform: false, manufacturer: false, supplier: false, client: true },
       name: 'CSVC Test Deactivation Co',
       vatNumber: 'CSVC-DEACT',
     })

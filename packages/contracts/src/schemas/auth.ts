@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { roleIdSchema } from './common'
+import { companyCapabilitiesSchema } from './companies'
 
 /** Business unit scope returned with user profile. */
 export const businessUnitScopeSchema = z.object({
@@ -18,15 +19,24 @@ export const userProfileSchema = z.object({
   email: z.string().email(),
   name: z.string().nullable(),
   status: z.enum(['pending_approval', 'invited', 'invite_failed', 'active', 'inactive']),
+  /** Primary (highest-ranked) role. */
   role: z.object({
     id: roleIdSchema,
     name: z.string(),
     description: z.string(),
   }),
+  /** Every role the user holds, highest rank first; includes the primary. */
+  roles: z.array(
+    z.object({
+      id: roleIdSchema,
+      name: z.string(),
+      description: z.string(),
+    }),
+  ),
   company: z.object({
     id: z.string().uuid(),
     name: z.string(),
-    type: z.enum(['platform', 'supplier', 'client']),
+    capabilities: companyCapabilitiesSchema,
     vatNumber: z.string(),
   }),
   businessUnits: z.array(businessUnitScopeSchema),

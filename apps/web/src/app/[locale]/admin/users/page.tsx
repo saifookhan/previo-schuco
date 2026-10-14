@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchFromApiResult } from '@/lib/api/server-client'
 import { PendingApprovalsCard } from '@/components/pending-approvals-card'
+import { activeCapabilityKeys } from '@/lib/company-capabilities'
 import type { AdminUsersListResponse } from '@schuco/contracts'
 
 /**
@@ -14,6 +15,7 @@ import type { AdminUsersListResponse } from '@schuco/contracts'
  */
 const AdminUsersPage = async () => {
   const t = await getTranslations('adminUsers')
+  const tCompanies = await getTranslations('adminCompanies')
   const [result, pendingResult] = await Promise.all([
     fetchFromApiResult<AdminUsersListResponse>('/api/admin/users'),
     fetchFromApiResult<AdminUsersListResponse>('/api/admin/users/pending'),
@@ -61,10 +63,18 @@ const AdminUsersPage = async () => {
                   <td className="px-6 py-4 text-slate-300">{user.email}</td>
                   <td className="px-6 py-4 text-slate-300">
                     <div>{user.company.name}</div>
-                    <div className="text-xs capitalize text-slate-500">{user.company.type}</div>
+                    <div className="text-xs text-slate-500">
+                      {activeCapabilityKeys(user.company.capabilities)
+                        .map((key) => tCompanies(`typeValue.${key}`))
+                        .join(', ')}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
-                    <Badge>{user.role.name}</Badge>
+                    {user.roles.map((role) => (
+                      <Badge key={role.id} className="mr-1">
+                        {role.name}
+                      </Badge>
+                    ))}
                   </td>
                   <td className="px-6 py-4">
                     <Badge

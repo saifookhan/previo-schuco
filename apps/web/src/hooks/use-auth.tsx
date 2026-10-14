@@ -10,20 +10,24 @@ import {
 } from 'react'
 
 import type { RoleId } from '@/types/settings'
+import type { CompanyCapabilities } from '@schuco/contracts'
 
 export interface AuthUser {
   id: string
   email: string
   name: string | null
+  /** Primary (highest-ranked) role. */
   role: {
     id: RoleId
     name: string
     description: string
   }
+  /** Every role the user holds, highest rank first; includes the primary. */
+  roles: Array<{ id: RoleId; name: string; description: string }>
   company: {
     id: string
     name: string
-    type: 'platform' | 'supplier' | 'client'
+    capabilities: CompanyCapabilities
   }
   businessUnits: Array<{ id: string; name: string; canEdit: boolean }>
 }
@@ -73,7 +77,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [])
 
   const hasRole = useCallback(
-    (...roles: RoleId[]) => (user ? roles.includes(user.role.id) : false),
+    (...roles: RoleId[]) => (user ? user.roles.some((r) => roles.includes(r.id)) : false),
     [user],
   )
 

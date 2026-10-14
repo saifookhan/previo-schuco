@@ -6,6 +6,7 @@ import {
   businessUnits,
   companies,
   roles,
+  userAdditionalRoles,
   userBusinessUnits,
   users,
 } from '../schema'
@@ -18,16 +19,45 @@ export interface BusinessUnitScope {
   canEdit: boolean
 }
 
+export interface RoleRef {
+  id: string
+  name: string
+  description: string
+}
+
+/** Highest rank first. A user's primary role (`users.role_id`) is always the highest-ranked role they hold. */
+export const ROLE_RANK = ['super-admin', 'company-admin', 'super-user', 'user'] as const
+
+const rankOf = (roleId: string): number => {
+  const index = (ROLE_RANK as readonly string[]).indexOf(roleId)
+  return index === -1 ? ROLE_RANK.length : index
+}
+
+export const sortRolesByRank = <T extends { id: string }>(list: T[]): T[] =>
+  [...list].sort((a, b) => rankOf(a.id) - rankOf(b.id))
+
+/** Splits a role set into the primary (highest-ranked) role and the rest. Throws on an empty set. */
+export const splitRoleIds = (roleIds: string[]): { primary: string; additional: string[] } => {
+  const unique = sortRolesByRank([...new Set(roleIds)].map((id) => ({ id })))
+  if (unique.length === 0) {
+    throw new Error('A user needs at least one role')
+  }
+  return { primary: unique[0].id, additional: unique.slice(1).map((r) => r.id) }
+}
+
 export interface UserListRow {
   id: string
   cognitoSub: string | null
   email: string
   name: string | null
   status: UserStatus
+  /** Primary (highest-ranked) role. */
   role: {
     id: string
     name: string
   }
+  /** Every role the user holds, highest rank first; includes the primary. */
+  roles: Array<{ id: string; name: string }>
   company: {
     id: string
     name: string
@@ -44,11 +74,10 @@ export interface UserProfile {
   email: string
   name: string | null
   status: UserStatus
-  role: {
-    id: string
-    name: string
-    description: string
-  }
+  /** Primary (highest-ranked) role. */
+  role: RoleRef
+  /** Every role the user holds, highest rank first; includes the primary. */
+  roles: RoleRef[]
   company: {
     id: string
     name: string
@@ -98,15 +127,23 @@ const getUserProfileByWhere = async (
     return null
   }
 
-  const buRows = await db
-    .select({
-      id: businessUnits.id,
-      name: businessUnits.name,
-      canEdit: userBusinessUnits.canEdit,
-    })
-    .from(userBusinessUnits)
-    .innerJoin(businessUnits, eq(userBusinessUnits.businessUnitId, businessUnits.id))
-    .where(eq(userBusinessUnits.userId, row.userId))
+  const [buRows, extraRoleRows] = await Promise.all([
+    db
+      .select({
+        id: businessUnits.id,
+        name: businessUnits.name,
+        canEdit: userBusinessUnits.canEdit,
+      })
+      .from(userBusinessUnits)
+      .innerJoin(businessUnits, eq(userBusinessUnits.businessUnitId, businessUnits.id))
+      .where(eq(userBusinessUnits.userId, row.userId)),
+    db
+      .select({ id: roles.id, name: roles.name, description: roles.description })
+      .from(userAdditionalRoles)
+      .innerJoin(roles, eq(userAdditionalRoles.roleId, roles.id))
+      .where(eq(userAdditionalRoles.userId, row.userId)),
+  ])
+  const primaryRole: RoleRef = { id: row.roleId, name: row.roleName, description: row.roleDescription }
 
   return {
     id: row.userId,
@@ -114,11 +151,8 @@ const getUserProfileByWhere = async (
     email: row.email,
     name: row.name,
     status: row.status,
-    role: {
-      id: row.roleId,
-      name: row.roleName,
-      description: row.roleDescription,
-    },
+    role: primaryRole,
+    roles: sortRolesByRank([primaryRole, ...extraRoleRows.filter((r) => r.id !== primaryRole.id)]),
     company: {
       id: row.companyId,
       name: row.companyName,
@@ -208,7 +242,8 @@ export interface CreateInvitedUserInput {
   email: string
   name?: string | null
   companyId: string
-  roleId: string
+  /** One or more roles; the highest-ranked becomes the primary role, the rest are stored as additional roles. */
+  roleIds: string[]
   businessUnitIds?: string[]
   /**
    * 'invited' (default) — an invite-accept email goes out immediately
@@ -235,6 +270,7 @@ export const createInvitedUser = async (
   db: DbLike,
   input: CreateInvitedUserInput,
 ): Promise<UserProfile> => {
+  const { primary, additional } = splitRoleIds(input.roleIds)
   const [inserted] = await db
     .insert(users)
     .values({
@@ -242,10 +278,14 @@ export const createInvitedUser = async (
       email: input.email.toLowerCase(),
       name: input.name ?? null,
       companyId: input.companyId,
-      roleId: input.roleId,
+      roleId: primary,
       status: input.initialStatus ?? 'invited',
     })
     .returning({ id: users.id })
+
+  if (additional.length) {
+    await db.insert(userAdditionalRoles).values(additional.map((roleId) => ({ userId: inserted.id, roleId })))
+  }
 
   if (input.businessUnitIds?.length) {
     await db.insert(userBusinessUnits).values(
@@ -262,6 +302,24 @@ export const createInvitedUser = async (
     throw new Error('Failed to load newly-invited user profile')
   }
   return profile
+}
+
+/**
+ * Replaces a user's whole role set. The highest-ranked role becomes the
+ * primary (`users.role_id`), the rest go to `user_additional_roles` — the
+ * one place that keeps that invariant, so callers never write either
+ * column directly.
+ * @param db - RLS-scoped transaction
+ * @param userId - The user whose roles are replaced
+ * @param roleIds - The complete new role set (at least one)
+ */
+export const setUserRoles = async (db: DbLike, userId: string, roleIds: string[]): Promise<void> => {
+  const { primary, additional } = splitRoleIds(roleIds)
+  await db.update(users).set({ roleId: primary, updatedAt: new Date() }).where(eq(users.id, userId))
+  await db.delete(userAdditionalRoles).where(eq(userAdditionalRoles.userId, userId))
+  if (additional.length) {
+    await db.insert(userAdditionalRoles).values(additional.map((roleId) => ({ userId, roleId })))
+  }
 }
 
 /**
@@ -467,6 +525,18 @@ export const listUsers = async (db: DbLike, companyId?: string, status?: UserSta
     businessUnitsByUser.set(bu.userId, existing)
   }
 
+  const extraRoleRows = await db
+    .select({ userId: userAdditionalRoles.userId, id: roles.id, name: roles.name })
+    .from(userAdditionalRoles)
+    .innerJoin(roles, eq(userAdditionalRoles.roleId, roles.id))
+    .where(inArray(userAdditionalRoles.userId, userIds))
+  const extraRolesByUser = new Map<string, Array<{ id: string; name: string }>>()
+  for (const r of extraRoleRows) {
+    const existing = extraRolesByUser.get(r.userId) ?? []
+    existing.push({ id: r.id, name: r.name })
+    extraRolesByUser.set(r.userId, existing)
+  }
+
   return userRows.map((row) => ({
     id: row.userId,
     cognitoSub: row.cognitoSub,
@@ -477,6 +547,10 @@ export const listUsers = async (db: DbLike, companyId?: string, status?: UserSta
       id: row.roleId,
       name: row.roleName,
     },
+    roles: sortRolesByRank([
+      { id: row.roleId, name: row.roleName },
+      ...(extraRolesByUser.get(row.userId) ?? []).filter((r) => r.id !== row.roleId),
+    ]),
     company: {
       id: row.companyId,
       name: row.companyName,

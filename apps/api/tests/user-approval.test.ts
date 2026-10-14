@@ -10,6 +10,7 @@ import { getDb } from '../src/lib/db'
 import {
   InviteConflictError,
   NotPendingApprovalError,
+  RoleNotGrantableError,
   approveInvite,
   inviteUser,
   listPendingApprovalUsers,
@@ -26,7 +27,7 @@ import {
 let db: Db
 let companyId: string
 let companyAdminUserId: string
-const actor = { actorUserId: '', actorCompanyId: '', callerRoleId: 'company-admin', requestId: 'test-request' }
+const actor = { actorUserId: '', actorCompanyId: '', callerRoleIds: ['company-admin'], requestId: 'test-request' }
 const approvalActor = { actorUserId: '', actorCompanyId: '', requestId: 'test-request' }
 
 const companyAdminCtx = () => ({ effectiveCompanyId: companyId, isSuperAdmin: false })
@@ -40,12 +41,13 @@ beforeAll(async () => {
       .values([
         { id: 'company-admin', name: 'Company Admin', description: 'test role' },
         { id: 'user', name: 'User', description: 'test role' },
+        { id: 'super-user', name: 'Super User', description: 'test role' },
       ])
       .onConflictDoNothing({ target: roles.id })
 
     const [company] = await tx
       .insert(companies)
-      .values({ type: 'client', name: 'Approval Test Co', vatNumber: 'APPROVAL-1' })
+      .values({ isClient: true, name: 'Approval Test Co', vatNumber: 'APPROVAL-1' })
       .returning({ id: companies.id })
     companyId = company.id
     actor.actorCompanyId = companyId
@@ -84,7 +86,7 @@ describe('inviteUser with requiresApproval', () => {
       companyAdminCtx(),
       actor,
       companyId,
-      { email: 'approval-pending@example.com', name: 'Pending User', roleId: 'user' },
+      { email: 'approval-pending@example.com', name: 'Pending User', roleIds: ['user'] },
       true,
     )
     expect(profile.status).toBe('pending_approval')
@@ -100,7 +102,7 @@ describe('inviteUser with requiresApproval', () => {
       companyAdminCtx(),
       actor,
       companyId,
-      { email: 'approval-retry@example.com', name: 'Retry User', roleId: 'user' },
+      { email: 'approval-retry@example.com', name: 'Retry User', roleIds: ['user'] },
       true,
     )
 
@@ -108,7 +110,7 @@ describe('inviteUser with requiresApproval', () => {
       companyAdminCtx(),
       actor,
       companyId,
-      { email: 'approval-retry@example.com', name: 'Retry User', roleId: 'user' },
+      { email: 'approval-retry@example.com', name: 'Retry User', roleIds: ['user'] },
       true,
     )
     expect(second.id).toBe(first.id)
@@ -118,9 +120,9 @@ describe('inviteUser with requiresApproval', () => {
   it('a super-admin invite skips approval entirely — invited immediately, with a token issued', async () => {
     const profile = await inviteUser(
       superAdminCtx(),
-      { ...actor, callerRoleId: 'super-admin' },
+      { ...actor, callerRoleIds: ['super-admin'] },
       companyId,
-      { email: 'approval-skip@example.com', name: 'Skip User', roleId: 'user' },
+      { email: 'approval-skip@example.com', name: 'Skip User', roleIds: ['user'] },
       false,
     )
     expect(profile.status).toBe('invited')
@@ -137,10 +139,57 @@ describe('inviteUser with requiresApproval', () => {
         companyAdminCtx(),
         actor,
         companyId,
-        { email: 'approval-test-company-admin@example.com', roleId: 'user' },
+        { email: 'approval-test-company-admin@example.com', roleIds: ['user'] },
         true,
       ),
     ).rejects.toThrow(InviteConflictError)
+  })
+})
+
+describe('inviteUser with several roles', () => {
+  it('stores every role and makes the highest-ranked one the primary', async () => {
+    const profile = await inviteUser(
+      companyAdminCtx(),
+      actor,
+      companyId,
+      { email: 'approval-multirole@example.com', roleIds: ['user', 'super-user'] },
+      true,
+    )
+    expect(profile.role.id).toBe('super-user')
+    expect(profile.roles.map((r) => r.id)).toEqual(['super-user', 'user'])
+  })
+
+  it('re-inviting a still-pending email replaces its role set', async () => {
+    const email = 'approval-multirole-retry@example.com'
+    await inviteUser(companyAdminCtx(), actor, companyId, { email, roleIds: ['user'] }, true)
+    const again = await inviteUser(companyAdminCtx(), actor, companyId, { email, roleIds: ['user', 'super-user'] }, true)
+    expect(again.roles.map((r) => r.id)).toEqual(['super-user', 'user'])
+    const downgraded = await inviteUser(companyAdminCtx(), actor, companyId, { email, roleIds: ['user'] }, true)
+    expect(downgraded.roles.map((r) => r.id)).toEqual(['user'])
+  })
+
+  it('rejects the whole request when any one role is not grantable by the caller', async () => {
+    await expect(
+      inviteUser(
+        companyAdminCtx(),
+        actor,
+        companyId,
+        { email: 'approval-multirole-denied@example.com', roleIds: ['user', 'super-admin'] },
+        true,
+      ),
+    ).rejects.toThrow(RoleNotGrantableError)
+  })
+
+  it('rejects an empty role list', async () => {
+    await expect(
+      inviteUser(
+        companyAdminCtx(),
+        actor,
+        companyId,
+        { email: 'approval-multirole-empty@example.com', roleIds: [] },
+        true,
+      ),
+    ).rejects.toThrow(RoleNotGrantableError)
   })
 })
 
@@ -150,7 +199,7 @@ describe('approveInvite', () => {
       companyAdminCtx(),
       actor,
       companyId,
-      { email: 'approval-approve-me@example.com', name: 'Approve Me', roleId: 'user' },
+      { email: 'approval-approve-me@example.com', name: 'Approve Me', roleIds: ['user'] },
       true,
     )
 
@@ -172,7 +221,7 @@ describe('approveInvite', () => {
       companyAdminCtx(),
       actor,
       companyId,
-      { email: 'approval-double-approve@example.com', roleId: 'user' },
+      { email: 'approval-double-approve@example.com', roleIds: ['user'] },
       true,
     )
     await approveInvite(superAdminCtx(), approvalActor, pending.id)
@@ -190,7 +239,7 @@ describe('rejectInvite', () => {
       companyAdminCtx(),
       actor,
       companyId,
-      { email: 'approval-reject-me@example.com', roleId: 'user' },
+      { email: 'approval-reject-me@example.com', roleIds: ['user'] },
       true,
     )
 
@@ -209,7 +258,7 @@ describe('listPendingApprovalUsers', () => {
       companyAdminCtx(),
       actor,
       companyId,
-      { email: 'approval-listed@example.com', roleId: 'user' },
+      { email: 'approval-listed@example.com', roleIds: ['user'] },
       true,
     )
 

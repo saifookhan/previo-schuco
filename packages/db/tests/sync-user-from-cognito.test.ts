@@ -37,7 +37,7 @@ beforeAll(async () => {
 
     const [c] = await tx
       .insert(companies)
-      .values({ type: 'client', name: 'Sync Test Co', vatNumber: 'SYNCTEST' })
+      .values({ isClient: true, name: 'Sync Test Co', vatNumber: 'SYNCTEST' })
       .returning({ id: companies.id })
     companyId = c.id
   })
@@ -56,7 +56,7 @@ describe('syncUserFromCognito recovers an invite_failed user', () => {
       createInvitedUser(tx, {
         email: 'invite-failed-recovers@example.com',
         companyId,
-        roleId: 'company-admin',
+        roleIds: ['company-admin'],
       }),
     )
 
@@ -78,7 +78,7 @@ describe('syncUserFromCognito recovers an invite_failed user', () => {
       createInvitedUser(tx, {
         email: 'stays-inactive@example.com',
         companyId,
-        roleId: 'company-admin',
+        roleIds: ['company-admin'],
       }),
     )
     await withSystemTransaction(db, (tx) =>

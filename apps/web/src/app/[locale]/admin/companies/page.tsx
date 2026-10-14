@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchFromApiResult } from '@/lib/api/server-client'
 import { CompanyCreateButton } from '@/components/company-create-button'
 import { CompanyRowActions } from '@/components/company-row-actions'
+import { activeCapabilityKeys } from '@/lib/company-capabilities'
 import type { CompaniesListResponse } from '@schuco/contracts'
 
 /** Super-admin platform-wide company management: create, edit, activate/deactivate. */
@@ -51,7 +52,7 @@ const AdminCompaniesPage = async () => {
               {companiesList.map((company) => (
                 <tr key={company.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
                   <td className="px-6 py-4 font-medium text-white">{company.name}</td>
-                  <td className="px-6 py-4 text-slate-300 capitalize">{t(`typeValue.${company.type}`)}</td>
+                  <td className="px-6 py-4 text-slate-300">{activeCapabilityKeys(company.capabilities).map((key) => t(`typeValue.${key}`)).join(', ')}</td>
                   <td className="px-6 py-4 font-mono text-xs text-slate-400">{company.vatNumber}</td>
                   <td className="px-6 py-4">
                     <Badge variant={company.isActive ? 'success' : 'muted'}>

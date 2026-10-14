@@ -23,3 +23,14 @@ export const canGrantRole = (callerRoleId: string, targetRoleId: string): boolea
   }
   return GRANTABLE_ROLES_BY_CALLER[callerRoleId]?.has(targetRoleId) ?? false
 }
+
+/**
+ * Multi-role version: every role being assigned must be grantable by at
+ * least one of the caller's roles. An empty target list is never grantable
+ * (a user always needs at least one role).
+ * @param callerRoleIds - All roles of the user performing the invite
+ * @param targetRoleIds - Roles being assigned to the invitee
+ */
+export const canGrantRoles = (callerRoleIds: string[], targetRoleIds: string[]): boolean =>
+  targetRoleIds.length > 0 &&
+  targetRoleIds.every((target) => callerRoleIds.some((caller) => canGrantRole(caller, target)))

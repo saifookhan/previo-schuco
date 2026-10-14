@@ -92,6 +92,13 @@
       "when": 1791967415455,
       "tag": "0013_company_capabilities",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791968628342,
+      "tag": "0014_user_additional_roles",
+      "breakpoints": true
     }
   ]
 }

@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useRouter } from '@/i18n/navigation'
-import type { CompanyDto } from '@schuco/contracts'
+import type { CompanyCapabilities, CompanyDto } from '@schuco/contracts'
+import { CompanyCapabilitiesField } from '@/components/company-capabilities-field'
+import { hasAnyCapability } from '@/lib/company-capabilities'
 
-const COMPANY_TYPES = ['platform', 'supplier', 'client'] as const
+const DEFAULT_CAPABILITIES: CompanyCapabilities = { platform: false, manufacturer: false, supplier: false, client: true }
 
 /** "New company" button + modal for the super-admin companies panel. */
 export const CompanyCreateButton = () => {
@@ -19,10 +21,10 @@ export const CompanyCreateButton = () => {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [form, setForm] = useState({ type: 'client' as (typeof COMPANY_TYPES)[number], name: '', vatNumber: '' })
+  const [form, setForm] = useState({ capabilities: DEFAULT_CAPABILITIES, name: '', vatNumber: '' })
 
   const openDialog = () => {
-    setForm({ type: 'client', name: '', vatNumber: '' })
+    setForm({ capabilities: DEFAULT_CAPABILITIES, name: '', vatNumber: '' })
     setError(null)
     setOpen(true)
   }
@@ -30,6 +32,10 @@ export const CompanyCreateButton = () => {
   const create = async () => {
     if (!form.name.trim() || !form.vatNumber.trim()) {
       setError(t('createRequired'))
+      return
+    }
+    if (!hasAnyCapability(form.capabilities)) {
+      setError(t('capabilityRequired'))
       return
     }
     setSaving(true)
@@ -83,21 +89,11 @@ export const CompanyCreateButton = () => {
             </div>
 
             <div className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="company-new-type">{t('fieldType')}</Label>
-                <select
-                  id="company-new-type"
-                  className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
-                  value={form.type}
-                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as typeof f.type }))}
-                >
-                  {COMPANY_TYPES.map((type) => (
-                    <option key={type} value={type}>
-                      {t(`typeValue.${type}`)}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CompanyCapabilitiesField
+                idPrefix="company-new-cap"
+                value={form.capabilities}
+                onChange={(capabilities) => setForm((f) => ({ ...f, capabilities }))}
+              />
               <div className="space-y-1">
                 <Label htmlFor="company-new-name">{t('fieldName')}</Label>
                 <Input

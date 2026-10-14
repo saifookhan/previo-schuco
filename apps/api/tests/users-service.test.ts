@@ -35,11 +35,11 @@ beforeAll(async () => {
 
     const [a] = await tx
       .insert(companies)
-      .values({ type: 'client', name: 'Service Test Co A', vatNumber: 'SVCTEST-A' })
+      .values({ isClient: true, name: 'Service Test Co A', vatNumber: 'SVCTEST-A' })
       .returning({ id: companies.id })
     const [b] = await tx
       .insert(companies)
-      .values({ type: 'client', name: 'Service Test Co B', vatNumber: 'SVCTEST-B' })
+      .values({ isClient: true, name: 'Service Test Co B', vatNumber: 'SVCTEST-B' })
       .returning({ id: companies.id })
     companyA = a.id
     companyB = b.id

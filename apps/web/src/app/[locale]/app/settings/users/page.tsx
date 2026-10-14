@@ -61,7 +61,11 @@ const UsersPage = async () => {
                   <td className="px-6 py-4 font-medium text-slate-900">{user.name ?? '—'}</td>
                   <td className="px-6 py-4 text-slate-600">{user.email}</td>
                   <td className="px-6 py-4">
-                    <Badge>{user.role.name}</Badge>
+                    {user.roles.map((role) => (
+                      <Badge key={role.id} className="mr-1">
+                        {role.name}
+                      </Badge>
+                    ))}
                   </td>
                   <td className="px-6 py-4">
                     <Badge variant={statusVariant(user.status)}>{user.status}</Badge>

@@ -36,19 +36,19 @@ beforeAll(async () => {
   await withSystemTransaction(db, async (tx) => {
     const [a] = await tx
       .insert(companies)
-      .values({ type: 'supplier', name: 'PF RLS Test Supplier A', vatNumber: 'PFRLS-SUP-A' })
+      .values({ isManufacturer: true, isSupplier: true, name: 'PF RLS Test Supplier A', vatNumber: 'PFRLS-SUP-A' })
       .returning({ id: companies.id })
     const [b] = await tx
       .insert(companies)
-      .values({ type: 'supplier', name: 'PF RLS Test Supplier B', vatNumber: 'PFRLS-SUP-B' })
+      .values({ isManufacturer: true, isSupplier: true, name: 'PF RLS Test Supplier B', vatNumber: 'PFRLS-SUP-B' })
       .returning({ id: companies.id })
     const [linked] = await tx
       .insert(companies)
-      .values({ type: 'client', name: 'PF RLS Test Client Linked', vatNumber: 'PFRLS-CLI-LINKED' })
+      .values({ isClient: true, name: 'PF RLS Test Client Linked', vatNumber: 'PFRLS-CLI-LINKED' })
       .returning({ id: companies.id })
     const [unlinked] = await tx
       .insert(companies)
-      .values({ type: 'client', name: 'PF RLS Test Client Unlinked', vatNumber: 'PFRLS-CLI-UNLINKED' })
+      .values({ isClient: true, name: 'PF RLS Test Client Unlinked', vatNumber: 'PFRLS-CLI-UNLINKED' })
       .returning({ id: companies.id })
 
     supplierA = a.id
@@ -87,6 +87,24 @@ describe('product_families RLS', () => {
     )
     expect(rows).toHaveLength(1)
     expect(rows[0].name).toBe('Unpublished Draft')
+  })
+
+  it('1b. a company that is a supplier but not a manufacturer cannot INSERT a product family', async () => {
+    const [sellerOnly] = await withSystemTransaction(db, (tx) =>
+      tx
+        .insert(companies)
+        .values({ isSupplier: true, name: 'PF RLS Test Seller Only', vatNumber: 'PFRLS-SELLER-ONLY' })
+        .returning({ id: companies.id }),
+    )
+    try {
+      await expect(
+        withRlsTransaction(db, { companyId: sellerOnly.id, isSuperAdmin: false }, (tx) =>
+          tx.insert(productFamilies).values({ supplierCompanyId: sellerOnly.id, name: 'Not Allowed' }),
+        ),
+      ).rejects.toThrow()
+    } finally {
+      await withSystemTransaction(db, (tx) => tx.delete(companies).where(eq(companies.id, sellerOnly.id)))
+    }
   })
 
   it('2. a supplier can access its own family, published or not', async () => {

@@ -14,6 +14,7 @@ export const toUserDto = (row: UserListRow): UserDto => ({
     id: row.role.id as RoleId,
     name: row.role.name,
   },
+  roles: row.roles.map((r) => ({ id: r.id as RoleId, name: r.name })),
   businessUnits: row.businessUnits,
 })
 
@@ -32,6 +33,7 @@ export const profileToUserDto = (profile: UserProfile): UserDto => ({
     id: profile.role.id as RoleId,
     name: profile.role.name,
   },
+  roles: profile.roles.map((r) => ({ id: r.id as RoleId, name: r.name })),
   businessUnits: profile.businessUnits,
 })
 

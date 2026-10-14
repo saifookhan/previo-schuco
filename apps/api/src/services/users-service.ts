@@ -8,16 +8,17 @@ import {
   listUsers,
   markInviteFailed,
   resetInvitePending,
+  setUserRoles,
   type UserListRow,
   type UserProfile,
 } from '@schuco/db'
 
-import { canGrantRole } from '../lib/role-hierarchy'
+import { canGrantRoles } from '../lib/role-hierarchy'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
 import { issueInviteToken } from './auth-service'
 import { recordAuditEvent } from './audit-service'
 
-/** The caller's role isn't allowed to grant the requested role (see `canGrantRole`). */
+/** The caller's role isn't allowed to grant the requested role (see `canGrantRoles`). */
 export class RoleNotGrantableError extends Error {}
 
 /** One or more requested `businessUnitIds` don't belong to `companyId`. */
@@ -54,15 +55,15 @@ export const listAllUsers = (ctx: TenantContext): Promise<UserListRow[]> =>
 export interface InviteUserInput {
   email: string
   name?: string
-  roleId: string
+  roleIds: string[]
   businessUnitIds?: string[]
 }
 
 export interface InviteActor {
   actorUserId: string
   actorCompanyId: string
-  /** Role of the user performing the invite — enforced here via `canGrantRole`, not just at the route (defense in depth: this is the one place every invite path funnels through). */
-  callerRoleId: string
+  /** All roles of the user performing the invite — enforced here via `canGrantRoles`, not just at the route (defense in depth: this is the one place every invite path funnels through). */
+  callerRoleIds: string[]
   /** Correlates this invite's audit entry back to the HTTP request (ADR 0010). */
   requestId?: string | null
 }
@@ -96,7 +97,7 @@ export interface InviteActor {
  * @param companyId - Company the invited user belongs to
  * @param input - Invitee details
  * @param requiresApproval - True: create as `'pending_approval'`, no email sent yet. False: invite immediately.
- * @throws {RoleNotGrantableError} `actor.callerRoleId` may not grant `input.roleId`
+ * @throws {RoleNotGrantableError} `actor.callerRoleIds` may not grant `input.roleIds`
  * @throws {InvalidBusinessUnitsError} a requested business unit doesn't belong to `companyId`
  * @throws {InviteConflictError} the email is already taken by a non-pending user
  */
@@ -107,8 +108,10 @@ export const inviteUser = async (
   input: InviteUserInput,
   requiresApproval: boolean,
 ): Promise<UserProfile> => {
-  if (!canGrantRole(actor.callerRoleId, input.roleId)) {
-    throw new RoleNotGrantableError(`'${actor.callerRoleId}' cannot assign role '${input.roleId}'`)
+  if (!canGrantRoles(actor.callerRoleIds, input.roleIds)) {
+    throw new RoleNotGrantableError(
+      `'${actor.callerRoleIds.join(', ')}' cannot assign role(s) '${input.roleIds.join(', ')}'`,
+    )
   }
 
   let validBusinessUnitIds: string[] = []
@@ -135,6 +138,8 @@ export const inviteUser = async (
       if (existing.status !== 'invited' && existing.status !== 'invite_failed' && existing.status !== 'pending_approval') {
         throw new InviteConflictError(`A user with email '${input.email}' already exists`)
       }
+      // Re-inviting is also how a pending invite's roles get corrected — apply the (already grant-checked) new set.
+      await setUserRoles(tx, existing.id, input.roleIds)
       const profile = await getUserProfileById(tx, existing.id)
       if (!profile) {
         throw new Error('Failed to load existing invited user profile')
@@ -143,7 +148,7 @@ export const inviteUser = async (
         action: existing.status === 'pending_approval' ? 'user.invite.request.retry' : 'user.invite.retry',
         resourceType: 'user',
         resourceId: profile.id,
-        metadata: { email: input.email, roleId: input.roleId },
+        metadata: { email: input.email, roleIds: input.roleIds },
       })
       return { created: profile, wasPendingApproval: existing.status === 'pending_approval' }
     }
@@ -152,7 +157,7 @@ export const inviteUser = async (
       email: input.email,
       name: input.name,
       companyId,
-      roleId: input.roleId,
+      roleIds: input.roleIds,
       businessUnitIds: validBusinessUnitIds,
       initialStatus: requiresApproval ? 'pending_approval' : 'invited',
     })
@@ -160,7 +165,7 @@ export const inviteUser = async (
       action: requiresApproval ? 'user.invite.request' : 'user.invite',
       resourceType: 'user',
       resourceId: profile.id,
-      metadata: { email: input.email, roleId: input.roleId },
+      metadata: { email: input.email, roleIds: input.roleIds },
     })
     return { created: profile, wasPendingApproval: requiresApproval }
   })

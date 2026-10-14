@@ -490,7 +490,15 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
               properties: {
                 id: { type: 'string', format: 'uuid' },
                 name: { type: 'string' },
-                type: { type: 'string', enum: ['platform', 'supplier', 'client'] },
+                capabilities: {
+                  type: 'object',
+                  properties: {
+                    platform: { type: 'boolean' },
+                    manufacturer: { type: 'boolean' },
+                    supplier: { type: 'boolean' },
+                    client: { type: 'boolean' },
+                  },
+                },
                 vatNumber: { type: 'string' },
               },
             },
@@ -540,7 +548,15 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
                   properties: {
                     id: { type: 'string', format: 'uuid' },
                     name: { type: 'string' },
-                    type: { type: 'string', enum: ['platform', 'supplier', 'client'] },
+                    capabilities: {
+                  type: 'object',
+                  properties: {
+                    platform: { type: 'boolean' },
+                    manufacturer: { type: 'boolean' },
+                    supplier: { type: 'boolean' },
+                    client: { type: 'boolean' },
+                  },
+                },
                   },
                 },
                 createdAt: { type: 'string', format: 'date-time' },

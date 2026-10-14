@@ -124,7 +124,7 @@ export const AppShell = ({ children }: AppShellProps) => {
         {!loading && user ? (
           <div className="border-b border-slate-100 px-5 py-3 text-xs text-slate-500">
             <p className="font-medium text-slate-700">{user.name ?? user.email}</p>
-            <p>{user.role.name}</p>
+            <p>{user.roles.map((role) => role.name).join(', ')}</p>
           </div>
         ) : null}
 

@@ -34,11 +34,11 @@ beforeAll(async () => {
 
     const [a] = await tx
       .insert(companies)
-      .values({ type: 'client', name: 'RLS Test Co A', vatNumber: 'RLSTEST-A' })
+      .values({ isClient: true, name: 'RLS Test Co A', vatNumber: 'RLSTEST-A' })
       .returning({ id: companies.id })
     const [b] = await tx
       .insert(companies)
-      .values({ type: 'client', name: 'RLS Test Co B', vatNumber: 'RLSTEST-B' })
+      .values({ isClient: true, name: 'RLS Test Co B', vatNumber: 'RLSTEST-B' })
       .returning({ id: companies.id })
 
     companyA = a.id
@@ -270,7 +270,7 @@ describe('supplier_client_links RLS', () => {
     await withSystemTransaction(db, async (tx) => {
       const [c] = await tx
         .insert(companies)
-        .values({ type: 'client', name: 'RLS Test Co C', vatNumber: 'RLSTEST-C' })
+        .values({ isClient: true, name: 'RLS Test Co C', vatNumber: 'RLSTEST-C' })
         .returning({ id: companies.id })
       companyC = c.id
 

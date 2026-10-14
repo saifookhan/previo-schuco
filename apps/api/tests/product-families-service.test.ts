@@ -53,7 +53,7 @@ beforeAll(async () => {
 
     const [company] = await tx
       .insert(companies)
-      .values({ type: 'supplier', name: 'PF Service Test Supplier', vatNumber: 'PFSVC-SUP' })
+      .values({ isManufacturer: true, isSupplier: true, name: 'PF Service Test Supplier', vatNumber: 'PFSVC-SUP' })
       .returning({ id: companies.id })
     supplierCompanyId = company.id
     actor.actorCompanyId = supplierCompanyId
@@ -432,7 +432,7 @@ describe('listProductFamilies', () => {
     const [otherCompany] = await withSystemTransaction(db, (tx) =>
       tx
         .insert(companies)
-        .values({ type: 'supplier', name: 'PF Service Test Other Supplier', vatNumber: 'PFSVC-OTHER' })
+        .values({ isManufacturer: true, isSupplier: true, name: 'PF Service Test Other Supplier', vatNumber: 'PFSVC-OTHER' })
         .returning({ id: companies.id }),
     )
     const otherCtx = { effectiveCompanyId: otherCompany.id, isSuperAdmin: false }

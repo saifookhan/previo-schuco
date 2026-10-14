@@ -123,7 +123,7 @@
     "usersCount": "{count} users",
     "name": "Name",
     "email": "Email",
-    "role": "Role",
+    "role": "Roles",
     "status": "Status",
     "addUserTitle": "Add user",
     "addUserHint": "Awaits a super-admin's approval before any invite email goes out.",
@@ -134,7 +134,8 @@
     "adding": "Adding…",
     "close": "Close",
     "errorLoading": "Couldn't load users — the server may be unreachable.",
-    "noUsersFound": "No users yet."
+    "noUsersFound": "No users yet.",
+    "rolesRequired": "Select at least one role"
   },
   "settingsRoles": {
     "title": "Roles",
@@ -385,7 +386,7 @@
     "subtitle": "Create and manage every company on the platform — super-admin only",
     "companiesCount": "{count} companies",
     "name": "Name",
-    "type": "Type",
+    "type": "Capabilities",
     "vatNumber": "VAT number",
     "status": "Status",
     "active": "Active",
@@ -400,13 +401,14 @@
     "createFailedUnreachable": "Could not create company — could not reach the server",
     "saveFailed": "Could not save company",
     "saveFailedUnreachable": "Could not save company — could not reach the server",
-    "fieldType": "Type",
+    "fieldType": "Capabilities",
     "fieldName": "Name",
     "fieldVatNumber": "VAT number",
     "typeValue": {
-      "platform": "Platform",
+      "manufacturer": "Manufacturer",
       "supplier": "Supplier",
-      "client": "Client"
+      "client": "Client",
+      "platform": "Platform"
     },
     "cancel": "Cancel",
     "create": "Create",
@@ -416,7 +418,14 @@
     "close": "Close",
     "edit": "Edit company",
     "activate": "Activate company",
-    "deactivate": "Deactivate company — blocks all its users from logging in"
+    "deactivate": "Deactivate company — blocks all its users from logging in",
+    "capabilityRequired": "Select at least one capability",
+    "typeHint": {
+      "manufacturer": "Builds and owns a product catalog",
+      "supplier": "Sells — creates quotes from linked manufacturers' catalogs",
+      "client": "Buys from linked suppliers",
+      "platform": "The PREVIO / Schüco platform operator"
+    }
   },
   "setPassword": {
     "title": "Set your password",
