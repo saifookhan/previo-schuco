@@ -5,6 +5,7 @@ import {
   filterBusinessUnitIdsByCompany,
   getUserByEmailInCompany,
   getUserProfileById,
+  listAllRoles,
   listUsers,
   markInviteFailed,
   resetInvitePending,
@@ -13,13 +14,17 @@ import {
   type UserProfile,
 } from '@schuco/db'
 
-import { canGrantRoles } from '../lib/role-hierarchy'
+import { canGrantByPermissions, canGrantRoles } from '../lib/role-hierarchy'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
 import { issueInviteToken } from './auth-service'
 import { recordAuditEvent } from './audit-service'
+import { getEffectiveRolePermissions } from './role-permissions-service'
 
 /** The caller's role isn't allowed to grant the requested role (see `canGrantRoles`). */
 export class RoleNotGrantableError extends Error {}
+
+/** A requested role id doesn't exist (e.g. a custom role deleted since the form loaded). */
+export class UnknownRoleError extends Error {}
 
 /** One or more requested `businessUnitIds` don't belong to `companyId`. */
 export class InvalidBusinessUnitsError extends Error {}
@@ -97,6 +102,7 @@ export interface InviteActor {
  * @param companyId - Company the invited user belongs to
  * @param input - Invitee details
  * @param requiresApproval - True: create as `'pending_approval'`, no email sent yet. False: invite immediately.
+ * @throws {UnknownRoleError} a requested role doesn't exist
  * @throws {RoleNotGrantableError} `actor.callerRoleIds` may not grant `input.roleIds`
  * @throws {InvalidBusinessUnitsError} a requested business unit doesn't belong to `companyId`
  * @throws {InviteConflictError} the email is already taken by a non-pending user
@@ -108,7 +114,15 @@ export const inviteUser = async (
   input: InviteUserInput,
   requiresApproval: boolean,
 ): Promise<UserProfile> => {
-  if (!canGrantRoles(actor.callerRoleIds, input.roleIds)) {
+  const knownRoles = new Set((await withTenantDb(ctx, (tx) => listAllRoles(tx))).map((role) => role.id))
+  const unknownRole = input.roleIds.find((id) => !knownRoles.has(id))
+  if (unknownRole) {
+    throw new UnknownRoleError(`Unknown role '${unknownRole}'`)
+  }
+  if (
+    !canGrantRoles(actor.callerRoleIds, input.roleIds) ||
+    !canGrantByPermissions(actor.callerRoleIds, input.roleIds, await getEffectiveRolePermissions())
+  ) {
     throw new RoleNotGrantableError(
       `'${actor.callerRoleIds.join(', ')}' cannot assign role(s) '${input.roleIds.join(', ')}'`,
     )

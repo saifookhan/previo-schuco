@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { canGrantRole } from '../src/lib/role-hierarchy'
+import { canGrantRole, canGrantByPermissions } from '../src/lib/role-hierarchy'
 
 /**
  * Pure unit test (ADR 0012, category "unit" — no DB) for the guard behind
@@ -27,5 +27,27 @@ describe('canGrantRole', () => {
     expect(canGrantRole('super-user', 'user')).toBe(false)
     expect(canGrantRole('user', 'user')).toBe(false)
     expect(canGrantRole('some-future-role', 'user')).toBe(false)
+  })
+})
+
+describe('canGrantByPermissions', () => {
+  const matrix = {
+    'company-admin': ['catalog.view', 'catalog.edit', 'users.manage'],
+    'super-user': ['catalog.view', 'catalog.edit'],
+    auditor: ['catalog.view'],
+    'power-role': ['catalog.view', 'catalog.edit', 'catalog.share'],
+  } as const
+
+  it('lets a caller hand out a role whose permissions it already holds', () => {
+    expect(canGrantByPermissions(['company-admin'], ['super-user', 'auditor'], matrix)).toBe(true)
+  })
+
+  it('refuses a role that carries a permission the caller lacks (no escalation through custom roles)', () => {
+    expect(canGrantByPermissions(['company-admin'], ['power-role'], matrix)).toBe(false)
+  })
+
+  it('counts permissions across all of the caller\'s roles, and never limits a super-admin', () => {
+    expect(canGrantByPermissions(['auditor', 'power-role'], ['power-role'], matrix)).toBe(true)
+    expect(canGrantByPermissions(['super-admin'], ['power-role'], matrix)).toBe(true)
   })
 })

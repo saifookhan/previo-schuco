@@ -1,44 +1,14 @@
-'use client'
+import { AlertTriangle } from 'lucide-react'
+import { getTranslations } from 'next-intl/server'
 
-import { Plus, Trash2 } from 'lucide-react'
-import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { RolesManager } from '@/components/roles-manager'
+import { fetchFromApiResult } from '@/lib/api/server-client'
+import type { RolesListResponse } from '@schuco/contracts'
 
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { DEMO_ROLES, type Role } from '@/types/settings'
-
-const CANONICAL_ROLE_IDS = ['super-admin', 'company-admin', 'super-user', 'user'] as const
-
-/**
- * Demo roles management with add/remove capability.
- */
-const RolesPage = () => {
-  const t = useTranslations('settingsRoles')
-  const [roles, setRoles] = useState<Role[]>(DEMO_ROLES)
-  const [newName, setNewName] = useState('')
-  const [newDescription, setNewDescription] = useState('')
-
-  const addRole = () => {
-    if (!newName.trim()) return
-    setRoles((prev) => [
-      ...prev,
-      {
-        id: newName.toLowerCase().replace(/\s+/g, '-'),
-        name: newName.trim(),
-        description: newDescription.trim() || t('customRole'),
-      },
-    ])
-    setNewName('')
-    setNewDescription('')
-  }
-
-  const removeRole = (id: string) => {
-    if (CANONICAL_ROLE_IDS.includes(id as (typeof CANONICAL_ROLE_IDS)[number])) return
-    setRoles((prev) => prev.filter((r) => r.id !== id))
-  }
+/** Roles (super-admin): the built-in roles plus custom ones that can be created and removed here. */
+const RolesPage = async () => {
+  const t = await getTranslations('settingsRoles')
+  const result = await fetchFromApiResult<RolesListResponse>('/api/admin/roles')
 
   return (
     <div className="p-6 md:p-8">
@@ -47,60 +17,14 @@ const RolesPage = () => {
         <p className="mt-1 text-sm text-slate-500">{t('subtitle')}</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {roles.map((role) => (
-          <Card key={role.id}>
-            <CardHeader className="flex flex-row items-start justify-between">
-              <div>
-                <CardTitle>{role.name}</CardTitle>
-                <p className="mt-1 text-sm text-slate-500">{role.description}</p>
-              </div>
-              {!CANONICAL_ROLE_IDS.includes(role.id as (typeof CANONICAL_ROLE_IDS)[number]) && (
-                <button
-                  onClick={() => removeRole(role.id)}
-                  className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                  aria-label={t('removeLabel', { name: role.name })}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
-            </CardHeader>
-            <CardContent>
-              <p className="font-mono text-xs text-slate-400">{role.id}</p>
-            </CardContent>
-          </Card>
-        ))}
-
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle>{t('addRole')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="role-name">{t('roleNameLabel')}</Label>
-              <Input
-                id="role-name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder={t('roleNamePlaceholder')}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="role-desc">{t('descriptionLabel')}</Label>
-              <Input
-                id="role-desc"
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                placeholder={t('descriptionPlaceholder')}
-              />
-            </div>
-            <Button onClick={addRole} className="w-full gap-2">
-              <Plus className="h-4 w-4" />
-              {t('addRole')}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      {result.data ? (
+        <RolesManager roles={result.data.roles} />
+      ) : (
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          {t('errorLoading')}
+        </div>
+      )}
     </div>
   )
 }

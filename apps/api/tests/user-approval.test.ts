@@ -11,6 +11,7 @@ import {
   InviteConflictError,
   NotPendingApprovalError,
   RoleNotGrantableError,
+  UnknownRoleError,
   approveInvite,
   inviteUser,
   listPendingApprovalUsers,
@@ -42,6 +43,7 @@ beforeAll(async () => {
         { id: 'company-admin', name: 'Company Admin', description: 'test role' },
         { id: 'user', name: 'User', description: 'test role' },
         { id: 'super-user', name: 'Super User', description: 'test role' },
+        { id: 'super-admin', name: 'Super Admin', description: 'test role' },
       ])
       .onConflictDoNothing({ target: roles.id })
 
@@ -178,6 +180,18 @@ describe('inviteUser with several roles', () => {
         true,
       ),
     ).rejects.toThrow(RoleNotGrantableError)
+  })
+
+  it('rejects a role that does not exist with a clear error instead of a database failure', async () => {
+    await expect(
+      inviteUser(
+        companyAdminCtx(),
+        actor,
+        companyId,
+        { email: 'approval-multirole-unknown@example.com', roleIds: ['no-such-role'] },
+        true,
+      ),
+    ).rejects.toThrow(UnknownRoleError)
   })
 
   it('rejects an empty role list', async () => {

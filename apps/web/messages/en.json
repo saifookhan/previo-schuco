@@ -135,17 +135,36 @@
     "close": "Close",
     "errorLoading": "Couldn't load users — the server may be unreachable.",
     "noUsersFound": "No users yet.",
-    "rolesRequired": "Select at least one role"
+    "rolesRequired": "Select at least one role",
+    "rolesLoading": "Loading roles…",
+    "rolesLoadFailed": "Could not load roles — try again"
   },
   "settingsRoles": {
     "title": "Roles",
-    "subtitle": "Define roles and permission groups",
+    "subtitle": "Built-in roles plus custom roles you create. Set what each role may do in Access Rights.",
     "addRole": "Add role",
     "roleNameLabel": "Role name",
     "roleNamePlaceholder": "e.g. Project Manager",
     "descriptionLabel": "Description",
     "descriptionPlaceholder": "Optional description",
     "removeLabel": "Remove {name}",
+    "builtIn": "Built-in",
+    "users": "{count, plural, =0 {No users} one {1 user} other {# users}}",
+    "nameRequired": "Enter a role name",
+    "createFailed": "Could not create role",
+    "createFailedUnreachable": "Could not create role — could not reach the server",
+    "creating": "Creating…",
+    "created": "Role “{name}” created",
+    "deleted": "Role “{name}” deleted",
+    "deleteFailed": "Could not delete role",
+    "deleteTitle": "Delete “{name}”?",
+    "deleteMessage": "This role will be removed. It has no users.",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "inUse": "{count, plural, one {1 user still has this role — remove it from them first.} other {# users still have this role — remove it from them first.}}",
+    "newRoleHint": "A new role has no permissions until you grant them in Access Rights.",
+    "editPermissions": "Edit permissions",
+    "errorLoading": "Couldn't load roles — the server may be unreachable.",
     "customRole": "Custom role"
   },
   "settingsAccessRights": {
@@ -167,20 +186,20 @@
     "lockSuperAdmin": "Super-admin always has every permission",
     "lockCompanyAdminUsers": "Company admins must keep user management",
     "permissionLabels": {
-      "catalog.view": "View catalog",
-      "catalog.edit": "Edit catalog",
-      "quote.view": "View quotes",
-      "quote.edit": "Create and edit quotes",
-      "users.manage": "Manage company users",
-      "catalog.share": "Share product families"
+      "catalog_view": "View catalog",
+      "catalog_edit": "Edit catalog",
+      "quote_view": "View quotes",
+      "quote_edit": "Create and edit quotes",
+      "users_manage": "Manage company users",
+      "catalog_share": "Share product families"
     },
     "permissionHints": {
-      "catalog.view": "Browse product families and their prices",
-      "catalog.edit": "Import, edit, publish and delete product families",
-      "quote.view": "Open quotes and download PDFs",
-      "quote.edit": "Create quotes and edit their positions",
-      "users.manage": "Invite and manage users of their own company",
-      "catalog.share": "Share a family with other companies and set their default discount"
+      "catalog_view": "Browse product families and their prices",
+      "catalog_edit": "Import, edit, publish and delete product families",
+      "quote_view": "Open quotes and download PDFs",
+      "quote_edit": "Create quotes and edit their positions",
+      "users_manage": "Invite and manage users of their own company",
+      "catalog_share": "Share a family with other companies and set their default discount"
     }
   },
   "settingsCompany": {

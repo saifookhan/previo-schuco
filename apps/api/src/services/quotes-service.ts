@@ -18,6 +18,7 @@ import {
 } from '@schuco/db'
 import { computeCharacteristicPrice, computeLinePrice, type PricingMatrix } from '@schuco/calculation'
 
+import { PG_UNIQUE_VIOLATION, pgErrorCode } from '../lib/pg-error'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
 import { recordAuditEvent } from './audit-service'
 
@@ -183,8 +184,7 @@ const isNonNegativeFinite = (n: unknown): n is number => typeof n === 'number' &
  * into the same QuoteValidationError the pre-check would have thrown,
  * instead of a raw 500.
  */
-const isPositionCodeConflict = (error: unknown): boolean =>
-  typeof error === 'object' && error !== null && 'code' in error && (error as { code: unknown }).code === '23505'
+const isPositionCodeConflict = (error: unknown): boolean => pgErrorCode(error) === PG_UNIQUE_VIOLATION
 
 const resolvePositionCode = (
   existingPositions: { id: string; positionCode: string }[],

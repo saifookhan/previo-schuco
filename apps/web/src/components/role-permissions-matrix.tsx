@@ -11,6 +11,9 @@ import { IMPLIED_PERMISSIONS, permissionLock, type Permission, type RolePermissi
 
 type Matrix = Record<string, Permission[]>
 
+/** next-intl keys can't contain dots, so `catalog.view` is stored as `catalog_view`. */
+const permissionKey = (permission: Permission) => permission.replace('.', '_')
+
 const cloneMatrix = (matrix: Record<string, readonly Permission[]>): Matrix =>
   Object.fromEntries(Object.entries(matrix).map(([role, perms]) => [role, [...perms]]))
 
@@ -107,8 +110,8 @@ export const RolePermissionsMatrix = ({ initial }: { initial: RolePermissionsRes
               {initial.permissions.map((permission) => (
                 <tr key={permission} className="border-b border-slate-50">
                   <td className="px-6 py-3">
-                    <p className="font-medium text-slate-900">{t(`permissionLabels.${permission}`)}</p>
-                    <p className="text-xs text-slate-500">{t(`permissionHints.${permission}`)}</p>
+                    <p className="font-medium text-slate-900">{t(`permissionLabels.${permissionKey(permission)}`)}</p>
+                    <p className="text-xs text-slate-500">{t(`permissionHints.${permissionKey(permission)}`)}</p>
                   </td>
                   {initial.roles.map((role) => {
                     const allowed = isAllowed(role.id, permission)
@@ -131,7 +134,7 @@ export const RolePermissionsMatrix = ({ initial }: { initial: RolePermissionsRes
                                 : 'hover:bg-slate-100'
                               : 'cursor-not-allowed opacity-70',
                           )}
-                          aria-label={`${role.name} — ${t(`permissionLabels.${permission}`)}: ${allowed ? t('allowed') : t('denied')}`}
+                          aria-label={`${role.name} — ${t(`permissionLabels.${permissionKey(permission)}`)}: ${allowed ? t('allowed') : t('denied')}`}
                         >
                           {lock !== null && allowed ? <Lock className="h-3.5 w-3.5" /> : allowed ? '✓' : '—'}
                         </button>

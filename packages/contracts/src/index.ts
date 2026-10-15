@@ -9,3 +9,4 @@ export { buildOpenApiDocument, type OpenApiDocument, type OpenApiOptions } from 
 export * from './permissions'
 export * from './schemas/family-shares'
 export * from './schemas/role-permissions'
+export * from './schemas/roles'

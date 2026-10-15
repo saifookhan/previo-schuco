@@ -6,6 +6,7 @@ import {
   InvalidBusinessUnitsError,
   InviteConflictError,
   RoleNotGrantableError,
+  UnknownRoleError,
   inviteUser,
   listUsersForCompany,
 } from '../services/users-service'
@@ -70,6 +71,9 @@ users.post('/', requireAuth, requireRoles(['company-admin']), async (c) => {
       true, // requiresApproval — a company-admin's own invite always needs a super-admin's sign-off (Stage 3)
     )
   } catch (error) {
+    if (error instanceof UnknownRoleError) {
+      return c.json({ error: error.message }, 400)
+    }
     if (error instanceof RoleNotGrantableError) {
       return c.json({ error: error.message }, 403)
     }

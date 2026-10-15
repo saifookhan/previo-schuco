@@ -68,6 +68,9 @@ export {
   type UpdateCompanyInput,
 } from './queries/companies'
 export {
+  countRoleHolders,
+  deleteRoleById,
+  insertRole,
   listAllRoles,
   listRolePermissionPairs,
   lockRolePermissions,

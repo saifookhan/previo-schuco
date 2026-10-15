@@ -135,18 +135,37 @@
     "close": "Schließen",
     "errorLoading": "Benutzer konnten nicht geladen werden — der Server ist möglicherweise nicht erreichbar.",
     "noUsersFound": "Noch keine Benutzer.",
-    "rolesRequired": "Mindestens eine Rolle auswählen"
+    "rolesRequired": "Mindestens eine Rolle auswählen",
+    "rolesLoading": "Rollen werden geladen…",
+    "rolesLoadFailed": "Rollen konnten nicht geladen werden — bitte erneut versuchen"
   },
   "settingsRoles": {
     "title": "Rollen",
-    "subtitle": "Rollen und Berechtigungsgruppen definieren",
+    "subtitle": "Eingebaute Rollen plus eigene Rollen, die Sie anlegen. Legen Sie unter Zugriffsrechte fest, was jede Rolle darf.",
     "addRole": "Rolle hinzufügen",
     "roleNameLabel": "Rollenname",
     "roleNamePlaceholder": "z. B. Projektleiter",
     "descriptionLabel": "Beschreibung",
     "descriptionPlaceholder": "Optionale Beschreibung",
     "removeLabel": "{name} entfernen",
-    "customRole": "Benutzerdefinierte Rolle"
+    "builtIn": "Eingebaut",
+    "users": "{count, plural, =0 {Keine Benutzer} one {1 Benutzer} other {# Benutzer}}",
+    "nameRequired": "Rollennamen eingeben",
+    "createFailed": "Rolle konnte nicht erstellt werden",
+    "createFailedUnreachable": "Rolle konnte nicht erstellt werden — Server nicht erreichbar",
+    "creating": "Wird erstellt…",
+    "created": "Rolle „{name}“ erstellt",
+    "deleted": "Rolle „{name}“ gelöscht",
+    "deleteFailed": "Rolle konnte nicht gelöscht werden",
+    "deleteTitle": "„{name}“ löschen?",
+    "deleteMessage": "Diese Rolle wird entfernt. Sie hat keine Benutzer.",
+    "delete": "Löschen",
+    "cancel": "Abbrechen",
+    "inUse": "{count, plural, one {1 Benutzer hat diese Rolle noch — zuerst entfernen.} other {# Benutzer haben diese Rolle noch — zuerst entfernen.}}",
+    "newRoleHint": "Eine neue Rolle hat keine Berechtigungen, bis Sie sie unter Zugriffsrechte vergeben.",
+    "editPermissions": "Berechtigungen bearbeiten",
+    "errorLoading": "Rollen konnten nicht geladen werden — der Server ist möglicherweise nicht erreichbar.",
+    "customRole": "Eigene Rolle"
   },
   "settingsAccessRights": {
     "title": "Zugriffsrechte",
@@ -167,20 +186,20 @@
     "lockSuperAdmin": "Super-Admin hat immer alle Berechtigungen",
     "lockCompanyAdminUsers": "Firmenadministratoren müssen die Benutzerverwaltung behalten",
     "permissionLabels": {
-      "catalog.view": "Katalog ansehen",
-      "catalog.edit": "Katalog bearbeiten",
-      "quote.view": "Angebote ansehen",
-      "quote.edit": "Angebote erstellen und bearbeiten",
-      "users.manage": "Firmenbenutzer verwalten",
-      "catalog.share": "Produktfamilien teilen"
+      "catalog_view": "Katalog ansehen",
+      "catalog_edit": "Katalog bearbeiten",
+      "quote_view": "Angebote ansehen",
+      "quote_edit": "Angebote erstellen und bearbeiten",
+      "users_manage": "Firmenbenutzer verwalten",
+      "catalog_share": "Produktfamilien teilen"
     },
     "permissionHints": {
-      "catalog.view": "Produktfamilien und Preise durchsuchen",
-      "catalog.edit": "Produktfamilien importieren, bearbeiten, veröffentlichen und löschen",
-      "quote.view": "Angebote öffnen und PDFs herunterladen",
-      "quote.edit": "Angebote erstellen und deren Positionen bearbeiten",
-      "users.manage": "Benutzer des eigenen Unternehmens einladen und verwalten",
-      "catalog.share": "Eine Familie mit anderen Unternehmen teilen und deren Standardrabatt festlegen"
+      "catalog_view": "Produktfamilien und Preise durchsuchen",
+      "catalog_edit": "Produktfamilien importieren, bearbeiten, veröffentlichen und löschen",
+      "quote_view": "Angebote öffnen und PDFs herunterladen",
+      "quote_edit": "Angebote erstellen und deren Positionen bearbeiten",
+      "users_manage": "Benutzer des eigenen Unternehmens einladen und verwalten",
+      "catalog_share": "Eine Familie mit anderen Unternehmen teilen und deren Standardrabatt festlegen"
     }
   },
   "settingsCompany": {

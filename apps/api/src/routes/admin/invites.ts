@@ -6,6 +6,7 @@ import {
   InvalidBusinessUnitsError,
   InviteConflictError,
   RoleNotGrantableError,
+  UnknownRoleError,
   inviteUser,
 } from '../../services/users-service'
 import type { AuthVariables } from '../../middleware/auth'
@@ -53,6 +54,9 @@ adminInvites.post('/', requireAuth, requireRoles(['super-admin']), async (c) => 
       false, // requiresApproval — a super-admin IS the approver, nothing to gate (Stage 3)
     )
   } catch (error) {
+    if (error instanceof UnknownRoleError) {
+      return c.json({ error: error.message }, 400)
+    }
     if (error instanceof RoleNotGrantableError) {
       return c.json({ error: error.message }, 403)
     }

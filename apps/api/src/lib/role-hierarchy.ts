@@ -1,19 +1,11 @@
-/**
- * Which roles a caller may grant when inviting a user. `super-admin` is
- * handled as an explicit allow-all branch below, not a table entry — it's
- * the platform operator role (cross-tenant), and there's nothing above it
- * to escalate to.
- */
-const GRANTABLE_ROLES_BY_CALLER: Record<string, ReadonlySet<string>> = {
-  'company-admin': new Set(['company-admin', 'super-user', 'user']),
-}
+import type { RolePermissionMatrix } from '@schuco/contracts'
 
 /**
  * Whether `callerRoleId` may assign `targetRoleId` to an invited user.
- * Fails closed: any `callerRoleId` not explicitly handled — including one
- * `requireRoles` might allow in the future that this table doesn't yet
- * know about — is denied, never silently granted. `super-admin` is the
- * one explicit allow-all.
+ * `super-admin` may grant anything. A `company-admin` may grant any role
+ * except `super-admin` — the platform operator role (cross-tenant), and
+ * custom roles carry only the permissions the matrix gives them. Every
+ * other caller role is denied (fails closed).
  * @param callerRoleId - Role of the user performing the invite
  * @param targetRoleId - Role being assigned to the invitee
  */
@@ -21,7 +13,27 @@ export const canGrantRole = (callerRoleId: string, targetRoleId: string): boolea
   if (callerRoleId === 'super-admin') {
     return true
   }
-  return GRANTABLE_ROLES_BY_CALLER[callerRoleId]?.has(targetRoleId) ?? false
+  return callerRoleId === 'company-admin' && targetRoleId !== 'super-admin'
+}
+
+/**
+ * A non-super-admin may only hand out roles whose permissions they themselves
+ * hold (taken across all their roles) — otherwise a custom role with extra
+ * permissions would be a way to escalate. Super-admin is unrestricted.
+ * @param callerRoleIds - All roles of the user performing the invite
+ * @param targetRoleIds - Roles being assigned
+ * @param matrix - The role → permissions matrix in force
+ */
+export const canGrantByPermissions = (
+  callerRoleIds: string[],
+  targetRoleIds: string[],
+  matrix: RolePermissionMatrix,
+): boolean => {
+  if (callerRoleIds.includes('super-admin')) {
+    return true
+  }
+  const callerPermissions = new Set(callerRoleIds.flatMap((id) => matrix[id] ?? []))
+  return targetRoleIds.every((target) => (matrix[target] ?? []).every((permission) => callerPermissions.has(permission)))
 }
 
 /**

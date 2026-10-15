@@ -119,10 +119,13 @@ export const roleRank: Record<RoleId, number> = {
   user: 1,
 }
 
+/** Custom roles aren't in the ladder; they count as the lowest built-in level (permissions, not rank, decide what they may do). */
+const rankOf = (role: RoleId): number => roleRank[role] ?? 1
+
 /**
  * Check if user meets minimum role level.
  * @param userRole - Current user role
  * @param minimum - Minimum required role
  */
 export const hasMinimumRole = (userRole: RoleId, minimum: RoleId): boolean =>
-  roleRank[userRole] >= roleRank[minimum]
+  rankOf(userRole) >= rankOf(minimum)

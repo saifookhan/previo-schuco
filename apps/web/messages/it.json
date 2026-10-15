@@ -135,17 +135,36 @@
     "close": "Chiudi",
     "errorLoading": "Impossibile caricare gli utenti — il server potrebbe non essere raggiungibile.",
     "noUsersFound": "Nessun utente ancora.",
-    "rolesRequired": "Seleziona almeno un ruolo"
+    "rolesRequired": "Seleziona almeno un ruolo",
+    "rolesLoading": "Caricamento ruoli…",
+    "rolesLoadFailed": "Impossibile caricare i ruoli — riprova"
   },
   "settingsRoles": {
     "title": "Ruoli",
-    "subtitle": "Definisci ruoli e gruppi di permessi",
+    "subtitle": "Ruoli predefiniti più i ruoli personalizzati che crei. Imposta cosa può fare ogni ruolo in Diritti di accesso.",
     "addRole": "Aggiungi ruolo",
     "roleNameLabel": "Nome ruolo",
     "roleNamePlaceholder": "es. Project Manager",
     "descriptionLabel": "Descrizione",
     "descriptionPlaceholder": "Descrizione opzionale",
     "removeLabel": "Rimuovi {name}",
+    "builtIn": "Predefinito",
+    "users": "{count, plural, =0 {Nessun utente} one {1 utente} other {# utenti}}",
+    "nameRequired": "Inserisci un nome per il ruolo",
+    "createFailed": "Impossibile creare il ruolo",
+    "createFailedUnreachable": "Impossibile creare il ruolo — server non raggiungibile",
+    "creating": "Creazione…",
+    "created": "Ruolo «{name}» creato",
+    "deleted": "Ruolo «{name}» eliminato",
+    "deleteFailed": "Impossibile eliminare il ruolo",
+    "deleteTitle": "Eliminare «{name}»?",
+    "deleteMessage": "Questo ruolo verrà rimosso. Non ha utenti.",
+    "delete": "Elimina",
+    "cancel": "Annulla",
+    "inUse": "{count, plural, one {1 utente ha ancora questo ruolo — rimuovilo prima.} other {# utenti hanno ancora questo ruolo — rimuovilo prima.}}",
+    "newRoleHint": "Un nuovo ruolo non ha permessi finché non li assegni in Diritti di accesso.",
+    "editPermissions": "Modifica permessi",
+    "errorLoading": "Impossibile caricare i ruoli — il server potrebbe non essere raggiungibile.",
     "customRole": "Ruolo personalizzato"
   },
   "settingsAccessRights": {
@@ -167,20 +186,20 @@
     "lockSuperAdmin": "Il super-admin ha sempre tutti i permessi",
     "lockCompanyAdminUsers": "Gli amministratori aziendali devono mantenere la gestione utenti",
     "permissionLabels": {
-      "catalog.view": "Vedere il catalogo",
-      "catalog.edit": "Modificare il catalogo",
-      "quote.view": "Vedere i preventivi",
-      "quote.edit": "Creare e modificare preventivi",
-      "users.manage": "Gestire gli utenti dell'azienda",
-      "catalog.share": "Condividere famiglie di prodotti"
+      "catalog_view": "Vedere il catalogo",
+      "catalog_edit": "Modificare il catalogo",
+      "quote_view": "Vedere i preventivi",
+      "quote_edit": "Creare e modificare preventivi",
+      "users_manage": "Gestire gli utenti dell'azienda",
+      "catalog_share": "Condividere famiglie di prodotti"
     },
     "permissionHints": {
-      "catalog.view": "Consultare le famiglie di prodotti e i prezzi",
-      "catalog.edit": "Importare, modificare, pubblicare ed eliminare famiglie di prodotti",
-      "quote.view": "Aprire i preventivi e scaricare i PDF",
-      "quote.edit": "Creare preventivi e modificarne le posizioni",
-      "users.manage": "Invitare e gestire gli utenti della propria azienda",
-      "catalog.share": "Condividere una famiglia con altre aziende e impostarne lo sconto predefinito"
+      "catalog_view": "Consultare le famiglie di prodotti e i prezzi",
+      "catalog_edit": "Importare, modificare, pubblicare ed eliminare famiglie di prodotti",
+      "quote_view": "Aprire i preventivi e scaricare i PDF",
+      "quote_edit": "Creare preventivi e modificarne le posizioni",
+      "users_manage": "Invitare e gestire gli utenti della propria azienda",
+      "catalog_share": "Condividere una famiglia con altre aziende e impostarne lo sconto predefinito"
     }
   },
   "settingsCompany": {

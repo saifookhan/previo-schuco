@@ -1,12 +1,12 @@
 import { z } from 'zod'
 
-/** Canonical PREVIO role identifiers. */
-export const roleIdSchema = z.enum([
-  'super-admin',
-  'company-admin',
-  'super-user',
-  'user',
-])
+/** The four roles every installation has; they cannot be deleted. Super-admins can add more (custom roles). */
+export const BUILTIN_ROLE_IDS = ['super-admin', 'company-admin', 'super-user', 'user'] as const
+
+export const isBuiltInRole = (roleId: string): boolean => (BUILTIN_ROLE_IDS as readonly string[]).includes(roleId)
+
+/** A role identifier — one of the built-in roles, or a custom role's slug. */
+export const roleIdSchema = z.string().min(1)
 
 export type RoleId = z.infer<typeof roleIdSchema>
 

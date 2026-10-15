@@ -8,18 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useRouter } from '@/i18n/navigation'
-import type { UserDto } from '@schuco/contracts'
-
-/**
- * Roles a company-admin may grant, matching apps/api's canGrantRoles
- * (company-admin can't grant super-admin — that's the platform operator
- * role). Kept in sync by hand since there's no roles endpoint yet.
- */
-const GRANTABLE_ROLES = [
-  { id: 'company-admin', label: 'Company Admin' },
-  { id: 'super-user', label: 'Super User (Sales Manager)' },
-  { id: 'user', label: 'User (Sales Associate)' },
-] as const
+import type { GrantableRolesResponse, UserDto } from '@schuco/contracts'
 
 /**
  * "Add user" button + modal for a company-admin's own company. Lands as
@@ -31,6 +20,8 @@ export const UserInviteButton = () => {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [availableRoles, setAvailableRoles] = useState<GrantableRolesResponse['roles']>([])
+  const [rolesState, setRolesState] = useState<'loading' | 'ready' | 'failed'>('loading')
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<{ email: string; name: string; roleIds: string[] }>({ email: '', name: '', roleIds: ['user'] })
 
@@ -38,6 +29,20 @@ export const UserInviteButton = () => {
     setForm({ email: '', name: '', roleIds: ['user'] })
     setError(null)
     setOpen(true)
+    // The role list comes from the server so custom roles a super-admin adds show up here.
+    setRolesState('loading')
+    void fetch('/api/roles', { cache: 'no-store' })
+      .then((response) => (response.ok ? (response.json() as Promise<GrantableRolesResponse>) : null))
+      .then((data) => {
+        setAvailableRoles(data?.roles ?? [])
+        setRolesState(data ? 'ready' : 'failed')
+        // Keep only default selections that exist for this caller.
+        if (data) {
+          const ids = new Set(data.roles.map((r) => r.id))
+          setForm((f) => ({ ...f, roleIds: f.roleIds.filter((id) => ids.has(id)) }))
+        }
+      })
+      .catch(() => setRolesState('failed'))
   }
 
   const create = async () => {
@@ -125,7 +130,9 @@ export const UserInviteButton = () => {
               </div>
               <fieldset className="space-y-2">
                 <legend className="text-sm font-medium text-slate-700">{t('role')}</legend>
-                {GRANTABLE_ROLES.map((role) => (
+                {rolesState === 'loading' ? <p className="text-xs text-slate-400">{t('rolesLoading')}</p> : null}
+                {rolesState === 'failed' ? <p className="text-xs text-red-600">{t('rolesLoadFailed')}</p> : null}
+                {availableRoles.map((role) => (
                   <label key={role.id} htmlFor={`invite-role-${role.id}`} className="flex cursor-pointer items-center gap-2.5">
                     <input
                       id={`invite-role-${role.id}`}
@@ -139,7 +146,7 @@ export const UserInviteButton = () => {
                         }))
                       }
                     />
-                    <span className="text-sm text-slate-900">{role.label}</span>
+                    <span className="text-sm text-slate-900">{role.name}</span>
                   </label>
                 ))}
               </fieldset>
@@ -150,7 +157,7 @@ export const UserInviteButton = () => {
               <Button type="button" variant="outline" disabled={saving} onClick={() => setOpen(false)}>
                 {t('cancel')}
               </Button>
-              <Button type="button" disabled={saving} className="gap-2" onClick={() => void create()}>
+              <Button type="button" disabled={saving || rolesState !== 'ready'} className="gap-2" onClick={() => void create()}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {saving ? t('adding') : t('addUser')}
               </Button>

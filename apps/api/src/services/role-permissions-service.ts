@@ -12,6 +12,7 @@ import {
   listRolePermissionPairs,
   lockRolePermissions,
   replaceRolePermissionPairs,
+  sortRolesByRank,
   withSystemTransaction,
 } from '@schuco/db'
 
@@ -104,7 +105,7 @@ export const getRolePermissionsView = async (ctx: TenantContext): Promise<RolePe
     const { matrix, isDefault } = buildMatrix(pairs)
     return {
       permissions: [...PERMISSIONS],
-      roles: roleRows,
+      roles: sortRolesByRank(roleRows),
       matrix: Object.fromEntries(roleRows.map((role) => [role.id, [...(matrix[role.id] ?? [])]])),
       isDefault,
     }
@@ -182,7 +183,7 @@ export const updateRolePermissions = async (
         metadata: { before: before.matrix, after: next },
       },
     )
-    return { permissions: [...PERMISSIONS], roles: roleRows, matrix: next, isDefault: false }
+    return { permissions: [...PERMISSIONS], roles: sortRolesByRank(roleRows), matrix: next, isDefault: false }
   })
   invalidateRolePermissionsCache()
   return view
