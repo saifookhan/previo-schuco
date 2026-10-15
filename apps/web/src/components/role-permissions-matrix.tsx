@@ -35,9 +35,6 @@ export const RolePermissionsMatrix = ({ initial }: { initial: RolePermissionsRes
     if (lock === 'super-admin') {
       return t('lockSuperAdmin')
     }
-    if (lock === 'super-admin-only') {
-      return t('lockSuperAdminOnly')
-    }
     if (lock === 'company-admin-users') {
       return t('lockCompanyAdminUsers')
     }

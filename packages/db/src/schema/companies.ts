@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { boolean, check, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { boolean, check, pgTable, pgView, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 
 /**
  * A company on the platform. What it can do is a set of independent
@@ -30,3 +30,14 @@ export const companies = pgTable(
     ),
   ],
 )
+
+/**
+ * Names only — the one view of other companies a tenant may read: itself,
+ * companies it shares families with (either direction), and owners of
+ * families it can see. Defined in 0001_rls.sql (runs with the owner's rights,
+ * so it exposes id + name without opening up the companies row itself).
+ */
+export const companyDirectory = pgView('company_directory', {
+  id: uuid('id').notNull(),
+  name: text('name').notNull(),
+}).existing()

@@ -2,7 +2,7 @@ import { eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import type { Db } from '../src/client'
-import { businessUnits, companies, roles, supplierClientLinks, userBusinessUnits, users } from '../src/schema'
+import { businessUnits, companies, companyDirectory, productFamilies, productFamilyShares, roles, userBusinessUnits, users } from '../src/schema'
 import { withRlsTransaction, withSystemTransaction } from '../src/queries/users'
 import { getTestDb } from './helpers'
 
@@ -15,7 +15,7 @@ import { getTestDb } from './helpers'
  * This file covers `companies` and `users` fully. `business_units` gets
  * the cross-tenant-denial case (the one that matters most and is most
  * likely to silently regress). `user_business_units` and
- * `supplier_client_links` are covered below.
+ * `product_family_shares` are covered below.
  */
 
 let db: Db
@@ -257,14 +257,11 @@ describe('user_business_units RLS', () => {
   })
 })
 
-describe('supplier_client_links RLS', () => {
-  // A third company that is neither the supplier nor the client on the
-  // second link, so it's a genuine cross-tenant negative case rather than
-  // "the other half of the same relationship" (which companyA/B already
-  // are of each other on link1's own terms).
+describe('product_family_shares RLS', () => {
+  // A third company that is neither sharer nor recipient on the second share,
+  // so it's a genuine cross-tenant negative case.
   let companyC: string
-  let linkAB: { supplierCompanyId: string; clientCompanyId: string }
-  let linkBC: { supplierCompanyId: string; clientCompanyId: string }
+  let familyId: string
 
   beforeAll(async () => {
     await withSystemTransaction(db, async (tx) => {
@@ -273,54 +270,69 @@ describe('supplier_client_links RLS', () => {
         .values({ isClient: true, name: 'RLS Test Co C', vatNumber: 'RLSTEST-C' })
         .returning({ id: companies.id })
       companyC = c.id
-
-      linkAB = { supplierCompanyId: companyA, clientCompanyId: companyB }
-      linkBC = { supplierCompanyId: companyB, clientCompanyId: companyC }
-      await tx.insert(supplierClientLinks).values([linkAB, linkBC])
+      const [family] = await tx
+        .insert(productFamilies)
+        .values({ supplierCompanyId: companyA, name: 'RLS Share Family', isPublished: true })
+        .returning({ id: productFamilies.id })
+      familyId = family.id
+      await tx.insert(productFamilyShares).values([
+        { productFamilyId: familyId, fromCompanyId: companyA, toCompanyId: companyB },
+        { productFamilyId: familyId, fromCompanyId: companyB, toCompanyId: companyC },
+      ])
     })
   })
 
   afterAll(async () => {
     await withSystemTransaction(db, async (tx) => {
+      await tx.delete(productFamilies).where(eq(productFamilies.id, familyId))
       await tx.delete(companies).where(eq(companies.id, companyC))
     })
   })
 
-  it('1. a tenant can access a link where it is a party (as supplier or client)', async () => {
+  const sharesSeenBy = (companyId: string, isSuperAdmin = false) =>
+    withRlsTransaction(db, { companyId, isSuperAdmin }, (tx) =>
+      tx.select().from(productFamilyShares).where(eq(productFamilyShares.productFamilyId, familyId)),
+    )
+
+  it('1. a tenant sees a share where it is a party (as sharer or recipient)', async () => {
+    const asSharer = await sharesSeenBy(companyA)
+    expect(asSharer.map((r) => r.toCompanyId)).toEqual([companyB])
+    const asBoth = await sharesSeenBy(companyB)
+    expect(asBoth).toHaveLength(2) // received from A, shared onward to C
+  })
+
+  it('2. a tenant cannot see a share where it is neither party', async () => {
+    const rows = await sharesSeenBy(companyA)
+    expect(rows.some((r) => r.toCompanyId === companyC)).toBe(false)
+  })
+
+  it('3. super-admin sees shares across tenants', async () => {
+    const rows = await sharesSeenBy(companyA, true)
+    expect(rows).toHaveLength(2)
+  })
+
+  it('4. a recipient cannot create a share on behalf of another company', async () => {
+    await expect(
+      withRlsTransaction(db, { companyId: companyC, isSuperAdmin: false }, (tx) =>
+        tx.insert(productFamilyShares).values({ productFamilyId: familyId, fromCompanyId: companyA, toCompanyId: companyC }),
+      ),
+    ).rejects.toThrow()
+  })
+
+  it('5. the company directory shows names of companies it shares with, but not an unrelated one', async () => {
     const rows = await withRlsTransaction(db, { companyId: companyA, isSuperAdmin: false }, (tx) =>
-      tx
-        .select()
-        .from(supplierClientLinks)
-        .where(eq(supplierClientLinks.supplierCompanyId, linkAB.supplierCompanyId)),
+      tx.select().from(companyDirectory),
     )
-    expect(rows).toHaveLength(1)
-    expect(rows[0].clientCompanyId).toBe(companyB)
+    const ids = rows.map((r) => r.id)
+    expect(ids).toContain(companyA)
+    expect(ids).toContain(companyB)
+    expect(ids).not.toContain(companyC)
   })
 
-  it('2. a tenant cannot access a link where it is neither party', async () => {
+  it('6. a partner\'s full companies row (VAT etc.) stays private — only the name view opens up', async () => {
     const rows = await withRlsTransaction(db, { companyId: companyA, isSuperAdmin: false }, (tx) =>
-      tx
-        .select()
-        .from(supplierClientLinks)
-        .where(eq(supplierClientLinks.clientCompanyId, companyC)),
+      tx.select({ id: companies.id }).from(companies),
     )
-    expect(rows).toHaveLength(0)
-  })
-
-  it('3. super-admin sees links across tenants', async () => {
-    const rows = await withRlsTransaction(db, { companyId: companyA, isSuperAdmin: true }, (tx) =>
-      tx.select().from(supplierClientLinks),
-    )
-    const pairs = rows.map((r) => `${r.supplierCompanyId}:${r.clientCompanyId}`)
-    expect(pairs).toContain(`${linkAB.supplierCompanyId}:${linkAB.clientCompanyId}`)
-    expect(pairs).toContain(`${linkBC.supplierCompanyId}:${linkBC.clientCompanyId}`)
-  })
-
-  it('4. acting-as-tenant with an explicit filter narrows to that tenant\'s links only', async () => {
-    const rows = await withRlsTransaction(db, { companyId: companyC, isSuperAdmin: true }, (tx) =>
-      tx.select().from(supplierClientLinks).where(eq(supplierClientLinks.clientCompanyId, companyC)),
-    )
-    expect(rows).toHaveLength(1)
-    expect(rows[0].supplierCompanyId).toBe(companyB)
+    expect(rows.map((r) => r.id)).toEqual([companyA])
   })
 })

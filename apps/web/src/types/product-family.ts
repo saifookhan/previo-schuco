@@ -10,6 +10,10 @@ export interface ProductFamilySummary {
   isPublished: boolean
   createdAt: string
   updatedAt: string
+  /** List endpoint only: the owning company's name, when the caller may read it. */
+  ownerCompanyName?: string | null
+  /** List endpoint only: default discount this family was shared with the caller at; null for the caller's own. */
+  shareDiscountPct?: number | null
 }
 
 export interface ProductFamilyImage {
@@ -72,4 +76,6 @@ export interface ProductFamilyDetail {
   relations: { productLineId: string; characteristicId: string }[]
   /** False when the server's edit policy locks this family (e.g. published under `draft-only`). */
   editable: boolean
+  /** Default discount this family was shared with the caller's company at (null if own or shared at 0%). */
+  shareDiscountPct?: number | null
 }

@@ -86,8 +86,8 @@ interface QuoteBuilderProps {
 const tidy = (v: string): string => String(Number(v))
 
 /**
- * The real quote builder: pick a product family + line from the caller's
- * own catalog, size it, choose applicable characteristics, and add it as
+ * The real quote builder: pick a product family + line (the caller's own,
+ * or one shared with their company), size it, choose applicable characteristics, and add it as
  * a priced position — the server computes the price with the same
  * costing engine the catalog itself uses, so nothing is priced twice.
  * The position list is presented as sortable cards (reorder, duplicate,
@@ -176,7 +176,8 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
     setLineManualValue('')
     setCharPricing({})
     const selectedLine = family?.lines.find((l) => l.id === id)
-    setDiscountPct(selectedLine ? tidy(selectedLine.discountPct) : '')
+    // A family shared with this company at a non-zero discount starts there (same rule the API applies); otherwise the line's own.
+    setDiscountPct(selectedLine ? (family?.shareDiscountPct ? tidy(String(family.shareDiscountPct)) : tidy(selectedLine.discountPct)) : '')
     setExtraMarkupPct(selectedLine ? tidy(selectedLine.markupPct) : '')
   }
 

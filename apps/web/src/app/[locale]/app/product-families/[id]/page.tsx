@@ -11,6 +11,7 @@ import { ProductFamilyMatrixPreview } from '@/components/product-family-matrix-p
 import { ProductFamilyNewVersionButton } from '@/components/product-family-new-version-button'
 import { ProductFamilyPricingEditor } from '@/components/product-family-pricing-editor'
 import { ProductFamilyRowActions } from '@/components/product-family-row-actions'
+import { ProductFamilyShareButton } from '@/components/product-family-share-button'
 import type { ProductFamilyDetail } from '@/types/product-family'
 
 interface ProductFamilyDetailPageProps {
@@ -94,6 +95,7 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
             redirectAfterDeleteHref="/app/product-families"
           />
           <ProductFamilyNewVersionButton familyId={family.id} />
+          <ProductFamilyShareButton familyId={family.id} familyName={family.name} isPublished={family.isPublished} />
         </div>
       </div>
 

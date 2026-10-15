@@ -10,8 +10,8 @@ import {
   companies,
   createDb,
   quotes,
+  productFamilyShares,
   roles,
-  supplierClientLinks,
   users,
   withSystemTransaction,
   type Db,
@@ -60,6 +60,16 @@ const importFreshFamily = () =>
     buffer: fixtureBuffer,
     originalName: 'product-family-sample.xlsx',
   })
+/** Shares a family `supplierCompanyId` → `linkedClientCompanyId` at the given default discount. */
+const shareWithLinkedCompany = (familyId: string, discountPct = '0') =>
+  withSystemTransaction(db, (tx) =>
+    tx.insert(productFamilyShares).values({
+      productFamilyId: familyId,
+      fromCompanyId: supplierCompanyId,
+      toCompanyId: linkedClientCompanyId,
+      discountPct,
+    }),
+  )
 const matrixLineOf = async (familyId: string) => {
   const detail = await getProductFamilyDetail(ctx(), familyId)
   return detail!.lines.find((l) => l.name.startsWith('N95 L'))!
@@ -101,7 +111,6 @@ beforeAll(async () => {
       .values({ isClient: true, isSupplier: true, name: 'Quote Service Test Linked Client', vatNumber: 'QSVC-CLIENT' })
       .returning({ id: companies.id })
     linkedClientCompanyId = linkedClient.id
-    await tx.insert(supplierClientLinks).values({ supplierCompanyId, clientCompanyId: linkedClientCompanyId })
   })
 })
 
@@ -339,10 +348,11 @@ describe('createQuote + addQuotePosition', () => {
     expect(new Set(sortOrders).size).toBe(sortOrders.length)
   })
 
-  it("lets a linked supplier quote from a manufacturer's PUBLISHED family, under the supplier's own quote", async () => {
+  it("lets a company quote from a PUBLISHED family shared with it, under its own quote", async () => {
     const family = await importFreshFamily()
     const line = await matrixLineOf(family.id)
     await setProductFamilyPublishedStatus(ctx(), actor, family.id, true)
+    await shareWithLinkedCompany(family.id)
 
     const linkedCtx = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: false }
     const linkedActor = { actorUserId, actorCompanyId: linkedClientCompanyId, requestId: 'test-request' }
@@ -364,7 +374,7 @@ describe('createQuote + addQuotePosition', () => {
     expect(detail.positions).toHaveLength(1)
   })
 
-  it("rejects quoting from a manufacturer's family when the catalog is not linked to the caller", async () => {
+  it("rejects quoting from a family that was not shared with the caller", async () => {
     const family = await importFreshFamily()
     const line = await matrixLineOf(family.id)
     await setProductFamilyPublishedStatus(ctx(), actor, family.id, true)
@@ -395,6 +405,35 @@ describe('createQuote + addQuotePosition', () => {
     } finally {
       extraCompanyIds.push(stranger.id) // audit_log is append-only for the app role — afterAll cleans up with the superuser
     }
+  })
+
+  it("starts a shared family's positions at the share's discount, and falls back to the line's own discount when shared at 0%", async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    await setProductFamilyPublishedStatus(ctx(), actor, family.id, true)
+    await shareWithLinkedCompany(family.id, '25.00')
+
+    const linkedCtx = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: false }
+    const linkedActor = { actorUserId, actorCompanyId: linkedClientCompanyId, requestId: 'test-request' }
+    const quote = await createQuote(linkedCtx, linkedActor, { reference: 'TEST-Q-SVC-SHARE-DISCOUNT', customerName: 'Test Customer' })
+    const position = { productFamilyId: family.id, productLineId: line.id, quantity: 1, widthMm: 1000, heightMm: 800, characteristicSelections: [] }
+
+    const defaulted = await addQuotePosition(linkedCtx, linkedActor, quote.id, position)
+    expect(Number(defaulted.positions[0].discountPct)).toBe(25)
+
+    const overridden = await addQuotePosition(linkedCtx, linkedActor, quote.id, { ...position, discountPct: 10 })
+    expect(Number(overridden.positions[1].discountPct)).toBe(10) // the share's discount is only a default
+
+    await withSystemTransaction(db, (tx) =>
+      tx.update(productFamilyShares).set({ discountPct: '0' }).where(eq(productFamilyShares.productFamilyId, family.id)),
+    )
+    const fallback = await addQuotePosition(linkedCtx, linkedActor, quote.id, position)
+    expect(Number(fallback.positions[2].discountPct)).toBe(Number(line.discountPct))
+
+    // The owner's own quotes never pick up a share discount.
+    const ownQuote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-OWN-DISCOUNT', customerName: 'Test Customer' })
+    const own = await addQuotePosition(ctx(), actor, ownQuote.id, position)
+    expect(Number(own.positions[0].discountPct)).toBe(Number(line.discountPct))
   })
 
   it('a super-admin acting as another tenant (X-Tenant-Id) cannot price from a family that tenant does not own', async () => {

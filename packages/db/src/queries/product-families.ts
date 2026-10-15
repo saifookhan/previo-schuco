@@ -1,14 +1,14 @@
-import { and, desc, eq, exists, inArray, isNotNull, or } from 'drizzle-orm'
+import { and, desc, eq, getTableColumns, inArray, isNotNull, or, sql } from 'drizzle-orm'
 
 import type { DbLike } from '../client'
 import {
   characteristics,
+  companyDirectory,
   pricingMatrices,
   productFamilies,
   productFamilyImages,
   productLineCharacteristics,
   productLines,
-  supplierClientLinks,
 } from '../schema'
 
 export interface InsertProductFamilyInput {
@@ -119,44 +119,42 @@ export interface ProductFamilySummary {
   updatedAt: Date
 }
 
+export interface ProductFamilyListItem extends ProductFamilySummary {
+  /** Name of the company that owns the family; null if the caller cannot read that company. */
+  ownerCompanyName: string | null
+  /** Default discount the family was shared with the caller at (highest if several companies shared it); null for the caller's own families. */
+  shareDiscountPct: number | null
+}
+
 /**
- * Lists product families visible to the caller — RLS already scopes this
- * (own company's families, plus published families of linked suppliers);
- * no explicit companyId filter needed the way tenant-scoped list queries
- * elsewhere in this codebase use one, since "visible" here isn't simply
- * "belongs to my company."
- * @param db - RLS-scoped transaction
- */
-/**
- * Lists families visible to `companyId`: its own, plus published
- * families of suppliers it's linked to as a client. Explicit filter, not
- * RLS alone — `app_is_super_admin()` makes `product_families_select`'s
- * scoping a no-op for a super-admin, including one acting as a specific
- * tenant via `X-Tenant-Id` (ADR 0006 / 0008); mirrors that policy's own
- * `own OR published+linked` condition (minus its super-admin bypass) so
+ * Lists families visible to `companyId`: its own, plus published families
+ * that reach it through the share chain. Explicit filter, not RLS alone —
+ * `app_is_super_admin()` makes `product_families_select`'s scoping a no-op
+ * for a super-admin, including one acting as a specific tenant via
+ * `X-Tenant-Id` (ADR 0006 / 0008); mirrors that policy's own
+ * `own OR published+reachable` condition (minus its super-admin bypass) so
  * a super-admin acting as `companyId` sees exactly what `companyId`
  * itself would.
  */
-export const listVisibleProductFamilies = (db: DbLike, companyId: string): Promise<ProductFamilySummary[]> =>
+export const listVisibleProductFamilies = (db: DbLike, companyId: string): Promise<ProductFamilyListItem[]> =>
   db
-    .select()
+    .select({
+      ...getTableColumns(productFamilies),
+      ownerCompanyName: companyDirectory.name,
+      shareDiscountPct: sql<number | null>`(
+        SELECT max(s.discount_pct)::float FROM product_family_shares s
+        WHERE s.product_family_id = ${productFamilies.id} AND s.to_company_id = ${companyId}::uuid
+          AND app_family_reaches_company(s.product_family_id, s.from_company_id)
+      )`,
+    })
     .from(productFamilies)
+    .leftJoin(companyDirectory, eq(productFamilies.supplierCompanyId, companyDirectory.id))
     .where(
       or(
         eq(productFamilies.supplierCompanyId, companyId),
         and(
           eq(productFamilies.isPublished, true),
-          exists(
-            db
-              .select({ one: supplierClientLinks.supplierCompanyId })
-              .from(supplierClientLinks)
-              .where(
-                and(
-                  eq(supplierClientLinks.supplierCompanyId, productFamilies.supplierCompanyId),
-                  eq(supplierClientLinks.clientCompanyId, companyId),
-                ),
-              ),
-          ),
+          sql`app_family_reaches_company(${productFamilies.id}, ${companyId}::uuid)`,
         ),
       ),
     )

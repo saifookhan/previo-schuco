@@ -3,7 +3,6 @@ ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE business_units ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_business_units ENABLE ROW LEVEL SECURITY;
-ALTER TABLE supplier_client_links ENABLE ROW LEVEL SECURITY;
 
 CREATE OR REPLACE FUNCTION app_is_super_admin() RETURNS boolean AS $$
   SELECT coalesce(current_setting('app.is_super_admin', true), 'false') = 'true';
@@ -68,15 +67,6 @@ CREATE POLICY user_bu_tenant ON user_business_units
     )
   );
 
-DROP POLICY IF EXISTS supplier_client_tenant ON supplier_client_links;
-CREATE POLICY supplier_client_tenant ON supplier_client_links
-  FOR ALL
-  USING (
-    app_is_super_admin()
-    OR supplier_company_id = app_current_company_id()
-    OR client_company_id = app_current_company_id()
-  );
-
 -- audit_log (ADR 0010): a company sees entries where it's the effective
 -- target (actions taken against it, including by an acting-as super-admin);
 -- super-admin sees everything. Table must already exist — created by an
@@ -90,13 +80,31 @@ CREATE POLICY audit_log_tenant ON audit_log
     OR effective_company_id = app_current_company_id()
   );
 
+-- Share-chain reachability (see product_family_shares): the owner, plus every
+-- company a reachable company shared the family with, transitively (UNION also
+-- stops cycles). SECURITY DEFINER on purpose — the walk must read every share,
+-- including edges between OTHER companies that the caller's own RLS hides;
+-- it only returns a boolean. Revoking an upstream share therefore cuts off
+-- everything downstream of it automatically.
+CREATE OR REPLACE FUNCTION app_family_reaches_company(p_family_id uuid, p_company_id uuid) RETURNS boolean AS $$
+  WITH RECURSIVE reach(company_id) AS (
+    SELECT supplier_company_id FROM product_families WHERE id = p_family_id
+    UNION
+    SELECT s.to_company_id
+    FROM product_family_shares s
+    JOIN reach r ON s.from_company_id = r.company_id
+    WHERE s.product_family_id = p_family_id
+  )
+  SELECT EXISTS (SELECT 1 FROM reach WHERE company_id = p_company_id);
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+
 -- Product families (Phase 2, project-context.md) and everything under
 -- them. Two helper functions capture the shared rule so it's written
 -- once, not five times:
 --   - "owns" (write access): the supplier company itself, or super-admin.
 --   - "can view" (read access): owns it, OR the family is published AND
 --     the caller's company is a linked client of that supplier
---     (supplier_client_links) — a client never sees a supplier's
+--     (product_family_shares) — a recipient never sees an owner's
 --     unpublished/draft work.
 -- Tables must already exist — created by an earlier-numbered drizzle
 -- migration, which always runs before this file (see apply-migrations.ts).
@@ -110,10 +118,9 @@ $$ LANGUAGE sql STABLE;
 CREATE OR REPLACE FUNCTION app_can_view_product_family(family_id uuid) RETURNS boolean AS $$
   SELECT app_owns_product_family(family_id) OR EXISTS (
     SELECT 1 FROM product_families pf
-    JOIN supplier_client_links scl ON scl.supplier_company_id = pf.supplier_company_id
     WHERE pf.id = family_id
       AND pf.is_published
-      AND scl.client_company_id = app_current_company_id()
+      AND app_family_reaches_company(pf.id, app_current_company_id())
   );
 $$ LANGUAGE sql STABLE;
 
@@ -159,11 +166,7 @@ CREATE POLICY product_families_select ON product_families
   USING (
     app_is_super_admin()
     OR supplier_company_id = app_current_company_id()
-    OR (is_published AND EXISTS (
-      SELECT 1 FROM supplier_client_links scl
-      WHERE scl.supplier_company_id = product_families.supplier_company_id
-        AND scl.client_company_id = app_current_company_id()
-    ))
+    OR (is_published AND app_family_reaches_company(id, app_current_company_id()))
   );
 
 DROP POLICY IF EXISTS product_families_insert ON product_families;
@@ -265,6 +268,48 @@ BEGIN
   END IF;
 END
 $$;
+
+-- product_family_shares: visible to the sharer and the recipient; only the
+-- sharer (or a super-admin) writes. The service additionally checks the
+-- sharer can actually reach the family.
+ALTER TABLE product_family_shares ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS product_family_shares_select ON product_family_shares;
+CREATE POLICY product_family_shares_select ON product_family_shares
+  FOR SELECT
+  USING (
+    app_is_super_admin()
+    OR from_company_id = app_current_company_id()
+    OR to_company_id = app_current_company_id()
+  );
+DROP POLICY IF EXISTS product_family_shares_write ON product_family_shares;
+CREATE POLICY product_family_shares_write ON product_family_shares
+  FOR ALL
+  USING (app_is_super_admin() OR from_company_id = app_current_company_id())
+  WITH CHECK (app_is_super_admin() OR from_company_id = app_current_company_id());
+
+-- Other companies' names (and only names): a view that runs with its owner's
+-- rights, so it can show id + name without opening the companies row itself
+-- (VAT number, capabilities, ...) to partners. Visible: self, companies the
+-- caller shares families with in either direction, and owners of published
+-- families that reach the caller.
+DROP POLICY IF EXISTS companies_share_partner_read ON companies;
+DROP POLICY IF EXISTS companies_family_owner_read ON companies;
+CREATE OR REPLACE VIEW company_directory AS
+SELECT c.id, c.name
+FROM companies c
+WHERE app_is_super_admin()
+   OR c.id = app_current_company_id()
+   OR EXISTS (
+     SELECT 1 FROM product_family_shares s
+     WHERE (s.from_company_id = app_current_company_id() AND s.to_company_id = c.id)
+        OR (s.to_company_id = app_current_company_id() AND s.from_company_id = c.id)
+   )
+   OR EXISTS (
+     SELECT 1 FROM product_families pf
+     WHERE pf.supplier_company_id = c.id
+       AND pf.is_published
+       AND app_family_reaches_company(pf.id, app_current_company_id())
+   );
 
 GRANT USAGE ON SCHEMA public TO previo_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO previo_app;

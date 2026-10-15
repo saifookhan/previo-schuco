@@ -63,8 +63,7 @@
     "openMenu": "Apri menu",
     "closeMenu": "Chiudi menu",
     "quotes": "Preventivi",
-    "adminCompanies": "Aziende",
-    "adminLinks": "Collegamenti catalogo"
+    "adminCompanies": "Aziende"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -166,7 +165,6 @@
     "saveFailedUnreachable": "Impossibile salvare — server non raggiungibile",
     "errorLoading": "Impossibile caricare la matrice dei permessi — il server potrebbe non essere raggiungibile.",
     "lockSuperAdmin": "Il super-admin ha sempre tutti i permessi",
-    "lockSuperAdminOnly": "Solo il super-admin può avere questo permesso",
     "lockCompanyAdminUsers": "Gli amministratori aziendali devono mantenere la gestione utenti",
     "permissionLabels": {
       "catalog.view": "Vedere il catalogo",
@@ -174,7 +172,7 @@
       "quote.view": "Vedere i preventivi",
       "quote.edit": "Creare e modificare preventivi",
       "users.manage": "Gestire gli utenti dell'azienda",
-      "links.manage": "Gestire i collegamenti al catalogo"
+      "catalog.share": "Condividere famiglie di prodotti"
     },
     "permissionHints": {
       "catalog.view": "Consultare le famiglie di prodotti e i prezzi",
@@ -182,7 +180,7 @@
       "quote.view": "Aprire i preventivi e scaricare i PDF",
       "quote.edit": "Creare preventivi e modificarne le posizioni",
       "users.manage": "Invitare e gestire gli utenti della propria azienda",
-      "links.manage": "Scegliere quali fornitori e clienti vedono il catalogo di un produttore"
+      "catalog.share": "Condividere una famiglia con altre aziende e impostarne lo sconto predefinito"
     }
   },
   "settingsCompany": {
@@ -229,7 +227,12 @@
     "importFailed": "Importazione fallita",
     "importFailedUnreachable": "Importazione fallita — server non raggiungibile",
     "errorLoading": "Impossibile caricare le famiglie di prodotto — il server potrebbe non essere raggiungibile. Prova ad aggiornare.",
-    "version": "Versione"
+    "version": "Versione",
+    "tabOwn": "Le mie famiglie",
+    "tabShared": "Condivise con me",
+    "emptyShared": "Nessuna famiglia di prodotti è stata ancora condivisa con la tua azienda.",
+    "owner": "Proprietario",
+    "yourDiscount": "Il tuo sconto"
   },
   "productFamilyActions": {
     "publish": "Pubblica",
@@ -478,20 +481,27 @@
     "checkEmail": "Se quell'email ha un account, un link di reset è in arrivo.",
     "backToLogin": "Torna al login"
   },
-  "adminLinks": {
-    "title": "Collegamenti catalogo",
-    "subtitle": "Scegli quali fornitori e clienti possono vedere e preventivare dal catalogo pubblicato di un produttore",
-    "manufacturer": "Produttore",
-    "partner": "Fornitore o cliente",
-    "choose": "Seleziona un'azienda",
-    "addLink": "Aggiungi collegamento",
-    "adding": "Aggiunta…",
-    "selectBoth": "Seleziona un produttore e un fornitore o cliente",
-    "addFailed": "Impossibile aggiungere il collegamento",
-    "addFailedUnreachable": "Impossibile aggiungere il collegamento — server non raggiungibile",
-    "removeFailed": "Impossibile rimuovere il collegamento",
-    "remove": "Rimuovi collegamento",
-    "empty": "Nessun collegamento al catalogo.",
-    "errorLoading": "Impossibile caricare i collegamenti — il server potrebbe non essere raggiungibile."
+  "productFamilyShare": {
+    "title": "Condividi «{name}»",
+    "hint": "Scegli quali aziende possono usare questa famiglia. Lo sconto è quello con cui iniziano le loro posizioni di preventivo, e possono comunque modificarlo.",
+    "share": "Condividi",
+    "companyPlaceholder": "Seleziona un'azienda…",
+    "add": "Aggiungi",
+    "company": "Azienda",
+    "discount": "Sconto predefinito",
+    "empty": "Non ancora condivisa con nessuna azienda.",
+    "discountHint": "0% significa nessuno sconto specifico: vale lo sconto di catalogo della linea.",
+    "discountFor": "Sconto predefinito per {name}",
+    "remove": "Smetti di condividere con {name}",
+    "cancel": "Annulla",
+    "save": "Salva",
+    "saving": "Salvataggio…",
+    "close": "Chiudi",
+    "saved": "Condivisione aggiornata — condivisa con {count} aziende",
+    "loadFailed": "Impossibile caricare le impostazioni di condivisione",
+    "saveFailed": "Impossibile salvare la condivisione",
+    "saveFailedUnreachable": "Impossibile salvare la condivisione — server non raggiungibile",
+    "discountInvalid": "Ogni sconto deve essere un numero da 0 a 100",
+    "publishFirst": "Pubblica prima questa famiglia per condividerla"
   }
 }

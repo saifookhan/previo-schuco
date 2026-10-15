@@ -75,12 +75,14 @@ export {
   type RoleRow,
 } from './queries/role-permissions'
 export {
-  deleteCatalogLink,
-  insertCatalogLink,
-  isCatalogLinked,
-  listCatalogLinks,
-  type CatalogLinkRow,
-} from './queries/supplier-client-links'
+  getIncomingShareDiscounts,
+  isFamilySharedWith,
+  listFamilyShareTargets,
+  listOutgoingFamilyShares,
+  replaceOutgoingFamilyShares,
+  type FamilyShareRow,
+  type FamilyShareTarget,
+} from './queries/product-family-shares'
 export { filterBusinessUnitIdsByCompany } from './queries/business-units'
 export { writeAuditLog, type WriteAuditLogInput } from './queries/audit'
 export {
@@ -109,6 +111,7 @@ export {
   type InsertProductLineInput,
   type PricingMatrixRow,
   type ProductFamilyDetail,
+  type ProductFamilyListItem,
   type ProductLineRow,
   type UpdateCharacteristicInput,
   type UpdatePricingMatrixInput,

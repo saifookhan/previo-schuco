@@ -150,9 +150,6 @@ export const updateRolePermissions = async (
       }
       for (const permission of PERMISSIONS) {
         const lock = permissionLock(id, permission)
-        if (lock === 'super-admin-only' && granted.includes(permission)) {
-          throw new RolePermissionsValidationError(`'${permission}' can only belong to super-admin`)
-        }
         if (lock === 'company-admin-users' && !granted.includes(permission)) {
           throw new RolePermissionsValidationError(`'${id}' must keep '${permission}'`)
         }

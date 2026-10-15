@@ -120,7 +120,7 @@ describe('role permission matrix', () => {
     expect([...view.matrix['super-admin']].sort()).toEqual([...PERMISSIONS].sort())
   })
 
-  it('rejects unknown/missing roles, a company-admin without users.manage, and super-admin-only permissions on other roles', async () => {
+  it('rejects unknown/missing roles and a company-admin without users.manage', async () => {
     const withUnknown = { ...defaults(), ghost: ['catalog.view' as Permission] }
     await expect(updateRolePermissions(superAdminCtx, actor, withUnknown)).rejects.toThrow(RolePermissionsValidationError)
 
@@ -131,9 +131,6 @@ describe('role permission matrix', () => {
     noUsersManage['company-admin'] = noUsersManage['company-admin'].filter((p) => p !== 'users.manage')
     await expect(updateRolePermissions(superAdminCtx, actor, noUsersManage)).rejects.toThrow(RolePermissionsValidationError)
 
-    const linksToUser = defaults()
-    linksToUser.user = [...linksToUser.user, 'links.manage']
-    await expect(updateRolePermissions(superAdminCtx, actor, linksToUser)).rejects.toThrow(RolePermissionsValidationError)
   })
 
   it('rejects a role that can edit something it cannot view', async () => {

@@ -6,7 +6,6 @@ import {
   businessUnits,
   companies,
   roles,
-  supplierClientLinks,
   userBusinessUnits,
   users,
 } from './schema'
@@ -128,21 +127,6 @@ export const seedDatabase = async (db: Db): Promise<void> => {
       .returning({ id: businessUnits.id })
 
     businessUnitIds.set(unit.key, created.id)
-  }
-
-  const schucoId = companyIds.get('schuco')
-  const suppliId = companyIds.get('suppli')
-  const fabbrikkaId = companyIds.get('fabbrikka')
-  const technometalId = companyIds.get('technometal')
-
-  if (schucoId && suppliId && fabbrikkaId && technometalId) {
-    await db.insert(supplierClientLinks).values([
-      { supplierCompanyId: schucoId, clientCompanyId: fabbrikkaId },
-      { supplierCompanyId: suppliId, clientCompanyId: fabbrikkaId },
-      { supplierCompanyId: suppliId, clientCompanyId: technometalId },
-    ]).onConflictDoNothing({
-      target: [supplierClientLinks.supplierCompanyId, supplierClientLinks.clientCompanyId],
-    })
   }
 
   for (const demoUser of DEMO_USER_SEEDS) {

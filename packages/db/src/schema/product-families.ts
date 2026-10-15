@@ -15,7 +15,7 @@ import { companies } from './companies'
 
 /**
  * A supplier's product family (Phase 2, project-context.md). Owned by the
- * supplier company — visibility to clients follows `supplier_client_links`
+ * supplier company — visibility to other companies follows `product_family_shares`
  * (Schuco's own families are visible to everyone per that table's rows,
  * not a special case here) *and* `isPublished` below (a family can be
  * linked to clients but still hidden while a draft/re-import is in

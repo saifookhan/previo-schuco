@@ -1,8 +1,16 @@
 import { readFile } from 'node:fs/promises'
 
+import { familySharesResponseSchema, updateFamilySharesRequestSchema } from '@schuco/contracts'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 
+import {
+  FamilyShareNotFoundError,
+  FamilyShareValidationError,
+  getFamilyShareDiscount,
+  getFamilyShares,
+  updateFamilyShares,
+} from '../services/family-shares-service'
 import {
   ExcelImportError,
   createNewVersionFromExcel,
@@ -113,7 +121,7 @@ productFamilies.post(
   },
 )
 
-/** Lists product families visible to the caller (own company's, plus published families of linked suppliers). */
+/** Lists product families visible to the caller (own company's, plus published families shared with it). */
 productFamilies.get('/', requireAuth, requirePermission('catalog.view'), async (c) => {
   const ctx = {
     effectiveCompanyId: c.get('effectiveCompanyId'),
@@ -137,7 +145,61 @@ productFamilies.get('/:id', requireAuth, requirePermission('catalog.view'), asyn
   if (!detail) {
     return c.json({ error: 'Not found' }, 404)
   }
-  return c.json({ ...detail, editable: isProductFamilyEditable(detail.family) })
+  const shareDiscountPct = await getFamilyShareDiscount(ctx, id)
+  return c.json({ ...detail, editable: isProductFamilyEditable(detail.family), shareDiscountPct })
+})
+
+/** The companies the caller's company shares this family with (plus the companies it could add). */
+productFamilies.get('/:id/shares', requireAuth, requirePermission('catalog.share'), async (c) => {
+  const id = c.req.param('id')
+  if (!id) {
+    return c.json({ error: 'Missing id' }, 400)
+  }
+  try {
+    const result = await getFamilyShares(
+      { effectiveCompanyId: c.get('effectiveCompanyId'), isSuperAdmin: c.get('isSuperAdmin') },
+      id,
+    )
+    return c.json(familySharesResponseSchema.parse(result))
+  } catch (error) {
+    if (error instanceof FamilyShareNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+    throw error
+  }
+})
+
+/** Replaces the set of companies the caller's company shares this family with, each at a default discount. */
+productFamilies.put('/:id/shares', requireAuth, requirePermission('catalog.share'), async (c) => {
+  const id = c.req.param('id')
+  if (!id) {
+    return c.json({ error: 'Missing id' }, 400)
+  }
+  const parsedBody = updateFamilySharesRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsedBody.success) {
+    return c.json({ error: 'Invalid request body', details: parsedBody.error.issues }, 400)
+  }
+  try {
+    const result = await updateFamilyShares(
+      { effectiveCompanyId: c.get('effectiveCompanyId'), isSuperAdmin: c.get('isSuperAdmin') },
+      {
+        actorUserId: c.get('actorUserId'),
+        actorCompanyId: c.get('user').company.id,
+        requestId: c.get('requestId'),
+      },
+      id,
+      parsedBody.data.shares,
+    )
+    return c.json(familySharesResponseSchema.parse(result))
+  } catch (error) {
+    if (error instanceof FamilyShareNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+    if (error instanceof FamilyShareValidationError) {
+      return c.json({ error: error.message }, 400)
+    }
+    throw error
+  }
 })
 
 const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {

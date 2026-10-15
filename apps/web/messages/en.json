@@ -63,8 +63,7 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "quotes": "Quotes",
-    "adminCompanies": "Companies",
-    "adminLinks": "Catalog links"
+    "adminCompanies": "Companies"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -166,7 +165,6 @@
     "saveFailedUnreachable": "Could not save — could not reach the server",
     "errorLoading": "Couldn't load the permission matrix — the server may be unreachable.",
     "lockSuperAdmin": "Super-admin always has every permission",
-    "lockSuperAdminOnly": "Only super-admin can hold this permission",
     "lockCompanyAdminUsers": "Company admins must keep user management",
     "permissionLabels": {
       "catalog.view": "View catalog",
@@ -174,7 +172,7 @@
       "quote.view": "View quotes",
       "quote.edit": "Create and edit quotes",
       "users.manage": "Manage company users",
-      "links.manage": "Manage catalog links"
+      "catalog.share": "Share product families"
     },
     "permissionHints": {
       "catalog.view": "Browse product families and their prices",
@@ -182,7 +180,7 @@
       "quote.view": "Open quotes and download PDFs",
       "quote.edit": "Create quotes and edit their positions",
       "users.manage": "Invite and manage users of their own company",
-      "links.manage": "Choose which suppliers and clients see a manufacturer's catalog"
+      "catalog.share": "Share a family with other companies and set their default discount"
     }
   },
   "settingsCompany": {
@@ -229,7 +227,12 @@
     "importFailed": "Import failed",
     "importFailedUnreachable": "Import failed — could not reach the server",
     "errorLoading": "Couldn't load product families — the server may be unreachable. Try refreshing.",
-    "version": "Version"
+    "version": "Version",
+    "tabOwn": "My families",
+    "tabShared": "Shared with me",
+    "emptyShared": "No product families have been shared with your company yet.",
+    "owner": "Owner",
+    "yourDiscount": "Your discount"
   },
   "productFamilyActions": {
     "publish": "Publish",
@@ -478,20 +481,27 @@
     "checkEmail": "If that email has an account, a reset link is on its way.",
     "backToLogin": "Back to sign in"
   },
-  "adminLinks": {
-    "title": "Catalog links",
-    "subtitle": "Choose which suppliers and clients can see and quote from a manufacturer's published catalog",
-    "manufacturer": "Manufacturer",
-    "partner": "Supplier or client",
-    "choose": "Select a company",
-    "addLink": "Add link",
-    "adding": "Adding…",
-    "selectBoth": "Select a manufacturer and a supplier or client",
-    "addFailed": "Could not add link",
-    "addFailedUnreachable": "Could not add link — could not reach the server",
-    "removeFailed": "Could not remove link",
-    "remove": "Remove link",
-    "empty": "No catalog links yet.",
-    "errorLoading": "Couldn't load links — the server may be unreachable."
+  "productFamilyShare": {
+    "title": "Share “{name}”",
+    "hint": "Choose which companies can use this family. The discount is the default their quote positions start with — they can still change it.",
+    "share": "Share",
+    "companyPlaceholder": "Select a company…",
+    "add": "Add",
+    "company": "Company",
+    "discount": "Default discount",
+    "empty": "Not shared with any company yet.",
+    "discountHint": "0% means no specific discount: the line's own catalog discount applies.",
+    "discountFor": "Default discount for {name}",
+    "remove": "Stop sharing with {name}",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "close": "Close",
+    "saved": "Sharing updated — shared with {count} companies",
+    "loadFailed": "Could not load sharing settings",
+    "saveFailed": "Could not save sharing",
+    "saveFailedUnreachable": "Could not save sharing — could not reach the server",
+    "discountInvalid": "Each discount must be a number from 0 to 100",
+    "publishFirst": "Publish this family first to share it"
   }
 }

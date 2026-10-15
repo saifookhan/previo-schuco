@@ -63,8 +63,7 @@
     "openMenu": "Menü öffnen",
     "closeMenu": "Menü schließen",
     "quotes": "Angebote",
-    "adminCompanies": "Unternehmen",
-    "adminLinks": "Katalogverknüpfungen"
+    "adminCompanies": "Unternehmen"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -166,7 +165,6 @@
     "saveFailedUnreachable": "Speichern fehlgeschlagen — Server nicht erreichbar",
     "errorLoading": "Die Berechtigungsmatrix konnte nicht geladen werden — der Server ist möglicherweise nicht erreichbar.",
     "lockSuperAdmin": "Super-Admin hat immer alle Berechtigungen",
-    "lockSuperAdminOnly": "Nur Super-Admin darf diese Berechtigung haben",
     "lockCompanyAdminUsers": "Firmenadministratoren müssen die Benutzerverwaltung behalten",
     "permissionLabels": {
       "catalog.view": "Katalog ansehen",
@@ -174,7 +172,7 @@
       "quote.view": "Angebote ansehen",
       "quote.edit": "Angebote erstellen und bearbeiten",
       "users.manage": "Firmenbenutzer verwalten",
-      "links.manage": "Katalogverknüpfungen verwalten"
+      "catalog.share": "Produktfamilien teilen"
     },
     "permissionHints": {
       "catalog.view": "Produktfamilien und Preise durchsuchen",
@@ -182,7 +180,7 @@
       "quote.view": "Angebote öffnen und PDFs herunterladen",
       "quote.edit": "Angebote erstellen und deren Positionen bearbeiten",
       "users.manage": "Benutzer des eigenen Unternehmens einladen und verwalten",
-      "links.manage": "Festlegen, welche Lieferanten und Kunden den Katalog eines Herstellers sehen"
+      "catalog.share": "Eine Familie mit anderen Unternehmen teilen und deren Standardrabatt festlegen"
     }
   },
   "settingsCompany": {
@@ -229,7 +227,12 @@
     "importFailed": "Import fehlgeschlagen",
     "importFailedUnreachable": "Import fehlgeschlagen — Server nicht erreichbar",
     "errorLoading": "Produktfamilien konnten nicht geladen werden — der Server ist möglicherweise nicht erreichbar. Bitte aktualisieren.",
-    "version": "Version"
+    "version": "Version",
+    "tabOwn": "Meine Familien",
+    "tabShared": "Mit mir geteilt",
+    "emptyShared": "Mit Ihrem Unternehmen wurden noch keine Produktfamilien geteilt.",
+    "owner": "Eigentümer",
+    "yourDiscount": "Ihr Rabatt"
   },
   "productFamilyActions": {
     "publish": "Veröffentlichen",
@@ -478,20 +481,27 @@
     "checkEmail": "Falls diese E-Mail ein Konto hat, ist ein Reset-Link unterwegs.",
     "backToLogin": "Zurück zur Anmeldung"
   },
-  "adminLinks": {
-    "title": "Katalogverknüpfungen",
-    "subtitle": "Legen Sie fest, welche Lieferanten und Kunden den veröffentlichten Katalog eines Herstellers sehen und daraus Angebote erstellen dürfen",
-    "manufacturer": "Hersteller",
-    "partner": "Lieferant oder Kunde",
-    "choose": "Unternehmen auswählen",
-    "addLink": "Verknüpfung hinzufügen",
-    "adding": "Wird hinzugefügt…",
-    "selectBoth": "Hersteller und Lieferant oder Kunde auswählen",
-    "addFailed": "Verknüpfung konnte nicht hinzugefügt werden",
-    "addFailedUnreachable": "Verknüpfung konnte nicht hinzugefügt werden — Server nicht erreichbar",
-    "removeFailed": "Verknüpfung konnte nicht entfernt werden",
-    "remove": "Verknüpfung entfernen",
-    "empty": "Noch keine Katalogverknüpfungen.",
-    "errorLoading": "Verknüpfungen konnten nicht geladen werden — der Server ist möglicherweise nicht erreichbar."
+  "productFamilyShare": {
+    "title": "„{name}“ teilen",
+    "hint": "Legen Sie fest, welche Unternehmen diese Familie nutzen dürfen. Der Rabatt ist der Standardwert ihrer Angebotspositionen – er kann weiterhin geändert werden.",
+    "share": "Teilen",
+    "companyPlaceholder": "Unternehmen auswählen…",
+    "add": "Hinzufügen",
+    "company": "Unternehmen",
+    "discount": "Standardrabatt",
+    "empty": "Noch mit keinem Unternehmen geteilt.",
+    "discountHint": "0 % bedeutet kein besonderer Rabatt: Es gilt der Katalograbatt der Linie.",
+    "discountFor": "Standardrabatt für {name}",
+    "remove": "Teilen mit {name} beenden",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "saving": "Wird gespeichert…",
+    "close": "Schließen",
+    "saved": "Freigabe aktualisiert — mit {count} Unternehmen geteilt",
+    "loadFailed": "Freigabeeinstellungen konnten nicht geladen werden",
+    "saveFailed": "Freigabe konnte nicht gespeichert werden",
+    "saveFailedUnreachable": "Freigabe konnte nicht gespeichert werden — Server nicht erreichbar",
+    "discountInvalid": "Jeder Rabatt muss eine Zahl von 0 bis 100 sein",
+    "publishFirst": "Veröffentlichen Sie diese Familie zuerst, um sie zu teilen"
   }
 }

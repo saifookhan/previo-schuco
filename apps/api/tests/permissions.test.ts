@@ -44,10 +44,15 @@ describe('computePermissions', () => {
     expect(p).not.toContain('quote.edit')
   })
 
-  it('super-admin is cross-tenant and bypasses capabilities; links.manage is super-admin only', () => {
-    expect(computePermissions(['super-admin'], caps({ platform: true }))).toContain('links.manage')
-    expect(computePermissions(['company-admin'], caps({ manufacturer: true, supplier: true, client: true }))).not.toContain(
-      'links.manage',
-    )
+  it('super-admin is cross-tenant and bypasses the capability filter', () => {
+    const p = computePermissions(['super-admin'], caps({ platform: true }))
+    expect(p).toEqual(expect.arrayContaining(['catalog.edit', 'catalog.share', 'quote.edit']))
+  })
+
+  it('manufacturers and suppliers can share families; a client cannot', () => {
+    expect(computePermissions(['company-admin'], caps({ manufacturer: true }))).toContain('catalog.share')
+    expect(computePermissions(['company-admin'], caps({ supplier: true }))).toContain('catalog.share')
+    expect(computePermissions(['company-admin'], caps({ client: true }))).not.toContain('catalog.share')
+    expect(computePermissions(['user'], caps({ supplier: true }))).not.toContain('catalog.share')
   })
 })

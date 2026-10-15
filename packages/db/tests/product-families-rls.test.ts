@@ -1,8 +1,8 @@
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import type { Db } from '../src/client'
-import { companies, productFamilies, supplierClientLinks } from '../src/schema'
+import { companies, productFamilies, productFamilyShares } from '../src/schema'
 import { withRlsTransaction, withSystemTransaction } from '../src/queries/users'
 import { getTestDb } from './helpers'
 
@@ -12,7 +12,7 @@ import { getTestDb } from './helpers'
  * rls.test.ts) because its policy shape is genuinely different from
  * every other table here: visibility isn't just "my own company's rows"
  * — a client company can also see a supplier's *published* families
- * (via `supplier_client_links`), and this table's own SELECT/UPDATE/
+ * (via `product_family_shares`), and this table's own SELECT/UPDATE/
  * DELETE policies must use a direct `supplier_company_id` column check,
  * NOT the `app_owns_product_family`/`app_can_view_product_family` helper
  * functions those same policies delegate to on every CHILD table
@@ -55,22 +55,32 @@ beforeAll(async () => {
     supplierB = b.id
     clientLinkedToA = linked.id
     clientUnlinked = unlinked.id
-
-    await tx.insert(supplierClientLinks).values({
-      supplierCompanyId: supplierA,
-      clientCompanyId: clientLinkedToA,
-    })
   })
 })
+
+/** Creates a family owned by `owner` and shares it `from` → `to` in one go (the share is what makes it visible to `to`). */
+const createSharedFamily = (
+  name: string,
+  opts: { published: boolean; owner: string; from: string; to: string },
+): Promise<string> =>
+  withSystemTransaction(db, async (tx) => {
+    const [row] = await tx
+      .insert(productFamilies)
+      .values({ supplierCompanyId: opts.owner, name, isPublished: opts.published })
+      .returning({ id: productFamilies.id })
+    await tx.insert(productFamilyShares).values({
+      productFamilyId: row.id,
+      fromCompanyId: opts.from,
+      toCompanyId: opts.to,
+    })
+    return row.id
+  })
 
 afterAll(async () => {
   await withSystemTransaction(db, async (tx) => {
     await tx.delete(productFamilies).where(
       inArray(productFamilies.supplierCompanyId, [supplierA, supplierB]),
     )
-    await tx
-      .delete(supplierClientLinks)
-      .where(eq(supplierClientLinks.supplierCompanyId, supplierA))
     await tx
       .delete(companies)
       .where(inArray(companies.id, [supplierA, supplierB, clientLinkedToA, clientUnlinked]))
@@ -137,13 +147,12 @@ describe('product_families RLS', () => {
     expect(rows).toHaveLength(0)
   })
 
-  it('4. a linked client CANNOT see an unpublished family', async () => {
-    const familyId = await withSystemTransaction(db, async (tx) => {
-      const [row] = await tx
-        .insert(productFamilies)
-        .values({ supplierCompanyId: supplierA, name: 'Still A Draft', isPublished: false })
-        .returning({ id: productFamilies.id })
-      return row.id
+  it('4. a company a family was shared with CANNOT see it while it is unpublished', async () => {
+    const familyId = await createSharedFamily('Still A Draft', {
+      published: false,
+      owner: supplierA,
+      from: supplierA,
+      to: clientLinkedToA,
     })
 
     const rows = await withRlsTransaction(db, { companyId: clientLinkedToA, isSuperAdmin: false }, (tx) =>
@@ -152,13 +161,12 @@ describe('product_families RLS', () => {
     expect(rows).toHaveLength(0)
   })
 
-  it('5. a linked client CAN see a published family ("allowing a user to see")', async () => {
-    const familyId = await withSystemTransaction(db, async (tx) => {
-      const [row] = await tx
-        .insert(productFamilies)
-        .values({ supplierCompanyId: supplierA, name: 'Now Published', isPublished: true })
-        .returning({ id: productFamilies.id })
-      return row.id
+  it('5. a company a family was shared with CAN see it once it is published', async () => {
+    const familyId = await createSharedFamily('Now Published', {
+      published: true,
+      owner: supplierA,
+      from: supplierA,
+      to: clientLinkedToA,
     })
 
     const rows = await withRlsTransaction(db, { companyId: clientLinkedToA, isSuperAdmin: false }, (tx) =>
@@ -167,7 +175,7 @@ describe('product_families RLS', () => {
     expect(rows).toHaveLength(1)
   })
 
-  it('6. an UNLINKED client cannot see a published family either — publishing alone is not enough, the supplier-client link matters', async () => {
+  it('6. a company the family was NOT shared with cannot see it even when published — publishing alone is not enough', async () => {
     const familyId = await withSystemTransaction(db, async (tx) => {
       const [row] = await tx
         .insert(productFamilies)
@@ -182,13 +190,12 @@ describe('product_families RLS', () => {
     expect(rows).toHaveLength(0)
   })
 
-  it('7. a linked client cannot UPDATE a supplier\'s published family, even though it can SELECT it', async () => {
-    const familyId = await withSystemTransaction(db, async (tx) => {
-      const [row] = await tx
-        .insert(productFamilies)
-        .values({ supplierCompanyId: supplierA, name: 'Client Tries To Edit', isPublished: true })
-        .returning({ id: productFamilies.id })
-      return row.id
+  it('7. a company a family was shared with cannot UPDATE it, even though it can SELECT it', async () => {
+    const familyId = await createSharedFamily('Client Tries To Edit', {
+      published: true,
+      owner: supplierA,
+      from: supplierA,
+      to: clientLinkedToA,
     })
 
     const updated = await withRlsTransaction(db, { companyId: clientLinkedToA, isSuperAdmin: false }, (tx) =>
@@ -204,6 +211,36 @@ describe('product_families RLS', () => {
       tx.select({ name: productFamilies.name }).from(productFamilies).where(eq(productFamilies.id, familyId)),
     )
     expect(unchanged.name).toBe('Client Tries To Edit')
+  })
+
+  it('7b. onward sharing: A → linked client → unlinked client makes it visible downstream, and revoking the first hop cuts the second off', async () => {
+    const familyId = await createSharedFamily('Shared Onward', {
+      published: true,
+      owner: supplierA,
+      from: supplierA,
+      to: clientLinkedToA,
+    })
+    await withSystemTransaction(db, (tx) =>
+      tx.insert(productFamilyShares).values({
+        productFamilyId: familyId,
+        fromCompanyId: clientLinkedToA,
+        toCompanyId: clientUnlinked,
+        discountPct: '12.50',
+      }),
+    )
+    const visibleTo = (companyId: string) =>
+      withRlsTransaction(db, { companyId, isSuperAdmin: false }, (tx) =>
+        tx.select().from(productFamilies).where(eq(productFamilies.id, familyId)),
+      )
+    expect(await visibleTo(clientUnlinked)).toHaveLength(1)
+
+    await withSystemTransaction(db, (tx) =>
+      tx
+        .delete(productFamilyShares)
+        .where(and(eq(productFamilyShares.productFamilyId, familyId), eq(productFamilyShares.fromCompanyId, supplierA))),
+    )
+    expect(await visibleTo(clientLinkedToA)).toHaveLength(0)
+    expect(await visibleTo(clientUnlinked)).toHaveLength(0) // the downstream edge still exists but is no longer reachable
   })
 
   it('8. super-admin sees every family regardless of company or published status', async () => {

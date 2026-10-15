@@ -7,7 +7,8 @@ import {
   insertQuote,
   insertQuotePosition,
   insertQuotePositionCharacteristic,
-  isCatalogLinked,
+  getIncomingShareDiscounts,
+  isFamilySharedWith,
   listQuotes,
   recalculateQuoteTotal,
   reorderQuotePositions as reorderQuotePositionsQuery,
@@ -261,9 +262,9 @@ export const priceQuotePosition = async (
 
   const family = await getProductFamilyDetail(tx, input.productFamilyId)
   // A quote belongs to the supplier issuing it. It may be priced from that
-  // company's own catalog, or from a PUBLISHED family of a manufacturer that
-  // has linked its catalog to the company (supplier_client_links). A family
-  // merely visible for another reason is not enough. No isSuperAdmin
+  // company's own catalog, or from a PUBLISHED family that was shared with
+  // the company, directly or through a chain (product_family_shares). A
+  // family merely visible for another reason is not enough. No isSuperAdmin
   // exception: isSuperAdmin stays true while acting as another tenant via
   // X-Tenant-Id (ADR 0008), so a bypass here would let a super-admin acting
   // as company A attach an arbitrary company's family to a quote owned by A;
@@ -271,8 +272,7 @@ export const priceQuotePosition = async (
   const isUsableFamily =
     !!family &&
     (family.family.supplierCompanyId === ctx.effectiveCompanyId ||
-      (family.family.isPublished &&
-        (await isCatalogLinked(tx, family.family.supplierCompanyId, ctx.effectiveCompanyId))))
+      (family.family.isPublished && (await isFamilySharedWith(tx, family.family.id, ctx.effectiveCompanyId))))
   if (!family || !isUsableFamily) {
     throw new QuoteValidationError('Product family not found or not visible')
   }
@@ -399,7 +399,13 @@ export const priceQuotePosition = async (
   const basePricePerUnit = lineBasePrice + characteristicsBasePrice
   const basePrice = basePricePerUnit * input.quantity
 
-  const discountPct = input.discountPct ?? Number(line.discountPct)
+  // A family shared with this company at a non-zero discount starts positions at that discount;
+  // otherwise (own family, or shared at 0%) the line's own catalog discount applies. Always overridable via input.
+  const shareDiscount =
+    family.family.supplierCompanyId === ctx.effectiveCompanyId
+      ? 0
+      : ((await getIncomingShareDiscounts(tx, ctx.effectiveCompanyId, [family.family.id])).get(family.family.id) ?? 0)
+  const discountPct = input.discountPct ?? (shareDiscount > 0 ? shareDiscount : Number(line.discountPct))
   const extraMarkupPct = input.extraMarkupPct ?? Number(line.markupPct)
   if (discountPct < 0 || discountPct > 100) {
     throw new QuoteValidationError('discountPct must be between 0 and 100')

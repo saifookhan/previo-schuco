@@ -51,7 +51,7 @@ This distinction exists because RLS is the platform's core correctness property,
 
 **Fixtures follow the same split, not a single rule.** A repository/DB-layer test's fixtures may be created directly via repository calls or raw inserts — that's appropriate and simpler for a test whose whole point is examining persistence behavior. A service-layer or API/E2E test's fixtures should generally go through services (e.g. an admin-invite service, once it exists per [0004](./0004-admin-invite-only-onboarding.md)) when doing so isn't excessively coupled — but this is a preference for realism, not an absolute rule that turns "set up a company, a role, a user, and a business unit" into a chain of five service calls when a direct repository-level fixture helper is clearly more appropriate for what that particular test is checking.
 
-**5. RLS test coverage is mandatory, not incidental.** Every tenant-scoped table/policy (`companies`, `business_units`, `users`, `user_business_units`, `supplier_client_links`, and the future `audit_log` per [0010](./0010-tenant-aware-audit-logging.md)) must have at least one repository/DB-layer integration test proving, at minimum:
+**5. RLS test coverage is mandatory, not incidental.** Every tenant-scoped table/policy (`companies`, `business_units`, `users`, `user_business_units`, `product_family_shares`, and the future `audit_log` per [0010](./0010-tenant-aware-audit-logging.md)) must have at least one repository/DB-layer integration test proving, at minimum:
 
 1. A tenant can access its own records.
 2. A tenant **cannot** access another tenant's records (the negative case — this is the one that actually matters and is the one most likely to be skipped without an explicit rule requiring it).

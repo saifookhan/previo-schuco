@@ -18,6 +18,7 @@ import {
   type CharacteristicRow,
   type PricingMatrixRow,
   type ProductFamilyDetail,
+  type ProductFamilyListItem,
   type ProductFamilySummary,
   type ProductLineRow,
 } from '@schuco/db'
@@ -264,7 +265,7 @@ export const importProductFamilyFromExcel = async (
   return family
 }
 
-export const listProductFamilies = (ctx: TenantContext): Promise<ProductFamilySummary[]> =>
+export const listProductFamilies = (ctx: TenantContext): Promise<ProductFamilyListItem[]> =>
   withTenantDb(ctx, (tx) => listVisibleProductFamilies(tx, ctx.effectiveCompanyId))
 
 export const getProductFamilyDetail = (
