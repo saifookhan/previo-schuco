@@ -3,14 +3,12 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**", "build/**"],
+      "outputs": [".next/**", "dist/**"],
       // Turbo's strict env mode silently strips any process.env var not
       // listed here before spawning the task — without this, apps/web's
       // bootstrap-env.ts sees AUTH_SECRET as unset even when CI (or a
       // real deploy) sets it, and fails with "AUTH_SECRET: Required".
-      // DOMAIN / MAILPIT_DOMAIN / DOCS_DOMAIN: apps/docs bakes the URLs it
-      // links to into its static pages (docusaurus.config.ts).
-      "env": ["AUTH_SECRET", "NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_APP_URL", "DOMAIN", "MAILPIT_DOMAIN", "DOCS_DOMAIN"]
+      "env": ["AUTH_SECRET", "NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_APP_URL"]
     },
     "dev": {
       "cache": false,

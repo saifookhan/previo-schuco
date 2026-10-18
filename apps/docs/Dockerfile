@@ -8,9 +8,10 @@ COPY apps/docs ./apps/docs
 # Baked into the static pages at build time (docusaurus.config.ts) — the
 # docs link to the app, Mailpit and themselves on these hostnames.
 ARG DOMAIN=
+ARG APP_PUBLIC_URL=
 ARG MAILPIT_DOMAIN=
 ARG DOCS_DOMAIN=
-RUN DOMAIN=$DOMAIN MAILPIT_DOMAIN=$MAILPIT_DOMAIN DOCS_DOMAIN=$DOCS_DOMAIN pnpm --filter @schuco/docs build
+RUN DOMAIN=$DOMAIN APP_PUBLIC_URL=$APP_PUBLIC_URL MAILPIT_DOMAIN=$MAILPIT_DOMAIN DOCS_DOMAIN=$DOCS_DOMAIN pnpm --filter @schuco/docs build
 
 FROM caddy:2-alpine
 COPY apps/docs/Caddyfile /etc/caddy/Caddyfile

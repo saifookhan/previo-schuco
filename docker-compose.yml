@@ -188,6 +188,7 @@ services:
       dockerfile: apps/docs/Dockerfile
       args:
         DOMAIN: ${DOMAIN:-}
+        APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
         MAILPIT_DOMAIN: ${MAILPIT_DOMAIN:-}
         DOCS_DOMAIN: ${DOCS_DOMAIN:-}
 
@@ -221,7 +222,6 @@ services:
       - caddy_config:/config
     depends_on:
       - web
-      - docs
 
 volumes:
   previo_pg_data:

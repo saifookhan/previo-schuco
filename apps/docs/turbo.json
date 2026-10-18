@@ -1,0 +1,12 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "outputs": ["build/**"],
+      // The docs bake the app / Mailpit / docs URLs into their static pages
+      // (docusaurus.config.ts) — only this package's cache depends on them.
+      "env": ["DOMAIN", "APP_PUBLIC_URL", "MAILPIT_DOMAIN", "DOCS_DOMAIN"]
+    }
+  }
+}

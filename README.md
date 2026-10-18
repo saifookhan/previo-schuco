@@ -187,7 +187,7 @@ Spins up a real `previo_test` Postgres database (dropped/recreated each run) and
 apps/
   web/     → Next.js frontend (+ server-side proxy to the API)
   api/     → Hono API (Docker); also the BullMQ worker entrypoint (src/worker.ts)
-  docs/    → Docusaurus (planned)
+  docs/    → Docusaurus testing docs (features, URLs, demo logins) — `pnpm dev:docs`
 packages/
   calculation/  → Quote pricing engine
   db/           → Drizzle schema, migrations, RBAC, RLS policies

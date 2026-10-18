@@ -7,7 +7,8 @@ import { themes as prismThemes } from 'prism-react-renderer'
 // server build links to the real server and a local build links to localhost.
 const httpsOr = (domain: string | undefined, fallback: string) => (domain ? `https://${domain}` : fallback)
 
-const appUrl = httpsOr(process.env.DOMAIN, 'http://localhost:3000')
+// Without a DOMAIN (IP-only box) the app is reached at APP_PUBLIC_URL, e.g. http://<server-ip>:3000.
+const appUrl = httpsOr(process.env.DOMAIN, process.env.APP_PUBLIC_URL || 'http://localhost:3000')
 const mailpitUrl = httpsOr(process.env.MAILPIT_DOMAIN, 'http://localhost:8025')
 const docsUrl = httpsOr(process.env.DOCS_DOMAIN, 'http://localhost:3002')
 
