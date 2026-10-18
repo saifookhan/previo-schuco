@@ -1,0 +1,51 @@
+---
+sidebar_position: 4
+title: E-Mail & Mailpit
+---
+
+import AppLink from '@site/src/components/AppLink'
+
+# E-Mail & Mailpit
+
+Die App verschickt zwei Arten von E-Mails: **Einladungen** (mit einem Link zum Festlegen des Passworts) und **Passwort-Resets**.
+
+Wohin sie gehen, hängt von der Serverkonfiguration ab:
+
+| Konfiguration | E-Mails gehen an |
+|---|---|
+| `RESEND_API_KEY` gesetzt | Echte Postfächer, versendet über Resend |
+| Sonst (Standard) | **Mailpit** — ein Test-Postfach, das alles auffängt. Nichts erreicht echte Postfächer |
+| Zusätzlich `SMTP_HOST` leer | Nirgendwohin — der Link steht nur in `docker compose logs api` |
+
+## Mailpit öffnen
+
+**Postfach:** <AppLink to="mailpit" />
+
+Auf dem Server ist Mailpit mit Benutzername und Passwort geschützt (HTTP Basic Auth, gesetzt über
+`MAILPIT_UI_AUTH` in der `.env` des Servers). **Die Zugangsdaten beim Team erfragen** — sie liegen im
+Passwortmanager, nicht in dieser Dokumentation.
+
+![Eine Passwort-Reset-E-Mail in Mailpit](/img/screens/mailpit.png)
+
+Lokal (`docker compose up -d`) läuft Mailpit unter `http://localhost:8025`, ohne Anmeldung.
+
+Ist auf dem Server keine Mailpit-Subdomain eingerichtet, über einen SSH-Tunnel öffnen:
+
+```bash
+ssh -L 8025:localhost:8025 <server>
+# dann http://localhost:8025 öffnen
+```
+
+## Eine Einladung komplett testen
+
+1. Als `admin@suppli-demo.it` anmelden → **Einstellungen → Benutzer → Benutzer hinzufügen**, mit einer
+   ausgedachten E-Mail, z. B. `tester1@example.com`, und mindestens einer Rolle. Der Benutzer ist *wartet auf Freigabe* — noch keine E-Mail.
+2. Abmelden, als `admin@schuco-demo.it` (Super-Admin) anmelden → **Admin → Benutzer** → Anfrage **freigeben**.
+3. Mailpit öffnen — die Einladung für `tester1@example.com` steht ganz oben.
+4. Link anklicken → Seite **Passwort festlegen** → Passwort wählen (mindestens 10 Zeichen).
+5. Mit dieser E-Mail und diesem Passwort über das normale Anmeldeformular anmelden.
+
+Für einen **Passwort-Reset** auf der Anmeldeseite **Passwort vergessen** mit der E-Mail dieses Benutzers
+verwenden und die Reset-E-Mail genauso in Mailpit öffnen.
+
+Jede E-Mail an jede Adresse erscheint in Mailpit — beliebig viele ausgedachte Adressen sind möglich.

@@ -1,0 +1,62 @@
+---
+sidebar_position: 2
+title: URLs
+---
+
+import AppLink from '@site/src/components/AppLink'
+
+# URLs
+
+Die Links auf dieser Seite zeigen auf die Umgebung, für die diese Dokumentation erstellt wurde.
+
+## Dienste
+
+| Dienst | Diese Umgebung | Lokal (`pnpm dev` + `docker compose up -d`) |
+|---|---|---|
+| Web-App | <AppLink /> | `http://localhost:3000` |
+| Mailpit (E-Mail-Postfach) | <AppLink to="mailpit" /> | `http://localhost:8025` |
+| API | — (die App ruft sie über ihre eigenen `/api/*`-Routen auf; öffentlich ist nur die API-Dokumentation unten) | `http://localhost:3001` |
+| API-Dokumentation (Swagger UI) | <AppLink path="/docs" /> | `http://localhost:3001/docs` |
+| OpenAPI-Spezifikation | <AppLink path="/openapi.json" /> | `http://localhost:3001/openapi.json` |
+| API-Health-Check | — | `http://localhost:3001/health` |
+| Diese Dokumentation | — | `http://localhost:3002` (`pnpm --filter @schuco/docs dev`) |
+
+## Seiten der App
+
+Die URLs enthalten keine Sprache — die Sprache (standardmäßig Italienisch, Englisch, Deutsch) wird in der App gewählt.
+
+### Öffentlich
+
+| Seite | URL |
+|---|---|
+| Anmeldung (+ Demo-Anmeldung) | <AppLink path="/login" /> |
+| Passwort vergessen | <AppLink path="/forgot-password" /> |
+| Passwort festlegen (aus der Einladungs- / Reset-E-Mail) | `/set-password?token=…` |
+
+### App (jeder angemeldete Benutzer)
+
+| Seite | URL | Benötigt |
+|---|---|---|
+| Dashboard | <AppLink path="/app/dashboard" /> | — |
+| Produktfamilien (Katalog) | <AppLink path="/app/product-families" /> | `catalog.view` |
+| Produktfamilie im Detail | `/app/product-families/<id>` | `catalog.view` |
+| Angebote | <AppLink path="/app/quotes" /> | `quote.view` |
+| Angebotsdetail / Angebotserstellung | `/app/quotes/<id>` | `quote.view` (`quote.edit` zum Ändern) |
+| Angebotseditor (frühe Demo-Nachbildung) | <AppLink path="/app/invoice" /> | — |
+
+### Einstellungen
+
+| Seite | URL | Wer |
+|---|---|---|
+| Unternehmensdaten | <AppLink path="/app/settings/company" /> | Unternehmensadmin |
+| Benutzer (einladen) | <AppLink path="/app/settings/users" /> | `users.manage` |
+| Rollen | <AppLink path="/app/settings/roles" /> | Super-Admin |
+| Zugriffsrechte (Berechtigungsmatrix) | <AppLink path="/app/settings/access-rights" /> | Super-Admin |
+
+### Admin-Bereich (nur Super-Admin)
+
+| Seite | URL |
+|---|---|
+| Admin-Dashboard | <AppLink path="/admin/dashboard" /> |
+| Alle Benutzer + offene Freigaben | <AppLink path="/admin/users" /> |
+| Unternehmen | <AppLink path="/admin/companies" /> |

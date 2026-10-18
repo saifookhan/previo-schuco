@@ -9,6 +9,8 @@ A company decides who can use each of its product families, and at which default
 
 **Where:** family list or family page → **Share** · needs `catalog.share`.
 
+![Share dialog](/img/screens/share-dialog.png)
+
 ## Rules
 
 - A family must be **published** before it can be shared.
@@ -22,7 +24,12 @@ A company decides who can use each of its product families, and at which default
 
 ## How to test
 
-1. As `admin@suppli-demo.it`: import and publish a family, then share it with **Technometal** at 10%.
-2. As `admin@technometal-demo.it`: *Product families → Shared with me* shows it with "Your discount 10%".
-3. As `admin@fabbrikka-demo.it`: the family is **not** visible.
+The demo family *Demo Window W70* is already shared with Technometal at 10%.
+
+1. As `admin@technometal-demo.it`: *Product families → Shared with me* shows it with "Your discount 10%".
+
+   ![Shared with me tab](/img/screens/product-families-shared.png)
+
+2. As `admin@suppli-demo.it`: share it with **Fabbrikka** at 5% too.
+3. As `admin@fabbrikka-demo.it`: it now shows with 5%. Remove the share again → it is gone.
 4. Back as Suppli: unpublish it → it disappears for Technometal.

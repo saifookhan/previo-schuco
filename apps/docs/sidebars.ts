@@ -6,6 +6,7 @@ const sidebars: SidebarsConfig = {
     'urls',
     'demo-logins',
     'email-mailpit',
+    'demo-data',
     {
       type: 'category',
       label: 'Features',
@@ -19,8 +20,16 @@ const sidebars: SidebarsConfig = {
         'features/admin-panel',
       ],
     },
+    {
+      type: 'category',
+      label: 'Reference',
+      collapsed: false,
+      items: ['excel-format', 'pricing', 'api'],
+    },
     'testing-checklist',
     'known-gaps',
+    'reporting-bugs',
+    'release-notes',
   ],
 }
 

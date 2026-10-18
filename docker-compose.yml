@@ -191,6 +191,8 @@ services:
         APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
         MAILPIT_DOMAIN: ${MAILPIT_DOMAIN:-}
         DOCS_DOMAIN: ${DOCS_DOMAIN:-}
+        # Shown in the docs footer; deploy.yml exports it.
+        GIT_COMMIT: ${GIT_COMMIT:-}
 
   # Reverse proxy fronting `web` with automatic HTTPS — Caddy requests and
   # auto-renews a real Let's Encrypt certificate for DOMAIN the first time

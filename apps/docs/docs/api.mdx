@@ -1,0 +1,21 @@
+---
+sidebar_position: 13
+title: API reference
+---
+
+import AppLink from '@site/src/components/AppLink'
+
+# API reference
+
+The API is documented with OpenAPI.
+
+| | This environment | Local |
+|---|---|---|
+| Swagger UI | <AppLink path="/docs" /> | `http://localhost:3001/docs` |
+| OpenAPI spec (JSON) | <AppLink path="/openapi.json" /> | `http://localhost:3001/openapi.json` |
+
+Every data endpoint requires a logged-in session. The browser app talks to the API through its own
+`/api/*` routes, which add the session for you — so the easiest way to explore real responses is the
+browser's network tab while using the app.
+
+The source of the spec is `packages/contracts` in the repository.

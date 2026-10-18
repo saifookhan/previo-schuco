@@ -9,6 +9,8 @@ There is no public sign-up. Users only join by **invite**.
 
 **Where:** *Settings → Users* · needs `users.manage`.
 
+![Users in Settings](/img/screens/settings-users.png)
+
 ## Invite flow
 
 1. A company admin clicks **Add user**, enters an email and picks one or more roles.

@@ -8,6 +8,8 @@ title: Quotes
 **Where:** *Quotes* in the sidebar · viewing needs `quote.view`, creating and editing needs `quote.edit`,
 which only **supplier** companies have (in the demo data: Suppli).
 
+![Quotes list](/img/screens/quotes.png)
+
 ## Flow
 
 1. **New quote** → reference, customer name, fiscal code, address, city, project location.
@@ -20,7 +22,11 @@ which only **supplier** companies have (in the demo data: Suppli).
 3. Edit, duplicate, delete and **reorder** positions.
 4. **Download PDF**.
 
-Positions from a shared family start with the discount set on the share.
+![Quote with three positions](/img/screens/quote-detail.png)
+
+![Add a position form](/img/screens/add-position.png)
+
+Positions from a shared family start with the discount set on the share. How every number is computed: [How prices are calculated](../pricing.md).
 
 ## Not built yet
 

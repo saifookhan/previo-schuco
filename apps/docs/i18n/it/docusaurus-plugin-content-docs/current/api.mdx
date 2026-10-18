@@ -1,0 +1,21 @@
+---
+sidebar_position: 13
+title: Riferimento API
+---
+
+import AppLink from '@site/src/components/AppLink'
+
+# Riferimento API
+
+L'API è documentata con OpenAPI.
+
+| | Questo ambiente | Locale |
+|---|---|---|
+| Swagger UI | <AppLink path="/docs" /> | `http://localhost:3001/docs` |
+| Specifica OpenAPI (JSON) | <AppLink path="/openapi.json" /> | `http://localhost:3001/openapi.json` |
+
+Ogni endpoint di dati richiede una sessione autenticata. L'app nel browser parla con l'API tramite le
+proprie rotte `/api/*`, che aggiungono la sessione per te — il modo più semplice per vedere risposte
+reali è la scheda "Rete" del browser mentre usi l'app.
+
+La sorgente della specifica è `packages/contracts` nel repository.

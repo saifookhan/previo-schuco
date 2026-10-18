@@ -28,6 +28,10 @@ title: Roles & permissions
 A super-admin can change these in **Settings → Access rights** (role × permission matrix) and create
 **custom roles** in **Settings → Roles**. Roles are global — the same for every company.
 
+![Access rights matrix](/img/screens/access-rights.png)
+
+![Roles](/img/screens/settings-roles.png)
+
 ## Company capabilities
 
 A permission only takes effect if the user's **company** also has a capability that unlocks it:

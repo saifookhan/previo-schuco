@@ -64,6 +64,7 @@ Full step-by-step (Docker install, read-only deploy key, `.env`, first `up`, HTT
 | `APP_DB_PASSWORD` | A real password for the restricted `previo_app` database role (the app never connects as the owner — [ADR 0007](adr/0007-application-db-role.md)) |
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Real outbound email. Without a key, mail goes to Mailpit (not delivered) |
 | `MAILPIT_UI_AUTH`, `MAILPIT_BIND`, `MAILPIT_DOMAIN` | Only if you expose Mailpit's UI — see the README |
+| `GIT_COMMIT` | Set by `deploy.yml`; shown in the docs footer. Not needed in `.env` |
 | `DOCS_DOMAIN` | Serves the testing docs (`apps/docs`, `docs` service) at `https://<DOCS_DOMAIN>`, publicly readable. App and Mailpit links inside the docs come from `DOMAIN` / `MAILPIT_DOMAIN` at build time |
 
 `.env` is gitignored and lives only on the server. GitHub only holds the two deploy secrets above.

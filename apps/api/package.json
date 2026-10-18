@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "worker:dev": "tsx watch src/worker.ts",
-    "build": "tsc",
+    "build": "tsc && tsc -p tsconfig.scripts.json",
     "start": "node dist/index.js",
     "worker": "node dist/worker.js",
+    "seed:demo-family": "tsx scripts/seed-demo-family.ts",
+    "sample:workbook": "tsx scripts/sample-workbook.ts",
     "pretest": "pnpm --filter @schuco/db test:db:setup",
     "test": "vitest run"
   },

@@ -26,5 +26,12 @@ jobs:
             cd /root/previo-schuco
             git fetch origin main
             git reset --hard origin/main
+            export GIT_COMMIT=$(git rev-parse --short HEAD)
             docker compose --profile selfhost up -d --build
+            # Demo data for testers: imports + publishes the sample product
+            # family for the seeded Suppli company. Idempotent (skips when it
+            # already exists). `run` waits for migrate like the api service
+            # does. A failure must not fail the deploy, but is flagged.
+            docker compose --profile selfhost run --rm -T api pnpm seed:demo-family \
+              || echo "::warning::seed:demo-family failed — demo family may be missing"
             docker image prune -f

@@ -8,6 +8,8 @@ title: Demo logins
 The database is seeded with demo companies and one user per role. On the login page, under
 **"Dev seed login"**, pick one of the emails below and press the button — **no password is needed**.
 
+![Login page with the demo login section](/img/screens/login.png)
+
 :::warning
 The demo login shortcut is controlled by `ALLOW_DEV_LOGIN` (on by default). It must be set to `false`
 before real customers use the server — then the section disappears and only email + password works.

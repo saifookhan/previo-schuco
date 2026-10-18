@@ -59,7 +59,9 @@ Production is a single self-hosted server running Docker Compose. See [deploymen
 
 | Item | Status | Notes |
 |---|---|---|
-| Testing docs site | ✅ `apps/docs` (Docusaurus), `docs` service | Served at `https://<DOCS_DOMAIN>` when set; public, no login. Lists demo logins — those only work while `ALLOW_DEV_LOGIN=true` |
+| Testing docs site | ✅ `apps/docs` (Docusaurus, EN/IT/DE, local search), `docs` service | Served at `https://<DOCS_DOMAIN>` when set; public, no login. Lists demo logins — those only work while `ALLOW_DEV_LOGIN=true` |
+| API reference | ✅ Swagger UI at `https://<DOMAIN>/docs`, spec at `/openapi.json` | Routed by Caddy to `api`; public, read-only (data endpoints still need a session) |
+| Demo data | ✅ `seed:demo-family` after every deploy | Imports + publishes *Demo Window W70* for the seeded Suppli company, shares it with Technometal at 10%. Idempotent. Remove from `deploy.yml` once the server holds only real customers |
 
 ## Observability
 

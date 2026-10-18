@@ -1,0 +1,14 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.docs.category.Features": {
+    "message": "Funzionalità",
+    "description": "The label for category 'Features' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.Reference": {
+    "message": "Riferimenti",
+    "description": "The label for category 'Reference' in sidebar 'docs'"
+  }
+}

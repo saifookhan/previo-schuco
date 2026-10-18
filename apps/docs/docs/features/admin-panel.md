@@ -13,5 +13,11 @@ Super-admin only (`admin@schuco-demo.it`). Open it from **Admin portal** in the 
 | Users | Every user across all companies, plus **pending approvals** (approve / reject invites) |
 | Companies | Create and edit companies, set capabilities (manufacturer / supplier / client / platform), deactivate and re-activate |
 
+![Admin dashboard](/img/screens/admin-dashboard.png)
+
+![All users](/img/screens/admin-users.png)
+
+![Companies](/img/screens/admin-companies.png)
+
 A super-admin can also act inside a specific company (tenant override), and every change is written to
 an append-only **audit log**.

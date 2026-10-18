@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
 
+import { buildSampleWorkbook, SAMPLE_FAMILY_NAME } from '../scripts/sample-workbook'
 import { extract2DArray } from '../src/lib/excel-import/extract-2d-array'
 import { extractEmbeddedImages } from '../src/lib/excel-import/extract-embedded-images'
 import { parseProductFamilyWorkbook } from '../src/lib/excel-import'
@@ -151,5 +152,40 @@ describe('extractEmbeddedImages (real fixture)', () => {
   it('returns an empty array for a sheet with no drawings', async () => {
     const images = await extractEmbeddedImages(fixtureBuffer, 'Product lines')
     expect(images).toEqual([])
+  })
+})
+
+describe('sample workbook (scripts/sample-workbook.ts)', () => {
+  it('parses into the family the docs and seed-demo-family describe', () => {
+    const parsed = parseProductFamilyWorkbook(buildSampleWorkbook())
+
+    expect(parsed.family.family_name).toBe(SAMPLE_FAMILY_NAME)
+    expect(parsed.productLines.map((line) => line.name)).toEqual(['Finestra 1 anta', 'Finestra 2 ante', 'Zanzariera'])
+    expect(parsed.productLines[0].listinoAcquisto).toEqual({
+      widths: [600, 800, 1000, 1200],
+      heights: [800, 1200, 1600],
+      matrix: [
+        [210, 240, 270, 300],
+        [260, 295, 330, 365],
+        [310, 350, 390, 430],
+      ],
+    })
+    expect(parsed.characteristics.map((main) => [main.name, main.subCharacters.length])).toEqual([
+      ['Vetro', 3],
+      ['Colore', 3],
+      ['Maniglia', 3],
+    ])
+    expect(parsed.relations).toHaveLength(7)
+    // "% sul valore base" options are Excel percentages: 0.08 in the sheet is read as 8 (%),
+    // which the docs' worked example (Antracite = 8% of the line price) depends on.
+    const colore = parsed.characteristics.find((main) => main.name === 'Colore')!
+    expect(colore.subCharacters.find((sub) => sub.name === 'Antracite')!.listinoAcquisto).toBeCloseTo(8)
+    const priceListTypes = [
+      ...parsed.productLines.map((line) => line.priceListType),
+      ...parsed.characteristics.flatMap((main) => main.subCharacters.map((sub) => sub.priceListType)),
+    ]
+    for (const type of priceListTypes) {
+      expect(() => resolvePriceListType(type!)).not.toThrow()
+    }
   })
 })

@@ -1,0 +1,51 @@
+---
+sidebar_position: 4
+title: Email e Mailpit
+---
+
+import AppLink from '@site/src/components/AppLink'
+
+# Email e Mailpit
+
+L'app invia due tipi di email: **inviti** (con un link per impostare la password) e **reset password**.
+
+Dove arrivano dipende dalla configurazione del server:
+
+| Configurazione | Le email vanno a |
+|---|---|
+| `RESEND_API_KEY` impostata | Caselle reali, inviate tramite Resend |
+| Altrimenti (default) | **Mailpit** — una casella di test che raccoglie tutto. Nulla arriva a caselle reali |
+| Anche `SMTP_HOST` vuoto | Da nessuna parte — il link viene solo scritto in `docker compose logs api` |
+
+## Aprire Mailpit
+
+**Casella:** <AppLink to="mailpit" />
+
+Sul server Mailpit è protetto da utente e password (HTTP Basic Auth, impostati da `MAILPIT_UI_AUTH`
+nel file `.env` del server). **Chiedi le credenziali al team** — sono nel password manager, non in
+questa documentazione.
+
+![Un'email di reset password in Mailpit](/img/screens/mailpit.png)
+
+In locale (`docker compose up -d`) Mailpit è su `http://localhost:8025`, senza login.
+
+Se sul server non è configurato un sottodominio per Mailpit, aprilo tramite un tunnel SSH:
+
+```bash
+ssh -L 8025:localhost:8025 <server>
+# poi apri http://localhost:8025
+```
+
+## Testare un invito dall'inizio alla fine
+
+1. Accedi come `admin@suppli-demo.it` → **Impostazioni → Utenti → Aggiungi utente**, con un'email
+   inventata, ad es. `tester1@example.com`, e almeno un ruolo. L'utente è *in attesa di approvazione* — nessuna email per ora.
+2. Esci, accedi come `admin@schuco-demo.it` (super-admin) → **Admin → Utenti** → **Approva** la richiesta.
+3. Apri Mailpit — l'email di invito per `tester1@example.com` è in cima.
+4. Clicca il link → pagina **Imposta password** → scegli una password (almeno 10 caratteri).
+5. Accedi dal normale modulo di login con quell'email e password.
+
+Per testare il **reset password**, usa **Password dimenticata** nella pagina di login con l'email di
+quell'utente e apri l'email di reset in Mailpit allo stesso modo.
+
+Ogni email inviata a qualsiasi indirizzo compare in Mailpit, quindi puoi usare tutti gli indirizzi finti che vuoi.

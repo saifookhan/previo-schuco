@@ -48,7 +48,8 @@ pnpm dev                          # Web on :3000 — MUST be `pnpm dev`, not `pn
 - API: http://localhost:3001
 - Swagger UI: http://localhost:3001/docs
 - OpenAPI spec: http://localhost:3001/openapi.json
-- **Testing docs** (features, URLs, demo logins, Mailpit): `pnpm dev:docs` → http://localhost:3002 — source in [`apps/docs`](apps/docs)
+- **Testing docs** (features, URLs, demo logins, Mailpit): `pnpm dev:docs` → http://localhost:3002 — source in [`apps/docs`](apps/docs) (`pnpm dev:docs --locale it` / `de` for the translations; search only works on a build — `pnpm --filter @schuco/docs build && pnpm --filter @schuco/docs serve`)
+- **Demo product family** for testers: `pnpm --filter @schuco/api seed:demo-family` (idempotent; the server runs it on every deploy)
 - **Mailpit (local email inbox):** http://localhost:8025 — invite and password-reset emails land here instead of a real inbox (no `RESEND_API_KEY` needed for local dev); apps/api is already pointed at it by default (see `.env.example`)
 - Login: go to `/login` and sign in as one of the seeded demo users via the "dev seed login" shortcut (no password needed for these — real accounts go through email+password, invited from the admin panel and set via the `/set-password` link that shows up in Mailpit):
 

@@ -15,22 +15,25 @@ An end-to-end run through the main flows. Use [Demo logins](./demo-logins.md) to
 
 ## Catalog — as `admin@suppli-demo.it`
 
-- [ ] Import a product family from Excel.
+- [ ] *Demo Window W70* is there, published.
+- [ ] Import [the sample Excel](pathname:///samples/previo-sample-family.xlsx) — a new draft family appears.
 - [ ] Edit a line price, a characteristic and a pricing matrix; save.
 - [ ] Publish it — editing is now locked.
 - [ ] Create a **new version**, edit it, publish it.
-- [ ] Share it with Technometal at 10%.
+- [ ] Share the demo family with Fabbrikka at 5%.
 
 ## Visibility
 
-- [ ] Technometal users see it under *Shared with me* with 10%.
-- [ ] Fabbrikka does **not** see it.
-- [ ] After unpublishing, Technometal no longer sees it.
+- [ ] Technometal users see *Demo Window W70* under *Shared with me* with 10%.
+- [ ] Fabbrikka sees it with 5%; after removing that share, Fabbrikka no longer sees it.
+- [ ] After unpublishing, Technometal no longer sees it (publish it again afterwards).
 
 ## Quotes — as `admin@suppli-demo.it`
 
 - [ ] Create a quote.
-- [ ] Add a position with automatic price; check the live preview.
+- [ ] Add *Finestra 1 anta*, 800 × 1200, qty 4, Triplo vetro / Antracite / Con chiave → **1 857,02 €**
+      (see the [worked example](./pricing.md#worked-example)).
+- [ ] Try a size bigger than the price table (e.g. 1300 × 900) → a clear error, no price.
 - [ ] Switch a position and a characteristic to manual price.
 - [ ] Edit, duplicate, reorder and delete positions.
 - [ ] Download the PDF and check totals.

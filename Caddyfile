@@ -4,7 +4,16 @@
 # like 188-245-28-215.sslip.io, or a real domain once one exists. Falls
 # back to :80 (plain HTTP, no cert — DOMAIN unset means local/no-TLS use).
 {$DOMAIN:-:80} {
-	reverse_proxy web:3000
+	# API reference (Swagger UI + the spec it loads) — the web app has no
+	# routes at these paths. Read-only docs; every data endpoint still
+	# needs a session.
+	@apidocs path /docs /docs/* /openapi.json
+	handle @apidocs {
+		reverse_proxy api:3001
+	}
+	handle {
+		reverse_proxy web:3000
+	}
 }
 
 # Mailpit's web UI, behind its own HTTPS cert on a subdomain — set

@@ -1,0 +1,14 @@
+{
+  "title": {
+    "message": "PREVIO Docs",
+    "description": "The title in the navbar"
+  },
+  "item.label.Open app": {
+    "message": "Apri app",
+    "description": "Navbar item with label Open app"
+  },
+  "item.label.Mailpit": {
+    "message": "Mailpit",
+    "description": "Navbar item with label Mailpit"
+  }
+}

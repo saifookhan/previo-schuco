@@ -1,0 +1,62 @@
+---
+sidebar_position: 2
+title: URL
+---
+
+import AppLink from '@site/src/components/AppLink'
+
+# URL
+
+I link in questa pagina puntano all'ambiente per cui è stata generata questa documentazione.
+
+## Servizi
+
+| Servizio | Questo ambiente | Locale (`pnpm dev` + `docker compose up -d`) |
+|---|---|---|
+| App web | <AppLink /> | `http://localhost:3000` |
+| Mailpit (casella email) | <AppLink to="mailpit" /> | `http://localhost:8025` |
+| API | — (l'app la chiama tramite le proprie rotte `/api/*`; pubblica è solo la documentazione API qui sotto) | `http://localhost:3001` |
+| Documentazione API (Swagger UI) | <AppLink path="/docs" /> | `http://localhost:3001/docs` |
+| Specifica OpenAPI | <AppLink path="/openapi.json" /> | `http://localhost:3001/openapi.json` |
+| Health check API | — | `http://localhost:3001/health` |
+| Questa documentazione | — | `http://localhost:3002` (`pnpm --filter @schuco/docs dev`) |
+
+## Pagine dell'app
+
+Gli URL non contengono la lingua — la lingua (italiano di default, inglese, tedesco) si sceglie nell'app.
+
+### Pubbliche
+
+| Pagina | URL |
+|---|---|
+| Login (+ accesso demo) | <AppLink path="/login" /> |
+| Password dimenticata | <AppLink path="/forgot-password" /> |
+| Imposta password (dal link nell'email di invito / reset) | `/set-password?token=…` |
+
+### App (qualsiasi utente autenticato)
+
+| Pagina | URL | Richiede |
+|---|---|---|
+| Dashboard | <AppLink path="/app/dashboard" /> | — |
+| Famiglie di prodotto (catalogo) | <AppLink path="/app/product-families" /> | `catalog.view` |
+| Dettaglio famiglia | `/app/product-families/<id>` | `catalog.view` |
+| Preventivi | <AppLink path="/app/quotes" /> | `quote.view` |
+| Dettaglio / composizione preventivo | `/app/quotes/<id>` | `quote.view` (`quote.edit` per modificare) |
+| Editor preventivo (prima replica demo) | <AppLink path="/app/invoice" /> | — |
+
+### Impostazioni
+
+| Pagina | URL | Chi |
+|---|---|---|
+| Dati aziendali | <AppLink path="/app/settings/company" /> | admin aziendale |
+| Utenti (invito) | <AppLink path="/app/settings/users" /> | `users.manage` |
+| Ruoli | <AppLink path="/app/settings/roles" /> | super-admin |
+| Diritti di accesso (matrice permessi) | <AppLink path="/app/settings/access-rights" /> | super-admin |
+
+### Pannello admin (solo super-admin)
+
+| Pagina | URL |
+|---|---|
+| Dashboard admin | <AppLink path="/admin/dashboard" /> |
+| Tutti gli utenti + approvazioni in attesa | <AppLink path="/admin/users" /> |
+| Aziende | <AppLink path="/admin/companies" /> |
