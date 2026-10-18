@@ -1,116 +1,100 @@
 # PREVIO — Architecture (current & future)
 
-How the monorepo is organized today and how it evolves toward separate deployable services, Changesets, and a Docusaurus docs site.
+How the monorepo is organized today and how it could evolve toward separately deployable services, Changesets, and a Docusaurus docs site.
 
 ## Principles
 
 | Principle | Rationale |
 |-----------|-----------|
 | **Libraries first** | Domain logic lives in `packages/`; promote to `apps/<service>` only when deploy/scaling/team boundaries require it |
-| **One auth gateway** | `apps/api` remains the BFF — Cognito, RBAC, tenant context; other services are internal |
-| **Shared contracts** | `@schuco/contracts` holds Zod schemas and the OpenAPI document so services don’t drift |
-| **Independent docs** | User-facing docs in Docusaurus (`apps/docs`); repo `docs/` for ADRs and internal notes |
+| **One gateway** | `apps/api` is the only service that authenticates users and decides what they may do (session JWT, RBAC + permissions, tenant context); anything else would sit behind it on the internal network |
+| **Shared contracts** | `@schuco/contracts` holds Zod schemas, the permission map and the OpenAPI document so the web app and API don't drift |
+| **The database enforces tenancy** | Postgres Row-Level Security does tenant isolation and share visibility; application code never relies on filtering alone ([ADR 0006](./adr/0006-rls-request-scoped-transaction.md)) |
+| **Independent docs** | User-facing testing docs in Docusaurus (`apps/docs`); repo `docs/` for ADRs and internal notes |
 
 ---
 
-## Current layout (Phase 1)
+## Current layout
 
 ```
 previo-schuco/
 ├── apps/
-│   ├── web/                 # Next.js → Vercel
-│   └── api/                 # Hono BFF → ECS (dev) / Docker (local); also the BullMQ worker entrypoint
+│   ├── web/                 # Next.js 15 (UI + server-side proxy to the API)
+│   └── api/                 # Hono API; same image also runs the BullMQ worker
 ├── packages/
-│   ├── calculation/         # Pure quote pricing (imported by API)
-│   ├── contracts/           # Shared Zod schemas + OpenAPI spec
-│   ├── db/                  # Drizzle schema, migrations, RBAC queries, RLS policies
-│   ├── env/                 # Per-environment env resolution (ADR 0005)
-│   └── queue/                # BullMQ job/worker helpers (ADR 0009)
-├── docs/                    # Markdown (project context, deployment, architecture, adr/)
-├── infra/terraform/         # AWS dev (VPC, RDS, Cognito, ECS, S3)
-└── .github/workflows/       # CI, API deploy, Terraform plan
+│   ├── calculation/         # Pure quote pricing (imported by the API)
+│   ├── contracts/           # Zod schemas, permission map, OpenAPI spec
+│   ├── db/                  # Drizzle schema, migrations, queries, RLS policies, seed
+│   ├── env/                 # Per-target env resolution for local dev (ADR 0005)
+│   └── queue/               # BullMQ job/worker helpers (ADR 0009)
+├── docs/                    # Project context, deployment, architecture, ADRs
+├── .github/workflows/       # CI (build + test + docker builds) and deploy (SSH)
+├── docker-compose.yml       # The whole stack; `selfhost` profile adds web + caddy
+├── Caddyfile                # HTTPS reverse proxy config
+└── infra/terraform/         # LEGACY — retired AWS setup, unused (ADR 0013)
 ```
 
 ```mermaid
 flowchart LR
-  subgraph vercel [Vercel]
-    Web[apps/web]
+  Browser[Browser]
+
+  subgraph server [One server — Docker Compose]
+    Caddy[caddy<br/>HTTPS]
+    Web[web<br/>Next.js]
+    API[api<br/>Hono]
+    Worker[worker<br/>BullMQ]
+    PG[(postgres)]
+    Redis[(redis)]
+    Mail[mailpit]
+    Disk[/data/uploads/]
   end
 
-  subgraph local_or_ecs [Docker / ECS]
-    API[apps/api]
-  end
+  Resend[Resend<br/>outbound email]
 
-  subgraph packages [packages]
+  subgraph packages [packages — imported in-process]
     Calc[calculation]
     Db[db]
+    Contracts[contracts]
   end
 
-  subgraph data [Data]
-    PG[(PostgreSQL)]
-    Cognito[Cognito]
-  end
-
-  Web -->|session + REST| API
-  Web -->|OIDC| Cognito
+  Browser --> Caddy --> Web
+  Web -->|"/api/* proxy, Bearer session JWT"| API
+  API --> Db --> PG
   API --> Calc
-  API --> Db
-  Db --> PG
+  API --> Contracts
+  API --> Redis
+  Worker --> Redis
+  Worker --> PG
+  API -.->|if RESEND_API_KEY| Resend
+  API -.->|otherwise SMTP| Mail
+  API --> Disk
 ```
+
+Requests flow `browser → caddy → web → api → postgres`. The browser never calls the API directly: every `/api/*` route in `apps/web` is a server-side proxy that attaches the session as a bearer token, so `api`, `postgres` and `redis` need no public exposure.
+
+Locally the same stack runs with `docker compose up -d` (everything except `web`/`caddy`), and `pnpm dev` runs the web app on the host. See [deployment.md](./deployment.md).
 
 ---
 
-## Target layout (Phase 2–5)
+## Possible future layout
+
+Only if scale or team boundaries ever require it; nothing below exists yet.
 
 ```
 previo-schuco/
 ├── apps/
-│   ├── web/                      # Next.js → Vercel
-│   ├── api/                      # Core BFF: auth, RBAC, orchestration → ECS
-│   ├── docs/                     # Docusaurus → Vercel (previo-schuco-docs)
-│   ├── calculation-service/      # Phase 3+ — HTTP quote engine → ECS
-│   └── files-service/            # Phase 4+ — S3, PDF, import/export → ECS
+│   ├── web/
+│   ├── api/                      # still the only authenticated entry point
+│   ├── docs/                     # Docusaurus site
+│   ├── calculation-service/      # HTTP quote engine, if recalculation outgrows the API
+│   └── files-service/            # PDF render, import/export, storage abstraction
 ├── packages/
-│   ├── calculation/              # Pure pricing logic (no HTTP)
-│   ├── db/                       # Schema + queries
-│   ├── contracts/                # Shared Zod types + API schemas
-│   ├── files/                    # S3/PDF abstractions (Phase 4)
-│   └── config-*/                 # Shared eslint/tsconfig (optional)
-├── .changeset/                   # Changesets config
-└── docs/                         # ADRs, links to apps/docs
+│   ├── calculation/  db/  contracts/
+│   └── files/                    # storage + PDF helpers
+└── .changeset/
 ```
 
-```mermaid
-flowchart LR
-  subgraph vercel [Vercel]
-    Web[apps/web]
-    Docs[apps/docs]
-  end
-
-  subgraph ecs [AWS ECS]
-    API[apps/api]
-    CalcSvc[calculation-service]
-    FilesSvc[files-service]
-  end
-
-  subgraph packages [packages]
-    CalcPkg[calculation]
-    Contracts[contracts]
-    DbPkg[db]
-    FilesPkg[files]
-  end
-
-  Web --> API
-  API -->|internal HTTP| CalcSvc
-  API -->|internal HTTP| FilesSvc
-  CalcSvc --> CalcPkg
-  CalcSvc --> Contracts
-  FilesSvc --> FilesPkg
-  FilesSvc --> Contracts
-  API --> DbPkg
-```
-
----
+Each extra service would be one more Compose service behind the same network (or a second host), reached by `apps/api` over internal HTTP — never directly from the browser.
 
 ## When to split a service
 
@@ -119,99 +103,63 @@ flowchart LR
 | Fast, synchronous calls | Heavy/batch compute (quote recalc at scale) |
 | Same release cadence as API | Independent scaling or SLA |
 | Single team owns it | Separate team or tech stack |
-| Phase 1–2 | Phase 3+ (calculation), Phase 4+ (files) |
+| Today | Only when a real bottleneck appears |
 
-### Phase 3 — calculation-service (optional)
+### calculation-service (optional)
 
-- `packages/calculation` — unchanged pure functions
-- `apps/calculation-service` — thin Hono: `POST /calculate`, `POST /validate`
-- `apps/api` calls via internal ALB; web never calls calculation-service directly
+- `packages/calculation` stays the pure pricing functions
+- `apps/calculation-service` would be a thin Hono wrapper (`POST /calculate`, `POST /validate`)
+- `apps/api` calls it over the internal network; the web app never does
 
-### Phase 4 — files-service
+### files-service (optional)
 
-- `packages/files` — S3 client, PDF templates, presigned URL helpers
-- `apps/files-service` — upload/download, PDF render, Excel import/export
-- IAM: files-service task role gets S3 access; API does not need bucket credentials
+- Today files are written to local disk (`apps/api/src/lib/local-storage.ts`, mounted at `./data/uploads`) and PDFs are rendered in the API (`apps/api/src/lib/quote-pdf.ts`)
+- A separate service, or an object-storage backend behind the same storage interface, would only be worthwhile with multiple servers or large files
 
 ---
 
 ## Changesets (planned)
 
-[Changesets](https://github.com/changesets/changesets) coordinates **version bumps and changelogs** for `packages/*`.
+[Changesets](https://github.com/changesets/changesets) would coordinate **version bumps and changelogs** for `packages/*`.
 
 | Scope | Versioned with Changesets? | Deploy |
 |-------|---------------------------|--------|
-| `@schuco/calculation`, `@schuco/db`, `@schuco/contracts` | Yes | Via apps that depend on them |
-| `apps/web`, `apps/api`, services | No (deploy on merge) | CI → Vercel / ECR+ECS |
+| `@schuco/calculation`, `@schuco/db`, `@schuco/contracts` | Yes | Via the apps that depend on them |
+| `apps/web`, `apps/api` | No (deploy on merge) | CI → SSH deploy of the Compose stack |
 
-**Workflow (future):**
-
-1. Developer runs `pnpm changeset` when changing a package
-2. Merge PR → GitHub Action opens “Version packages” PR or auto-bumps
-3. App deploy workflows run on `main` as today
-
-**Root scripts (to add):**
-
-```json
-"changeset": "changeset",
-"version-packages": "changeset version",
-"release": "pnpm build && changeset publish"
-```
-
-Internal packages stay `private: true`; Changesets is for changelog discipline and semver alignment, not npm publish (unless needed later).
-
----
+Workflow (future): run `pnpm changeset` when changing a package; on merge, a GitHub Action opens a "Version packages" PR; app deploys continue to run on `main` as today. Internal packages stay `private: true` — the goal is changelog discipline, not npm publishing.
 
 ## Docusaurus (planned)
 
 | Content | Location |
 |---------|----------|
 | Product/domain docs, user guides | `apps/docs/docs/` |
-| API reference (OpenAPI → plugin) | `@schuco/contracts` + Swagger UI at `/docs` |
+| API reference | `@schuco/contracts` OpenAPI + Swagger UI at `/docs` on the API |
 | Deployment runbooks | Port from `docs/deployment.md` |
-| ADRs, internal architecture | Repo `docs/` or `apps/docs/docs/internal/` |
+| ADRs, internal architecture | Repo `docs/` |
 
-**Deploy:** separate Vercel project `previo-schuco-docs` (recommended) or subdomain `docs.<domain>`.
-
-**Turbo:**
-
-```json
-"docs#build": { "outputs": ["build/**"] }
-```
-
-Until `apps/docs` exists, canonical docs remain in repo [`docs/`](.).
+It is a static build served by the `docs` container behind Caddy on `DOCS_DOMAIN` (e.g. `docs.<domain>`). Repo [`docs/`](.) stays the place for internal/architecture docs.
 
 ---
 
-## Terraform / Docker per service
+## Communication between services
 
-Each new ECS app gets:
-
-| Artifact | Pattern |
-|----------|---------|
-| Dockerfile | `apps/<service>/Dockerfile` or shared base |
-| ECR repo | `previo-schuco-<env>-<service>` |
-| ECS service | Reuse `infra/terraform/modules/ecs` module |
-| CI | Extend `deploy-api-dev.yml` or add per-service workflow |
+1. **Sync, in-process (now):** `import from '@schuco/calculation'`, `@schuco/db`, `@schuco/contracts`
+2. **Async (now):** BullMQ on Redis for background jobs, consumed by the `worker` service — [ADR 0009](./adr/0009-bullmq-background-jobs.md)
+3. **HTTP between services (only if split):** REST + `@schuco/contracts` types
+4. **Auth:** the session JWT is validated only in `apps/api`; any future service stays on the internal network
 
 ---
 
-## Communication between services (when split)
-
-1. **Sync (now):** `import from '@schuco/calculation'`
-2. **Async (Phase 5+):** BullMQ (Redis-backed) for reports, notifications, bulk import — see [ADR 0008](./adr/0008-bullmq-background-jobs.md); supersedes the SQS approach previously sketched here
-3. **HTTP (Phase 3–4):** REST + `@schuco/contracts` request/response types
-4. **Auth:** service-to-service via internal network; user JWT validated only at `apps/api`
-
----
-
-## Implementation checklist (future PRs)
+## Implementation checklist (future work)
 
 - [ ] Add `@changesets/cli` + `.changeset/config.json`
-- [ ] Scaffold `apps/docs` (Docusaurus classic)
-- [x] Add `packages/contracts` with quote/product Zod schemas
-- [ ] Extract `apps/calculation-service` (Phase 3, if needed)
-- [ ] Extract `apps/files-service` (Phase 4)
-- [x] OpenAPI spec in `@schuco/contracts` (Swagger UI at `/docs`; Docusaurus plugin later)
+- [x] Scaffold `apps/docs` (Docusaurus classic)
+- [x] `packages/contracts` with quote/product/permission schemas
+- [x] OpenAPI spec in `@schuco/contracts` (Swagger UI at `/docs`)
+- [x] Background jobs on BullMQ (`worker` service)
+- [ ] Extract `apps/calculation-service` (only if needed)
+- [ ] Extract `apps/files-service` (only if needed)
+- [ ] Remove the retired `infra/terraform/` directory and the AWS-only scripts
 
-See also: [technical-overview.md](./technical-overview.md), [project-context.md](./project-context.md), [deployment.md](./deployment.md).
+See also: [technical-overview.md](./technical-overview.md), [project-context.md](./project-context.md), [deployment.md](./deployment.md), [infra-status.md](./infra-status.md).

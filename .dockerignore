@@ -9,3 +9,6 @@ dist
 *.md
 infra
 .github
+!apps/docs/docs/**/*.md
+apps/docs/build
+apps/docs/.docusaurus

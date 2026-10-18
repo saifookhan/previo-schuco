@@ -16,3 +16,10 @@
 {$MAILPIT_DOMAIN:-:8080} {
 	reverse_proxy mailpit:8025
 }
+
+# This documentation site (apps/docs), on its own subdomain — set
+# DOCS_DOMAIN (e.g. docs.188-245-28-215.sslip.io) to enable. Publicly
+# readable, no login. Falls back to an unpublished internal port when unset.
+{$DOCS_DOMAIN:-:8081} {
+	reverse_proxy docs:80
+}

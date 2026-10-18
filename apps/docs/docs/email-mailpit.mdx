@@ -1,0 +1,49 @@
+---
+sidebar_position: 4
+title: Email & Mailpit
+---
+
+import AppLink from '@site/src/components/AppLink'
+
+# Email & Mailpit
+
+The app sends two kinds of email: **invites** (with a link to set a password) and **password resets**.
+
+Where they go depends on the server configuration:
+
+| Config | Emails go to |
+|---|---|
+| `RESEND_API_KEY` set | Real inboxes, sent through Resend |
+| Otherwise (default) | **Mailpit** — a catch-all test inbox. Nothing reaches a real mailbox |
+| `SMTP_HOST` empty as well | Nowhere — the link is only printed in `docker compose logs api` |
+
+## Opening Mailpit
+
+**Inbox:** <AppLink to="mailpit" />
+
+On the server Mailpit is protected with a username and password (HTTP Basic Auth, set by
+`MAILPIT_UI_AUTH` in the server's `.env`). **Ask the team for the login** — it is kept in the
+password manager, not in this documentation.
+
+Locally (`docker compose up -d`) Mailpit is at `http://localhost:8025` with no login.
+
+If the server has no Mailpit subdomain configured, open it through an SSH tunnel instead:
+
+```bash
+ssh -L 8025:localhost:8025 <server>
+# then open http://localhost:8025
+```
+
+## Testing an invite end to end
+
+1. Log in as `admin@suppli-demo.it` → **Settings → Users → Add user**, with any made-up email, e.g.
+   `tester1@example.com`, and at least one role. The user is now *pending approval* — no email yet.
+2. Log out, log in as `admin@schuco-demo.it` (super-admin) → **Admin → Users** → **Approve** the request.
+3. Open Mailpit — the invite email for `tester1@example.com` is at the top.
+4. Click the link → **Set password** page → choose a password (10+ characters).
+5. Log in on the normal login form with that email and password.
+
+To test a **password reset**, use **Forgot password** on the login page with that user's email and
+open the reset email in Mailpit the same way.
+
+Every email sent to any address shows up in Mailpit, so you can use as many fake addresses as you like.

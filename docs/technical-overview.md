@@ -8,60 +8,51 @@ For deeper detail see [project-context.md](./project-context.md) (domain & roadm
 
 ## What PREVIO does
 
-PREVIO is a B2B platform where **suppliers** publish versioned product **rate-lists** and **clients** build **quotations** (preventivi) and invoices from those lists. **Schuco** operates the platform as both operator and supplier.
+PREVIO is a B2B platform where **manufacturers** publish versioned **product families** (with product lines, characteristics and pricing matrices), **suppliers** build **quotations** (preventivi) from the families shared with them, and **clients** can browse what is shared with them. **Schuco** operates the platform.
 
 | Actor | Role in the platform |
 |-------|----------------------|
-| **Schuco** | Platform operator (`super-admin`) and a supplier whose product families are available to all clients |
-| **Supplier** (e.g. Suppli) | Provides product lines with client-specific pricing via discounts |
-| **Client** (e.g. Fabbrikka, Technometa) | Creates quotations from rate-lists provided by linked suppliers |
+| **Schuco** | Platform operator (`super-admin` users, `platform` capability) |
+| **Manufacturer** (e.g. Suppli) | Owns and edits a catalog of product families; shares published families with other companies, each with a default discount |
+| **Supplier** (e.g. Suppli) | Creates quotes from its own families or from families shared with it; may share a received family onward |
+| **Client** (e.g. Fabbrikka, Technometal) | Browses the families shared with it |
+
+A company's abilities are independent **capabilities** (manufacturer, supplier, client, platform) — one company can hold several, for example Suppli is both manufacturer and supplier.
 
 ---
 
-## System architecture (Phase 1)
+## System architecture
 
 ```mermaid
 flowchart TB
-  subgraph Users
-    Browser[Sales staff / Admins]
+  Browser[Sales staff / Admins]
+
+  subgraph server["One server — Docker Compose"]
+    Caddy["caddy<br/>HTTPS"]
+    Web["web<br/>Next.js 15"]
+    API["api<br/>Hono"]
+    Worker["worker<br/>BullMQ"]
+    PG[("PostgreSQL<br/>RBAC + RLS")]
+    Redis[("Redis")]
+    Mail["mailpit / Resend"]
   end
 
-  subgraph Vercel
-    Web["apps/web<br/>Next.js 15"]
-  end
-
-  subgraph AWS["AWS — ECS / Docker"]
-    API["apps/api<br/>Hono BFF"]
-  end
-
-  subgraph Packages["Shared packages"]
+  subgraph Packages["Shared packages (in-process)"]
     Calc[calculation]
     Db[db]
     Contracts[contracts]
   end
 
-  subgraph Data
-    Cognito["Cognito<br/>Authentication"]
-    PG[("PostgreSQL<br/>RBAC + RLS")]
-    S3["S3<br/>Documents — future"]
-  end
-
-  subgraph Infra
-    TF["Terraform<br/>VPC · ECS · RDS"]
-  end
-
-  Browser --> Web
-  Browser -->|OIDC login| Cognito
-  Web --> Cognito
-  Web -->|JWT + REST| API
+  Browser --> Caddy --> Web
+  Web -->|"/api/* proxy + Bearer JWT"| API
   API --> Calc
   API --> Db
   API --> Contracts
   Db --> PG
-  API -.-> S3
-  TF --> API
-  TF --> PG
-  TF --> Cognito
+  API --> Redis
+  Worker --> Redis
+  Worker --> PG
+  API --> Mail
 ```
 
 ### Layer summary
@@ -69,10 +60,11 @@ flowchart TB
 | Layer | Components | Purpose |
 |-------|-----------|---------|
 | **Client** | Browser | Users interact with the Next.js app |
-| **Application** | `apps/web`, `apps/api` | UI on Vercel; Hono BFF on ECS/Docker orchestrates business logic |
-| **Packages** | `calculation`, `db`, `contracts` | Shared libraries imported in-process by the API |
-| **Data** | Cognito, PostgreSQL, S3 | Authentication (Cognito); authorization + tenant data (PostgreSQL + RLS) |
-| **Infrastructure** | Terraform | Provisions AWS dev environment (VPC, ECS, RDS, Cognito) |
+| **Edge** | Caddy | Automatic HTTPS, reverse proxy to `web` |
+| **Application** | `apps/web`, `apps/api`, `worker` | UI + server-side proxy; Hono API orchestrates business logic; worker runs background jobs |
+| **Packages** | `calculation`, `db`, `contracts` | Shared libraries imported in-process |
+| **Data** | PostgreSQL, Redis, local disk | Tenant data + authorization (PostgreSQL + RLS); job queue; uploads |
+| **Delivery** | GitHub Actions, Docker Compose | CI builds and tests, then deploys to the server over SSH — see [deployment.md](./deployment.md) |
 
 ### Request flow
 
@@ -80,17 +72,17 @@ flowchart TB
 sequenceDiagram
   participant U as User
   participant W as apps/web
-  participant C as Cognito
   participant A as apps/api
   participant D as PostgreSQL
 
-  U->>W: Visit /login
-  W->>C: OIDC redirect
-  C->>W: JWT + session
+  U->>W: Sign in at /login (email + password)
+  W->>A: Verify credentials
+  A->>W: User identity
+  W->>U: Session cookie (signed JWT)
   U->>W: Navigate /app/*
-  W->>A: REST + Bearer JWT
-  A->>C: Verify JWT signature
-  A->>D: Query with RBAC / RLS context
+  W->>A: REST + Bearer session JWT
+  A->>A: Verify JWT, load roles and company capabilities
+  A->>D: Query inside a tenant-scoped transaction (RLS context)
   D->>A: Tenant-scoped rows
   A->>W: JSON response
   W->>U: Rendered UI
@@ -103,14 +95,14 @@ sequenceDiagram
 ```mermaid
 flowchart TB
   Schuco[Schuco<br/>Platform operator]
-  Supplier[Supplier e.g. Suppli]
+  Supplier[Manufacturer / Supplier e.g. Suppli]
   Client[Client e.g. Fabbrikka]
 
   Company[Company<br/>Shared VAT]
   BU[Business Unit<br/>Branding + address]
   User[User<br/>Role + BU scope]
 
-  RateList[Rate-list<br/>Supplier ↔ Client link]
+  Share[Family share<br/>owner → company + default discount]
   Family[Product Family<br/>Versioned]
   Line[Product Line<br/>Characteristics + pricing]
   Quote[Quotation / Invoice<br/>Preventivo]
@@ -119,9 +111,9 @@ flowchart TB
   Supplier --> Company
   Client --> Company
   Company --> BU --> User
-  Supplier --> RateList
-  Client --> RateList
-  RateList --> Family --> Line --> Quote
+  Supplier --> Share
+  Client --> Share
+  Share --> Family --> Line --> Quote
   User --> Quote
 ```
 
@@ -133,43 +125,49 @@ Company (shared VAT)
         └── Users (scoped to BUs, editing rights on a subset)
 ```
 
-### Product hierarchy (Phase 2+)
+### Product hierarchy
 
 ```
-Product family (versioned)
+Product family (versioned, owned by a manufacturer)
   └── Product line
-        └── Sub-characteristics (color, glazing, etc.)
-              └── Linked characteristics + installation hours
+        ├── Pricing matrix / formula
+        └── Characteristics (colour, glazing, …) and their sub-characteristics
 ```
 
-### Pricing rules
+### Sharing and pricing rules
 
-- Client-specific **discounts** apply on the **same rate-list** — not duplicate product families.
-- Material pricing differences require a **new product family** version.
-- Supplier–client links are many-to-many; each link can carry a client discount and installation hours.
+- A family is visible to another company only when it is **published** and **shared** with it (or with someone who shared it onward). Unpublishing, or revoking an upstream share, hides it immediately.
+- Each share carries a **default discount** for the receiver's quote positions. It is only a default: the receiver can change it on each position. `0%` means "no specific discount" and the line's own catalog discount applies.
+- Material pricing differences still call for a **new product family** version.
+- Quotes belong to the supplier that issues them and are priced from its own families or families shared with it. Any position's price, and any characteristic's price, can be switched from automatic to a typed-in value.
 
 ---
 
 ## Security model
 
-Authentication and authorization are deliberately split:
+Authentication, authorization and tenancy are separate concerns:
 
 | Concern | Technology | Question answered |
 |---------|-----------|-------------------|
-| **Authentication** | AWS Cognito (OIDC) | Who are you? |
-| **Authorization** | PostgreSQL RBAC + RLS | What can you see and edit? |
-| **Gateway** | `apps/api` | Validates JWT, resolves tenant context |
+| **Authentication** | Own email + password, bcrypt-hashed; signed session JWT | Who are you? |
+| **Authorization** | Role × permission matrix, filtered by company capabilities | What may you do? |
+| **Tenancy** | PostgreSQL Row-Level Security | Which rows may you see and write? |
+| **Gateway** | `apps/api` | Verifies the JWT, resolves tenant context, enforces permissions |
 
-### Auth flow (6 steps)
+### Auth flow
 
-1. **Login** — User signs in via Cognito OIDC (or dev-login locally)
-2. **Session** — Next.js stores session; middleware protects `/app/*` and `/admin/*` routes
-3. **API call** — Web sends JWT to `apps/api` on each REST request
-4. **Verify** — API validates Cognito JWT signature and expiry
-5. **RBAC** — PostgreSQL resolves role + business-unit scope via RLS
-6. **Response** — Data filtered to tenant; `GET /api/me` returns profile
+1. **Login** — email + password at `/login` (a password-less demo-user shortcut exists for seeded users when `ALLOW_DEV_LOGIN` is on)
+2. **Session** — `apps/web` signs a session JWT (`AUTH_SECRET`) into a cookie; middleware protects `/app/*` and `/admin/*`
+3. **API call** — web's server-side proxy sends the JWT as a bearer token on every request
+4. **Verify** — `apps/api` verifies the signature and expiry, loads the user's roles and company
+5. **Permissions** — effective permissions = (permissions of the user's roles, from the editable matrix) ∩ (what the company's capabilities unlock); super-admin bypasses the capability filter
+6. **RLS** — queries run in a tenant-scoped transaction so Postgres itself limits the rows; `GET /api/me` returns the profile and effective permissions
 
-### Four canonical roles
+Users are **invited** (no self sign-up): an emailed one-time link opens `/set-password`. A company-admin's invitation waits for super-admin approval.
+
+### Roles
+
+Four built-in roles; a super-admin can add custom roles (global, no permissions until granted in Access Rights). A user may hold several roles.
 
 | Role ID | Display name | Scope | Capabilities |
 |---------|--------------|-------|--------------|
@@ -180,6 +178,8 @@ Authentication and authorization are deliberately split:
 
 Users may belong to **multiple** business units but have **editing rights** on a subset.
 
+What each role may do is not hard-coded: the **Access Rights** matrix (super-admin) maps roles to permissions (`catalog.view`, `catalog.edit`, `catalog.share`, `quote.view`, `quote.edit`, `users.manage`). Company capabilities then decide which of those a company can use at all — for example only a manufacturer can edit a catalog and only a supplier can create quotes.
+
 ---
 
 ## Monorepo layout
@@ -187,14 +187,17 @@ Users may belong to **multiple** business units but have **editing rights** on a
 ```
 previo-schuco/
 ├── apps/
-│   ├── web/          Next.js frontend → Vercel
-│   └── api/          Hono BFF → ECS / Docker
+│   ├── web/          Next.js frontend (+ server-side proxy to the API)
+│   └── api/          Hono API (+ BullMQ worker entrypoint)
 ├── packages/
 │   ├── calculation/  Pure quote pricing (no HTTP)
-│   ├── db/           Drizzle schema, migrations, RBAC queries
-│   └── contracts/    Shared Zod schemas + OpenAPI spec
-├── infra/terraform/  AWS infrastructure
-└── docs/             Project documentation (this file)
+│   ├── contracts/    Zod schemas, permission map, OpenAPI spec
+│   ├── db/           Drizzle schema, migrations, queries, RLS policies, seed
+│   ├── env/          Env resolution for local dev
+│   └── queue/        BullMQ helpers
+├── docs/             Project documentation (this file)
+├── docker-compose.yml, Caddyfile   The whole deployable stack
+└── infra/terraform/  Legacy, unused (retired AWS setup)
 ```
 
 ### Key routes & endpoints
@@ -202,7 +205,7 @@ previo-schuco/
 | Path | Description |
 |------|-------------|
 | `/` | Public home |
-| `/login` | Cognito or dev login |
+| `/login` | Email + password (or the demo-user shortcut) |
 | `/app/*` | Authenticated app (dashboard, invoice editor, settings) |
 | `/admin/*` | Super-admin portal |
 | `GET /api/me` | Current user profile |
@@ -211,7 +214,7 @@ previo-schuco/
 ### Local development
 
 ```bash
-docker compose up -d   # Postgres + API on :3001
+docker compose up -d   # Postgres, Redis, Mailpit, API (:3001) and worker
 pnpm dev               # Web on :3000
 ```
 
@@ -223,7 +226,7 @@ Demo users are defined in `packages/db/src/demo-users.ts` and seeded via `packag
 
 | Phase | Focus | Timeline |
 |-------|-------|----------|
-| **1 — Foundations** | Infra, auth/RBAC, Next.js + API scaffold | W1–W3 |
+| **1 — Foundations** | Hosting, auth/RBAC, Next.js + API scaffold | W1–W3 |
 | **2 — Core data** | Product lines, profiles, price-list UI | W4–W7 |
 | **3 — Quote engine** | Calculator, workflow, quote builder UI | W8–W12 |
 | **4 — Documents & I/O** | PDF, import/export, print templates | W13–W15 |
@@ -232,7 +235,7 @@ Demo users are defined in `packages/db/src/demo-users.ts` and seeded via `packag
 
 ### Future architecture (Phase 3–4)
 
-When independent scaling is needed, heavy workloads split into dedicated ECS services while `apps/api` remains the auth gateway:
+If independent scaling is ever needed, heavy workloads could split into dedicated services on the internal network while `apps/api` remains the auth gateway (nothing below exists yet):
 
 ```mermaid
 flowchart LR
@@ -250,4 +253,4 @@ See [architecture.md](./architecture.md) for the full split criteria and Changes
 
 ## One-liner
 
-> PREVIO is a multi-tenant B2B quoting platform: suppliers publish versioned product rate-lists, clients build quotations from those lists, and Schuco operates the platform with role-based access across companies and business units.
+> PREVIO is a multi-tenant B2B quoting platform: manufacturers publish versioned product families and share them (with default discounts), suppliers build quotations from them, and Schuco operates the platform with role- and capability-based access across companies and business units.

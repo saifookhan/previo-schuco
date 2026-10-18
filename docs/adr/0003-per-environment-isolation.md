@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted — AWS-specific parts (RDS, Cognito pool, ECS, S3 per environment) were retired by [0013](./0013-single-server-docker-compose-deployment.md); only `local` and one production server exist today.
 
 **Author:** Syed Arif Iqbal (arifiqbal@outlook.com)
 **Date:** 2026-09-04

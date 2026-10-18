@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Superseded by [0013](./0013-single-server-docker-compose-deployment.md) — secrets now live in the server's `.env` and GitHub repository secrets; AWS Secrets Manager is not used.
 
 **Author:** Syed Arif Iqbal (arifiqbal@outlook.com)
 **Date:** 2026-09-04

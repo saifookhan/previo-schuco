@@ -48,6 +48,7 @@ pnpm dev                          # Web on :3000 — MUST be `pnpm dev`, not `pn
 - API: http://localhost:3001
 - Swagger UI: http://localhost:3001/docs
 - OpenAPI spec: http://localhost:3001/openapi.json
+- **Testing docs** (features, URLs, demo logins, Mailpit): `pnpm dev:docs` → http://localhost:3002 — source in [`apps/docs`](apps/docs)
 - **Mailpit (local email inbox):** http://localhost:8025 — invite and password-reset emails land here instead of a real inbox (no `RESEND_API_KEY` needed for local dev); apps/api is already pointed at it by default (see `.env.example`)
 - Login: go to `/login` and sign in as one of the seeded demo users via the "dev seed login" shortcut (no password needed for these — real accounts go through email+password, invited from the admin panel and set via the `/set-password` link that shows up in Mailpit):
 
@@ -72,7 +73,7 @@ pnpm dev                          # Web on :3000 — MUST be `pnpm dev`, not `pn
 
 ### Running the whole app with just `docker compose up -d` (self-hosted / demo server)
 
-For handing the app to someone via SSH on a bare server (no Node/pnpm needed on the host, no Vercel/AWS) — the `web` app is also containerized, opt-in via the `selfhost` [Compose profile](https://docs.docker.com/compose/how-tos/profiles/) so it doesn't interfere with the local-dev flow above.
+For running the app on a bare server (no Node/pnpm needed on the host; this is also the production setup) — the `web` app is also containerized, opt-in via the `selfhost` [Compose profile](https://docs.docker.com/compose/how-tos/profiles/) so it doesn't interfere with the local-dev flow above.
 
 **On a completely fresh server** (verified against a fresh Ubuntu 26.04 Hetzner box):
 
@@ -162,17 +163,15 @@ docker compose --profile selfhost up -d --build
 
 Open ports **80** and **443** to the internet first (Let's Encrypt validates over port 80; Caddy then serves everything over 443) — on Hetzner that's a Cloud Firewall inbound rule, same as the one you added for 22/3000/3001/8025. Caddy requests and renews the certificate itself on first start; nothing else to do. The app is then reachable at `https://<your-domain>` — plain `http://<server-ip>:3000` still works directly (Caddy just fronts it), but isn't encrypted, so prefer the HTTPS URL once it's up.
 
-This is a single-server convenience path — see [docs/deployment.md](docs/deployment.md) for other options.
+This is also how production runs — see [docs/deployment.md](docs/deployment.md) for continuous deployment, backups and the production checklist.
 
 ### Running everything locally (no Docker API/worker)
 
 ```bash
-pnpm dev:local     # web + api + worker, all pointed at local Docker Postgres/Redis
-pnpm dev:hybrid    # web + api local, DB/Redis pointed at dev (needs: pnpm env:fetch dev)
-pnpm dev:remote    # web only, API/DB/Redis all remote dev
+pnpm dev:local     # web + api on the host, pointed at local Docker Postgres/Redis (worker: pnpm dev:worker)
 ```
 
-Each dependency (DB, Redis, API) resolves independently via `*_TARGET` env vars (`DB_TARGET`, `REDIS_TARGET`, `API_TARGET`) read from `.env.local` plus, for non-local targets, a fetched `.env.<target>.local` (never hand-typed — `pnpm env:fetch dev`, requires `aws sso login`). See [ADR 0005](docs/adr/0005-env-target-composition.md) and [ADR 0011](docs/adr/0011-secrets-config-management.md).
+Each dependency (DB, Redis, API) resolves independently via `*_TARGET` env vars (`DB_TARGET`, `REDIS_TARGET`, `API_TARGET`) read from `.env.local`. Only the `local` target is usable today: the `dev` / `staging` targets (and `pnpm env:fetch`, `dev:hybrid`, `dev:remote`) belonged to the retired AWS environment — see [docs/environments.md](docs/environments.md) and [ADR 0013](docs/adr/0013-single-server-docker-compose-deployment.md).
 
 ### Tests
 
@@ -186,22 +185,24 @@ Spins up a real `previo_test` Postgres database (dropped/recreated each run) and
 
 ```
 apps/
-  web/     → Next.js frontend (Vercel)
-  api/     → Hono BFF (ECS / Docker); also the BullMQ worker entrypoint (src/worker.ts)
+  web/     → Next.js frontend (+ server-side proxy to the API)
+  api/     → Hono API (Docker); also the BullMQ worker entrypoint (src/worker.ts)
   docs/    → Docusaurus (planned)
 packages/
   calculation/  → Quote pricing engine
   db/           → Drizzle schema, migrations, RBAC, RLS policies
-  contracts/    → Shared Zod schemas + OpenAPI spec
+  contracts/    → Shared Zod schemas, permission map + OpenAPI spec
   env/          → Per-environment env resolution (ADR 0005)
   queue/        → BullMQ job/worker helpers (ADR 0009)
 infra/
-  terraform/    → AWS infrastructure
+  terraform/    → LEGACY — retired AWS setup, unused (ADR 0013)
 docs/
   technical-overview.md
   project-context.md
-  deployment.md
+  deployment.md      → how production runs and deploys
+  infra-status.md    → what is running / missing
   architecture.md
+  environments.md
   adr/          → Architecture decision records
 ```
 
@@ -214,18 +215,18 @@ docs/
 | `super-user` | Super User (Sales Manager) |
 | `user` | User (Sales Associate) |
 
-A super-admin can act on behalf of another company via the `X-Tenant-Id` request header — see [ADR 0008](docs/adr/0008-super-admin-tenant-override-header.md).
+A super-admin can add custom roles (Roles page) and choose what each role may do in the Access Rights matrix; a company's capabilities (manufacturer / supplier / client) then limit what its users can use. A super-admin can act on behalf of another company via the `X-Tenant-Id` request header — see [ADR 0008](docs/adr/0008-super-admin-tenant-override-header.md).
 
 ## Deployment
 
-See [docs/deployment.md](docs/deployment.md) for Terraform bootstrap, ECR/ECS deploy, and Vercel setup.
+Production is one self-hosted server running Docker Compose, deployed by GitHub Actions over SSH after CI passes on `main`. See [docs/deployment.md](docs/deployment.md) for how it works, backups and the production checklist, [docs/infra-status.md](docs/infra-status.md) for what is live, and [ADR 0013](docs/adr/0013-single-server-docker-compose-deployment.md) for why the earlier AWS/Terraform/Vercel setup was retired.
 
 ## Demo routes
 
 | Route | Description |
 |-------|-------------|
 | `/` | Public home page |
-| `/login` | Cognito or dev login |
+| `/login` | Email + password, or the demo-user shortcut |
 | `/app/dashboard` | Stats overview (auth required) |
 | `/app/invoice` | PREVIO preventivo editor |
 | `/app/settings/*` | Role-gated settings screens |

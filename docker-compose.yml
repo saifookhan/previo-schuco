@@ -177,6 +177,20 @@ services:
     depends_on:
       - api
 
+  # Testing docs (apps/docs, Docusaurus) — a static build served on
+  # DOCS_DOMAIN through the `caddy` service below; no published port.
+  # The app/Mailpit URLs inside the docs are baked in at build time, so a
+  # changed DOMAIN / MAILPIT_DOMAIN needs `up -d --build` to show up.
+  docs:
+    profiles: ['selfhost']
+    build:
+      context: .
+      dockerfile: apps/docs/Dockerfile
+      args:
+        DOMAIN: ${DOMAIN:-}
+        MAILPIT_DOMAIN: ${MAILPIT_DOMAIN:-}
+        DOCS_DOMAIN: ${DOCS_DOMAIN:-}
+
   # Reverse proxy fronting `web` with automatic HTTPS — Caddy requests and
   # auto-renews a real Let's Encrypt certificate for DOMAIN the first time
   # it starts, zero manual cert handling. See README's self-host section
@@ -195,6 +209,9 @@ services:
       # subdomain (e.g. mail.188-245-28-215.sslip.io) instead of a
       # directly-published port. See README's Mailpit section.
       MAILPIT_DOMAIN: ${MAILPIT_DOMAIN:-}
+      # Optional — serves the docs site (the `docs` service) on its own
+      # subdomain, e.g. docs.188-245-28-215.sslip.io.
+      DOCS_DOMAIN: ${DOCS_DOMAIN:-}
     ports:
       - '80:80'
       - '443:443'
@@ -204,6 +221,7 @@ services:
       - caddy_config:/config
     depends_on:
       - web
+      - docs
 
 volumes:
   previo_pg_data:

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [0013](./0013-single-server-docker-compose-deployment.md) — Cognito is no longer used for login. The principle that Postgres is the tenant/role source of truth still stands.
 
 **Author:** Syed Arif Iqbal (arifiqbal@outlook.com)
 **Date:** 2026-09-04

@@ -1,77 +1,85 @@
 # Infrastructure & Deployment Status
 
-Tracks what's actually provisioned/live vs. planned, across auth, environments,
-AWS infra, and deployment — so this doesn't have to be re-derived from the
-codebase every time. Update this file whenever one of these items changes
-state; don't let it silently drift like `docs/project-context.md`'s phase
-table can.
+What is actually running, what is missing, and what is legacy — so it does not have to be re-derived from the codebase each time. Update this file whenever one of these items changes.
 
-**Last verified:** 2026-09-08 (against `feat/multi-tenant-env-hardening`, by actually applying dev Terraform and deploying — not just reading code).
+**Last verified:** 2026-10-15, against the repository (`docker-compose.yml`, `Caddyfile`, `.github/workflows/*`, application code). The live server itself was **not** re-inspected for this update — check `docker compose ps` there if in doubt.
 
-## Authentication & RBAC
+Production is a single self-hosted server running Docker Compose. See [deployment.md](./deployment.md) for how it works and [ADR 0013](./adr/0013-single-server-docker-compose-deployment.md) for why the earlier AWS / Terraform / Vercel / Cognito setup was retired.
+
+## Hosting & delivery
 
 | Item | Status | Notes |
 |---|---|---|
-| Cognito JWT verification | ✅ Done | `apps/api/src/middleware/auth.ts` |
-| RBAC (4 canonical roles) | ✅ Done | `super-admin`, `company-admin`, `super-user`, `user` |
-| Postgres RLS tenant isolation | ✅ Done | ADR 0006/0007; restricted `previo_app` DB role, not superuser |
-| Admin-invite-only onboarding | ✅ Done | ADR 0004; no public signup |
-| Super-admin tenant override (`X-Tenant-Id`) | ✅ Done | ADR 0008 |
-| Tenant-aware audit logging | ✅ Done | ADR 0010, pulled forward from Phase 5 |
-| Fine-grained resource:action permissions | ⏸️ Deferred | Intentionally out of scope until Phase 3 (offer-level permissions); current 4-role model is sufficient for now |
+| Server | ✅ One Hetzner Cloud VM | Docker Compose `selfhost` profile: `caddy`, `web`, `docs`, `api`, `worker`, `migrate`, `postgres`, `redis`, `mailpit` |
+| HTTPS | ✅ Caddy + Let's Encrypt | Active when `DOMAIN` is set (an `sslip.io` name works without owning a domain); certificates auto-renew; data kept in the `caddy_data` volume |
+| CI | ✅ `ci.yml` | Build + tests against real Postgres + Docker builds of `api` and `web` |
+| CD | ✅ `deploy.yml` | After CI passes on `main`: SSH to the server, `git reset --hard origin/main`, `docker compose --profile selfhost up -d --build` |
+| Staging / separate environments | ❌ None | One environment only; every merge to `main` that passes CI deploys to it |
+| Custom domain | ⚠️ Depends on `DOMAIN` | A free `sslip.io`/DuckDNS name works; a purchased domain is the better long-term choice |
 
-## Environment setup
+## Data
 
 | Item | Status | Notes |
 |---|---|---|
-| Per-environment env resolution | ✅ Done | ADR 0005 (`DB_TARGET`/`REDIS_TARGET`/`API_TARGET` composition) |
-| Secrets Manager-backed config | ✅ Done | ADR 0011; dev fetchable via `pnpm env:fetch dev`, staging needs separate IAM grant, prod never fetched to a workstation |
-| Local dev off `.env` files | ✅ Done | `docs/environments.md` |
+| PostgreSQL 16 | ✅ In Docker (`previo_pg_data` volume) | App connects as the restricted `previo_app` role, never the owner ([ADR 0007](./adr/0007-application-db-role.md)) |
+| Row-Level Security | ✅ | Tenant isolation, share-chain visibility, quote/catalog write rules — [ADR 0006](./adr/0006-rls-request-scoped-transaction.md); policies live in `packages/db/migrations/0001_rls.sql` |
+| Migrations | ✅ Automatic | `migrate` service runs on every `up` — forward-only |
+| **Automated backups** | ❌ **Not set up** | The most important gap. Only manual `pg_dump` (see deployment.md). Uploaded files in `data/uploads` are not backed up either |
+| Redis (BullMQ) | ✅ In Docker, AOF + `noeviction` | [ADR 0009](./adr/0009-bullmq-background-jobs.md) |
+| File storage | ✅ Local disk (`./data/uploads`) | No object storage; S3 is not used |
 
-## AWS infrastructure (Terraform)
+## Authentication & access
 
-| Environment | Status | Notes |
+| Item | Status | Notes |
 |---|---|---|
-| **dev** | ✅ Provisioned & state-clean | VPC/network, RDS Postgres, Cognito, ECS Fargate + ALB + ECR, S3 — `infra/terraform/environments/dev/`. 2026-09-08: recovered from a month-old interrupted apply that had left ALB/ECR/IAM roles/ECS service created in AWS but untracked in state (`terraform import` × 7 resources); state now matches reality. |
-| **stage** | ❌ Not started | `infra/terraform/environments/stage/` is a placeholder README only ("copy dev/ and adjust tfvars when ready") — no `.tf` files exist |
-| **prod** | ❌ Not started | Same — `infra/terraform/environments/prod/` is a placeholder README only |
+| Login | ✅ Own email + password (bcrypt) | Session JWT signed by `apps/web` with `AUTH_SECRET`, verified by `apps/api`. No external identity provider (Cognito was removed) |
+| Invite-only onboarding | ✅ | One-time email token → `/set-password`; company-admin requests need super-admin approval ([ADR 0004](./adr/0004-admin-invite-only-onboarding.md)) |
+| Roles | ✅ 4 built-in + custom roles | Super-admin creates custom roles; roles are global |
+| Permissions | ✅ Editable role × permission matrix | Effective permissions = roles' permissions ∩ the company's capabilities (manufacturer / supplier / client / platform) |
+| Super-admin tenant override (`X-Tenant-Id`) | ✅ | [ADR 0008](./adr/0008-super-admin-tenant-override-header.md) |
+| Audit log | ✅ | Append-only, written in the same transaction as the change ([ADR 0010](./adr/0010-tenant-aware-audit-logging.md)) |
+| Demo-user login shortcut | ⚠️ On by default | `ALLOW_DEV_LOGIN` defaults to `true`; **set it to `false` before real customers use the server** |
 
-## Live deployment
+## Email
 
-| Environment | API | Web | Notes |
-|---|---|---|---|
-| **dev** | ✅ Live, healthy | ✅ Live (dev-login only; real Cognito on Vercel not yet wired) | API confirmed healthy at `http://previo-schuco-dev-alb-355685339.eu-central-1.elb.amazonaws.com` (`/health` ok, `/api/me` correctly 401s unauthenticated) as of 2026-09-08. ECR was empty (no image ever pushed) — built + pushed. First push was arm64 (Apple Silicon default) and crashed Fargate (`exec format error` — Fargate is x86_64); rebuilt with `docker buildx build --platform linux/amd64` and redeployed successfully. Web on Vercel (`previo-schuco-web.vercel.app`), but its `NEXT_PUBLIC_COGNITO_*`/`NEXT_PUBLIC_API_URL`/`AUTH_SECRET` env vars have not been pushed yet (`configure-vercel-dev.sh` not run) — Cognito login button won't appear on Vercel until that's done. DB migration status against this RDS instance not yet re-verified this session. |
-| **stage** | ❌ None | ❌ None | No infra, no pipeline |
-| **prod** | ❌ None | ❌ None | No infra, no pipeline |
+| Item | Status | Notes |
+|---|---|---|
+| Outbound email | ✅ Resend when `RESEND_API_KEY` is set | Otherwise SMTP (`SMTP_HOST`, defaults to the bundled Mailpit), otherwise the link is only logged |
+| Mailpit | ✅ | Local/demo inbox; UI bound to `127.0.0.1:8025` unless deliberately exposed behind a login |
 
-## CI/CD
+## Secrets & config
 
-| Pipeline | Status |
+| Item | Status | Notes |
+|---|---|---|
+| Server config | ✅ `.env` on the server (gitignored) | Plain file; keep a copy in a password manager |
+| CI/CD secrets | ✅ GitHub repository secrets | `HETZNER_HOST`, `HETZNER_SSH_KEY` |
+| Local dev | ✅ `.env.local` (for `pnpm dev`) + `.env` (for Docker Compose) | [environments.md](./environments.md) |
+
+## Documentation
+
+| Item | Status | Notes |
+|---|---|---|
+| Testing docs site | ✅ `apps/docs` (Docusaurus), `docs` service | Served at `https://<DOCS_DOMAIN>` when set; public, no login. Lists demo logins — those only work while `ALLOW_DEV_LOGIN=true` |
+
+## Observability
+
+| Item | Status | Notes |
+|---|---|---|
+| Logs | ✅ `docker compose logs` | No log shipping |
+| Monitoring / alerting / uptime checks | ❌ None configured | |
+| Error tracking | ❌ None configured | |
+
+## Legacy (kept in the repo, not used)
+
+| Item | Notes |
 |---|---|
-| `.github/workflows/ci.yml` | ✅ Exists (build/test) |
-| `.github/workflows/terraform-plan.yml` | ✅ Exists (dev only) |
-| `.github/workflows/deploy-api-dev.yml` | ✅ Exists (dev only) |
-| Stage/prod deploy workflows | ❌ Not started |
+| `infra/terraform/` | AWS dev environment (VPC, RDS, Cognito, ECS, ECR, S3). Retired; may be removed |
+| `scripts/env-fetch.sh`, `pnpm env:fetch`, `pnpm dev:hybrid`, `pnpm dev:remote` | Pulled credentials from AWS Secrets Manager for the retired dev environment |
+| `docs/adr/0002`, `0011` | Describe Cognito and Secrets Manager; superseded by ADR 0013 |
+| `users.cognito_sub` column | Kept as a nullable external-identity slot; used by the seeded demo users |
 
-## SSL/HTTPS
+## Product status (for context)
 
-| Item | Status | Notes |
-|---|---|---|
-| ALB listener | ⚠️ HTTP only | `infra/terraform/modules/ecs/main.tf` — `aws_lb_listener "http"` on port 80, no HTTPS listener |
-| ACM certificate | ❌ Not provisioned | No `aws_acm_certificate` resource anywhere in the codebase |
-| Route53 hosted zone / custom domain | ❌ Not provisioned | ALB is reached via its raw AWS DNS name; no custom domain for the API |
-| Auto-renewal | N/A yet | Moot until a cert exists — see recommendation below |
+Built and in use: product families (Excel import, versioning, pricing editor, publish), per-family sharing with default discounts, quote builder (auto/manual pricing, edit, custom position codes, PDF), company capabilities, custom roles + permission matrix, invite-only user management, admin panel.
 
-**Recommendation:** add ACM + Route53 + an HTTPS listener to the `ecs` module before dev is used for anything beyond internal testing, and definitely before stage/prod exist. Blocked on: a registered domain (none currently owned — the Vercel URL is Vercel's own free subdomain, not a purchased domain). See conversation notes / follow-up task for the concrete Terraform shape.
-
-## Build note: Apple Silicon vs Fargate architecture
-
-Building the API image with a plain `docker build` on an arm64 Mac produces an arm64 image; Fargate tasks here run x86_64 (`runtimePlatform` isn't pinned in `infra/terraform/modules/ecs/main.tf`, so it defaults to `X86_64`). An arm64 image on an x86_64 task fails at container start with `exec format error`, not at image-pull time — it looks like a successful deploy right up until the task crash-loops. Always build/push with:
-
-```bash
-docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t <ecr-url>:latest --push .
-```
-
-## Not yet started (product side, for context)
-
-Per `docs/project-context.md`'s phased roadmap: Phase 2 (product families, product lines, rate-lists, pricing versioning, price-list UI) has not begun — `apps/api/src/routes/products.ts` and `quotes.ts` are legacy static-demo-data routes predating the DB work, not real Phase 2 implementation.
+Not built yet (see [project-context.md](./project-context.md)): quote status workflow (draft → sent → accepted/rejected), quote header edit / delete / full duplicate, editing characteristic ↔ line relations without Excel, automated backups, monitoring.

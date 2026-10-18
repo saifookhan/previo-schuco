@@ -1,199 +1,155 @@
 # Deployment Guide
 
-## Prerequisites
+How PREVIO runs in production and how code gets there. Production is **one self-hosted server** (a Hetzner Cloud VM) running Docker Compose — there is no AWS, Terraform or Vercel in the live path (see [ADR 0013](adr/0013-single-server-docker-compose-deployment.md); the old AWS Terraform code still sits in `infra/terraform/` but is unused).
 
-- AWS CLI authenticated (`aws sts get-caller-identity`)
-- Terraform >= 1.6
-- Docker
-- pnpm 9
-- Vercel account
+## What runs where
 
-## 1. Bootstrap Terraform state (once)
+One server, one `docker compose --profile selfhost` stack:
+
+| Service | Image / build | Role |
+|---|---|---|
+| `caddy` | `caddy:2-alpine` | Public entry point: ports 80/443, automatic Let's Encrypt HTTPS, reverse-proxies to `web` (and optionally Mailpit and `docs`) |
+| `docs` | `apps/docs/Dockerfile` | Static testing docs (Docusaurus), reached only through `caddy` on `DOCS_DOMAIN` |
+| `web` | `apps/web/Dockerfile` | Next.js. The browser only ever talks to this service; its `/api/*` routes proxy to `api` over Docker's internal network |
+| `api` | `apps/api/Dockerfile` | Hono API (auth, RBAC/permissions, quotes, catalog) |
+| `worker` | same image as `api` | BullMQ worker (background jobs) |
+| `migrate` | `apps/api/Dockerfile` (target `migrate`) | One-shot job on every `up`: Drizzle migrations → RLS policies/grants → app-role password → idempotent seed. Exits `0` when done |
+| `postgres` | `postgres:16-alpine` | Database (volume `previo_pg_data`) |
+| `redis` | `redis:7-alpine` | Job queue (AOF on, `noeviction`; volume `previo_redis_data`) |
+| `mailpit` | `axllent/mailpit` | SMTP catcher used when no `RESEND_API_KEY` is set |
+
+Uploaded files live on the server's disk in `./data/uploads` (mounted into `api` as `LOCAL_STORAGE_DIR`). There is no S3.
+
+## Continuous deployment
+
+Two GitHub Actions workflows:
+
+1. **`ci.yml`** — on every pull request and push to `main`: install, `pnpm build`, `pnpm test` (against a real Postgres service container, so RLS tests hit real policies), and Docker builds of the API and web images (catches a broken self-host build before it deploys).
+2. **`deploy.yml`** — runs after CI **succeeds on `main`**. It SSHes into the server as `root` and runs:
+
+   ```bash
+   cd /root/previo-schuco
+   git fetch origin main
+   git reset --hard origin/main
+   docker compose --profile selfhost up -d --build
+   docker image prune -f
+   ```
+
+   Repository secrets required: `HETZNER_HOST` (server address) and `HETZNER_SSH_KEY` (private key for `root`).
+
+Consequences worth knowing:
+
+- Every push to `main` that passes CI deploys. There is no manual approval step and no staging server.
+- `git reset --hard` discards any edits made by hand to tracked files on the server. Untracked files (the server's `.env`, `data/uploads`) are untouched.
+- Always use `--build`. Plain `docker compose up -d` happily reuses stale cached images and will keep serving old code (and skip new migrations) — this has bitten us after Docker restarts.
+
+## First-time server setup
+
+Full step-by-step (Docker install, read-only deploy key, `.env`, first `up`, HTTPS with `sslip.io`/DuckDNS/a real domain, Mailpit access) is in the **[README's self-host section](../README.md#running-the-whole-app-with-just-docker-compose-up--d-self-hosted--demo-server)**. In short:
+
+1. Install Docker Engine; open ports **22, 80, 443** in the cloud firewall.
+2. Clone the repo to `/root/previo-schuco` (the path `deploy.yml` expects) using a read-only deploy key.
+3. Create `.env` next to `docker-compose.yml` (see below), then `docker compose --profile selfhost up -d --build`.
+4. Add the `HETZNER_HOST` / `HETZNER_SSH_KEY` secrets in GitHub so pushes deploy automatically.
+
+### Production `.env`
+
+| Variable | Set it to |
+|---|---|
+| `AUTH_SECRET` | `openssl rand -base64 32`. **Required** — shared by `web` (signs sessions) and `api` (verifies them). The compose default is an insecure placeholder |
+| `APP_PUBLIC_URL` | The public URL, e.g. `https://<domain>` — also what invite / password-reset email links point to |
+| `DOMAIN` | Domain pointing at the server; enables Caddy's automatic HTTPS |
+| `COOKIE_SECURE` | `true` once served over HTTPS |
+| `ALLOW_DEV_LOGIN` | `false` for anything real customers use (it enables the password-less demo-user shortcut) |
+| `APP_DB_PASSWORD` | A real password for the restricted `previo_app` database role (the app never connects as the owner — [ADR 0007](adr/0007-application-db-role.md)) |
+| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Real outbound email. Without a key, mail goes to Mailpit (not delivered) |
+| `MAILPIT_UI_AUTH`, `MAILPIT_BIND`, `MAILPIT_DOMAIN` | Only if you expose Mailpit's UI — see the README |
+| `DOCS_DOMAIN` | Serves the testing docs (`apps/docs`, `docs` service) at `https://<DOCS_DOMAIN>`, publicly readable. App and Mailpit links inside the docs come from `DOMAIN` / `MAILPIT_DOMAIN` at build time |
+
+`.env` is gitignored and lives only on the server. GitHub only holds the two deploy secrets above.
+
+## Database migrations
+
+Migrations run automatically: the `migrate` service executes on every `docker compose up`. It applies the Drizzle migrations in `packages/db/migrations/`, then re-applies `0001_rls.sql` (idempotent RLS policies, helper functions, grants), sets the `previo_app` password from `APP_DB_PASSWORD`, and runs the idempotent seed (4 roles, the demo companies and demo users if absent).
+
+- Migrations are **forward-only**. Rolling the code back does not undo a migration.
+- Migrations that drop or rewrite data (for example `0013` replaced the company `type` column, `0016` replaced company links with per-family shares) deserve a **backup first** — see below.
+- When adding a migration with `pnpm --filter @schuco/db db:generate`, check that the generated file number does not collide with an existing one and that the snapshot chain (`migrations/meta/`) stays intact.
+
+## Backups and restore
+
+> **Automated backups are not set up yet.** Until they are, back up by hand before risky changes, and treat this as the top operational gap.
+
+What needs backing up:
+
+| What | Where |
+|---|---|
+| Database | `postgres` volume `previo_pg_data` |
+| Uploaded files | `/root/previo-schuco/data/uploads` |
+| `.env` | server only — keep a copy in a password manager (losing `AUTH_SECRET` just logs everyone out; losing `APP_DB_PASSWORD` is recoverable but annoying) |
+
+Manual database backup / restore (run on the server, in the repo directory):
 
 ```bash
-chmod +x infra/terraform/bootstrap/bootstrap.sh
-./infra/terraform/bootstrap/bootstrap.sh
+# backup (custom format, compressed)
+docker compose exec -T postgres pg_dump -U previo -Fc previo > previo-$(date +%F).dump
+
+# restore into the running database (stop api/worker/web first to avoid writes)
+docker compose exec -T postgres pg_restore -U previo -d previo --clean --if-exists < previo-YYYY-MM-DD.dump
 ```
 
-## 2. Provision AWS dev environment
+Copy the dump off the server (`scp`) — a backup on the same disk does not survive losing the server.
 
-**SSO users:** refresh credentials before apply (`aws sso login`), then:
+## Operating the server
 
 ```bash
-chmod +x infra/terraform/scripts/apply-dev.sh
-./infra/terraform/scripts/apply-dev.sh -auto-approve
+docker compose --profile selfhost ps              # status (migrate should show "exited (0)")
+docker compose --profile selfhost logs -f api     # follow API logs (also: web, worker, caddy, migrate)
+docker compose --profile selfhost up -d --build   # redeploy by hand
 ```
 
-Or manually:
+Roll back code: `git reset --hard <good-sha>` then `docker compose --profile selfhost up -d --build` (remember migrations stay applied). A later push to `main` will deploy forward again.
+
+## Local development
 
 ```bash
-eval "$(aws configure export-credentials --format env)"
-cd infra/terraform/environments/dev
-terraform init
-terraform apply
-```
-
-If a previous apply failed with `ExpiredToken`, recover with:
-
-```bash
-./infra/terraform/scripts/apply-dev.sh -auto-approve
-```
-
-The bootstrap script and remote state bucket are already created in account `795346865194` (eu-central-1).
-
-Capture outputs:
-
-```bash
-terraform output cognito_user_pool_id
-terraform output cognito_client_id
-terraform output cognito_domain
-terraform output api_url
-terraform output ecr_repository_url
-```
-
-## 3. Build and push API image to ECR
-
-```bash
-ECR_URL=$(terraform -chdir=infra/terraform/environments/dev output -raw ecr_repository_url)
-AWS_REGION=eu-central-1
-aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${ECR_URL%/*}
-
-docker build -f apps/api/Dockerfile -t previo-api .
-docker tag previo-api:latest $ECR_URL:latest
-docker push $ECR_URL:latest
-
-aws ecs update-service \
-  --cluster $(terraform -chdir=infra/terraform/environments/dev output -raw ecs_cluster_name) \
-  --service $(terraform -chdir=infra/terraform/environments/dev output -raw ecs_service_name) \
-  --force-new-deployment \
-  --region $AWS_REGION
-```
-
-Run database migrations against RDS (from a machine with VPC access or a one-off ECS task). Both values below must come from Secrets Manager — never hand-typed — or the `previo_app` role's password will diverge from what the running ECS task's `DATABASE_URL` (the `database-app` secret) actually has, and the API will fail to log in:
-
-```bash
-DATABASE_URL="<from Secrets Manager previo/dev/database url field>"
-APP_DB_PASSWORD="<from Secrets Manager previo/dev/database-app password field>"
-cd packages/db && pnpm db:migrate
-```
-
-## 4. Vercel project — `previo-schuco-web`
-
-Project: [previo-schuco-web](https://vercel.com/einsteinsaifoos-projects/previo-schuco-web)  
-Production URL: **https://previo-schuco-web.vercel.app**
-
-1. Root Directory: **apps/web** (monorepo)
-2. Framework: Next.js (uses [`apps/web/vercel.json`](../apps/web/vercel.json))
-
-**Vercel does not connect to Postgres directly.** The web app calls the ECS API (`NEXT_PUBLIC_API_URL`); the API uses RDS via `DATABASE_URL` from Secrets Manager.
-
-After Terraform dev is applied:
-
-```bash
-aws sso login
-./infra/terraform/scripts/configure-vercel-dev.sh
-cd apps/web && vercel --prod
-```
-
-### Environment variables (dev)
-
-| Variable | Value |
-|----------|-------|
-| `NEXT_PUBLIC_API_URL` | Terraform `api_url` output (ECS ALB) |
-| `NEXT_PUBLIC_APP_URL` | `https://previo-schuco-web.vercel.app` |
-| `NEXT_PUBLIC_COGNITO_REGION` | `eu-central-1` |
-| `NEXT_PUBLIC_COGNITO_USER_POOL_ID` | Terraform output |
-| `NEXT_PUBLIC_COGNITO_CLIENT_ID` | Terraform output |
-| `NEXT_PUBLIC_COGNITO_DOMAIN` | Terraform output (domain prefix only) |
-| `AUTH_SECRET` | `openssl rand -base64 32` |
-
-Update Cognito callback/logout URLs and API CORS via Terraform (`variables.tf` includes the Vercel URL), then `./infra/terraform/scripts/apply-dev.sh -auto-approve`.
-
-**Cognito `redirect_mismatch` on Vercel:** the app client still has the old callback URL. Fix without a full apply:
-
-```bash
-aws login   # or aws sso login
-./infra/terraform/scripts/update-cognito-vercel-urls.sh
-```
-
-**Login still fails after Cognito fix:** set `NEXT_PUBLIC_API_URL` (missing today — web defaults to `localhost:3001`):
-
-```bash
-./infra/terraform/scripts/configure-vercel-dev.sh
-cd apps/web && vercel --prod
-```
-
-Optional: enable seed-user login on Vercel while Cognito users are being set up:
-
-```bash
-vercel env add NEXT_PUBLIC_ALLOW_DEV_LOGIN production,preview,development \
-  --value true --no-sensitive --yes --force -S einsteinsaifoos-projects
-vercel env add ALLOW_DEV_LOGIN production,preview \
-  --value true --yes --force -S einsteinsaifoos-projects
-```
-
-## 5. Local development
-
-```bash
+pnpm install
 cp .env.example .env.local        # NOT .env — see docs/environments.md, ADR 0005
-docker compose up -d postgres redis migrate api worker
-pnpm dev
+echo "AUTH_SECRET=<same value as in .env.local>" > .env     # Compose reads .env, pnpm dev reads .env.local
+docker compose up -d              # Postgres, Redis, Mailpit, migrate, API, worker
+pnpm dev                          # web only, on :3000
 ```
 
-`pnpm dev` starts **web only** (`:3000`). The API and the BullMQ worker run in Docker on `:3001` — do not run `turbo dev` with the API locally unless you stop the Docker API first (port conflict).
+- Web `:3000`, API `:3001`, Swagger UI `:3001/docs`, Mailpit `:8025`.
+- Postgres is on host port `5434` and Redis on `6380` (to avoid clashing with local installs).
+- `pnpm dev` starts **web only**; the API and worker run in Docker. Do not also run the API on the host (port conflict).
+- Preset: `pnpm dev:local` runs web + api on the host against the Docker Postgres/Redis (the worker separately via `pnpm dev:worker`; stop the Docker `api` first to free port 3001). The `dev:hybrid` / `dev:remote` presets and `pnpm env:fetch` belonged to the retired AWS dev environment and no longer have anything to connect to — see [environments.md](./environments.md).
 
-Postgres is exposed on host port `5434` (not the default `5432` — avoids clashing with another local Postgres) and Redis on host port `6380`; `.env.example`/`.env.local` already reflect this. The API and worker connect as the restricted `previo_app` role, never the migration/owner role — see [ADR 0007](adr/0007-application-db-role.md).
+Tests: `pnpm test` runs the `packages/db` and `apps/api` Vitest suites against a real `previo_test` database that is dropped and recreated each run ([ADR 0012](adr/0012-testing-strategy-and-service-layer.md)).
 
-Open http://localhost:3000/login — use dev seed emails (see `.env.example` / login form).
+### Demo users
 
-**API documentation:** http://localhost:3001/docs (Swagger UI). The OpenAPI spec covers the core BFF plus planned calculation and files services.
+Seeded by `pnpm db:migrate` (and by the `migrate` service). Defined in [`packages/db/src/demo-users.ts`](../packages/db/src/demo-users.ts); on the login page the "dev seed login" shortcut signs in as any of them without a password.
 
-### Alternative local presets
+| Email | Role | Company (capabilities) |
+|---|---|---|
+| admin@schuco-demo.it | super-admin | Schüco / PREVIO Platform (platform) |
+| elena.costa@schuco-demo.it | company-admin (inactive) | Schüco / PREVIO Platform |
+| admin@suppli-demo.it | company-admin | Suppli S.r.l. (manufacturer + supplier) |
+| admin@technometal-demo.it | company-admin | Technometal S.p.A. (client) |
+| manager@technometal-demo.it | super-user | Technometal S.p.A. |
+| sales@technometal-demo.it | user | Technometal S.p.A. |
+| admin@fabbrikka-demo.it | company-admin | Fabbrikka S.r.l. (client) |
 
-```bash
-pnpm dev:local     # web + api + worker, all against local Docker Postgres/Redis (same as above, one command)
-pnpm dev:hybrid    # web + api local, DB/Redis pointed at dev — run `pnpm env:fetch dev` first (needs AWS SSO)
-pnpm dev:remote    # web only; API/DB/Redis all remote dev
-```
+The seed does **not** share any product family: a client sees a family only after its owner shares it (see [project-context.md](./project-context.md)).
 
-See [ADR 0005](adr/0005-env-target-composition.md) for how `DB_TARGET`/`REDIS_TARGET`/`API_TARGET` compose, and [ADR 0011](adr/0011-secrets-config-management.md) for how `pnpm env:fetch <target>` pulls credentials from Secrets Manager (dev is fetchable by default; staging needs a separately-granted IAM permission; production is never fetched to a workstation).
+Real users are invited from the admin panel and set a password through the emailed one-time link (`/set-password`); there is no external identity provider.
 
-### Tests
+## Production checklist
 
-```bash
-pnpm test
-```
-
-Runs `packages/db`'s and `apps/api`'s Vitest suites via Turborepo, against a real `previo_test` Postgres database (dropped and recreated on each run) — RLS/tenant-isolation tests exercise actual Postgres policies, not a mocked repository layer. See [ADR 0012](adr/0012-testing-strategy-and-service-layer.md).
-
-Seed users:
-
-| Email | Role | Company |
-|-------|------|---------|
-| admin@schuco-demo.it | super-admin | Schuco |
-| elena.costa@schuco-demo.it | company-admin (inactive) | Schuco |
-| admin@suppli-demo.it | company-admin | Suppli |
-| admin@technometal-demo.it | company-admin | Technometal |
-| manager@technometal-demo.it | super-user | Technometal |
-| sales@technometal-demo.it | user | Technometal |
-| admin@fabbrikka-demo.it | company-admin | Fabbrikka |
-
-All defined in [`packages/db/src/demo-users.ts`](../packages/db/src/demo-users.ts) and seeded via `pnpm db:migrate`.
-
-## 6. Cognito user provisioning
-
-1. Create user in Cognito User Pool (AWS Console or CLI)
-2. Ensure matching email exists in RDS seed or create user row with correct `company_id` and `role_id`
-3. On first login, API links Cognito `sub` to RDS user by email
-
-## Stage / Prod
-
-Copy `infra/terraform/environments/dev/` to `stage/` and `prod/`, adjust backend key and tfvars. See placeholder READMEs in those folders.
-
-## Monorepo & docs (future)
-
-See [architecture.md](./architecture.md) for:
-
-- Separate ECS services (calculation, files) — when and how to split
-- **Changesets** — package versioning and changelogs
-- **Docusaurus** (`apps/docs`) — product and API documentation on Vercel
+- [ ] `AUTH_SECRET` is a generated secret (not the placeholder)
+- [ ] `ALLOW_DEV_LOGIN=false`
+- [ ] `APP_DB_PASSWORD` changed from `previo_app`
+- [ ] `DOMAIN` set, `COOKIE_SECURE=true`, ports 80/443 open
+- [ ] `RESEND_API_KEY` set (or Mailpit deliberately exposed behind a login)
+- [ ] A recent off-server database + uploads backup exists

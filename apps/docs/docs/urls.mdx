@@ -1,0 +1,62 @@
+---
+sidebar_position: 2
+title: URLs
+---
+
+import AppLink from '@site/src/components/AppLink'
+
+# URLs
+
+Links on this page point to the environment this documentation was built for.
+
+## Services
+
+| Service | This environment | Local (`pnpm dev` + `docker compose up -d`) |
+|---|---|---|
+| Web app | <AppLink /> | `http://localhost:3000` |
+| Mailpit (email inbox) | <AppLink to="mailpit" /> | `http://localhost:8025` |
+| API | — (only reachable through the web app) | `http://localhost:3001` |
+| API docs (Swagger UI) | — | `http://localhost:3001/docs` |
+| OpenAPI spec | — | `http://localhost:3001/openapi.json` |
+| API health check | — | `http://localhost:3001/health` |
+| This documentation | — | `http://localhost:3002` (`pnpm --filter @schuco/docs dev`) |
+
+## App pages
+
+All pages start with a locale: `/it`, `/en` or `/de`. Italian is the default.
+
+### Public
+
+| Page | URL |
+|---|---|
+| Login (+ demo login) | <AppLink path="/en/login" /> |
+| Forgot password | <AppLink path="/en/forgot-password" /> |
+| Set password (opened from the invite / reset email) | `/en/set-password?token=…` |
+
+### App (any logged-in user)
+
+| Page | URL | Needs |
+|---|---|---|
+| Dashboard | <AppLink path="/en/app/dashboard" /> | — |
+| Product families (catalog) | <AppLink path="/en/app/product-families" /> | `catalog.view` |
+| Product family detail | `/en/app/product-families/<id>` | `catalog.view` |
+| Quotes | <AppLink path="/en/app/quotes" /> | `quote.view` |
+| Quote detail / builder | `/en/app/quotes/<id>` | `quote.view` (`quote.edit` to change) |
+| Preventivo editor (early demo replica) | <AppLink path="/en/app/invoice" /> | — |
+
+### Settings
+
+| Page | URL | Who |
+|---|---|---|
+| Company details | <AppLink path="/en/app/settings/company" /> | company admin |
+| Users (invite) | <AppLink path="/en/app/settings/users" /> | `users.manage` |
+| Roles | <AppLink path="/en/app/settings/roles" /> | super-admin |
+| Access rights (permission matrix) | <AppLink path="/en/app/settings/access-rights" /> | super-admin |
+
+### Admin panel (super-admin only)
+
+| Page | URL |
+|---|---|
+| Admin dashboard | <AppLink path="/en/admin/dashboard" /> |
+| All users + pending approvals | <AppLink path="/en/admin/users" /> |
+| Companies | <AppLink path="/en/admin/companies" /> |

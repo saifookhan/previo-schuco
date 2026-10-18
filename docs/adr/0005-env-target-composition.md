@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted — the `dev` / `staging` remote targets are currently unbacked after [0013](./0013-single-server-docker-compose-deployment.md); `local` works as described.
 
 **Author:** Syed Arif Iqbal (arifiqbal@outlook.com)
 **Date:** 2026-09-04

@@ -26,7 +26,7 @@ Subdomain routing needs wildcard DNS, a wildcard SSL cert, Vercel wildcard domai
 
 API route paths never carry a company/tenant path segment (e.g. `/users`, not `/companies/:id/users`) — every route is implicitly scoped to the caller's own company via RLS ([0006](./0006-rls-request-scoped-transaction.md)).
 
-The one exception is **super-admin**, who can act on behalf of another tenant. That capability is expressed as an explicit `X-Tenant-Id` request header, never a URL — see [0007](./0007-super-admin-tenant-override-header.md).
+The one exception is **super-admin**, who can act on behalf of another tenant. That capability is expressed as an explicit `X-Tenant-Id` request header, never a URL — see [0007](./0008-super-admin-tenant-override-header.md).
 
 ## Consequences
 

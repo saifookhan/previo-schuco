@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted — the invite-only decision stands; the Cognito mechanics described below were replaced by an emailed one-time token and `/set-password` page ([0013](./0013-single-server-docker-compose-deployment.md)).
 
 **Author:** Syed Arif Iqbal (arifiqbal@outlook.com)
 **Date:** 2026-09-04
