@@ -87,7 +87,14 @@ export {
   type FamilyShareTarget,
 } from './queries/product-family-shares'
 export { filterBusinessUnitIdsByCompany } from './queries/business-units'
-export { writeAuditLog, type WriteAuditLogInput } from './queries/audit'
+export {
+  hasRecentAuditEntry,
+  listAuditLogEntries,
+  writeAuditLog,
+  type AuditLogFilters,
+  type AuditLogRow,
+  type WriteAuditLogInput,
+} from './queries/audit'
 export {
   deleteProductFamily,
   getProductFamiliesPublishStatus,

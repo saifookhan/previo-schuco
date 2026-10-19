@@ -3,17 +3,16 @@ import { computePermissions, type Permission } from '@schuco/contracts'
 import { getCompanyById, getUserProfileByCognitoSub, getUserProfileById, withSystemTransaction, type UserProfile } from '@schuco/db'
 
 import { getDb } from '../lib/db'
+import type { RequestVariables } from './request-context'
 import { getEffectiveRolePermissions } from '../services/role-permissions-service'
 import { parseBearerToken, verifySessionJwt } from '../lib/session-jwt'
 
-export type AuthVariables = {
+export type AuthVariables = RequestVariables & {
   user: UserProfile
   actorUserId: string
   effectiveCompanyId: string
   isSuperAdmin: boolean
   isActingAsTenant: boolean
-  /** Correlates this request's audit entries/logs back to it (ADR 0010) — cheap to add now, expensive to retrofit later. */
-  requestId: string
 }
 
 const DEV_SUB_HEADER = 'x-dev-user-sub'
@@ -115,7 +114,10 @@ export const requireAuth = async (c: Context, next: Next): Promise<Response | vo
   c.set('effectiveCompanyId', tenantOverride ?? profile.company.id)
   c.set('isSuperAdmin', isSuperAdmin)
   c.set('isActingAsTenant', Boolean(tenantOverride))
-  c.set('requestId', crypto.randomUUID())
+  // Normally already set by the app-wide `requestContext`; routers mounted without it (tests) still get one.
+  if (!c.get('requestId')) {
+    c.set('requestId', crypto.randomUUID())
+  }
 
   await next()
 }

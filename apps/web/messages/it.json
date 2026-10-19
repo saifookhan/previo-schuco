@@ -63,7 +63,8 @@
     "openMenu": "Apri menu",
     "closeMenu": "Chiudi menu",
     "quotes": "Preventivi",
-    "adminCompanies": "Aziende"
+    "adminCompanies": "Aziende",
+    "auditLog": "Registro attività"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -522,5 +523,45 @@
     "saveFailedUnreachable": "Impossibile salvare la condivisione — server non raggiungibile",
     "discountInvalid": "Ogni sconto deve essere un numero da 0 a 100",
     "publishFirst": "Pubblica prima questa famiglia per condividerla"
+  },
+  "auditLog": {
+    "title": "Registro attività",
+    "subtitle": "Chi ha modificato cosa nella tua azienda, e quando. Le voci non si possono modificare né eliminare.",
+    "subtitleAdmin": "Ogni modifica sulla piattaforma, per tutte le aziende. Le voci non si possono modificare né eliminare.",
+    "company": "Azienda",
+    "allCompanies": "Tutte le aziende",
+    "resourceType": "Tipo",
+    "allTypes": "Tutti i tipi",
+    "from": "Dal",
+    "to": "Al",
+    "requestId": "ID richiesta",
+    "requestIdPlaceholder": "es. da una segnalazione di errore",
+    "apply": "Applica",
+    "reset": "Azzera",
+    "onlyActor": "Solo {name}",
+    "clearActor": "Mostra tutti",
+    "filterByActor": "Mostra solo le azioni di questa persona",
+    "errorLoading": "Impossibile caricare il registro attività.",
+    "entriesShown": "{count} voci mostrate",
+    "when": "Quando",
+    "who": "Chi",
+    "action": "Azione",
+    "resource": "Elemento",
+    "details": "Dettagli",
+    "jobId": "ID job",
+    "system": "Sistema",
+    "anonymous": "Non autenticato",
+    "unknownUser": "Utente sconosciuto",
+    "viaCompany": "da {name}",
+    "empty": "Nessuna voce corrisponde ai filtri.",
+    "loadMore": "Carica altri",
+    "resourceTypes": {
+      "user": "Utente",
+      "company": "Azienda",
+      "product_family": "Famiglia di prodotto",
+      "quote": "Preventivo",
+      "role": "Ruolo",
+      "role_permissions": "Permessi dei ruoli"
+    }
   }
 }

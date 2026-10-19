@@ -162,6 +162,30 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           },
         },
       },
+      '/api/audit-log': {
+        get: {
+          tags: ['Admin'],
+          summary: 'Audit log (read-only)',
+          description:
+            'Newest first, keyset-paged via `nextCursor`. Company admins see their own company; super-admins see every company and may filter with `companyId`. A date-only `to` includes that whole day.',
+          operationId: 'listAuditLog',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          parameters: [
+            ...['companyId', 'actorUserId', 'resourceType', 'resourceId', 'requestId', 'from', 'to', 'cursor'].map((name) => ({
+              name,
+              in: 'query',
+              required: false,
+              schema: { type: 'string' },
+            })),
+            { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
+          ],
+          responses: {
+            '200': jsonResponse('One page of audit entries', 'AuditLogListResponse'),
+            '400': { description: 'Invalid filter or cursor', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
       '/api/products': {
         get: {
           tags: ['Products'],
@@ -583,6 +607,40 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
             users: { type: 'array', items: { $ref: '#/components/schemas/AdminUserDto' } },
           },
           required: ['users'],
+        },
+        AuditLogEntry: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            createdAt: { type: 'string', format: 'date-time' },
+            action: { type: 'string', example: 'quote.add_position' },
+            resourceType: { type: 'string', example: 'quote' },
+            resourceId: { type: 'string', nullable: true },
+            metadata: { type: 'object', nullable: true },
+            requestId: { type: 'string', nullable: true },
+            jobId: { type: 'string', nullable: true },
+            actorType: { type: 'string', enum: ['user', 'system'] },
+            actor: {
+              type: 'object',
+              nullable: true,
+              properties: { id: { type: 'string' }, name: { type: 'string', nullable: true }, email: { type: 'string', nullable: true } },
+            },
+            actorCompany: {
+              type: 'object',
+              nullable: true,
+              properties: { id: { type: 'string' }, name: { type: 'string', nullable: true } },
+            },
+            company: { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string', nullable: true } } },
+          },
+          required: ['id', 'createdAt', 'action', 'resourceType', 'actorType', 'company'],
+        },
+        AuditLogListResponse: {
+          type: 'object',
+          properties: {
+            entries: { type: 'array', items: { $ref: '#/components/schemas/AuditLogEntry' } },
+            nextCursor: { type: 'string', nullable: true },
+          },
+          required: ['entries', 'nextCursor'],
         },
         Product: {
           type: 'object',

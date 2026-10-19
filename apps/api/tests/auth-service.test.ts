@@ -3,9 +3,19 @@ process.env.DATABASE_URL =
   `postgresql://previo_app:${process.env.APP_DB_PASSWORD ?? 'previo_app'}@localhost:5434/previo_test`
 // No RESEND_API_KEY here on purpose — exercises the dev-bypass path (no real network call), same philosophy as the old Cognito dev-bypass.
 
-import { inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { companies, createInvitedUser, insertAuthToken, roles, users, withSystemTransaction, type Db } from '@schuco/db'
+import {
+  auditLog,
+  companies,
+  createDb,
+  createInvitedUser,
+  insertAuthToken,
+  roles,
+  users,
+  withSystemTransaction,
+  type Db,
+} from '@schuco/db'
 
 import { getDb } from '../src/lib/db'
 import { AUTH_TOKEN_TTL_MS, generateRawToken, hashToken } from '../src/lib/auth-tokens'
@@ -78,6 +88,13 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  // The auth flows now write audit entries; audit_log is append-only for the app role (ADR 0010),
+  // so its cleanup needs the superuser connection.
+  const superuserUrl = process.env.TEST_DB_SUPERUSER_URL ?? 'postgresql://previo:previo@localhost:5434/previo'
+  const superuserDb = createDb(superuserUrl.replace(/\/[^/]+$/, '/previo_test'))
+  await superuserDb.delete(auditLog).where(eq(auditLog.effectiveCompanyId, companyId))
+  await superuserDb.$client.end()
+
   await withSystemTransaction(db, async (tx) => {
     await tx.delete(users).where(inArray(users.companyId, [companyId]))
     await tx.delete(companies).where(inArray(companies.id, [companyId]))
@@ -222,5 +239,63 @@ describe('requestPasswordReset', () => {
 
   it('resolves for a real active account too', async () => {
     await expect(requestPasswordReset('authsvc-active@example.com')).resolves.toBeUndefined()
+  })
+})
+
+describe('auth audit trail', () => {
+  const auditFor = (userId: string, action: string) =>
+    withSystemTransaction(db, (tx) =>
+      tx
+        .select({ requestId: auditLog.requestId, actorUserId: auditLog.actorUserId, metadata: auditLog.metadata })
+        .from(auditLog)
+        .where(and(eq(auditLog.resourceId, userId), eq(auditLog.action, action))),
+    )
+
+  // Runs first: an earlier test changed this user's password; this puts ACTIVE_PASSWORD back.
+  it('records a password set from a token, with the token purpose', async () => {
+    const rawToken = await mintTestToken(activeUserId, 'password_reset')
+    await consumeAuthToken(rawToken, ACTIVE_PASSWORD, { requestId: 'req-set-pw' })
+    const rows = await auditFor(activeUserId, 'auth.password_set')
+    expect(rows.find((row) => row.requestId === 'req-set-pw')?.metadata).toEqual({ purpose: 'password_reset' })
+  })
+
+  it('records a successful login with its request id, filed under the user\'s company', async () => {
+    await login('authsvc-active@example.com', ACTIVE_PASSWORD, { requestId: 'req-login-ok' })
+    const rows = await auditFor(activeUserId, 'auth.login')
+    expect(rows.find((row) => row.requestId === 'req-login-ok')?.actorUserId).toBe(activeUserId)
+  })
+
+  it('records a wrong password as auth.login_failed without an actor — once per minute per account', async () => {
+    const passwordHash = await hashPassword('guess-me-not-123')
+    const [target] = await withSystemTransaction(db, (tx) =>
+      tx
+        .insert(users)
+        .values({ email: 'authsvc-bruteforce@example.com', companyId, roleId: 'company-admin', status: 'active', passwordHash })
+        .returning({ id: users.id }),
+    )
+    createdUserIds.push(target.id)
+
+    for (const requestId of ['req-login-bad-1', 'req-login-bad-2', 'req-login-bad-3']) {
+      await expect(login('authsvc-bruteforce@example.com', 'wrong-password', { requestId })).rejects.toThrow(InvalidCredentialsError)
+    }
+    const rows = await auditFor(target.id, 'auth.login_failed')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ requestId: 'req-login-bad-1', actorUserId: null, metadata: { reason: 'wrong_password' } })
+  })
+
+  it('writes nothing for an unknown email (no company to file it under, and no guessed emails stored)', async () => {
+    await expect(login('nobody-at-all@example.com', 'whatever', { requestId: 'req-unknown' })).rejects.toThrow(
+      InvalidCredentialsError,
+    )
+    const rows = await withSystemTransaction(db, (tx) =>
+      tx.select({ id: auditLog.id }).from(auditLog).where(eq(auditLog.requestId, 'req-unknown')),
+    )
+    expect(rows).toHaveLength(0)
+  })
+
+  it('records a password reset request for a real account', async () => {
+    await requestPasswordReset('authsvc-active@example.com', { requestId: 'req-reset' })
+    const rows = await auditFor(activeUserId, 'auth.password_reset_requested')
+    expect(rows.some((row) => row.requestId === 'req-reset')).toBe(true)
   })
 })

@@ -10,6 +10,7 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 ## Oktober 2026
 
 **Woche vom 13. Oktober**
+- **Aktivitätsprotokoll**: *Einstellungen → Aktivitätsprotokoll* (Unternehmensadmins) und *Admin → Aktivitätsprotokoll* (Super-Admin) — wer was wann geändert hat; inklusive Anmeldungen und fehlgeschlagener Anmeldungen.
 - **Testdokumentation** (diese Seite): Demo-Anmeldungen, URLs, Mailpit, Funktionen, Preise, Excel-Format, Screenshots.
 - **Demo-Daten**: die Familie *Demo Window W70* wird automatisch angelegt, dazu eine Beispiel-Excel-Datei zum Herunterladen.
 - **Eigene Rollen**: Super-Admins können eigene Rollen anlegen.

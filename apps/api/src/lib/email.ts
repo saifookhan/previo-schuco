@@ -1,6 +1,8 @@
 import nodemailer from 'nodemailer'
 import { Resend } from 'resend'
 
+import { logger } from './logger'
+
 export type SendEmailResult = { outcome: 'sent-smtp' | 'sent-resend' } | { outcome: 'skipped-dev-bypass' }
 
 let resendClient: Resend | null = null
@@ -65,10 +67,10 @@ const sendEmail = async (input: { to: string; subject: string; html: string; dev
     return { outcome: 'sent-smtp' }
   }
 
-  // eslint-disable-next-line no-console
-  console.warn(
-    `[email] Neither RESEND_API_KEY nor SMTP_HOST configured — ${input.devLogLabel} for ${input.to} not sent.` +
-      (input.devLogLink ? ` Link: ${input.devLogLink}` : ''),
+  // Dev-only fallback: the link is logged on purpose so a local developer can still follow it.
+  logger.warn(
+    { to: input.to, email: input.devLogLabel, link: input.devLogLink },
+    'email not sent: neither RESEND_API_KEY nor SMTP_HOST configured',
   )
   return { outcome: 'skipped-dev-bypass' }
 }

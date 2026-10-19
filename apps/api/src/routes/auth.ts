@@ -7,6 +7,8 @@ import {
 } from '@schuco/contracts'
 import { Hono } from 'hono'
 
+import type { RequestVariables } from '../middleware/request-context'
+
 import {
   AccountNotActiveError,
   InvalidCredentialsError,
@@ -22,7 +24,7 @@ import {
  * apps/web mints and every other route's `requireAuth` verifies. Never
  * behind `requireAuth`/`requireRoles` (that would be circular).
  */
-export const auth = new Hono()
+export const auth = new Hono<{ Variables: RequestVariables }>()
 
 /** Verifies email+password. On success, returns the full profile — apps/web's own route mints and sets the session cookie from this. */
 auth.post('/login', async (c) => {
@@ -33,7 +35,7 @@ auth.post('/login', async (c) => {
   }
 
   try {
-    const profile = await login(parsedBody.data.email, parsedBody.data.password)
+    const profile = await login(parsedBody.data.email, parsedBody.data.password, { requestId: c.get('requestId') })
     const parsed = loginResponseSchema.safeParse({ user: profile })
     if (!parsed.success) {
       return c.json({ error: 'Internal response validation failed' }, 500)
@@ -59,7 +61,7 @@ auth.post('/set-password', async (c) => {
   }
 
   try {
-    const profile = await consumeAuthToken(parsedBody.data.token, parsedBody.data.password)
+    const profile = await consumeAuthToken(parsedBody.data.token, parsedBody.data.password, { requestId: c.get('requestId') })
     const parsed = setPasswordResponseSchema.safeParse({ user: profile })
     if (!parsed.success) {
       return c.json({ error: 'Internal response validation failed' }, 500)
@@ -84,6 +86,6 @@ auth.post('/request-password-reset', async (c) => {
     return c.json({ error: 'Invalid request body', details: parsedBody.error.issues }, 400)
   }
 
-  await requestPasswordReset(parsedBody.data.email)
+  await requestPasswordReset(parsedBody.data.email, { requestId: c.get('requestId') })
   return c.json({ ok: true })
 })

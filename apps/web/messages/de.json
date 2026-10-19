@@ -63,7 +63,8 @@
     "openMenu": "Menü öffnen",
     "closeMenu": "Menü schließen",
     "quotes": "Angebote",
-    "adminCompanies": "Unternehmen"
+    "adminCompanies": "Unternehmen",
+    "auditLog": "Aktivitätsprotokoll"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -522,5 +523,45 @@
     "saveFailedUnreachable": "Freigabe konnte nicht gespeichert werden — Server nicht erreichbar",
     "discountInvalid": "Jeder Rabatt muss eine Zahl von 0 bis 100 sein",
     "publishFirst": "Veröffentlichen Sie diese Familie zuerst, um sie zu teilen"
+  },
+  "auditLog": {
+    "title": "Aktivitätsprotokoll",
+    "subtitle": "Wer in deinem Unternehmen was geändert hat, und wann. Einträge können nicht bearbeitet oder gelöscht werden.",
+    "subtitleAdmin": "Jede Änderung auf der Plattform, über alle Unternehmen. Einträge können nicht bearbeitet oder gelöscht werden.",
+    "company": "Unternehmen",
+    "allCompanies": "Alle Unternehmen",
+    "resourceType": "Typ",
+    "allTypes": "Alle Typen",
+    "from": "Von",
+    "to": "Bis",
+    "requestId": "Anfrage-ID",
+    "requestIdPlaceholder": "z. B. aus einer Fehlermeldung",
+    "apply": "Anwenden",
+    "reset": "Zurücksetzen",
+    "onlyActor": "Nur {name}",
+    "clearActor": "Alle anzeigen",
+    "filterByActor": "Nur Aktionen dieser Person anzeigen",
+    "errorLoading": "Das Aktivitätsprotokoll konnte nicht geladen werden.",
+    "entriesShown": "{count} Einträge angezeigt",
+    "when": "Wann",
+    "who": "Wer",
+    "action": "Aktion",
+    "resource": "Datensatz",
+    "details": "Details",
+    "jobId": "Job-ID",
+    "system": "System",
+    "anonymous": "Nicht angemeldet",
+    "unknownUser": "Unbekannter Benutzer",
+    "viaCompany": "durch {name}",
+    "empty": "Keine Einträge passen zu diesen Filtern.",
+    "loadMore": "Mehr laden",
+    "resourceTypes": {
+      "user": "Benutzer",
+      "company": "Unternehmen",
+      "product_family": "Produktfamilie",
+      "quote": "Angebot",
+      "role": "Rolle",
+      "role_permissions": "Rollenberechtigungen"
+    }
   }
 }

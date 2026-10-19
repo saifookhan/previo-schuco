@@ -1,6 +1,8 @@
 import { defineJob, registerJob } from '@schuco/queue'
 import { z } from 'zod'
 
+import { logger } from '../lib/logger'
+
 /**
  * Smoke-test job — proves the queue/worker pipeline (enqueue -> Redis ->
  * worker -> handler) end-to-end. Not a real feature; delete once a real
@@ -10,6 +12,5 @@ import { z } from 'zod'
 export const echoJob = defineJob('email', 'echo', z.object({ message: z.string() }), 'platform')
 
 export const echoJobRegistration = registerJob(echoJob, async (payload) => {
-  // eslint-disable-next-line no-console
-  console.log(`[jobs/echo] received: ${payload.message}`)
+  logger.info({ job: 'echo', message: payload.message }, 'echo job received')
 })

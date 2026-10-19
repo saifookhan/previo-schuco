@@ -67,7 +67,9 @@ Production is a single self-hosted server running Docker Compose. See [deploymen
 
 | Item | Status | Notes |
 |---|---|---|
-| Logs | ✅ `docker compose logs` | No log shipping |
+| Logs | ✅ `docker compose logs`, rotated | API + worker write one JSON line per event (pino); every request line has `requestId`, method, path, status, duration and the user. Docker keeps 5 × 10 MB per container. No log shipping |
+| Request IDs | ✅ | Every API response carries `X-Request-Id`; a 500 answers `{ error, requestId }`. The same id is stored on audit entries |
+| Audit log viewer | ✅ *Settings → Audit log* (company admin), *Admin → Audit log* (super-admin) | Read-only, filters + paging, indexed (`0017_audit_log_indexes`). Logins, failed logins, password set and reset requests are audited too |
 | Monitoring / alerting / uptime checks | ❌ None configured | |
 | Error tracking | ❌ None configured | |
 
@@ -82,6 +84,6 @@ Production is a single self-hosted server running Docker Compose. See [deploymen
 
 ## Product status (for context)
 
-Built and in use: product families (Excel import, versioning, pricing editor, publish), per-family sharing with default discounts, quote builder (auto/manual pricing, edit, custom position codes, PDF), company capabilities, custom roles + permission matrix, invite-only user management, admin panel.
+Built and in use: audit log viewer, structured logging, product families (Excel import, versioning, pricing editor, publish), per-family sharing with default discounts, quote builder (auto/manual pricing, edit, custom position codes, PDF), company capabilities, custom roles + permission matrix, invite-only user management, admin panel.
 
 Not built yet (see [project-context.md](./project-context.md)): quote status workflow (draft → sent → accepted/rejected), quote header edit / delete / full duplicate, editing characteristic ↔ line relations without Excel, automated backups, monitoring.

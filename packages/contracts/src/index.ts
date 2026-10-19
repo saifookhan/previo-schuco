@@ -1,3 +1,4 @@
+export * from './schemas/audit-log'
 export * from './schemas/auth'
 export * from './schemas/auth-flows'
 export * from './schemas/common'

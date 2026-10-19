@@ -55,3 +55,6 @@ Un percorso completo dei flussi principali. Usa gli [Accessi demo](./demo-logins
 ## Admin
 
 - [ ] Crea un'azienda, imposta le capacità, disattivala e riattivala.
+- [ ] *Admin → Registro attività* mostra ognuna delle modifiche sopra, dalla più recente; *Carica altri* va avanti.
+- [ ] Accedi con una password sbagliata per un account reale → compare una voce `auth.login_failed` per la sua azienda.
+- [ ] Come `admin@suppli-demo.it`, *Impostazioni → Registro attività* mostra solo le voci di Suppli.

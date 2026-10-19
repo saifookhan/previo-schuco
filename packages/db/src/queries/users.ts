@@ -416,6 +416,7 @@ export const resetInvitePending = async (db: DbLike, userId: string): Promise<vo
 
 export interface UserAuthRow {
   id: string
+  companyId: string
   email: string
   passwordHash: string | null
   status: UserStatus
@@ -432,7 +433,7 @@ export interface UserAuthRow {
  */
 export const getUserByEmail = async (db: DbLike, email: string): Promise<UserAuthRow | null> => {
   const rows = await db
-    .select({ id: users.id, email: users.email, passwordHash: users.passwordHash, status: users.status })
+    .select({ id: users.id, companyId: users.companyId, email: users.email, passwordHash: users.passwordHash, status: users.status })
     .from(users)
     .where(eq(users.email, email.toLowerCase()))
     .limit(1)

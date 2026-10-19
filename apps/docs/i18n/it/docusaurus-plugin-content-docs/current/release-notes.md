@@ -10,6 +10,7 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 ## Ottobre 2026
 
 **Settimana del 13 ottobre**
+- **Registro attività**: *Impostazioni → Registro attività* (admin aziendali) e *Admin → Registro attività* (super-admin) — chi ha modificato cosa, e quando; inclusi accessi e accessi falliti.
 - **Documentazione per i test** (questo sito): accessi demo, URL, Mailpit, funzionalità, prezzi, formato Excel, screenshot.
 - **Dati demo**: la famiglia *Demo Window W70* viene creata automaticamente, più un file Excel di esempio scaricabile.
 - **Ruoli personalizzati**: i super-admin possono creare ruoli propri.

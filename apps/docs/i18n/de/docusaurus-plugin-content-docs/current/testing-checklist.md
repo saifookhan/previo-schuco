@@ -55,3 +55,6 @@ Ein kompletter Durchlauf der wichtigsten Abläufe. Mit den [Demo-Anmeldungen](./
 ## Admin
 
 - [ ] Ein Unternehmen anlegen, Fähigkeiten setzen, deaktivieren und wieder aktivieren.
+- [ ] *Admin → Aktivitätsprotokoll* zeigt jede dieser Änderungen, neueste zuerst; *Mehr laden* blättert weiter.
+- [ ] Mit falschem Passwort an einem echten Konto anmelden → ein Eintrag `auth.login_failed` erscheint für dessen Unternehmen.
+- [ ] Als `admin@suppli-demo.it` zeigt *Einstellungen → Aktivitätsprotokoll* nur Einträge von Suppli.

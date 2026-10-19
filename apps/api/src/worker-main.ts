@@ -1,6 +1,7 @@
 import { closeQueueConnection, closeWorkerGracefully, createWorker } from '@schuco/queue'
 
 import { echoJobRegistration } from './jobs/echo'
+import { logger } from './lib/logger'
 
 /**
  * Background job worker entrypoint (ADR 0009). Ships from the same Docker
@@ -13,10 +14,10 @@ const importExportWorker = createWorker('import-export', [])
 
 const workers = [emailWorker, documentsWorker, importExportWorker]
 
-console.log('Schuco worker running — domains: email, documents, import-export')
+logger.info({ domains: ['email', 'documents', 'import-export'] }, 'Schuco worker running')
 
 const shutdown = async (signal: string): Promise<void> => {
-  console.log(`${signal} received, closing workers gracefully...`)
+  logger.info({ signal }, 'closing workers gracefully')
   await Promise.all(workers.map((worker) => closeWorkerGracefully(worker)))
   await closeQueueConnection()
   process.exit(0)

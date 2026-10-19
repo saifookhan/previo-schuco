@@ -14,6 +14,7 @@ import {
   type UserProfile,
 } from '@schuco/db'
 
+import { logger } from '../lib/logger'
 import { canGrantByPermissions, canGrantRoles } from '../lib/role-hierarchy'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
 import { issueInviteToken } from './auth-service'
@@ -197,8 +198,7 @@ export const inviteUser = async (
     }
     return created
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(`[usersService.inviteUser] Invite email failed for ${input.email}:`, error)
+    logger.error({ err: error, email: input.email, userId: created.id, requestId: actor.requestId }, 'invite email failed')
     await withTenantDb(ctx, (tx) => markInviteFailed(tx, created.id))
     return { ...created, status: 'invite_failed' }
   }
@@ -246,8 +246,7 @@ export const approveInvite = async (ctx: TenantContext, actor: ApprovalActor, us
     await issueInviteToken(approved.id, approved.email, approved.name)
     return approved
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(`[usersService.approveInvite] Invite email failed for ${approved.email}:`, error)
+    logger.error({ err: error, email: approved.email, userId: approved.id, requestId: actor.requestId }, 'invite email failed on approval')
     await withTenantDb(ctx, (tx) => markInviteFailed(tx, approved.id))
     return { ...approved, status: 'invite_failed' }
   }

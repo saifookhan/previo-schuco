@@ -55,3 +55,6 @@ An end-to-end run through the main flows. Use [Demo logins](./demo-logins.md) to
 ## Admin
 
 - [ ] Create a company, set capabilities, deactivate and re-activate it.
+- [ ] *Admin → Audit log* shows each of the changes above, newest first; *Load more* pages further.
+- [ ] Log in with a wrong password for a real account → an `auth.login_failed` entry appears for its company.
+- [ ] As `admin@suppli-demo.it`, *Settings → Audit log* shows only Suppli's entries.

@@ -2,12 +2,15 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 
+import { logger } from './lib/logger'
 import type { AuthVariables } from './middleware/auth'
+import { handleUncaughtError, requestContext } from './middleware/request-context'
 import { adminCompanies } from './routes/admin/companies'
 import { adminInvites } from './routes/admin/invites'
 import { adminRolePermissions } from './routes/admin/role-permissions'
 import { adminRoles } from './routes/admin/roles'
 import { adminUsers } from './routes/admin/users'
+import { auditLogRoutes } from './routes/audit-log'
 import { auth } from './routes/auth'
 import { calculate } from './routes/calculate'
 import { createDocsRoutes } from './routes/docs'
@@ -29,7 +32,9 @@ const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
 const port = Number(process.env.PORT ?? 3001)
 const apiPublicUrl = process.env.API_PUBLIC_URL ?? `http://localhost:${port}`
 
-app.use('*', cors({ origin: corsOrigins, credentials: true }))
+app.use('*', requestContext)
+app.use('*', cors({ origin: corsOrigins, credentials: true, exposeHeaders: ['X-Request-Id'] }))
+app.onError(handleUncaughtError)
 
 app.route('/health', health)
 app.route('/api/auth', auth)
@@ -41,6 +46,7 @@ app.route('/api/admin/companies', adminCompanies)
 app.route('/api/admin/role-permissions', adminRolePermissions)
 app.route('/api/admin/roles', adminRoles)
 app.route('/api/roles', roles)
+app.route('/api/audit-log', auditLogRoutes)
 app.route('/api/products', products)
 app.route('/api/product-families', productFamilies)
 app.route('/api/quotes', quotes)
@@ -49,8 +55,7 @@ app.route('/api/calculate', calculate)
 app.route('/', createDocsRoutes(apiPublicUrl))
 
 serve({ fetch: app.fetch, port }, () => {
-  console.log(`Schuco API running on http://localhost:${port}`)
-  console.log(`Swagger UI: http://localhost:${port}/docs`)
+  logger.info({ port, swaggerUi: `http://localhost:${port}/docs` }, 'Schuco API running')
 })
 
 export default app

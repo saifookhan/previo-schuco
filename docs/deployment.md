@@ -109,6 +109,22 @@ docker compose --profile selfhost logs -f api     # follow API logs (also: web, 
 docker compose --profile selfhost up -d --build   # redeploy by hand
 ```
 
+### Reading the logs
+
+The API and worker log one JSON object per line (pino; `level` 30 = info, 40 = warn, 50 = error). Every
+request line has `requestId`, `method`, `path`, `status`, `durationMs`, `userId` and `companyId`. Docker keeps
+the last 5 × 10 MB per container (`x-logging` in `docker-compose.yml`).
+
+```bash
+docker compose --profile selfhost logs --no-log-prefix api | jq -c 'select(.level >= 50)'           # errors only
+docker compose --profile selfhost logs --no-log-prefix api | jq -c 'select(.requestId == "<id>")'   # one request
+docker compose --profile selfhost logs --no-log-prefix api | jq -c 'select(.status >= 500)'         # failed requests
+```
+
+A 500 response body contains the `requestId`; the same id is on that request's audit entries, so
+*Admin → Audit log → Request ID* shows what the request changed. `LOG_LEVEL` (default `info`) and
+`LOG_FORMAT` (`json` / `pretty`; default: pretty only in a terminal) tune the output.
+
 Roll back code: `git reset --hard <good-sha>` then `docker compose --profile selfhost up -d --build` (remember migrations stay applied). A later push to `main` will deploy forward again.
 
 ## Local development

@@ -63,7 +63,8 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "quotes": "Quotes",
-    "adminCompanies": "Companies"
+    "adminCompanies": "Companies",
+    "auditLog": "Audit log"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -522,5 +523,45 @@
     "saveFailedUnreachable": "Could not save sharing — could not reach the server",
     "discountInvalid": "Each discount must be a number from 0 to 100",
     "publishFirst": "Publish this family first to share it"
+  },
+  "auditLog": {
+    "title": "Audit log",
+    "subtitle": "Who changed what in your company, and when. Entries can't be edited or deleted.",
+    "subtitleAdmin": "Every change on the platform, across all companies. Entries can't be edited or deleted.",
+    "company": "Company",
+    "allCompanies": "All companies",
+    "resourceType": "Type",
+    "allTypes": "All types",
+    "from": "From",
+    "to": "To",
+    "requestId": "Request ID",
+    "requestIdPlaceholder": "e.g. from an error report",
+    "apply": "Apply",
+    "reset": "Reset",
+    "onlyActor": "Only {name}",
+    "clearActor": "Show everyone",
+    "filterByActor": "Show only this person's actions",
+    "errorLoading": "Could not load the audit log.",
+    "entriesShown": "{count} entries shown",
+    "when": "When",
+    "who": "Who",
+    "action": "Action",
+    "resource": "Record",
+    "details": "Details",
+    "jobId": "Job ID",
+    "system": "System",
+    "anonymous": "Not signed in",
+    "unknownUser": "Unknown user",
+    "viaCompany": "by {name}",
+    "empty": "No entries match these filters.",
+    "loadMore": "Load more",
+    "resourceTypes": {
+      "user": "User",
+      "company": "Company",
+      "product_family": "Product family",
+      "quote": "Quote",
+      "role": "Role",
+      "role_permissions": "Role permissions"
+    }
   }
 }

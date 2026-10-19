@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   Package,
+  ScrollText,
   Settings,
   Shield,
   ShieldCheck,
@@ -55,6 +56,7 @@ const settingsNav = [
     minRole: 'super-admin' as RoleId,
   },
   { href: '/app/settings/company', labelKey: 'company', icon: Building2, minRole: 'company-admin' as RoleId },
+  { href: '/app/settings/audit-log', labelKey: 'auditLog', icon: ScrollText, minRole: 'company-admin' as RoleId },
 ]
 
 const adminNav = [

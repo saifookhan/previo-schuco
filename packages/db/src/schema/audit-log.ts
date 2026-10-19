@@ -1,4 +1,5 @@
-import { jsonb, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+import { index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 
 import { companies } from './companies'
 import { users } from './users'
@@ -31,4 +32,13 @@ export const auditLog = pgTable('audit_log', {
   requestId: text('request_id'),
   jobId: text('job_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-})
+}, (table) => [
+  // The audit viewer pages newest-first with a (created_at, id) keyset; each filter has an index that keeps that order.
+  index('audit_log_created_idx').on(table.createdAt.desc(), table.id.desc()),
+  index('audit_log_company_created_idx').on(table.effectiveCompanyId, table.createdAt.desc(), table.id.desc()),
+  index('audit_log_actor_created_idx').on(table.actorUserId, table.createdAt.desc(), table.id.desc()),
+  index('audit_log_type_created_idx').on(table.resourceType, table.createdAt.desc(), table.id.desc()),
+  index('audit_log_resource_created_idx').on(table.resourceType, table.resourceId, table.createdAt.desc(), table.id.desc()),
+  // "What did this request do?" — looked up from a request id in the logs or an error message.
+  index('audit_log_request_id_idx').on(table.requestId).where(sql`${table.requestId} IS NOT NULL`),
+])

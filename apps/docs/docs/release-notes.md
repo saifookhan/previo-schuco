@@ -10,6 +10,7 @@ What changed, newest first. Use it to see what's new to test.
 ## October 2026
 
 **Week of 13 October**
+- **Audit log**: *Settings → Audit log* (company admins) and *Admin → Audit log* (super-admin) — who changed what, when; sign-ins and failed sign-ins included.
 - **Testing docs** (this site): demo logins, URLs, Mailpit, features, pricing, Excel format, screenshots.
 - **Demo data**: the *Demo Window W70* product family is created automatically, plus a downloadable sample Excel file.
 - **Custom roles**: super-admins can create their own roles.
