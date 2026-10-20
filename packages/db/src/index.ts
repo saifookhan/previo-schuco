@@ -130,6 +130,7 @@ export {
 } from './queries/product-families'
 export {
   deleteQuotePosition,
+  quoteExists,
   deleteQuotePositionCharacteristics,
   getQuoteDetail,
   insertQuote,

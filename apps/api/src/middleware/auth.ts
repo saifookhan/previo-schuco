@@ -3,6 +3,7 @@ import { computePermissions, type Permission } from '@schuco/contracts'
 import { getCompanyById, getUserProfileByCognitoSub, getUserProfileById, withSystemTransaction, type UserProfile } from '@schuco/db'
 
 import { getDb } from '../lib/db'
+import { isUuid } from '../lib/uuid'
 import type { RequestVariables } from './request-context'
 import { getEffectiveRolePermissions } from '../services/role-permissions-service'
 import { parseBearerToken, verifySessionJwt } from '../lib/session-jwt'
@@ -18,7 +19,6 @@ export type AuthVariables = RequestVariables & {
 const DEV_SUB_HEADER = 'x-dev-user-sub'
 const TENANT_OVERRIDE_HEADER = 'x-tenant-id'
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * Resolve dev-mode user sub (the seeded demo users — see demo-users.ts).
@@ -99,7 +99,7 @@ export const requireAuth = async (c: Context, next: Next): Promise<Response | vo
     if (!isSuperAdmin) {
       return c.json({ error: `Forbidden — ${TENANT_OVERRIDE_HEADER} is restricted to super-admin` }, 403)
     }
-    if (!UUID_RE.test(tenantOverride)) {
+    if (!isUuid(tenantOverride)) {
       return c.json({ error: `Invalid ${TENANT_OVERRIDE_HEADER}` }, 400)
     }
 

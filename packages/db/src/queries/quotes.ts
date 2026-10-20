@@ -142,13 +142,23 @@ export const recalculateQuoteTotal = async (db: DbLike, quoteId: string): Promis
     .where(eq(quotes.id, quoteId))
 }
 
-/** Deletes a position, but only if it belongs to `quoteId` — scoped in the WHERE itself, not just checked after the fact. */
-export const deleteQuotePosition = async (db: DbLike, quoteId: string, positionId: string): Promise<string | null> => {
+/** Deletes a position, but only if it belongs to `quoteId` — scoped in the WHERE itself, not just checked after the fact. Returns the deleted position's code (for the audit trail), or null if nothing matched. */
+export const deleteQuotePosition = async (
+  db: DbLike,
+  quoteId: string,
+  positionId: string,
+): Promise<{ positionCode: string } | null> => {
   const [row] = await db
     .delete(quotePositions)
     .where(and(eq(quotePositions.id, positionId), eq(quotePositions.quoteId, quoteId)))
-    .returning({ quoteId: quotePositions.quoteId })
-  return row?.quoteId ?? null
+    .returning({ positionCode: quotePositions.positionCode })
+  return row ?? null
+}
+
+/** Whether the quote exists and is visible to the caller (RLS). */
+export const quoteExists = async (db: DbLike, quoteId: string): Promise<boolean> => {
+  const rows = await db.select({ id: quotes.id }).from(quotes).where(eq(quotes.id, quoteId)).limit(1)
+  return rows.length > 0
 }
 
 export interface UpdateQuotePositionInput {

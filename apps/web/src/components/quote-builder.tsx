@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 
 import { CollapsibleSection } from '@/components/collapsible-section'
+import { RecordHistory } from '@/components/record-history'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -904,6 +905,12 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
               <p className="text-xs text-slate-400">{t('validityNote', { days: detail.quote.validityDays })}</p>
             </div>
           </CollapsibleSection>
+
+          <RecordHistory
+            endpoint={`/api/sales-quotes/${detail.quote.id}/history`}
+            // Reordering doesn't touch the quote's updatedAt, so the position order is part of the key too.
+            refreshKey={`${detail.quote.updatedAt}|${detail.positions.map((p) => p.id).join(',')}`}
+          />
         </div>
       </main>
 

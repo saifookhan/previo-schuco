@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, gte, lt, or, sql, type SQL } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 
 import type { DbLike } from '../client'
@@ -48,6 +48,12 @@ export interface AuditLogFilters {
   resourceType?: string
   resourceId?: string
   requestId?: string
+  /**
+   * A product family's whole history: entries about the family itself, plus its
+   * line/characteristic/matrix edits — older ones filed under the item's own id
+   * with `metadata.productFamilyId` (see `audit_log_family_item_idx`).
+   */
+  productFamilyId?: string
   from?: Date
   to?: Date
   /** Keyset position: return entries strictly older than this one. */
@@ -105,6 +111,14 @@ export const listAuditLogEntries = async (tx: DbLike, filters: AuditLogFilters, 
   }
   if (filters.requestId !== undefined) {
     conditions.push(eq(auditLog.requestId, filters.requestId))
+  }
+  if (filters.productFamilyId !== undefined) {
+    conditions.push(
+      and(
+        eq(auditLog.resourceType, 'product_family'),
+        or(eq(auditLog.resourceId, filters.productFamilyId), sql`${auditLog.metadata}->>'productFamilyId' = ${filters.productFamilyId}`),
+      )!,
+    )
   }
   if (filters.from !== undefined) {
     conditions.push(gte(auditLog.createdAt, filters.from))

@@ -22,6 +22,7 @@ import {
   type ProductFamilySummary,
   type ProductLineRow,
 } from '@schuco/db'
+import type { AuditLogListResponse, RecordHistoryQuery } from '@schuco/contracts'
 
 import { extractEmbeddedImages } from '../lib/excel-import/extract-embedded-images'
 import { parseProductFamilyWorkbook } from '../lib/excel-import'
@@ -37,7 +38,7 @@ import {
 } from '../lib/product-family-edit'
 import { saveLocalFile } from '../lib/local-storage'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
-import { recordAuditEvent } from './audit-service'
+import { listAuditPage, recordAuditEvent, toHistoryEntry } from './audit-service'
 
 export interface ProductFamilyActor {
   actorUserId: string
@@ -47,6 +48,9 @@ export interface ProductFamilyActor {
 
 /** The uploaded workbook doesn't have a recognized required sheet, an unrecognized Tipo_Listino, or another data problem — the import never touched the DB. */
 export class ExcelImportError extends Error {}
+
+/** The caller can see the family (it was shared with them) but its history belongs to the owning company. */
+export class ProductFamilyHistoryForbiddenError extends Error {}
 
 const isMatrix = (value: number | RawPricingMatrix): value is RawPricingMatrix =>
   typeof value === 'object'
@@ -532,7 +536,7 @@ const editFamilyPricing = <T>(
   ctx: TenantContext,
   actor: ProductFamilyActor,
   familyId: string,
-  audit: { action: string; resourceId: string; changed: string[] },
+  audit: { action: string; itemType: 'line' | 'characteristic' | 'matrix'; itemId: string; changed: string[] },
   apply: (tx: Parameters<Parameters<typeof withTenantDb>[1]>[0]) => Promise<T | null>,
 ): Promise<T> =>
   withTenantDb(ctx, async (tx) => {
@@ -552,9 +556,10 @@ const editFamilyPricing = <T>(
     await touchProductFamily(tx, familyId)
     await recordAuditEvent(tx, auditActor(actor), family.supplierCompanyId, {
       action: audit.action,
+      // Filed under the family (its history panel finds it by resourceId); the edited item is in the metadata.
       resourceType: 'product_family',
-      resourceId: audit.resourceId,
-      metadata: { productFamilyId: familyId, changed: audit.changed },
+      resourceId: familyId,
+      metadata: { productFamilyId: familyId, itemType: audit.itemType, itemId: audit.itemId, changed: audit.changed },
     })
     return row
   })
@@ -577,7 +582,7 @@ export const updatePricingMatrix = async (
     ctx,
     actor,
     familyId,
-    { action: 'product_family.matrix_update', resourceId: matrixId, changed: ['widths', 'heights', 'matrix'] },
+    { action: 'product_family.matrix_update', itemType: 'matrix', itemId: matrixId, changed: ['widths', 'heights', 'matrix'] },
     (tx) => updatePricingMatrixQuery(tx, familyId, matrixId, validated),
   )
 }
@@ -599,7 +604,7 @@ export const updateProductLine = async (
     ctx,
     actor,
     familyId,
-    { action: 'product_family.line_update', resourceId: lineId, changed: Object.keys(patch) },
+    { action: 'product_family.line_update', itemType: 'line', itemId: lineId, changed: Object.keys(patch) },
     (tx) => updateProductLineQuery(tx, familyId, lineId, patch),
   )
 }
@@ -621,7 +626,35 @@ export const updateCharacteristic = async (
     ctx,
     actor,
     familyId,
-    { action: 'product_family.characteristic_update', resourceId: characteristicId, changed: Object.keys(patch) },
+    { action: 'product_family.characteristic_update', itemType: 'characteristic', itemId: characteristicId, changed: Object.keys(patch) },
     (tx) => updateCharacteristicQuery(tx, familyId, characteristicId, patch),
   )
 }
+
+/** The one rule for who may see a family's history — used by the history endpoint and the detail response's `canViewHistory`. */
+export const canViewProductFamilyHistory = (ctx: TenantContext, family: { supplierCompanyId: string }): boolean =>
+  ctx.isSuperAdmin || family.supplierCompanyId === ctx.effectiveCompanyId
+
+/**
+ * A product family's change history, newest first — only for the owning company
+ * (and super-admins): the entries are filed under the owner, and a company the
+ * family was shared with has no business seeing who edited the owner's catalog.
+ * Returns null when the family doesn't exist or isn't visible.
+ * @throws {ProductFamilyHistoryForbiddenError} visible (shared) but not owned by the caller
+ * @throws {InvalidAuditCursorError} `query.cursor` was not produced by this API
+ */
+export const getProductFamilyHistory = (
+  ctx: TenantContext,
+  familyId: string,
+  query: RecordHistoryQuery,
+): Promise<AuditLogListResponse | null> =>
+  withTenantDb(ctx, async (tx) => {
+    const family = await getProductFamilyById(tx, familyId)
+    if (!family) {
+      return null
+    }
+    if (!canViewProductFamilyHistory(ctx, family)) {
+      throw new ProductFamilyHistoryForbiddenError('Only the owning company can see this family\'s history')
+    }
+    return listAuditPage(tx, { productFamilyId: familyId }, query.cursor, query.limit, toHistoryEntry)
+  })

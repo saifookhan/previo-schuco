@@ -39,6 +39,10 @@ export const auditLog = pgTable('audit_log', {
   index('audit_log_actor_created_idx').on(table.actorUserId, table.createdAt.desc(), table.id.desc()),
   index('audit_log_type_created_idx').on(table.resourceType, table.createdAt.desc(), table.id.desc()),
   index('audit_log_resource_created_idx').on(table.resourceType, table.resourceId, table.createdAt.desc(), table.id.desc()),
+  // A product family's history also includes item edits recorded under the item's id (pre-2026-10 entries).
+  index('audit_log_family_item_idx')
+    .on(sql`(${table.metadata}->>'productFamilyId')`)
+    .where(sql`${table.resourceType} = 'product_family'`),
   // "What did this request do?" — looked up from a request id in the logs or an error message.
   index('audit_log_request_id_idx').on(table.requestId).where(sql`${table.requestId} IS NOT NULL`),
 ])

@@ -28,6 +28,13 @@ title: Angebote
 
 Positionen aus einer geteilten Familie starten mit dem Rabatt der Freigabe. Wie jede Zahl berechnet wird: [Wie Preise berechnet werden](../pricing.md).
 
+## Verlauf
+
+Unten im Angebot **Verlauf** öffnen, um zu sehen, wer es erstellt hat und wer welche Position hinzugefügt,
+bearbeitet, dupliziert, umsortiert oder entfernt hat, und wann. Wer das Angebot sehen kann, sieht auch den Verlauf.
+
+![Angebotsverlauf](/img/screens/quote-history.png)
+
 ## Noch nicht umgesetzt
 
 - Status-Ablauf — jedes Angebot bleibt **Entwurf** (Gesendet / Angenommen / Abgelehnt gibt es nur im Datenmodell).

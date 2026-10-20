@@ -7,6 +7,7 @@ import {
   createQuote,
   duplicatePosition,
   getQuote,
+  getQuoteHistory,
   listMyQuotes,
   previewQuotePosition,
   removeQuotePosition,
@@ -17,6 +18,7 @@ import {
 import { renderQuotePdf } from '../lib/quote-pdf'
 import type { AuthVariables } from '../middleware/auth'
 import { requireAuth, requirePermission } from '../middleware/auth'
+import { respondWithRecordHistory } from './record-history'
 
 /**
  * Real, catalog-backed sales quotes (not the unrelated legacy in-memory
@@ -74,6 +76,11 @@ salesQuotes.get('/:id', requireAuth, requirePermission('quote.view'), async (c) 
   }
   return c.json(detail)
 })
+
+/** The quote's change history (who added/edited/removed positions, when) — for anyone who can see the quote. */
+salesQuotes.get('/:id/history', requireAuth, requirePermission('quote.view'), (c) =>
+  respondWithRecordHistory(c, (id, query) => getQuoteHistory(ctxFrom(c), id, query)),
+)
 
 // Different path depth than '/:id/positions' below (3 segments vs 2), so —
 // unlike the PATCH .../reorder vs .../:positionId case — registration

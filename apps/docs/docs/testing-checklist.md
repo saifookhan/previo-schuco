@@ -37,6 +37,7 @@ An end-to-end run through the main flows. Use [Demo logins](./demo-logins.md) to
 - [ ] Switch a position and a characteristic to manual price.
 - [ ] Edit, duplicate, reorder and delete positions.
 - [ ] Download the PDF and check totals.
+- [ ] Open *History* on the quote — every step above is listed with your name.
 - [ ] As `sales@technometal-demo.it`: no option to create quotes.
 
 ## Users & onboarding

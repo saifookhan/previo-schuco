@@ -12,6 +12,7 @@ import { ProductFamilyNewVersionButton } from '@/components/product-family-new-v
 import { ProductFamilyPricingEditor } from '@/components/product-family-pricing-editor'
 import { ProductFamilyRowActions } from '@/components/product-family-row-actions'
 import { ProductFamilyShareButton } from '@/components/product-family-share-button'
+import { RecordHistory } from '@/components/record-history'
 import type { ProductFamilyDetail } from '@/types/product-family'
 
 interface ProductFamilyDetailPageProps {
@@ -42,7 +43,7 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
   }
 
   const detail = result.data
-  const { family, images, lines, characteristics, matrices, relations, editable } = detail
+  const { family, images, lines, characteristics, matrices, relations, editable, canViewHistory } = detail
   const matrixById = new Map(matrices.map((m) => [m.id, m]))
   const mainCharacteristics = characteristics.filter((c) => !c.parentId)
   const subCharacteristicsByParent = new Map<string, typeof characteristics>()
@@ -59,6 +60,23 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
         ...(characteristicNamesByLineId.get(rel.productLineId) ?? []),
         name,
       ])
+    }
+  }
+
+  // Readable names for the ids history entries mention: lines, options ("Glass: Triple"), and price tables (named after their owner).
+  const historyItemNames: Record<string, string> = {}
+  for (const line of lines) {
+    historyItemNames[line.id] = line.name
+  }
+  for (const main of mainCharacteristics) {
+    historyItemNames[main.id] = main.name
+    for (const sub of subCharacteristicsByParent.get(main.id) ?? []) {
+      historyItemNames[sub.id] = `${main.name}: ${sub.name}`
+    }
+  }
+  for (const item of [...lines, ...characteristics]) {
+    if (item.pricingMatrixId) {
+      historyItemNames[item.pricingMatrixId] = historyItemNames[item.id] ?? item.name
     }
   }
 
@@ -220,6 +238,14 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
           ))}
         </CardContent>
       </Card>
+
+      {/* Owning company / super-admin only (same rule as the API) — no empty panel on a shared family. */}
+      {canViewHistory ? (
+        <div className="mt-6">
+          {/* Every server render (e.g. router.refresh() after sharing) reloads an open panel — not every change touches updatedAt. */}
+          <RecordHistory endpoint={`/api/product-families/${family.id}/history`} itemNames={historyItemNames} refreshKey={new Date().toISOString()} />
+        </div>
+      ) : null}
     </div>
   )
 }

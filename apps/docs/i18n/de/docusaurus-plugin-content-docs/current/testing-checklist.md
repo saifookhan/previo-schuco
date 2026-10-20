@@ -37,6 +37,7 @@ Ein kompletter Durchlauf der wichtigsten Abläufe. Mit den [Demo-Anmeldungen](./
 - [ ] Eine Position und ein Merkmal auf manuellen Preis umstellen.
 - [ ] Positionen bearbeiten, duplizieren, umsortieren und löschen.
 - [ ] Das PDF herunterladen und die Summen prüfen.
+- [ ] *Verlauf* im Angebot öffnen — jeder Schritt oben steht mit deinem Namen da.
 - [ ] Als `sales@technometal-demo.it`: keine Möglichkeit, Angebote zu erstellen.
 
 ## Benutzer & Onboarding

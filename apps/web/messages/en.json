@@ -563,5 +563,44 @@
       "role": "Role",
       "role_permissions": "Role permissions"
     }
+  },
+  "recordHistory": {
+    "title": "History",
+    "show": "Show",
+    "hide": "Hide",
+    "empty": "No changes recorded yet.",
+    "errorLoading": "Could not load the history.",
+    "loadMore": "Show older",
+    "system": "System",
+    "anonymous": "Not signed in",
+    "unknownUser": "Unknown user",
+    "fields": {
+      "value": "value",
+      "formula": "formula",
+      "discountPct": "discount",
+      "markupPct": "markup",
+      "installationHoursPerUnit": "installation hours",
+      "widths": "widths",
+      "heights": "heights",
+      "matrix": "prices"
+    },
+    "actions": {
+      "quote_create": "{reference, select, none {Quote created} other {Quote {reference} created}}",
+      "quote_add_position": "{code, select, none {Position added} other {Position {code} added}}",
+      "quote_update_position": "{code, select, none {Position edited} other {Position {code} edited}}",
+      "quote_remove_position": "{code, select, none {Position removed} other {Position {code} removed}}",
+      "quote_reorder_positions": "Positions reordered",
+      "quote_duplicate_position": "{code, select, none {Position duplicated} other {Position duplicated as {code}}}",
+      "product_family_import": "{fileName, select, none {Imported from Excel} other {Imported from Excel ({fileName})}}",
+      "product_family_new_version": "{version, plural, =0 {New version created from Excel} other {Version # created from Excel}}",
+      "product_family_duplicate": "Created as a copy of another family",
+      "product_family_publish": "Published",
+      "product_family_unpublish": "Unpublished",
+      "product_family_delete": "Deleted",
+      "product_family_line_update": "{item, select, none {A product line was edited} other {Product line {item} edited}}: {fields}",
+      "product_family_characteristic_update": "{item, select, none {An option was edited} other {Option {item} edited}}: {fields}",
+      "product_family_matrix_update": "{item, select, none {A price table was edited} other {Price table of {item} edited}}",
+      "product_family_share_update": "{count, plural, =0 {Sharing removed for every company} one {Shared with # company} other {Shared with # companies}}"
+    }
   }
 }

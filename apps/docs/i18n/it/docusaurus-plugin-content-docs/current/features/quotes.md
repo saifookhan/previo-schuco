@@ -28,6 +28,13 @@ richiede `quote.edit`, che hanno solo le aziende **supplier** (nei dati demo: Su
 
 Le posizioni da una famiglia condivisa partono con lo sconto impostato sulla condivisione. Come viene calcolato ogni numero: [Come vengono calcolati i prezzi](../pricing.md).
 
+## Cronologia
+
+Apri **Cronologia** in fondo al preventivo per vedere chi l’ha creato e chi ha aggiunto, modificato, duplicato,
+riordinato o eliminato quale posizione, e quando. Chi può vedere il preventivo può vederne la cronologia.
+
+![Cronologia del preventivo](/img/screens/quote-history.png)
+
 ## Non ancora realizzato
 
 - Flusso di stato — ogni preventivo resta **Bozza** (Inviato / Accettato / Rifiutato esistono solo nel modello dati).

@@ -1,3 +1,5 @@
+import { NextResponse } from 'next/server'
+
 import { authConfig } from '@/lib/auth/config'
 import { getSession, getSessionToken } from '@/lib/auth/session'
 
@@ -65,4 +67,22 @@ export const fetchFromApiResult = async <T>(path: string): Promise<ApiFetchResul
   } catch {
     return { data: null, status: 'error' }
   }
+}
+
+/**
+ * Route-handler body for a plain authenticated GET passthrough to the core API:
+ * forwards the incoming query string, returns the API's JSON and status as-is.
+ * @param request - The incoming route-handler request (for its query string)
+ * @param path - API path including leading slash, without query
+ */
+export const proxyGetToApi = async (request: Request, path: string): Promise<NextResponse> => {
+  const headers = await buildAuthHeaders()
+  if (!headers) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  }
+
+  const { search } = new URL(request.url)
+  const response = await fetch(`${authConfig.apiUrl}${path}${search}`, { headers, cache: 'no-store' })
+  const data = await response.json().catch(() => ({ error: 'Invalid response from API' }))
+  return NextResponse.json(data, { status: response.status })
 }

@@ -50,3 +50,11 @@ export const auditLogListResponseSchema = z.object({
 })
 
 export type AuditLogListResponse = z.infer<typeof auditLogListResponseSchema>
+
+/** GET /api/sales-quotes/:id/history and /api/product-families/:id/history query string. Same response shape as the audit log. */
+export const recordHistoryQuerySchema = z.object({
+  cursor: z.string().min(1).max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+})
+
+export type RecordHistoryQuery = z.infer<typeof recordHistoryQuerySchema>

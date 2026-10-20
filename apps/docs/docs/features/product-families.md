@@ -39,6 +39,12 @@ Every environment already has one: **Demo Window W70** (see [Demo data](../demo-
 
 Full rules: [How prices are calculated](../pricing.md).
 
+## History
+
+At the bottom of a family's page, **History** lists its import, publishing, new versions, sharing changes and every
+price edit (which line or option, which fields). Only the owning company (and super-admins) see it — not companies
+the family was shared with.
+
 ## Tabs
 
 - **Own** — families your company owns.

@@ -563,5 +563,44 @@
       "role": "Ruolo",
       "role_permissions": "Permessi dei ruoli"
     }
+  },
+  "recordHistory": {
+    "title": "Cronologia",
+    "show": "Mostra",
+    "hide": "Nascondi",
+    "empty": "Nessuna modifica registrata.",
+    "errorLoading": "Impossibile caricare la cronologia.",
+    "loadMore": "Mostra precedenti",
+    "system": "Sistema",
+    "anonymous": "Non autenticato",
+    "unknownUser": "Utente sconosciuto",
+    "fields": {
+      "value": "valore",
+      "formula": "formula",
+      "discountPct": "sconto",
+      "markupPct": "markup",
+      "installationHoursPerUnit": "ore di posa",
+      "widths": "larghezze",
+      "heights": "altezze",
+      "matrix": "prezzi"
+    },
+    "actions": {
+      "quote_create": "{reference, select, none {Preventivo creato} other {Preventivo {reference} creato}}",
+      "quote_add_position": "{code, select, none {Posizione aggiunta} other {Posizione {code} aggiunta}}",
+      "quote_update_position": "{code, select, none {Posizione modificata} other {Posizione {code} modificata}}",
+      "quote_remove_position": "{code, select, none {Posizione eliminata} other {Posizione {code} eliminata}}",
+      "quote_reorder_positions": "Posizioni riordinate",
+      "quote_duplicate_position": "{code, select, none {Posizione duplicata} other {Posizione duplicata come {code}}}",
+      "product_family_import": "{fileName, select, none {Importata da Excel} other {Importata da Excel ({fileName})}}",
+      "product_family_new_version": "{version, plural, =0 {Nuova versione creata da Excel} other {Versione # creata da Excel}}",
+      "product_family_duplicate": "Creata come copia di un’altra famiglia",
+      "product_family_publish": "Pubblicata",
+      "product_family_unpublish": "Ritirata dalla pubblicazione",
+      "product_family_delete": "Eliminata",
+      "product_family_line_update": "{item, select, none {Linea di prodotto modificata} other {Linea di prodotto {item} modificata}}: {fields}",
+      "product_family_characteristic_update": "{item, select, none {Opzione modificata} other {Opzione {item} modificata}}: {fields}",
+      "product_family_matrix_update": "{item, select, none {Tabella prezzi modificata} other {Tabella prezzi di {item} modificata}}",
+      "product_family_share_update": "{count, plural, =0 {Condivisione rimossa per tutte le aziende} one {Condivisa con # azienda} other {Condivisa con # aziende}}"
+    }
   }
 }

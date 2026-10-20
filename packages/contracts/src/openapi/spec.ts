@@ -186,6 +186,39 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           },
         },
       },
+      ...Object.fromEntries(
+        (
+          [
+            ['/api/sales-quotes/{id}/history', 'getQuoteHistory', "A quote's change history — for anyone who can see the quote (quote.view)."],
+            [
+              '/api/product-families/{id}/history',
+              'getProductFamilyHistory',
+              "A product family's change history — owning company and super-admin only (403 for a company it was shared with).",
+            ],
+          ] as const
+        ).map(([path, operationId, description]) => [
+          path,
+          {
+            get: {
+              tags: ['Audit'],
+              summary: 'Record history (read-only)',
+              description: `${description} Newest first, paged via \`nextCursor\`.`,
+              operationId,
+              security: [{ bearerAuth: [] }, { devUserSub: [] }],
+              parameters: [
+                { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                { name: 'cursor', in: 'query', required: false, schema: { type: 'string' } },
+                { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } },
+              ],
+              responses: {
+                '200': jsonResponse('One page of history entries', 'AuditLogListResponse'),
+                '404': { description: 'No such record, or not visible to the caller', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+                ...errorResponses(),
+              },
+            },
+          },
+        ]),
+      ),
       '/api/products': {
         get: {
           tags: ['Products'],

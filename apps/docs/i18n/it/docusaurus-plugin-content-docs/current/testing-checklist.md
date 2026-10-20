@@ -37,6 +37,7 @@ Un percorso completo dei flussi principali. Usa gli [Accessi demo](./demo-logins
 - [ ] Passa una posizione e una caratteristica al prezzo manuale.
 - [ ] Modifica, duplica, riordina ed elimina posizioni.
 - [ ] Scarica il PDF e controlla i totali.
+- [ ] Apri *Cronologia* nel preventivo — ogni passo sopra è elencato con il tuo nome.
 - [ ] Come `sales@technometal-demo.it`: nessuna possibilità di creare preventivi.
 
 ## Utenti e onboarding

@@ -39,6 +39,12 @@ Jede Umgebung hat bereits eine: **Demo Window W70** (siehe [Demo-Daten](../demo-
 
 Alle Regeln: [Wie Preise berechnet werden](../pricing.md).
 
+## Verlauf
+
+Unten auf der Familienseite listet **Verlauf** Import, Veröffentlichung, neue Versionen, Änderungen an Freigaben und
+jede Preisänderung (welche Linie oder Option, welche Felder). Nur das besitzende Unternehmen (und Super-Admins)
+sehen ihn — nicht die Unternehmen, mit denen die Familie geteilt wurde.
+
 ## Reiter
 
 - **Meine Familien** — Familien deines Unternehmens.

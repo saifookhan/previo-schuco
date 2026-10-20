@@ -73,6 +73,16 @@ A dedicated `audit_log` table in Postgres is the implementation (simplest, query
   `X-Request-Id` is ignored, so nobody can make their actions share an id with someone else's.
 - **Indexes** are created without `CONCURRENTLY` (drizzle runs a migration in one transaction). Fine while the
   table is small; on a large table, build new indexes by hand with `CREATE INDEX CONCURRENTLY` first.
+- **Record history.** `GET /api/sales-quotes/:id/history` (anyone with `quote.view` who can see the quote) and
+  `GET /api/product-families/:id/history` (owning company and super-admin; 403 for a company it was only shared
+  with) show one record's entries as a *History* panel on the quote and family pages. Product-family price edits
+  (`line_update`, `characteristic_update`, `matrix_update`) are now filed under the **family** id, with the edited
+  item in `metadata.itemType` / `metadata.itemId`; older entries filed under the item's own id are still found
+  through `metadata.productFamilyId` (`audit_log_family_item_idx`, migration `0018_audit_log_family_item_index`).
+  History entries are trimmed for these wider audiences: actor name only (no email), no request/job id or acting
+  company, and only the metadata the panel shows (position code, reference, file name, version, edited item and
+  fields, number of shares). `quote.remove_position` now also records the
+  removed `positionCode`.
 - **Retention.** Entries are kept indefinitely for now — the table is small (one row per change) and
   append-only by design. When size or a data-protection requirement calls for it, add a scheduled job that
   runs as the table owner (the app role cannot delete) and removes entries older than an agreed period, and

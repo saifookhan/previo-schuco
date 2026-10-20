@@ -13,10 +13,13 @@ import {
 } from '../services/family-shares-service'
 import {
   ExcelImportError,
+  ProductFamilyHistoryForbiddenError,
   createNewVersionFromExcel,
   deleteProductFamily,
   duplicateProductFamily,
   getProductFamilyDetail,
+  canViewProductFamilyHistory,
+  getProductFamilyHistory,
   importProductFamilyFromExcel,
   listProductFamilies,
   setProductFamilyPublishedStatus,
@@ -33,6 +36,7 @@ import {
 } from '../lib/product-family-edit'
 import type { AuthVariables } from '../middleware/auth'
 import { requireAuth, requirePermission } from '../middleware/auth'
+import { respondWithRecordHistory } from './record-history'
 
 /** Product family catalog: import from Excel, list/detail, duplicate, publish toggle (Phase 2). */
 export const productFamilies = new Hono<{ Variables: AuthVariables }>()
@@ -146,8 +150,22 @@ productFamilies.get('/:id', requireAuth, requirePermission('catalog.view'), asyn
     return c.json({ error: 'Not found' }, 404)
   }
   const shareDiscountPct = await getFamilyShareDiscount(ctx, id)
-  return c.json({ ...detail, editable: isProductFamilyEditable(detail.family), shareDiscountPct })
+  return c.json({
+    ...detail,
+    editable: isProductFamilyEditable(detail.family),
+    shareDiscountPct,
+    canViewHistory: canViewProductFamilyHistory(ctx, detail.family),
+  })
 })
+
+/** The family's change history (import, publish, versions, price edits, sharing) — owning company and super-admin only. */
+productFamilies.get('/:id/history', requireAuth, requirePermission('catalog.view'), (c) =>
+  respondWithRecordHistory(
+    c,
+    (id, query) => getProductFamilyHistory({ effectiveCompanyId: c.get('effectiveCompanyId'), isSuperAdmin: c.get('isSuperAdmin') }, id, query),
+    [ProductFamilyHistoryForbiddenError],
+  ),
+)
 
 /** The companies the caller's company shares this family with (plus the companies it could add). */
 productFamilies.get('/:id/shares', requireAuth, requirePermission('catalog.share'), async (c) => {

@@ -563,5 +563,44 @@
       "role": "Rolle",
       "role_permissions": "Rollenberechtigungen"
     }
+  },
+  "recordHistory": {
+    "title": "Verlauf",
+    "show": "Anzeigen",
+    "hide": "Ausblenden",
+    "empty": "Noch keine Änderungen erfasst.",
+    "errorLoading": "Der Verlauf konnte nicht geladen werden.",
+    "loadMore": "Ältere anzeigen",
+    "system": "System",
+    "anonymous": "Nicht angemeldet",
+    "unknownUser": "Unbekannter Benutzer",
+    "fields": {
+      "value": "Wert",
+      "formula": "Formel",
+      "discountPct": "Rabatt",
+      "markupPct": "Aufschlag",
+      "installationHoursPerUnit": "Montagestunden",
+      "widths": "Breiten",
+      "heights": "Höhen",
+      "matrix": "Preise"
+    },
+    "actions": {
+      "quote_create": "{reference, select, none {Angebot erstellt} other {Angebot {reference} erstellt}}",
+      "quote_add_position": "{code, select, none {Position hinzugefügt} other {Position {code} hinzugefügt}}",
+      "quote_update_position": "{code, select, none {Position bearbeitet} other {Position {code} bearbeitet}}",
+      "quote_remove_position": "{code, select, none {Position entfernt} other {Position {code} entfernt}}",
+      "quote_reorder_positions": "Positionen umsortiert",
+      "quote_duplicate_position": "{code, select, none {Position dupliziert} other {Position dupliziert als {code}}}",
+      "product_family_import": "{fileName, select, none {Aus Excel importiert} other {Aus Excel importiert ({fileName})}}",
+      "product_family_new_version": "{version, plural, =0 {Neue Version aus Excel erstellt} other {Version # aus Excel erstellt}}",
+      "product_family_duplicate": "Als Kopie einer anderen Familie erstellt",
+      "product_family_publish": "Veröffentlicht",
+      "product_family_unpublish": "Veröffentlichung zurückgezogen",
+      "product_family_delete": "Gelöscht",
+      "product_family_line_update": "{item, select, none {Produktlinie bearbeitet} other {Produktlinie {item} bearbeitet}}: {fields}",
+      "product_family_characteristic_update": "{item, select, none {Option bearbeitet} other {Option {item} bearbeitet}}: {fields}",
+      "product_family_matrix_update": "{item, select, none {Preistabelle bearbeitet} other {Preistabelle von {item} bearbeitet}}",
+      "product_family_share_update": "{count, plural, =0 {Freigabe für alle Unternehmen entfernt} one {Mit # Unternehmen geteilt} other {Mit # Unternehmen geteilt}}"
+    }
   }
 }

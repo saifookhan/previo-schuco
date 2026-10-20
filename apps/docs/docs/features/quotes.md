@@ -28,6 +28,13 @@ which only **supplier** companies have (in the demo data: Suppli).
 
 Positions from a shared family start with the discount set on the share. How every number is computed: [How prices are calculated](../pricing.md).
 
+## History
+
+Open **History** at the bottom of a quote to see who created it and who added, edited, duplicated, reordered or
+removed which position, and when. Anyone who can see the quote can see its history.
+
+![Quote history](/img/screens/quote-history.png)
+
 ## Not built yet
 
 - Status workflow — every quote stays **Draft** (Sent / Accepted / Rejected exist in the data model only).

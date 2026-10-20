@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "audit_log_family_item_idx" ON "audit_log" USING btree (("metadata"->>'productFamilyId')) WHERE "audit_log"."resource_type" = 'product_family';

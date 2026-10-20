@@ -76,6 +76,8 @@ export interface ProductFamilyDetail {
   relations: { productLineId: string; characteristicId: string }[]
   /** False when the server's edit policy locks this family (e.g. published under `draft-only`). */
   editable: boolean
+  /** Whether the caller may open this family's History panel (owning company or super-admin). */
+  canViewHistory: boolean
   /** Default discount this family was shared with the caller's company at (null if own or shared at 0%). */
   shareDiscountPct?: number | null
 }

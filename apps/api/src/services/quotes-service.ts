@@ -10,6 +10,7 @@ import {
   getIncomingShareDiscounts,
   isFamilySharedWith,
   listQuotes,
+  quoteExists,
   recalculateQuoteTotal,
   reorderQuotePositions as reorderQuotePositionsQuery,
   updateQuotePosition as updateQuotePositionQuery,
@@ -17,10 +18,11 @@ import {
   type QuoteSummary,
 } from '@schuco/db'
 import { computeCharacteristicPrice, computeLinePrice, type PricingMatrix } from '@schuco/calculation'
+import type { AuditLogListResponse, RecordHistoryQuery } from '@schuco/contracts'
 
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from '../lib/pg-error'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
-import { recordAuditEvent } from './audit-service'
+import { listAuditPage, recordAuditEvent, toHistoryEntry } from './audit-service'
 
 export interface QuoteActor {
   actorUserId: string
@@ -675,8 +677,8 @@ export const removeQuotePosition = async (
   positionId: string,
 ): Promise<QuoteDetailWithValidity> =>
   withTenantDb(ctx, async (tx) => {
-    const owningQuoteId = await deleteQuotePositionQuery(tx, quoteId, positionId)
-    if (!owningQuoteId) {
+    const deleted = await deleteQuotePositionQuery(tx, quoteId, positionId)
+    if (!deleted) {
       throw new QuoteValidationError('Position not found in this quote')
     }
     await recalculateQuoteTotal(tx, quoteId)
@@ -693,7 +695,7 @@ export const removeQuotePosition = async (
         action: 'quote.remove_position',
         resourceType: 'quote',
         resourceId: quoteId,
-        metadata: { positionId },
+        metadata: { positionId, positionCode: deleted.positionCode },
       },
     )
     const detail = await finalizeQuoteDetail(tx, quoteId)
@@ -836,4 +838,21 @@ export const duplicatePosition = async (
     )
     const detail = await finalizeQuoteDetail(tx, quoteId)
     return detail!
+  })
+
+/**
+ * A quote's change history (its audit entries), newest first — for anyone who
+ * can see the quote. Returns null when the quote doesn't exist or isn't visible.
+ * @throws {InvalidAuditCursorError} `query.cursor` was not produced by this API
+ */
+export const getQuoteHistory = (
+  ctx: TenantContext,
+  quoteId: string,
+  query: RecordHistoryQuery,
+): Promise<AuditLogListResponse | null> =>
+  withTenantDb(ctx, async (tx) => {
+    if (!(await quoteExists(tx, quoteId))) {
+      return null
+    }
+    return listAuditPage(tx, { resourceType: 'quote', resourceId: quoteId }, query.cursor, query.limit, toHistoryEntry)
   })

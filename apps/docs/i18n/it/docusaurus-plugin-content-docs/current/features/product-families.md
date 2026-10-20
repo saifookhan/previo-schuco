@@ -39,6 +39,12 @@ Ogni ambiente ne ha già una: **Demo Window W70** (vedi [Dati demo](../demo-data
 
 Regole complete: [Come vengono calcolati i prezzi](../pricing.md).
 
+## Cronologia
+
+In fondo alla pagina della famiglia, **Cronologia** elenca importazione, pubblicazione, nuove versioni, modifiche
+alle condivisioni e ogni modifica di prezzo (quale linea o opzione, quali campi). La vede solo l’azienda proprietaria
+(e i super-admin) — non le aziende con cui la famiglia è condivisa.
+
 ## Schede
 
 - **Le mie famiglie** — le famiglie della tua azienda.
