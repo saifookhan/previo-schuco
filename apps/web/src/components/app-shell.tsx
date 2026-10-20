@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import {
   Building2,
   FileSpreadsheet,
-  FileText,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -29,7 +28,6 @@ import type { Permission } from '@schuco/contracts'
 
 const mainNav = [
   { href: '/app/dashboard', labelKey: 'dashboard', icon: LayoutDashboard, minRole: 'user' as RoleId },
-  { href: '/app/invoice', labelKey: 'invoice', icon: FileText, minRole: 'user' as RoleId },
   {
     href: '/app/product-families',
     labelKey: 'productFamilies',

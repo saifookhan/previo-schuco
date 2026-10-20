@@ -24,7 +24,7 @@ const DashboardPage = async () => {
   ]
 
   const quickActions = [
-    { label: t('createNewQuote'), href: '/app/invoice' },
+    { label: t('createNewQuote'), href: '/app/quotes' },
     { label: t('manageUsers'), href: '/app/settings/users' },
     { label: t('companySettings'), href: '/app/settings/company' },
   ]
