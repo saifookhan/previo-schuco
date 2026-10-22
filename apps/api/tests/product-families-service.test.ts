@@ -151,7 +151,12 @@ describe('duplicateProductFamily + setProductFamilyPublishedStatus', () => {
       originalName: 'product-family-sample.xlsx',
     })
 
-    const duplicate = await duplicateProductFamily(ctx, actor, original.id)
+    const duplicate = await duplicateProductFamily(ctx, actor, original.id, {
+      name: `${original.name} (copy)`,
+      priceValidFrom: '2027-01-01',
+      priceValidTo: null,
+      publish: false,
+    })
     expect(duplicate.id).not.toBe(original.id)
     expect(duplicate.duplicatedFromId).toBe(original.id)
     expect(duplicate.isPublished).toBe(false)
@@ -169,6 +174,46 @@ describe('duplicateProductFamily + setProductFamilyPublishedStatus', () => {
     // Publishing the duplicate must not affect the original.
     const originalAfter = await getProductFamilyDetail(ctx, original.id)
     expect(originalAfter!.family.isPublished).toBe(false)
+  })
+
+  it('uses the name, dates and publish choice from the copy dialog, and records them on the audit entry', async () => {
+    const ctx = { effectiveCompanyId: supplierCompanyId, isSuperAdmin: false }
+    const original = await importProductFamilyFromExcel(
+      ctx,
+      actor,
+      supplierCompanyId,
+      { buffer: fixtureBuffer, originalName: 'product-family-sample.xlsx' },
+      { priceValidFrom: '2026-01-01', priceValidTo: '2026-12-31' },
+    )
+
+    const copy = await duplicateProductFamily(ctx, actor, original.id, {
+      name: 'NEST 2027',
+      priceValidFrom: '2027-01-01',
+      priceValidTo: null,
+      publish: true,
+    })
+    expect(copy).toMatchObject({ name: 'NEST 2027', priceValidFrom: '2027-01-01', priceValidTo: null, isPublished: true })
+
+    const originalAfter = await getProductFamilyDetail(ctx, original.id)
+    expect(originalAfter!.family).toMatchObject({ priceValidFrom: '2026-01-01', priceValidTo: '2026-12-31', isPublished: false })
+
+    const entries = await withSystemTransaction(db, (tx) =>
+      tx.select().from(auditLog).where(and(eq(auditLog.resourceType, 'product_family'), eq(auditLog.resourceId, copy.id))),
+    )
+    expect(entries.map((entry) => entry.action)).toEqual(['product_family.duplicate'])
+    expect(entries[0].metadata).toMatchObject({ duplicatedFromId: original.id, priceValidFrom: '2027-01-01', priceValidTo: null, published: true })
+  })
+
+  it('throws ProductFamilyNotFoundError copying a family the caller cannot see', async () => {
+    const otherCtx = { effectiveCompanyId: '00000000-0000-0000-0000-000000000000', isSuperAdmin: false }
+    await expect(
+      duplicateProductFamily(otherCtx, actor, '00000000-0000-0000-0000-000000000001', {
+        name: 'x',
+        priceValidFrom: '2027-01-01',
+        priceValidTo: null,
+        publish: false,
+      }),
+    ).rejects.toThrow(ProductFamilyNotFoundError)
   })
 
   it("throws (never silently succeeds) publishing a family the caller doesn't own — RLS blocks the UPDATE, zero rows changed", async () => {

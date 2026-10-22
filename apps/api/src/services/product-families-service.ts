@@ -25,6 +25,7 @@ import {
 } from '@schuco/db'
 import type {
   AuditLogListResponse,
+  DuplicateProductFamilyRequest,
   PriceValidityRequest,
   ProductFamilyImportPreview,
   ProductFamilyImportWarning,
@@ -420,29 +421,33 @@ export const createNewVersionFromExcel = async (
  * @param ctx - Tenant context resolved by `requireAuth`
  * @param actor - Who's duplicating, for the audit record
  * @param familyId - Family to duplicate
- * @throws if the source family doesn't exist or isn't visible to the caller
+ * @param options - The copy's name, price validity and publish choice, from the copy dialog
+ * @throws {ProductFamilyNotFoundError} the source family doesn't exist or isn't visible to the caller
  */
 export const duplicateProductFamily = async (
   ctx: TenantContext,
   actor: ProductFamilyActor,
   familyId: string,
+  options: DuplicateProductFamilyRequest,
 ): Promise<ProductFamilySummary> =>
   withTenantDb(ctx, async (tx) => {
     const source = await getProductFamilyDetailQuery(tx, familyId)
     if (!source) {
-      throw new Error('Product family not found')
+      throw new ProductFamilyNotFoundError()
     }
+    const { priceValidFrom, priceValidTo, publish: published } = options
 
     const newFamilyId = await insertProductFamily(tx, {
       supplierCompanyId: source.family.supplierCompanyId,
-      name: `${source.family.name} (copy)`,
+      name: options.name,
       technicalName: source.family.technicalName,
       category: source.family.category,
       brand: source.family.brand,
       description1: source.family.description1,
       description2: source.family.description2,
-      priceValidFrom: source.family.priceValidFrom,
-      priceValidTo: source.family.priceValidTo,
+      priceValidFrom,
+      priceValidTo,
+      isPublished: published,
       duplicatedFromId: familyId,
     })
 
@@ -531,7 +536,7 @@ export const duplicateProductFamily = async (
         action: 'product_family.duplicate',
         resourceType: 'product_family',
         resourceId: newFamilyId,
-        metadata: { duplicatedFromId: familyId },
+        metadata: { duplicatedFromId: familyId, priceValidFrom, priceValidTo, published },
       },
     )
 

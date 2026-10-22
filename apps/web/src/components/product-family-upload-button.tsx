@@ -5,9 +5,13 @@ import { AlertTriangle, FileSpreadsheet, Loader2, Upload, X } from 'lucide-react
 import { useTranslations } from 'next-intl'
 import { useRef, useState } from 'react'
 
+import {
+  EMPTY_PRODUCT_FAMILY_DETAILS,
+  ProductFamilyDetailsFields,
+  useProductFamilyDetailsError,
+  type ProductFamilyDetails,
+} from '@/components/product-family-details-fields'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
@@ -17,10 +21,6 @@ interface ProductFamilyUploadButtonProps {
   /** Upload as a new version of this family; omit to import a new family. */
   version?: { familyId: string; familyName: string }
 }
-
-type Fields = { name: string; priceValidFrom: string; priceValidTo: string; publish: boolean }
-
-const EMPTY_FIELDS: Fields = { name: '', priceValidFrom: '', priceValidTo: '', publish: false }
 
 const COUNT_KEYS = ['productLines', 'characteristics', 'options', 'priceTables', 'relations', 'images'] as const
 
@@ -38,9 +38,10 @@ export const ProductFamilyUploadButton = ({ version }: ProductFamilyUploadButton
   const [checking, setChecking] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<ProductFamilyImportPreview | null>(null)
-  const [fields, setFields] = useState<Fields>(EMPTY_FIELDS)
+  const [fields, setFields] = useState<ProductFamilyDetails>(EMPTY_PRODUCT_FAMILY_DETAILS)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const dateError = useProductFamilyDetailsError()(fields)
 
   if (!user || !can('catalog.edit')) {
     return null
@@ -50,7 +51,7 @@ export const ProductFamilyUploadButton = ({ version }: ProductFamilyUploadButton
     setPreview(null)
     setFile(null)
     setError(null)
-    setFields(EMPTY_FIELDS)
+    setFields(EMPTY_PRODUCT_FAMILY_DETAILS)
   }
 
   const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,12 +87,6 @@ export const ProductFamilyUploadButton = ({ version }: ProductFamilyUploadButton
     }
   }
 
-  const dateError = !fields.priceValidFrom
-    ? t('validFromRequired')
-    : fields.priceValidTo && fields.priceValidTo < fields.priceValidFrom
-      ? t('validToBeforeFrom')
-      : null
-
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!file || dateError) {
@@ -123,8 +118,6 @@ export const ProductFamilyUploadButton = ({ version }: ProductFamilyUploadButton
       setSaving(false)
     }
   }
-
-  const set = <K extends keyof Fields>(key: K, value: Fields[K]) => setFields((current) => ({ ...current, [key]: value }))
 
   return (
     <>
@@ -208,52 +201,13 @@ export const ProductFamilyUploadButton = ({ version }: ProductFamilyUploadButton
                   ) : null}
                 </section>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="upload-name">{t('nameLabel')}</Label>
-                  <Input id="upload-name" value={fields.name} maxLength={200} onChange={(e) => set('name', e.target.value)} />
-                  <p className="text-xs text-slate-500">{t('nameHint')}</p>
-                </div>
-
-                <fieldset className="space-y-2">
-                  <legend className="text-sm font-medium text-slate-900">{t('validityLegend')}</legend>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="upload-valid-from">{t('validFrom')}</Label>
-                      <Input
-                        id="upload-valid-from"
-                        type="date"
-                        required
-                        value={fields.priceValidFrom}
-                        onChange={(e) => set('priceValidFrom', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="upload-valid-to">{t('validTo')}</Label>
-                      <Input
-                        id="upload-valid-to"
-                        type="date"
-                        min={fields.priceValidFrom || undefined}
-                        value={fields.priceValidTo}
-                        onChange={(e) => set('priceValidTo', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-500">{t('validityHint')}</p>
-                  {dateError && (fields.priceValidTo || !fields.priceValidFrom) ? <p className="text-xs text-red-600">{dateError}</p> : null}
-                </fieldset>
-
-                <label className="flex items-start gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-4 w-4 rounded border-slate-300"
-                    checked={fields.publish}
-                    onChange={(e) => set('publish', e.target.checked)}
-                  />
-                  <span>
-                    {t('publishLabel')}
-                    <span className="block text-xs text-slate-500">{t('publishHint')}</span>
-                  </span>
-                </label>
+                <ProductFamilyDetailsFields
+                  idPrefix="upload"
+                  details={fields}
+                  dateError={dateError}
+                  onChange={setFields}
+                  nameHint={t('nameHint')}
+                />
 
                 {error ? <p className="text-sm text-red-600">{error}</p> : null}
 

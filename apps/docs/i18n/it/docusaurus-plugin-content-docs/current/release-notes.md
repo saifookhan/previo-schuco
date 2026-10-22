@@ -11,6 +11,7 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 
 **Settimana del 20 ottobre**
 - **Caricamento Excel in due passi**: il file viene prima controllato e una finestra mostra cosa contiene; poi si impostano nome, **validità dei prezzi** (dal/al) e pubblicazione. Le nuove posizioni dei preventivi usano solo famiglie con prezzi validi oggi.
+- **Duplica** famiglia ora apre lo stesso tipo di finestra: nome, validità prezzi e pubblicazione.
 - **Pagina Ruoli nascosta** — i ruoli personalizzati per ora non servono. La descrizione di ogni ruolo è in *Impostazioni → Diritti di accesso*: clicca la ⓘ accanto al nome del ruolo.
 - **Preventivo** (il vecchio editor demo) rimosso dalla barra laterale, si confondeva con Preventivi.
 

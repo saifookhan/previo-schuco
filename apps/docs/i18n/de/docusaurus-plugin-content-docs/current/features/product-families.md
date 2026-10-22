@@ -26,7 +26,8 @@ Jede Umgebung hat bereits eine: **Demo Window W70** (siehe [Demo-Daten](../demo-
 | Tabelle bearbeiten | Bearbeiten → Zeilen und Spalten hinzufügen/entfernen | Raster Breite × Höhe |
 | Veröffentlichen / zurückziehen | Aktionsmenü | Nur veröffentlichte Familien können geteilt werden |
 | Neue Version | **Neue Version** auf der Seite der Familie | Derselbe Dialog wie beim Import; die neue Version bekommt eine eigene Preisgültigkeit, die alte behält ihre Daten |
-| Duplizieren / löschen | Aktionsmenü | |
+| Duplizieren | Kopier-Symbol in den Aktionen | Ein Dialog fragt nach Name, Preisgültigkeit und Veröffentlichung der Kopie (startet mit den Daten des Originals, unveröffentlicht) |
+| Löschen | Aktionsmenü | |
 | Preisgültigkeit ändern | **Bearbeiten** neben den Daten auf der Seite der Familie | Nur Eigentümer (oder Super-Admin) |
 
 ![Produktfamilie im Detail](/img/screens/product-family-detail.png)

@@ -269,7 +269,14 @@
     "duplicateSuccess": "Duplicated as \"{name}\"",
     "duplicateFailed": "Duplicate failed",
     "deleteSuccess": "Deleted \"{name}\"",
-    "deleteFailed": "Delete failed"
+    "deleteFailed": "Delete failed",
+    "copyName": "{name} (copy)",
+    "copyTitle": "Copy {name}",
+    "copyHint": "Everything in the family is copied — product lines, characteristics, price tables and images. Choose the copy’s name and price validity.",
+    "copyNameHint": "The copy is a separate family; changing it never touches the original.",
+    "copySave": "Create copy",
+    "duplicateFailedUnreachable": "Duplicate failed — could not reach the server",
+    "copySaving": "Copying…"
   },
   "productFamilyDetail": {
     "pricingMatrix": "Pricing matrix (BxH)",
@@ -592,7 +599,7 @@
       "quote_duplicate_position": "{code, select, none {Position duplicated} other {Position duplicated as {code}}}",
       "product_family_import": "{fileName, select, none {Imported from Excel} other {Imported from Excel ({fileName})}}{published, select, yes { and published} other {}}",
       "product_family_new_version": "{version, plural, =0 {New version created from Excel} other {Version # created from Excel}}{published, select, yes { and published} other {}}",
-      "product_family_duplicate": "Created as a copy of another family",
+      "product_family_duplicate": "Created as a copy of another family{published, select, yes { and published} other {}}",
       "product_family_publish": "Published",
       "product_family_unpublish": "Unpublished",
       "product_family_delete": "Deleted",

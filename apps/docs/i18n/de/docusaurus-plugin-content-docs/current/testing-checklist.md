@@ -19,6 +19,7 @@ Ein kompletter Durchlauf der wichtigsten Abläufe. Mit den [Demo-Anmeldungen](./
 - [ ] [Die Beispiel-Excel](pathname:///samples/previo-sample-family.xlsx) importieren — ein Dialog zeigt die Anzahlen (3 Linien, 3 Merkmale, 9 Optionen, 1 Preistabelle, 7 Zuordnungen); gespeichert wird erst mit **Familie importieren**.
 - [ ] Im Dialog sperrt ein *Gültig bis* vor *Gültig ab* das Speichern; mit Daten und **Sofort veröffentlichen** speichern — die neue Familie öffnet sich, veröffentlicht, mit ihren Daten.
 - [ ] Auf der Seite der Familie die Preisgültigkeit auf einen vergangenen Zeitraum **bearbeiten** — die Familie zeigt **Abgelaufen**, das Angebot bietet sie nicht mehr an; eine bestehende Position bleibt bearbeitbar.
+- [ ] Eine Familie **duplizieren** — ein Dialog fragt nach Name, Preisgültigkeit und Veröffentlichung; die Kopie öffnet sich mit diesen Werten, das Original bleibt unverändert.
 - [ ] **Neue Version** öffnet denselben Dialog; die alte Version behält ihre Daten.
 - [ ] Einen Linienpreis, ein Merkmal und eine Preistabelle bearbeiten; speichern.
 - [ ] Veröffentlichen — Bearbeiten ist nun gesperrt.

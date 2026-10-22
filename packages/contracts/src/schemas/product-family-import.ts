@@ -40,10 +40,10 @@ const validToNotBeforeFrom = (value: { priceValidFrom: string; priceValidTo?: st
 
 const VALID_TO_MESSAGE = { message: '"Valid to" must be on or after "Valid from"', path: ['priceValidTo'] }
 
+const priceValidityFields = { priceValidFrom: isoDateSchema, priceValidTo: isoDateSchema.nullable() }
+
 /** PUT /api/product-families/:id/price-validity body. */
-export const priceValidityRequestSchema = z
-  .object({ priceValidFrom: isoDateSchema, priceValidTo: isoDateSchema.nullable() })
-  .refine(validToNotBeforeFrom, VALID_TO_MESSAGE)
+export const priceValidityRequestSchema = z.object(priceValidityFields).refine(validToNotBeforeFrom, VALID_TO_MESSAGE)
 
 export type PriceValidityRequest = z.infer<typeof priceValidityRequestSchema>
 
@@ -66,6 +66,20 @@ export const productFamilyImportFieldsSchema = z
   .refine(validToNotBeforeFrom, VALID_TO_MESSAGE)
 
 export type ProductFamilyImportFields = z.infer<typeof productFamilyImportFieldsSchema>
+
+/**
+ * POST /api/product-families/:id/duplicate body: what the user confirmed in the copy dialog.
+ * The copy starts from the source's contents; these are the only things set fresh.
+ */
+export const duplicateProductFamilyRequestSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Name is required').max(200),
+    ...priceValidityFields,
+    publish: z.boolean(),
+  })
+  .refine(validToNotBeforeFrom, VALID_TO_MESSAGE)
+
+export type DuplicateProductFamilyRequest = z.infer<typeof duplicateProductFamilyRequestSchema>
 
 /** Something in the workbook that will be skipped or looks wrong, but doesn't stop the import. */
 export const productFamilyImportWarningSchema = z.discriminatedUnion('code', [

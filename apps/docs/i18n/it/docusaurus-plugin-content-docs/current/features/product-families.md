@@ -26,7 +26,8 @@ Ogni ambiente ne ha già una: **Demo Window W70** (vedi [Dati demo](../demo-data
 | Modifica una tabella | Modifica → aggiungi/rimuovi righe e colonne | Griglia larghezza × altezza |
 | Pubblica / ritira | Menu azioni | Solo le famiglie pubblicate si possono condividere |
 | Nuova versione | **Nuova versione** nella pagina della famiglia | Stessa finestra dell'importazione; la nuova versione ha la sua validità prezzi e quella vecchia mantiene le sue date |
-| Duplica / elimina | Menu azioni | |
+| Duplica | Icona copia nelle azioni | Una finestra chiede nome, validità prezzi e pubblicazione della copia (parte dalle date dell'originale, non pubblicata) |
+| Elimina | Menu azioni | |
 | Cambia validità prezzi | **Modifica** accanto alle date nella pagina della famiglia | Solo il proprietario (o il super-admin) |
 
 ![Dettaglio famiglia di prodotto](/img/screens/product-family-detail.png)

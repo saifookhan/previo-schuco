@@ -19,6 +19,7 @@ Un percorso completo dei flussi principali. Usa gli [Accessi demo](./demo-logins
 - [ ] Importa [l'Excel di esempio](pathname:///samples/previo-sample-family.xlsx) — una finestra mostra i conteggi (3 linee, 3 caratteristiche, 9 opzioni, 1 tabella prezzi, 7 relazioni); nulla viene salvato prima di **Importa famiglia**.
 - [ ] Nella finestra, un *Valido fino al* precedente a *Valido dal* disattiva il salvataggio; salva con le date e **Pubblica subito** — si apre la nuova famiglia, pubblicata, con le sue date.
 - [ ] Nella pagina della famiglia, **Modifica** la validità con un periodo passato — la famiglia risulta **Scaduta** e il preventivo non la propone più; una posizione esistente resta modificabile.
+- [ ] **Duplica** una famiglia — una finestra chiede nome, validità prezzi e pubblicazione; la copia si apre con quei valori e l’originale resta invariato.
 - [ ] **Nuova versione** apre la stessa finestra; la versione precedente mantiene le sue date.
 - [ ] Modifica il prezzo di una linea, una caratteristica e una tabella prezzi; salva.
 - [ ] Pubblicala — ora la modifica è bloccata.

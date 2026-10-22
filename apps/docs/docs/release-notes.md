@@ -11,6 +11,7 @@ What changed, newest first. Use it to see what's new to test.
 
 **Week of 20 October**
 - **Excel upload in two steps**: the file is checked first and a dialog shows what it holds; then set the name, **price validity** (from/to) and whether to publish. New quote positions only use families whose prices are valid today.
+- **Duplicate** a product family now opens the same kind of dialog: name, price validity and publish.
 - **Roles page hidden** — custom roles aren't needed for now. Each role's description is in *Settings → Access rights*: click the ⓘ next to the role name.
 - **Invoice** removed from the sidebar (it was the old demo editor and got confused with Quotes).
 

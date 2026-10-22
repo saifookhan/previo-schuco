@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 
 import {
+  duplicateProductFamilyRequestSchema,
   familySharesResponseSchema,
   priceValidityRequestSchema,
   productFamilyImportFieldsSchema,
@@ -333,18 +334,29 @@ productFamilies.get('/:id/images/:imageId', requireAuth, requirePermission('cata
   })
 })
 
-/** Deep-copies a family into a new, unpublished draft ("Duplicate"). */
+/** Deep-copies a family ("Duplicate") under the name, price validity and publish choice from the copy dialog. */
 productFamilies.post('/:id/duplicate', requireAuth, requirePermission('catalog.edit'), async (c) => {
-  const id = c.req.param('id')
-  if (!id) {
-    return c.json({ error: 'Missing id' }, 400)
+  const id = c.req.param('id') ?? ''
+  if (!isUuid(id)) {
+    return c.json({ error: 'Not found' }, 404)
+  }
+  const parsedBody = duplicateProductFamilyRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsedBody.success) {
+    return c.json({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request body', details: parsedBody.error.issues }, 400)
   }
   const ctx = {
     effectiveCompanyId: c.get('effectiveCompanyId'),
     isSuperAdmin: c.get('isSuperAdmin'),
   }
-  const family = await duplicateProductFamily(ctx, actorFrom(c), id)
-  return c.json({ family }, 201)
+  try {
+    const family = await duplicateProductFamily(ctx, actorFrom(c), id, parsedBody.data)
+    return c.json({ family }, 201)
+  } catch (error) {
+    if (error instanceof ProductFamilyNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+    throw error
+  }
 })
 
 /** Toggles client visibility ("allowing a user to see/no-see"). */

@@ -269,7 +269,14 @@
     "duplicateSuccess": "Duplicata come \"{name}\"",
     "duplicateFailed": "Duplicazione fallita",
     "deleteSuccess": "\"{name}\" eliminata",
-    "deleteFailed": "Eliminazione fallita"
+    "deleteFailed": "Eliminazione fallita",
+    "copyName": "{name} (copia)",
+    "copyTitle": "Copia {name}",
+    "copyHint": "Viene copiato tutto il contenuto della famiglia: linee di prodotto, caratteristiche, tabelle prezzi e immagini. Scegli il nome e la validità prezzi della copia.",
+    "copyNameHint": "La copia è una famiglia separata: modificarla non cambia mai l’originale.",
+    "copySave": "Crea copia",
+    "duplicateFailedUnreachable": "Duplicazione non riuscita — server non raggiungibile",
+    "copySaving": "Copia in corso…"
   },
   "productFamilyDetail": {
     "pricingMatrix": "Matrice prezzi (BxH)",
@@ -592,7 +599,7 @@
       "quote_duplicate_position": "{code, select, none {Posizione duplicata} other {Posizione duplicata come {code}}}",
       "product_family_import": "{fileName, select, none {Importata da Excel} other {Importata da Excel ({fileName})}}{published, select, yes { e pubblicata} other {}}",
       "product_family_new_version": "{version, plural, =0 {Nuova versione creata da Excel} other {Versione # creata da Excel}}{published, select, yes { e pubblicata} other {}}",
-      "product_family_duplicate": "Creata come copia di un’altra famiglia",
+      "product_family_duplicate": "Creata come copia di un’altra famiglia{published, select, yes { e pubblicata} other {}}",
       "product_family_publish": "Pubblicata",
       "product_family_unpublish": "Ritirata dalla pubblicazione",
       "product_family_delete": "Eliminata",

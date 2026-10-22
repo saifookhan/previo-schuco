@@ -113,6 +113,7 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
             familyId={family.id}
             familyName={family.name}
             isPublished={family.isPublished}
+            validity={family}
             redirectAfterDeleteHref="/app/product-families"
           />
           {canManage ? <ProductFamilyUploadButton version={{ familyId: family.id, familyName: family.name }} /> : null}

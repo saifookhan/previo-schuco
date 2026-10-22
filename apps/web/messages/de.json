@@ -269,7 +269,14 @@
     "duplicateSuccess": "Dupliziert als \"{name}\"",
     "duplicateFailed": "Duplizieren fehlgeschlagen",
     "deleteSuccess": "\"{name}\" gelöscht",
-    "deleteFailed": "Löschen fehlgeschlagen"
+    "deleteFailed": "Löschen fehlgeschlagen",
+    "copyName": "{name} (Kopie)",
+    "copyTitle": "{name} kopieren",
+    "copyHint": "Der gesamte Inhalt der Familie wird kopiert – Produktlinien, Merkmale, Preistabellen und Bilder. Wählen Sie Name und Preisgültigkeit der Kopie.",
+    "copyNameHint": "Die Kopie ist eine eigene Familie; Änderungen daran betreffen nie das Original.",
+    "copySave": "Kopie erstellen",
+    "duplicateFailedUnreachable": "Duplizieren fehlgeschlagen – Server nicht erreichbar",
+    "copySaving": "Wird kopiert…"
   },
   "productFamilyDetail": {
     "pricingMatrix": "Preismatrix (BxH)",
@@ -592,7 +599,7 @@
       "quote_duplicate_position": "{code, select, none {Position dupliziert} other {Position dupliziert als {code}}}",
       "product_family_import": "{fileName, select, none {Aus Excel importiert} other {Aus Excel importiert ({fileName})}}{published, select, yes { und veröffentlicht} other {}}",
       "product_family_new_version": "{version, plural, =0 {Neue Version aus Excel erstellt} other {Version # aus Excel erstellt}}{published, select, yes { und veröffentlicht} other {}}",
-      "product_family_duplicate": "Als Kopie einer anderen Familie erstellt",
+      "product_family_duplicate": "Als Kopie einer anderen Familie erstellt{published, select, yes { und veröffentlicht} other {}}",
       "product_family_publish": "Veröffentlicht",
       "product_family_unpublish": "Veröffentlichung zurückgezogen",
       "product_family_delete": "Gelöscht",

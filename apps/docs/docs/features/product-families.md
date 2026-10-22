@@ -26,7 +26,8 @@ Every environment already has one: **Demo Window W70** (see [Demo data](../demo-
 | Edit a matrix | Edit → add/remove rows and columns | Width × height grid |
 | Publish / unpublish | Actions menu | Only published families can be shared |
 | New version | **New version** on the family's page | Same dialog as an import; the new version gets its own price validity and the old one keeps its dates |
-| Duplicate / delete | Actions menu | |
+| Duplicate | Copy icon in the actions | A dialog asks for the copy's name, price validity and whether to publish it (starts from the original's dates, unpublished) |
+| Delete | Actions menu | |
 | Change price validity | **Edit** next to the dates on the family's page | Owner (or super-admin) only |
 
 ![Product family detail](/img/screens/product-family-detail.png)

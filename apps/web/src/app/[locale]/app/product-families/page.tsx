@@ -155,6 +155,7 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<{ t
                             familyId={family.id}
                             familyName={family.name}
                             isPublished={family.isPublished}
+                            validity={family}
                           />
                         ) : null}
                       </div>

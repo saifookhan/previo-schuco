@@ -273,6 +273,24 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           },
         ]),
       ),
+      '/api/product-families/{id}/duplicate': {
+        post: {
+          tags: ['Products'],
+          summary: 'Copy a product family',
+          description:
+            'Deep-copies the family (lines, characteristics, price tables, relations, images) under the name, price validity and publish choice the user confirmed. Needs catalog.edit on the owning company.',
+          operationId: 'duplicateProductFamily',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          requestBody: { required: true, content: { 'application/json': { schema: ref('DuplicateProductFamilyRequest') } } },
+          responses: {
+            '201': { description: 'Created; body is `{ family }`' },
+            '400': { description: 'Invalid fields', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            '404': { description: 'No such family, or not visible to the caller', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
       '/api/product-families/{id}/price-validity': {
         put: {
           tags: ['Products'],
@@ -754,6 +772,16 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
             priceValidTo: { type: 'string', format: 'date', nullable: true },
           },
           required: ['priceValidFrom', 'priceValidTo'],
+        },
+        DuplicateProductFamilyRequest: {
+          type: 'object',
+          required: ['name', 'priceValidFrom', 'priceValidTo', 'publish'],
+          properties: {
+            name: { type: 'string', maxLength: 200 },
+            priceValidFrom: { type: 'string', format: 'date' },
+            priceValidTo: { type: 'string', format: 'date', nullable: true, description: 'Null means until further notice' },
+            publish: { type: 'boolean', description: 'Publish the copy right away instead of saving a draft' },
+          },
         },
         ProductFamilyImportForm: {
           type: 'object',
