@@ -6,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Link } from '@/i18n/navigation'
 import { fetchFromApi, fetchFromApiResult } from '@/lib/api/server-client'
 import { cn } from '@/lib/utils'
-import { ProductFamilyImportButton } from '@/components/product-family-import-button'
+import { PriceValidityCell } from '@/components/product-family-price-validity'
 import { ProductFamilyRowActions } from '@/components/product-family-row-actions'
 import { ProductFamilyShareButton } from '@/components/product-family-share-button'
+import { ProductFamilyUploadButton } from '@/components/product-family-upload-button'
 import type { ProductFamilySummary } from '@/types/product-family'
-import type { MeResponse } from '@schuco/contracts'
+import { priceValidityToday, type MeResponse } from '@schuco/contracts'
 
 /**
  * Product families, split into the company's own and the ones shared with it:
@@ -30,6 +31,7 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<{ t
   const ownFamilies = allFamilies.filter((f) => f.supplierCompanyId === myCompanyId)
   const sharedFamilies = allFamilies.filter((f) => f.supplierCompanyId !== myCompanyId)
   const activeTab = tab === 'shared' ? 'shared' : 'own'
+  const today = priceValidityToday()
   const families = activeTab === 'shared' ? sharedFamilies : ownFamilies
   const loadFailed = result.status === 'error' || !myCompanyId
   const tabs = [
@@ -44,7 +46,7 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<{ t
           <h1 className="text-2xl font-bold text-slate-900">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-500">{t('subtitle')}</p>
         </div>
-        <ProductFamilyImportButton />
+        <ProductFamilyUploadButton />
       </div>
 
       {loadFailed ? (
@@ -85,7 +87,7 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<{ t
               <p className="text-sm">{activeTab === 'shared' ? t('emptyShared') : t('emptyState')}</p>
             </div>
           ) : (
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[880px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-slate-500">
                   <th className="px-6 py-3 font-medium">{t('name')}</th>
@@ -94,6 +96,7 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<{ t
                   <th className="px-6 py-3 font-medium">{t('brand')}</th>
                   {activeTab === 'shared' ? <th className="px-6 py-3 font-medium">{t('yourDiscount')}</th> : null}
                   <th className="px-6 py-3 font-medium">{t('status')}</th>
+                  <th className="px-6 py-3 font-medium">{t('priceValidity')}</th>
                   <th className="px-6 py-3 font-medium">{t('version')}</th>
                   <th className="px-6 py-3 font-medium" />
                 </tr>
@@ -123,6 +126,9 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<{ t
                       <Badge variant={family.isPublished ? 'success' : 'muted'}>
                         {family.isPublished ? t('published') : t('draft')}
                       </Badge>
+                    </td>
+                    <td className="px-6 py-4">
+                      <PriceValidityCell validity={family} today={today} />
                     </td>
                     <td className="px-6 py-4">
                       <Badge variant="muted">{tVersion('versionBadge', { version: family.version })}</Badge>

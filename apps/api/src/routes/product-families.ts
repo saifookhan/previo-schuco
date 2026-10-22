@@ -1,6 +1,12 @@
 import { readFile } from 'node:fs/promises'
 
-import { familySharesResponseSchema, updateFamilySharesRequestSchema } from '@schuco/contracts'
+import {
+  familySharesResponseSchema,
+  priceValidityRequestSchema,
+  productFamilyImportFieldsSchema,
+  updateFamilySharesRequestSchema,
+  type ProductFamilyImportFields,
+} from '@schuco/contracts'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 
@@ -18,10 +24,12 @@ import {
   deleteProductFamily,
   duplicateProductFamily,
   getProductFamilyDetail,
-  canViewProductFamilyHistory,
+  canManageProductFamily,
   getProductFamilyHistory,
   importProductFamilyFromExcel,
   listProductFamilies,
+  previewProductFamilyImport,
+  setProductFamilyPriceValidityDates,
   setProductFamilyPublishedStatus,
   updateCharacteristic,
   updatePricingMatrix,
@@ -34,6 +42,7 @@ import {
   ProductFamilyValidationError,
   isProductFamilyEditable,
 } from '../lib/product-family-edit'
+import { isUuid } from '../lib/uuid'
 import type { AuthVariables } from '../middleware/auth'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { respondWithRecordHistory } from './record-history'
@@ -47,6 +56,57 @@ const actorFrom = (c: Context<{ Variables: AuthVariables }>): ProductFamilyActor
   requestId: c.get('requestId'),
 })
 
+type UploadedWorkbook = { buffer: Buffer; originalName: string }
+
+/** The multipart `file` part, or null when it is missing. */
+const readWorkbookUpload = async (body: Record<string, unknown>): Promise<UploadedWorkbook | null> => {
+  const file = body.file
+  if (!(file instanceof File)) {
+    return null
+  }
+  return { buffer: Buffer.from(await file.arrayBuffer()), originalName: file.name }
+}
+
+const MISSING_FILE = { error: 'Missing "file" in multipart form data' }
+
+/**
+ * Checks an uploaded workbook in memory and says what it holds, so the
+ * upload dialog can show it before anything is saved. Writes nothing.
+ */
+productFamilies.post('/import/preview', requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const upload = await readWorkbookUpload(await c.req.parseBody())
+  if (!upload) {
+    return c.json(MISSING_FILE, 400)
+  }
+  try {
+    return c.json(await previewProductFamilyImport(upload))
+  } catch (error) {
+    if (error instanceof ExcelImportError) {
+      return c.json({ error: error.message }, 400)
+    }
+    throw error
+  }
+})
+
+/**
+ * Reads what both "save upload" routes take: the workbook, plus the fields
+ * the user confirmed in the upload dialog (validity dates, name, publish).
+ */
+const readImportRequest = async (
+  c: Context<{ Variables: AuthVariables }>,
+): Promise<{ upload: UploadedWorkbook; fields: ProductFamilyImportFields } | Response> => {
+  const body = await c.req.parseBody()
+  const upload = await readWorkbookUpload(body)
+  if (!upload) {
+    return c.json(MISSING_FILE, 400)
+  }
+  const fields = productFamilyImportFieldsSchema.safeParse(body)
+  if (!fields.success) {
+    return c.json({ error: fields.error.issues[0]?.message ?? 'Invalid request body', details: fields.error.issues }, 400)
+  }
+  return { upload, fields: fields.data }
+}
+
 /**
  * Imports a product family from an uploaded Excel workbook, into the
  * caller's own company (ADR 0001 — never a path/body-supplied company).
@@ -54,23 +114,17 @@ const actorFrom = (c: Context<{ Variables: AuthVariables }>): ProductFamilyActor
  * company never imports into a supplier's.
  */
 productFamilies.post('/import', requireAuth, requirePermission('catalog.edit'), async (c) => {
-  const body = await c.req.parseBody()
-  const file = body.file
-  if (!(file instanceof File)) {
-    return c.json({ error: 'Missing "file" in multipart form data' }, 400)
+  const request = await readImportRequest(c)
+  if (request instanceof Response) {
+    return request
   }
-
-  const buffer = Buffer.from(await file.arrayBuffer())
   const ctx = {
     effectiveCompanyId: c.get('effectiveCompanyId'),
     isSuperAdmin: c.get('isSuperAdmin'),
   }
 
   try {
-    const family = await importProductFamilyFromExcel(ctx, actorFrom(c), ctx.effectiveCompanyId, {
-      buffer,
-      originalName: file.name,
-    })
+    const family = await importProductFamilyFromExcel(ctx, actorFrom(c), ctx.effectiveCompanyId, request.upload, request.fields)
     return c.json({ family }, 201)
   } catch (error) {
     if (error instanceof ExcelImportError) {
@@ -83,7 +137,7 @@ productFamilies.post('/import', requireAuth, requirePermission('catalog.edit'), 
 /**
  * Re-imports an updated Excel workbook as a new version of an existing
  * family (`version + 1`, `supersedesId` set) — the existing version is
- * left untouched, published or not.
+ * left untouched, published or not, and keeps its own validity dates.
  */
 productFamilies.post(
   '/:id/new-version',
@@ -95,23 +149,17 @@ productFamilies.post(
       return c.json({ error: 'Missing id' }, 400)
     }
 
-    const body = await c.req.parseBody()
-    const file = body.file
-    if (!(file instanceof File)) {
-      return c.json({ error: 'Missing "file" in multipart form data' }, 400)
+    const request = await readImportRequest(c)
+    if (request instanceof Response) {
+      return request
     }
-
-    const buffer = Buffer.from(await file.arrayBuffer())
     const ctx = {
       effectiveCompanyId: c.get('effectiveCompanyId'),
       isSuperAdmin: c.get('isSuperAdmin'),
     }
 
     try {
-      const family = await createNewVersionFromExcel(ctx, actorFrom(c), id, {
-        buffer,
-        originalName: file.name,
-      })
+      const family = await createNewVersionFromExcel(ctx, actorFrom(c), id, request.upload, request.fields)
       return c.json({ family }, 201)
     } catch (error) {
       if (error instanceof ExcelImportError) {
@@ -124,6 +172,30 @@ productFamilies.post(
     }
   },
 )
+
+/** Changes the days the family's prices can be used on new quote positions (owner or super-admin). */
+productFamilies.put('/:id/price-validity', requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const id = c.req.param('id') ?? ''
+  if (!isUuid(id)) {
+    return c.json({ error: 'Not found' }, 404)
+  }
+  const parsedBody = priceValidityRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsedBody.success) {
+    return c.json({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request body', details: parsedBody.error.issues }, 400)
+  }
+  const ctx = {
+    effectiveCompanyId: c.get('effectiveCompanyId'),
+    isSuperAdmin: c.get('isSuperAdmin'),
+  }
+  try {
+    return c.json(await setProductFamilyPriceValidityDates(ctx, actorFrom(c), id, parsedBody.data))
+  } catch (error) {
+    if (error instanceof ProductFamilyNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+    throw error
+  }
+})
 
 /** Lists product families visible to the caller (own company's, plus published families shared with it). */
 productFamilies.get('/', requireAuth, requirePermission('catalog.view'), async (c) => {
@@ -150,11 +222,13 @@ productFamilies.get('/:id', requireAuth, requirePermission('catalog.view'), asyn
     return c.json({ error: 'Not found' }, 404)
   }
   const shareDiscountPct = await getFamilyShareDiscount(ctx, id)
+  const ownsFamily = canManageProductFamily(ctx, detail.family)
   return c.json({
     ...detail,
     editable: isProductFamilyEditable(detail.family),
     shareDiscountPct,
-    canViewHistory: canViewProductFamilyHistory(ctx, detail.family),
+    canViewHistory: ownsFamily,
+    canManage: ownsFamily,
   })
 })
 

@@ -25,12 +25,11 @@ title: Ruoli e permessi
 | Super user | catalogo vedere/modificare/condividere, preventivi vedere/modificare |
 | User | catalogo vedere, preventivi vedere/modificare |
 
-Un super-admin può cambiarli in **Impostazioni → Diritti di accesso** (matrice ruolo × permesso) e creare
-**ruoli personalizzati** in **Impostazioni → Ruoli**. I ruoli sono globali — uguali per ogni azienda.
+Un super-admin può cambiarli in **Impostazioni → Diritti di accesso** (matrice ruolo × permesso). Clicca
+l'icona ⓘ accanto al nome di un ruolo per vederne la descrizione. I ruoli sono globali — uguali per ogni
+azienda. La pagina Ruoli (creazione di ruoli personalizzati) per ora è nascosta.
 
 ![Matrice dei diritti di accesso](/img/screens/access-rights.png)
-
-![Ruoli](/img/screens/settings-roles.png)
 
 ## Capacità aziendali
 

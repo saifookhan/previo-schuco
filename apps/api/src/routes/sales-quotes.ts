@@ -16,6 +16,7 @@ import {
   type QuoteActor,
 } from '../services/quotes-service'
 import { renderQuotePdf } from '../lib/quote-pdf'
+import { isUuid } from '../lib/uuid'
 import type { AuthVariables } from '../middleware/auth'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { respondWithRecordHistory } from './record-history'
@@ -90,8 +91,14 @@ salesQuotes.get('/:id/history', requireAuth, requirePermission('quote.view'), (c
 /** Dry-run pricing for the add/edit position form — same computation, writes nothing. */
 salesQuotes.post('/:id/positions/preview', requireAuth, requirePermission('quote.edit'), async (c) => {
   const body = await c.req.json().catch(() => null)
+  const id = c.req.param('id')
+  const positionId: unknown = body?.positionId
   try {
-    const preview = await previewQuotePosition(ctxFrom(c), body ?? {})
+    const preview = await previewQuotePosition(
+      ctxFrom(c),
+      body ?? {},
+      id && isUuid(id) && typeof positionId === 'string' ? { quoteId: id, positionId } : undefined,
+    )
     return c.json(preview)
   } catch (error) {
     return quoteErrorResponse(c, error)

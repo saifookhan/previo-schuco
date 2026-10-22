@@ -11,7 +11,10 @@ import { buildAuthHeaders } from '@/lib/api/server-client'
  * @param request - The incoming browser request (JSON body)
  * @param apiPath - Core API path, e.g. `/api/product-families/<id>/lines/<id>`
  */
-export const proxyPatch = async (request: Request, apiPath: string): Promise<NextResponse> => {
+export const proxyPatch = (request: Request, apiPath: string): Promise<NextResponse> => proxyJson(request, apiPath, 'PATCH')
+
+/** `proxyPatch` for any JSON-bodied method (PUT, POST). */
+export const proxyJson = async (request: Request, apiPath: string, method: 'PATCH' | 'PUT' | 'POST'): Promise<NextResponse> => {
   const headers = await buildAuthHeaders()
   if (!headers) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -19,7 +22,7 @@ export const proxyPatch = async (request: Request, apiPath: string): Promise<Nex
 
   const body = await request.json().catch(() => null)
   const response = await fetch(`${authConfig.apiUrl}${apiPath}`, {
-    method: 'PATCH',
+    method,
     headers,
     body: JSON.stringify(body),
   })

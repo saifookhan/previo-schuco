@@ -342,7 +342,8 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
           const response = await fetch(`/api/sales-quotes/${detail.quote.id}/positions/preview`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            // While editing, the position's own family stays usable even if its prices have expired since.
+            body: JSON.stringify(editingPositionId ? { ...body, positionId: editingPositionId } : body),
           })
           if (requestId !== previewRequestId.current) {
             return
@@ -378,6 +379,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
     linePricingMode,
     lineManualValue,
     charPricing,
+    editingPositionId,
   ])
 
   /** Adds a new position, or — when `editingPositionId` is set — saves changes to that existing one instead (same form, same validation). */
@@ -606,6 +608,10 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                           {f.name}
                         </option>
                       ))}
+                      {/* An edited position's family may no longer be offered (expired or unpublished); keep it selectable. */}
+                      {familyId && family && !families.some((f) => f.id === familyId) ? (
+                        <option value={familyId}>{family.family.name}</option>
+                      ) : null}
                     </select>
                   </div>
 

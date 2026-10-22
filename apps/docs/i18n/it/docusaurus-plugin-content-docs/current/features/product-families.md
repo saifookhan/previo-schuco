@@ -20,15 +20,39 @@ Ogni ambiente ne ha già una: **Demo Window W70** (vedi [Dati demo](../demo-data
 
 | Azione | Come | Note |
 |---|---|---|
-| Importa da Excel | **Import from Excel** nell'elenco | Crea una nuova famiglia in bozza, non pubblicata — formato: [Formato di importazione Excel](../excel-format.md) |
+| Importa da Excel | **Importa da Excel** nell'elenco | Scegli il file, controllalo, imposta la validità dei prezzi — vedi [Importare da Excel](#importare-da-excel) |
 | Visualizza | Clicca una famiglia | Linee, caratteristiche, tabelle prezzi |
 | Modifica prezzi | **Modifica** su una linea, caratteristica o tabella | Valore, formula, sconto, markup, ore di posa |
 | Modifica una tabella | Modifica → aggiungi/rimuovi righe e colonne | Griglia larghezza × altezza |
 | Pubblica / ritira | Menu azioni | Solo le famiglie pubblicate si possono condividere |
-| Nuova versione | **Nuova versione** su una famiglia pubblicata | Le famiglie pubblicate sono **bloccate in modifica**; una nuova versione è una copia in bozza modificabile che sostituisce la precedente |
+| Nuova versione | **Nuova versione** nella pagina della famiglia | Stessa finestra dell'importazione; la nuova versione ha la sua validità prezzi e quella vecchia mantiene le sue date |
 | Duplica / elimina | Menu azioni | |
+| Cambia validità prezzi | **Modifica** accanto alle date nella pagina della famiglia | Solo il proprietario (o il super-admin) |
 
 ![Dettaglio famiglia di prodotto](/img/screens/product-family-detail.png)
+
+## Importare da Excel
+
+1. Clicca **Importa da Excel** e scegli il file `.xlsx`. Viene solo **controllato** — non si salva ancora nulla.
+2. Una finestra mostra cosa contiene il file: il nome della famiglia, quante linee di prodotto, caratteristiche,
+   opzioni, tabelle prezzi, relazioni e immagini, e cosa conviene controllare (ad esempio una riga di Relations che
+   nomina una linea inesistente — quella riga verrà saltata). Un file non importabile viene rifiutato qui, con il motivo.
+3. Compila:
+   - **Nome della famiglia** — preso dal file; puoi cambiarlo.
+   - **Valido dal** (obbligatorio, oggi di default) e **Valido fino al** (vuoto = fino a nuovo avviso).
+   - **Pubblica subito** — altrimenti viene salvata in bozza.
+4. **Importa famiglia** la salva e apre la sua pagina.
+
+![Finestra di caricamento](/img/screens/product-family-upload.png)
+
+Formato del file: [Formato di importazione Excel](../excel-format.md).
+
+## Validità dei prezzi
+
+I prezzi di una famiglia si possono usare nelle **nuove posizioni dei preventivi** solo da *Valido dal* a *Valido fino
+al* (giorni inclusi, ora italiana). Fuori da questi giorni la famiglia non è proposta nel preventivo e l'API la
+rifiuta. Le posizioni già nei preventivi mantengono i loro prezzi e restano modificabili. L'elenco mostra le date con
+il badge **Futura** o **Scaduta**; le famiglie importate prima di questa funzione non hanno date e sono sempre usabili.
 
 ## Campi di prezzo
 

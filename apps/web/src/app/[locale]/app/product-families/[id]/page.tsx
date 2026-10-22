@@ -8,12 +8,14 @@ import { Link } from '@/i18n/navigation'
 import { fetchFromApiResult } from '@/lib/api/server-client'
 import { ProductFamilyImageGallery } from '@/components/product-family-image-gallery'
 import { ProductFamilyMatrixPreview } from '@/components/product-family-matrix-preview'
-import { ProductFamilyNewVersionButton } from '@/components/product-family-new-version-button'
+import { ProductFamilyPriceValidity } from '@/components/product-family-price-validity'
 import { ProductFamilyPricingEditor } from '@/components/product-family-pricing-editor'
 import { ProductFamilyRowActions } from '@/components/product-family-row-actions'
 import { ProductFamilyShareButton } from '@/components/product-family-share-button'
+import { ProductFamilyUploadButton } from '@/components/product-family-upload-button'
 import { RecordHistory } from '@/components/record-history'
 import type { ProductFamilyDetail } from '@/types/product-family'
+import { priceValidityToday } from '@schuco/contracts'
 
 interface ProductFamilyDetailPageProps {
   params: Promise<{ id: string }>
@@ -43,7 +45,7 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
   }
 
   const detail = result.data
-  const { family, images, lines, characteristics, matrices, relations, editable, canViewHistory } = detail
+  const { family, images, lines, characteristics, matrices, relations, editable, canViewHistory, canManage } = detail
   const matrixById = new Map(matrices.map((m) => [m.id, m]))
   const mainCharacteristics = characteristics.filter((c) => !c.parentId)
   const subCharacteristicsByParent = new Map<string, typeof characteristics>()
@@ -95,6 +97,7 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
           <p className="mt-1 text-sm text-slate-500">
             {[family.technicalName, family.category, family.brand].filter(Boolean).join(' · ') || '—'}
           </p>
+          <ProductFamilyPriceValidity familyId={family.id} validity={family} canEdit={canManage} today={priceValidityToday()} />
           {family.supersedesId ? (
             <Link
               href={`/app/product-families/${family.supersedesId}`}
@@ -112,7 +115,7 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
             isPublished={family.isPublished}
             redirectAfterDeleteHref="/app/product-families"
           />
-          <ProductFamilyNewVersionButton familyId={family.id} />
+          {canManage ? <ProductFamilyUploadButton version={{ familyId: family.id, familyName: family.name }} /> : null}
           <ProductFamilyShareButton familyId={family.id} familyName={family.name} isPublished={family.isPublished} />
         </div>
       </div>

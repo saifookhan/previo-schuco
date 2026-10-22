@@ -46,7 +46,6 @@ const mainNav = [
 
 const settingsNav = [
   { href: '/app/settings/users', labelKey: 'users', icon: Users, minRole: 'company-admin' as RoleId },
-  { href: '/app/settings/roles', labelKey: 'roles', icon: Shield, minRole: 'super-admin' as RoleId },
   {
     href: '/app/settings/access-rights',
     labelKey: 'accessRights',

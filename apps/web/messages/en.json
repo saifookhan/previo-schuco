@@ -200,6 +200,14 @@
       "quote_edit": "Create quotes and edit their positions",
       "users_manage": "Invite and manage users of their own company",
       "catalog_share": "Share a family with other companies and set their default discount"
+    },
+    "roleInfo": "About {role}",
+    "customRole": "Custom role",
+    "roleDescriptions": {
+      "super-admin": "PREVIO / Schuco platform operators with cross-tenant access",
+      "company-admin": "Manages company settings, users, and product visibility",
+      "super-user": "Sales coordinator — team offers within scoped business units",
+      "user": "Standard sales staff — own offers only"
     }
   },
   "settingsCompany": {
@@ -241,17 +249,14 @@
     "status": "Status",
     "published": "Published",
     "draft": "Draft",
-    "importButton": "Import from Excel",
-    "importing": "Importing…",
-    "importFailed": "Import failed",
-    "importFailedUnreachable": "Import failed — could not reach the server",
     "errorLoading": "Couldn't load product families — the server may be unreachable. Try refreshing.",
     "version": "Version",
     "tabOwn": "My families",
     "tabShared": "Shared with me",
     "emptyShared": "No product families have been shared with your company yet.",
     "owner": "Owner",
-    "yourDiscount": "Your discount"
+    "yourDiscount": "Your discount",
+    "priceValidity": "Price validity"
   },
   "productFamilyActions": {
     "publish": "Publish",
@@ -278,11 +283,6 @@
   },
   "productFamilyVersion": {
     "versionBadge": "Version {version}",
-    "newVersionButton": "New version",
-    "creatingNewVersion": "Creating…",
-    "newVersionSuccess": "Created version {version}",
-    "newVersionFailed": "Could not create new version",
-    "newVersionFailedUnreachable": "Could not create new version — could not reach the server",
     "supersedes": "Supersedes an earlier version",
     "supersededBy": "A newer version exists",
     "viewPreviousVersion": "View previous version",
@@ -590,8 +590,8 @@
       "quote_remove_position": "{code, select, none {Position removed} other {Position {code} removed}}",
       "quote_reorder_positions": "Positions reordered",
       "quote_duplicate_position": "{code, select, none {Position duplicated} other {Position duplicated as {code}}}",
-      "product_family_import": "{fileName, select, none {Imported from Excel} other {Imported from Excel ({fileName})}}",
-      "product_family_new_version": "{version, plural, =0 {New version created from Excel} other {Version # created from Excel}}",
+      "product_family_import": "{fileName, select, none {Imported from Excel} other {Imported from Excel ({fileName})}}{published, select, yes { and published} other {}}",
+      "product_family_new_version": "{version, plural, =0 {New version created from Excel} other {Version # created from Excel}}{published, select, yes { and published} other {}}",
       "product_family_duplicate": "Created as a copy of another family",
       "product_family_publish": "Published",
       "product_family_unpublish": "Unpublished",
@@ -599,7 +599,77 @@
       "product_family_line_update": "{item, select, none {A product line was edited} other {Product line {item} edited}}: {fields}",
       "product_family_characteristic_update": "{item, select, none {An option was edited} other {Option {item} edited}}: {fields}",
       "product_family_matrix_update": "{item, select, none {A price table was edited} other {Price table of {item} edited}}",
-      "product_family_share_update": "{count, plural, =0 {Sharing removed for every company} one {Shared with # company} other {Shared with # companies}}"
+      "product_family_share_update": "{count, plural, =0 {Sharing removed for every company} one {Shared with # company} other {Shared with # companies}}",
+      "product_family_price_validity_update": "{validTo, select, none {Price validity set: from {validFrom}} other {Price validity set: {validFrom} – {validTo}}}"
     }
+  },
+  "productFamilyUpload": {
+    "importButton": "Import from Excel",
+    "newVersionButton": "New version",
+    "checking": "Checking file…",
+    "checkFailed": "This file cannot be imported",
+    "checkFailedUnreachable": "Could not check the file — could not reach the server",
+    "importTitle": "Import product family",
+    "versionTitle": "New version of {name}",
+    "dialogHint": "Nothing is saved yet. Check what the file holds, then set the price validity and confirm below.",
+    "changeFile": "Choose another file",
+    "workbookFamily": "Family in the file",
+    "counts": {
+      "productLines": "Product lines",
+      "characteristics": "Characteristics",
+      "options": "Options",
+      "priceTables": "Price tables",
+      "relations": "Relations",
+      "images": "Images"
+    },
+    "warningsTitle": "{count, plural, one {# thing to check} other {# things to check}}",
+    "warnings": {
+      "relationUnknownLine": "Relations: product line “{line}” is not in the Product lines sheet — row skipped",
+      "relationUnknownCharacteristic": "Relations: characteristic “{characteristic}” (for “{line}”) is not in the Caracteristics sheet — row skipped",
+      "duplicateLineName": "Product line “{line}” appears more than once",
+      "duplicateCharacteristicName": "Characteristic “{characteristic}” appears more than once"
+    },
+    "nameLabel": "Family name",
+    "nameHint": "Taken from the file — change it if you like.",
+    "validityLegend": "Price validity",
+    "validFrom": "Valid from",
+    "validTo": "Valid to",
+    "validityHint": "New quote positions can use these prices only between these days (inclusive). Leave “Valid to” empty for until further notice.",
+    "validFromRequired": "Choose the first day the prices are valid",
+    "validToBeforeFrom": "“Valid to” must be on or after “Valid from”",
+    "publishLabel": "Publish right away",
+    "publishHint": "Otherwise it is saved as a draft, visible only to your company.",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "saveFamily": "Import family",
+    "saveVersion": "Create version",
+    "saveFailed": "Could not save",
+    "saveFailedUnreachable": "Could not save — could not reach the server",
+    "familySaved": "Imported {name}",
+    "versionSaved": "Created version {version}"
+  },
+  "priceValidity": {
+    "range": "Prices valid {from} – {to}",
+    "fromOnly": "Prices valid from {from}",
+    "toOnly": "Prices valid until {to}",
+    "fromOnlyShort": "from {from}",
+    "toOnlyShort": "until {to}",
+    "notSet": "No price validity set",
+    "upcoming": "Upcoming",
+    "expired": "Expired",
+    "edit": "Edit",
+    "editTitle": "Price validity",
+    "editHint": "New quote positions can use these prices only between these days. Positions already on quotes keep their prices.",
+    "validFrom": "Valid from",
+    "validTo": "Valid to",
+    "validToHint": "Leave “Valid to” empty for until further notice.",
+    "validFromRequired": "Choose the first day the prices are valid",
+    "validToBeforeFrom": "“Valid to” must be on or after “Valid from”",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Price validity saved",
+    "saveFailed": "Could not save",
+    "saveFailedUnreachable": "Could not save — could not reach the server"
   }
 }

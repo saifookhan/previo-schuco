@@ -1,6 +1,7 @@
 'use client'
 
-import { Loader2, Lock } from 'lucide-react'
+import * as Popover from '@radix-ui/react-popover'
+import { Info, Loader2, Lock } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
@@ -22,6 +23,33 @@ const sameMatrix = (a: Matrix, b: Matrix) => {
   return [...roles].every((role) => [...(a[role] ?? [])].sort().join() === [...(b[role] ?? [])].sort().join())
 }
 
+/**
+ * Info icon next to a role's name; clicking it shows the role's description. The popover is
+ * portalled out of the scrolling table, so it never clips or widens it, and flips at screen edges.
+ */
+const RoleDescriptionHint = ({ roleName, description, label }: { roleName: string; description: string; label: string }) => (
+  <Popover.Root>
+    <Popover.Trigger
+      aria-label={label}
+      className="rounded-full text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 data-[state=open]:text-slate-700"
+    >
+      <Info className="h-3.5 w-3.5" />
+    </Popover.Trigger>
+    <Popover.Portal>
+      <Popover.Content
+        side="bottom"
+        align="center"
+        sideOffset={8}
+        collisionPadding={16}
+        className="z-50 w-64 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-xs leading-snug text-slate-600 shadow-lg focus:outline-none"
+      >
+        <p className="mb-0.5 font-medium text-slate-900">{roleName}</p>
+        {description}
+      </Popover.Content>
+    </Popover.Portal>
+  </Popover.Root>
+)
+
 /** Global role × permission editor (super-admin). Cells that the API would reject are locked here too. */
 export const RolePermissionsMatrix = ({ initial }: { initial: RolePermissionsResponse }) => {
   const t = useTranslations('settingsAccessRights')
@@ -32,6 +60,10 @@ export const RolePermissionsMatrix = ({ initial }: { initial: RolePermissionsRes
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
   const dirty = !sameMatrix(draft, saved)
+
+  /** Built-in roles have translated descriptions; custom ones show what was typed, if anything. */
+  const roleDescription = (role: { id: string; description: string }) =>
+    t.has(`roleDescriptions.${role.id}`) ? t(`roleDescriptions.${role.id}`) : role.description || t('customRole')
 
   const lockReason = (roleId: string, permission: Permission): string | null => {
     const lock = permissionLock(roleId, permission)
@@ -101,7 +133,14 @@ export const RolePermissionsMatrix = ({ initial }: { initial: RolePermissionsRes
                 <th className="px-6 py-3 text-left font-medium text-slate-500">{t('permissionHeader')}</th>
                 {initial.roles.map((role) => (
                   <th key={role.id} className="px-4 py-3 text-center font-medium text-slate-700">
-                    {role.name}
+                    <span className="inline-flex items-center gap-1">
+                      {role.name}
+                      <RoleDescriptionHint
+                        roleName={role.name}
+                        description={roleDescription(role)}
+                        label={t('roleInfo', { role: role.name })}
+                      />
+                    </span>
                   </th>
                 ))}
               </tr>

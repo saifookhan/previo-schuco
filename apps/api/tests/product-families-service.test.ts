@@ -5,8 +5,8 @@ process.env.DATABASE_URL =
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { auditLog, companies, createDb, roles, users, withSystemTransaction, type Db } from '@schuco/db'
-import { inArray } from 'drizzle-orm'
+import { auditLog, companies, createDb, productFamilies, roles, users, withSystemTransaction, type Db } from '@schuco/db'
+import { and, eq, inArray } from 'drizzle-orm'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { getDb } from '../src/lib/db'
@@ -16,7 +16,10 @@ import {
   duplicateProductFamily,
   getProductFamilyDetail,
   importProductFamilyFromExcel,
+  ExcelImportError,
   listProductFamilies,
+  previewProductFamilyImport,
+  setProductFamilyPriceValidityDates,
   setProductFamilyPublishedStatus,
   updateCharacteristic,
   updatePricingMatrix,
@@ -456,5 +459,76 @@ describe('listProductFamilies', () => {
         await tx.delete(companies).where(inArray(companies.id, [otherCompany.id]))
       })
     }
+  })
+})
+
+describe('upload dialog: preview, then save with the confirmed fields', () => {
+  const ctx = () => ({ effectiveCompanyId: supplierCompanyId, isSuperAdmin: false })
+  const familyCount = () =>
+    withSystemTransaction(db, async (tx) =>
+      (await tx.select({ id: productFamilies.id }).from(productFamilies).where(eq(productFamilies.supplierCompanyId, supplierCompanyId))).length,
+    )
+
+  it('previews what the workbook holds without saving anything', async () => {
+    const before = await familyCount()
+    const preview = await previewProductFamilyImport({ buffer: fixtureBuffer, originalName: 'product-family-sample.xlsx' })
+
+    expect(preview.family.name).toBe('Tenda tecnica NEST')
+    // Same hand-counted numbers as the full import test above.
+    expect(preview.counts).toEqual({ productLines: 5, characteristics: 5, options: 12, priceTables: 5, relations: 11, images: 3 })
+    expect(preview.warnings).toEqual([])
+    expect(await familyCount()).toBe(before)
+  })
+
+  it('rejects a file that is not a workbook in the preview already', async () => {
+    await expect(previewProductFamilyImport({ buffer: Buffer.from('nope'), originalName: 'x.xlsx' })).rejects.toThrow(ExcelImportError)
+  })
+
+  it('saves the name, validity dates and publish choice from the dialog, and records them on the import audit entry', async () => {
+    const family = await importProductFamilyFromExcel(
+      ctx(),
+      actor,
+      supplierCompanyId,
+      { buffer: fixtureBuffer, originalName: 'product-family-sample.xlsx' },
+      { name: '  NEST 2027  ', priceValidFrom: '2027-01-01', priceValidTo: '2027-12-31', publish: true },
+    )
+    expect(family).toMatchObject({ name: 'NEST 2027', priceValidFrom: '2027-01-01', priceValidTo: '2027-12-31', isPublished: true })
+
+    const entries = await withSystemTransaction(db, (tx) =>
+      tx.select().from(auditLog).where(and(eq(auditLog.resourceType, 'product_family'), eq(auditLog.resourceId, family.id))),
+    )
+    expect(entries.map((entry) => entry.action)).toEqual(['product_family.import'])
+    expect(entries[0].metadata).toMatchObject({ priceValidFrom: '2027-01-01', priceValidTo: '2027-12-31', published: true })
+  })
+
+  it('gives a new version its own dates and leaves the older version untouched', async () => {
+    const v1 = await importProductFamilyFromExcel(
+      ctx(),
+      actor,
+      supplierCompanyId,
+      { buffer: fixtureBuffer, originalName: 'v1.xlsx' },
+      { priceValidFrom: '2026-01-01', priceValidTo: null },
+    )
+    const v2 = await createNewVersionFromExcel(ctx(), actor, v1.id, { buffer: fixtureBuffer, originalName: 'v2.xlsx' }, { priceValidFrom: '2027-01-01' })
+
+    expect(v2).toMatchObject({ version: v1.version + 1, priceValidFrom: '2027-01-01', priceValidTo: null, isPublished: false })
+    const v1After = await getProductFamilyDetail(ctx(), v1.id)
+    expect(v1After!.family).toMatchObject({ priceValidFrom: '2026-01-01', priceValidTo: null })
+  })
+
+  it('changes the dates later for the owner only', async () => {
+    const family = await importProductFamilyFromExcel(ctx(), actor, supplierCompanyId, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+    expect(family).toMatchObject({ priceValidFrom: null, priceValidTo: null })
+
+    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2026-02-01', priceValidTo: '2026-06-30' })
+    expect((await getProductFamilyDetail(ctx(), family.id))!.family).toMatchObject({ priceValidFrom: '2026-02-01', priceValidTo: '2026-06-30' })
+
+    const stranger = { effectiveCompanyId: '00000000-0000-4000-8000-000000000000', isSuperAdmin: false }
+    await expect(
+      setProductFamilyPriceValidityDates(stranger, actor, family.id, { priceValidFrom: '2026-01-01', priceValidTo: null }),
+    ).rejects.toThrow(ProductFamilyNotFoundError)
   })
 })

@@ -8,6 +8,10 @@ export interface ProductFamilySummary {
   version: number
   supersedesId: string | null
   isPublished: boolean
+  /** `YYYY-MM-DD`, inclusive; null = no lower limit (families imported before validity existed). */
+  priceValidFrom: string | null
+  /** `YYYY-MM-DD`, inclusive; null = until further notice. */
+  priceValidTo: string | null
   createdAt: string
   updatedAt: string
   /** List endpoint only: the owning company's name, when the caller may read it. */
@@ -78,6 +82,8 @@ export interface ProductFamilyDetail {
   editable: boolean
   /** Whether the caller may open this family's History panel (owning company or super-admin). */
   canViewHistory: boolean
+  /** Owning company or super-admin: may upload a new version and change the price validity. */
+  canManage: boolean
   /** Default discount this family was shared with the caller's company at (null if own or shared at 0%). */
   shareDiscountPct?: number | null
 }

@@ -127,6 +127,13 @@
       "when": 1792394691682,
       "tag": "0018_audit_log_family_item_index",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792663809824,
+      "tag": "0019_product_family_price_validity",
+      "breakpoints": true
     }
   ]
 }

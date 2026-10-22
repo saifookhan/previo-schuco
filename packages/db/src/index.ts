@@ -112,6 +112,7 @@ export {
   insertProductLine,
   insertProductLineCharacteristic,
   listVisibleProductFamilies,
+  setProductFamilyPriceValidity,
   setProductFamilyPublished,
   type CharacteristicRow,
   type InsertCharacteristicInput,
@@ -131,6 +132,7 @@ export {
 export {
   deleteQuotePosition,
   quoteExists,
+  getQuotePositionFamilyId,
   deleteQuotePositionCharacteristics,
   getQuoteDetail,
   insertQuote,

@@ -1,0 +1,3 @@
+ALTER TABLE "product_families" ADD COLUMN "price_valid_from" date;--> statement-breakpoint
+ALTER TABLE "product_families" ADD COLUMN "price_valid_to" date;--> statement-breakpoint
+ALTER TABLE "product_families" ADD CONSTRAINT "product_families_price_validity_check" CHECK ("product_families"."price_valid_to" IS NULL OR "product_families"."price_valid_from" IS NULL OR "product_families"."price_valid_to" >= "product_families"."price_valid_from");

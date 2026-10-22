@@ -161,6 +161,15 @@ export const quoteExists = async (db: DbLike, quoteId: string): Promise<boolean>
   return rows.length > 0
 }
 
+/** The family one position of one quote was priced from, or null if there is no such position (RLS-scoped). */
+export const getQuotePositionFamilyId = async (db: DbLike, quoteId: string, positionId: string): Promise<string | null> => {
+  const [row] = await db
+    .select({ productFamilyId: quotePositions.productFamilyId })
+    .from(quotePositions)
+    .where(and(eq(quotePositions.quoteId, quoteId), eq(quotePositions.id, positionId)))
+  return row?.productFamilyId ?? null
+}
+
 export interface UpdateQuotePositionInput {
   productFamilyId: string
   productLineId: string

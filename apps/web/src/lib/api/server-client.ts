@@ -86,3 +86,27 @@ export const proxyGetToApi = async (request: Request, path: string): Promise<Nex
   const data = await response.json().catch(() => ({ error: 'Invalid response from API' }))
   return NextResponse.json(data, { status: response.status })
 }
+
+/**
+ * Route-handler body for a multipart upload passthrough (Excel workbooks):
+ * forwards the form data as-is and returns the API's JSON and status.
+ * `buildAuthHeaders` can't be used — its `Content-Type: application/json`
+ * would replace the multipart boundary `fetch` sets for the body.
+ * @param request - The incoming route-handler request carrying the form data
+ * @param path - API path including leading slash
+ */
+export const proxyFormDataToApi = async (request: Request, path: string): Promise<NextResponse> => {
+  const headers = await buildAuthHeaders()
+  if (!headers) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  }
+  delete headers['Content-Type']
+
+  const response = await fetch(`${authConfig.apiUrl}${path}`, {
+    method: 'POST',
+    headers,
+    body: await request.formData(),
+  })
+  const data = await response.json().catch(() => ({ error: 'Invalid response from API' }))
+  return NextResponse.json(data, { status: response.status })
+}

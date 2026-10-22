@@ -16,7 +16,10 @@ Un percorso completo dei flussi principali. Usa gli [Accessi demo](./demo-logins
 ## Catalogo — come `admin@suppli-demo.it`
 
 - [ ] *Demo Window W70* è presente e pubblicata.
-- [ ] Importa [l'Excel di esempio](pathname:///samples/previo-sample-family.xlsx) — compare una nuova famiglia in bozza.
+- [ ] Importa [l'Excel di esempio](pathname:///samples/previo-sample-family.xlsx) — una finestra mostra i conteggi (3 linee, 3 caratteristiche, 9 opzioni, 1 tabella prezzi, 7 relazioni); nulla viene salvato prima di **Importa famiglia**.
+- [ ] Nella finestra, un *Valido fino al* precedente a *Valido dal* disattiva il salvataggio; salva con le date e **Pubblica subito** — si apre la nuova famiglia, pubblicata, con le sue date.
+- [ ] Nella pagina della famiglia, **Modifica** la validità con un periodo passato — la famiglia risulta **Scaduta** e il preventivo non la propone più; una posizione esistente resta modificabile.
+- [ ] **Nuova versione** apre la stessa finestra; la versione precedente mantiene le sue date.
 - [ ] Modifica il prezzo di una linea, una caratteristica e una tabella prezzi; salva.
 - [ ] Pubblicala — ora la modifica è bloccata.
 - [ ] Crea una **nuova versione**, modificala, pubblicala.
@@ -49,7 +52,7 @@ Un percorso completo dei flussi principali. Usa gli [Accessi demo](./demo-logins
 
 ## Ruoli e accessi — come `admin@schuco-demo.it`
 
-- [ ] Crea un ruolo personalizzato, dagli permessi in Diritti di accesso, assegnalo a un utente.
+- [ ] In Diritti di accesso, clicca l'icona ⓘ accanto a ogni ruolo — compare la sua descrizione, in italiano, senza allargare la tabella.
 - [ ] L'utente vede esattamente le pagine consentite dai suoi permessi (∩ capacità dell'azienda).
 - [ ] Le celle del super-admin e `users.manage` dell'admin aziendale non si possono deselezionare.
 

@@ -2,7 +2,9 @@ import {
   deleteQuotePosition as deleteQuotePositionQuery,
   deleteQuotePositionCharacteristics as deleteQuotePositionCharacteristicsQuery,
   getProductFamiliesPublishStatus,
+  getProductFamilyById,
   getProductFamilyDetail,
+  getQuotePositionFamilyId,
   getQuoteDetail as getQuoteDetailQuery,
   insertQuote,
   insertQuotePosition,
@@ -18,7 +20,7 @@ import {
   type QuoteSummary,
 } from '@schuco/db'
 import { computeCharacteristicPrice, computeLinePrice, type PricingMatrix } from '@schuco/calculation'
-import type { AuditLogListResponse, RecordHistoryQuery } from '@schuco/contracts'
+import { priceValidityStatus, priceValidityToday, type AuditLogListResponse, type RecordHistoryQuery } from '@schuco/contracts'
 
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from '../lib/pg-error'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
@@ -238,6 +240,25 @@ interface PricedPosition {
 }
 
 /**
+ * New quote positions may only use a family whose prices are valid today
+ * (Italian time); positions already on a quote keep theirs.
+ * @throws {QuoteValidationError} the family's price validity hasn't started yet or has ended
+ */
+const assertPricesValidToday = (family: {
+  name: string
+  priceValidFrom: string | null
+  priceValidTo: string | null
+}): void => {
+  const validity = priceValidityStatus(family, priceValidityToday())
+  if (validity === 'upcoming') {
+    throw new QuoteValidationError(`The prices of "${family.name}" are valid from ${family.priceValidFrom}`)
+  }
+  if (validity === 'expired') {
+    throw new QuoteValidationError(`The prices of "${family.name}" expired on ${family.priceValidTo}`)
+  }
+}
+
+/**
  * Resolves the chosen product line + each selected characteristic in the
  * caller's own product-family catalog and computes this position's price
  * at the given width/height/quantity, using the shared costing engine
@@ -245,12 +266,16 @@ interface PricedPosition {
  * with). Shared by `addQuotePosition` and `updateQuotePosition` — pricing
  * is snapshotted into the row either way, never recomputed from the live
  * catalog on a later read.
- * @throws {QuoteValidationError} bad input, or the family/line/characteristic isn't visible to the caller
+ * Only a family whose prices are valid today can be used — except by
+ * `keepFamilyId`: an existing position may be edited without switching away
+ * from the (possibly expired) family it was priced from.
+ * @throws {QuoteValidationError} bad input, the family/line/characteristic isn't visible to the caller, or the family's prices aren't valid today
  */
 export const priceQuotePosition = async (
   ctx: TenantContext,
   tx: Parameters<typeof getProductFamilyDetail>[0],
   input: AddQuotePositionInput,
+  { keepFamilyId }: { keepFamilyId?: string } = {},
 ): Promise<PricedPosition> => {
   if (!isPositiveFinite(input.quantity) || !Number.isInteger(input.quantity)) {
     throw new QuoteValidationError('quantity must be a positive whole number')
@@ -277,6 +302,9 @@ export const priceQuotePosition = async (
       (family.family.isPublished && (await isFamilySharedWith(tx, family.family.id, ctx.effectiveCompanyId))))
   if (!family || !isUsableFamily) {
     throw new QuoteValidationError('Product family not found or not visible')
+  }
+  if (family.family.id !== keepFamilyId) {
+    assertPricesValidToday(family.family)
   }
   const line = family.lines.find((l) => l.id === input.productLineId)
   if (!line) {
@@ -455,9 +483,12 @@ export interface QuotePositionPreview {
 export const previewQuotePosition = async (
   ctx: TenantContext,
   input: AddQuotePositionInput,
+  /** When previewing an edit: the position, so its own family stays usable (see `priceQuotePosition`). */
+  editing?: { quoteId: string; positionId: string },
 ): Promise<QuotePositionPreview> =>
   withTenantDb(ctx, async (tx) => {
-    const priced = await priceQuotePosition(ctx, tx, input)
+    const keepFamilyId = editing ? await getQuotePositionFamilyId(tx, editing.quoteId, editing.positionId) : null
+    const priced = await priceQuotePosition(ctx, tx, input, { keepFamilyId: keepFamilyId ?? undefined })
     return {
       totalM2: priced.totalM2,
       basePrice: priced.basePrice,
@@ -587,7 +618,7 @@ export const updateQuotePosition = async (
       throw new QuoteValidationError('Position not found in this quote')
     }
 
-    const priced = await priceQuotePosition(ctx, tx, input)
+    const priced = await priceQuotePosition(ctx, tx, input, { keepFamilyId: existingPosition.productFamilyId })
     // Blank/omitted positionCode means "leave it alone" here (unlike
     // addQuotePosition, where blank means "auto-assign the next one") —
     // an edit must never silently renumber a position the caller didn't
@@ -767,6 +798,11 @@ export const duplicatePosition = async (
     const source = existingQuote.positions.find((p) => p.id === positionId)
     if (!source) {
       throw new QuoteValidationError('Position not found in this quote')
+    }
+    // A duplicate is a new position, so the same price-validity rule as adding one applies.
+    const sourceFamily = await getProductFamilyById(tx, source.productFamilyId)
+    if (sourceFamily) {
+      assertPricesValidToday(sourceFamily)
     }
 
     // Always auto-numbered, never the source's own code — a custom name is

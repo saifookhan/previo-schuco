@@ -9,6 +9,11 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 
 ## Oktober 2026
 
+**Woche vom 20. Oktober**
+- **Excel-Upload in zwei Schritten**: Die Datei wird zuerst geprüft und ein Dialog zeigt ihren Inhalt; dann Name, **Preisgültigkeit** (ab/bis) und Veröffentlichung festlegen. Neue Angebotspositionen verwenden nur Familien mit heute gültigen Preisen.
+- **Rollen-Seite ausgeblendet** — eigene Rollen werden vorerst nicht gebraucht. Die Beschreibung jeder Rolle steht unter *Einstellungen → Zugriffsrechte*: auf das ⓘ neben dem Rollennamen klicken.
+- **Angebot** (der alte Demo-Editor) aus der Seitenleiste entfernt, er wurde mit Angebote verwechselt.
+
 **Woche vom 13. Oktober**
 - **Verlauf** bei Angeboten und Produktfamilien: wer was geändert hat, direkt auf der Seite.
 - **Aktivitätsprotokoll**: *Einstellungen → Aktivitätsprotokoll* (Unternehmensadmins) und *Admin → Aktivitätsprotokoll* (Super-Admin) — wer was wann geändert hat; inklusive Anmeldungen und fehlgeschlagener Anmeldungen.

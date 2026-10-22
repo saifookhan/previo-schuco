@@ -6,6 +6,7 @@ import { fetchFromApiResult } from '@/lib/api/server-client'
 import { QuoteBuilder } from '@/components/quote-builder'
 import type { ProductFamilySummary } from '@/types/product-family'
 import type { QuoteDetail } from '@/types/sales-quote'
+import { priceValidityStatus, priceValidityToday } from '@schuco/contracts'
 
 interface QuoteDetailPageProps {
   params: Promise<{ id: string }>
@@ -34,7 +35,11 @@ const QuoteDetailPage = async ({ params }: QuoteDetailPageProps) => {
     )
   }
 
-  const families = (familiesResult.data?.families ?? []).filter((f) => f.isPublished)
+  // New positions can only come from published families whose prices are valid today (the API enforces the same).
+  const today = priceValidityToday()
+  const families = (familiesResult.data?.families ?? []).filter(
+    (f) => f.isPublished && priceValidityStatus(f, today) === 'current',
+  )
 
   return <QuoteBuilder initialDetail={quoteResult.data} families={families} />
 }

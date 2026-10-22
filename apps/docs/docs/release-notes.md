@@ -9,6 +9,11 @@ What changed, newest first. Use it to see what's new to test.
 
 ## October 2026
 
+**Week of 20 October**
+- **Excel upload in two steps**: the file is checked first and a dialog shows what it holds; then set the name, **price validity** (from/to) and whether to publish. New quote positions only use families whose prices are valid today.
+- **Roles page hidden** — custom roles aren't needed for now. Each role's description is in *Settings → Access rights*: click the ⓘ next to the role name.
+- **Invoice** removed from the sidebar (it was the old demo editor and got confused with Quotes).
+
 **Week of 13 October**
 - **History** on quotes and product families: who changed what, right on the record's page.
 - **Audit log**: *Settings → Audit log* (company admins) and *Admin → Audit log* (super-admin) — who changed what, when; sign-ins and failed sign-ins included.

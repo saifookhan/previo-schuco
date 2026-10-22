@@ -16,7 +16,10 @@ An end-to-end run through the main flows. Use [Demo logins](./demo-logins.md) to
 ## Catalog — as `admin@suppli-demo.it`
 
 - [ ] *Demo Window W70* is there, published.
-- [ ] Import [the sample Excel](pathname:///samples/previo-sample-family.xlsx) — a new draft family appears.
+- [ ] Import [the sample Excel](pathname:///samples/previo-sample-family.xlsx) — a dialog shows its counts (3 lines, 3 characteristics, 9 options, 1 price table, 7 relations); nothing is saved until **Import family**.
+- [ ] In that dialog, a *Valid to* before *Valid from* disables saving; save with dates and **Publish right away** — the new family opens, published, with its dates.
+- [ ] On the family's page, **Edit** the price validity to a past range — the family shows **Expired**, and the quote builder no longer offers it; an existing position from it can still be edited.
+- [ ] **New version** on a family opens the same dialog; the old version keeps its own dates.
 - [ ] Edit a line price, a characteristic and a pricing matrix; save.
 - [ ] Publish it — editing is now locked.
 - [ ] Create a **new version**, edit it, publish it.
@@ -49,7 +52,7 @@ An end-to-end run through the main flows. Use [Demo logins](./demo-logins.md) to
 
 ## Roles & access — as `admin@schuco-demo.it`
 
-- [ ] Create a custom role, give it permissions in Access rights, assign it to a user.
+- [ ] In Access rights, click the ⓘ next to each role name — its description pops up, in your language, without making the table wider.
 - [ ] The user sees exactly the pages their permissions (∩ company capabilities) allow.
 - [ ] Super-admin's and company-admin `users.manage` cells cannot be unticked.
 

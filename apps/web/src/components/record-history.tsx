@@ -76,6 +76,12 @@ export const RecordHistory = ({
     return entry.actor.name ?? entry.actor.email ?? t('unknownUser')
   }
 
+  /** A `YYYY-MM-DD` day from the metadata, formatted without any timezone shift. */
+  const day = (value: unknown): string | undefined =>
+    typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? format.dateTime(new Date(`${value}T00:00:00Z`), { dateStyle: 'medium', timeZone: 'UTC' })
+      : undefined
+
   const fieldList = (changed: unknown): string =>
     Array.isArray(changed)
       ? changed.map((field) => (t.has(`fields.${String(field)}`) ? t(`fields.${String(field)}`) : String(field))).join(', ')
@@ -99,6 +105,9 @@ export const RecordHistory = ({
       fields: fieldList(meta.changed),
       count: typeof meta.shareCount === 'number' ? meta.shareCount : 0,
       reason: text(meta.reason) ?? 'none',
+      validFrom: day(meta.priceValidFrom) ?? 'none',
+      validTo: day(meta.priceValidTo) ?? 'none',
+      published: meta.published === true ? 'yes' : 'no',
     })
   }
 

@@ -25,12 +25,11 @@ title: Rollen & Berechtigungen
 | Super-User | Katalog ansehen/bearbeiten/teilen, Angebote ansehen/bearbeiten |
 | User | Katalog ansehen, Angebote ansehen/bearbeiten |
 
-Ein Super-Admin kann diese unter **Einstellungen → Zugriffsrechte** (Matrix Rolle × Berechtigung) ändern und
-unter **Einstellungen → Rollen** **eigene Rollen** anlegen. Rollen sind global — für jedes Unternehmen gleich.
+Ein Super-Admin kann diese unter **Einstellungen → Zugriffsrechte** (Matrix Rolle × Berechtigung) ändern. Ein
+Klick auf das ⓘ neben einem Rollennamen zeigt die Beschreibung der Rolle. Rollen sind global — für jedes
+Unternehmen gleich. Die Rollen-Seite (eigene Rollen anlegen) ist vorerst ausgeblendet.
 
 ![Matrix der Zugriffsrechte](/img/screens/access-rights.png)
-
-![Rollen](/img/screens/settings-roles.png)
 
 ## Unternehmensfähigkeiten
 

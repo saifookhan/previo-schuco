@@ -16,7 +16,10 @@ Ein kompletter Durchlauf der wichtigsten Abläufe. Mit den [Demo-Anmeldungen](./
 ## Katalog — als `admin@suppli-demo.it`
 
 - [ ] *Demo Window W70* ist vorhanden und veröffentlicht.
-- [ ] [Die Beispiel-Excel](pathname:///samples/previo-sample-family.xlsx) importieren — eine neue Familie im Entwurf erscheint.
+- [ ] [Die Beispiel-Excel](pathname:///samples/previo-sample-family.xlsx) importieren — ein Dialog zeigt die Anzahlen (3 Linien, 3 Merkmale, 9 Optionen, 1 Preistabelle, 7 Zuordnungen); gespeichert wird erst mit **Familie importieren**.
+- [ ] Im Dialog sperrt ein *Gültig bis* vor *Gültig ab* das Speichern; mit Daten und **Sofort veröffentlichen** speichern — die neue Familie öffnet sich, veröffentlicht, mit ihren Daten.
+- [ ] Auf der Seite der Familie die Preisgültigkeit auf einen vergangenen Zeitraum **bearbeiten** — die Familie zeigt **Abgelaufen**, das Angebot bietet sie nicht mehr an; eine bestehende Position bleibt bearbeitbar.
+- [ ] **Neue Version** öffnet denselben Dialog; die alte Version behält ihre Daten.
 - [ ] Einen Linienpreis, ein Merkmal und eine Preistabelle bearbeiten; speichern.
 - [ ] Veröffentlichen — Bearbeiten ist nun gesperrt.
 - [ ] Eine **neue Version** erstellen, bearbeiten, veröffentlichen.
@@ -49,7 +52,7 @@ Ein kompletter Durchlauf der wichtigsten Abläufe. Mit den [Demo-Anmeldungen](./
 
 ## Rollen & Zugriff — als `admin@schuco-demo.it`
 
-- [ ] Eine eigene Rolle erstellen, ihr unter Zugriffsrechte Berechtigungen geben, einem Benutzer zuweisen.
+- [ ] Unter Zugriffsrechte auf das ⓘ neben jeder Rolle klicken — die Beschreibung erscheint auf Deutsch, ohne die Tabelle zu verbreitern.
 - [ ] Der Benutzer sieht genau die Seiten, die seine Berechtigungen (∩ Unternehmensfähigkeiten) erlauben.
 - [ ] Die Zellen des Super-Admins und `users.manage` des Unternehmensadmins lassen sich nicht abwählen.
 

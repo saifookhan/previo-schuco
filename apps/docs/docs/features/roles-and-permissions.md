@@ -25,12 +25,11 @@ title: Roles & permissions
 | Super user | catalog view/edit/share, quote view/edit |
 | User | catalog view, quote view/edit |
 
-A super-admin can change these in **Settings → Access rights** (role × permission matrix) and create
-**custom roles** in **Settings → Roles**. Roles are global — the same for every company.
+A super-admin can change these in **Settings → Access rights** (role × permission matrix). Click the ⓘ
+icon next to a role's name to see what the role is for. Roles are global — the same for every company.
+The Roles page (creating custom roles) is hidden for now.
 
 ![Access rights matrix](/img/screens/access-rights.png)
-
-![Roles](/img/screens/settings-roles.png)
 
 ## Company capabilities
 

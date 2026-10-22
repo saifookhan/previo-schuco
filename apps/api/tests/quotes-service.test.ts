@@ -24,6 +24,7 @@ import { renderQuotePdf } from '../src/lib/quote-pdf'
 import {
   getProductFamilyDetail,
   importProductFamilyFromExcel,
+  setProductFamilyPriceValidityDates,
   setProductFamilyPublishedStatus,
 } from '../src/services/product-families-service'
 import {
@@ -33,6 +34,7 @@ import {
   duplicatePosition,
   getQuote,
   listMyQuotes,
+  previewQuotePosition,
   removeQuotePosition,
   reorderPositions,
   updateQuotePosition,
@@ -828,5 +830,59 @@ describe('listMyQuotes', () => {
     const superAdminAsClient = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: true }
     const clientQuotes = await listMyQuotes(superAdminAsClient)
     expect(clientQuotes.every((q) => q.supplierCompanyId === linkedClientCompanyId)).toBe(true)
+  })
+})
+
+describe('price validity', () => {
+  const positionOn = (familyId: string, lineId: string) => ({
+    productFamilyId: familyId,
+    productLineId: lineId,
+    quantity: 1,
+    widthMm: 1000,
+    heightMm: 800,
+    characteristicSelections: [],
+  })
+
+  it('refuses new positions from a family whose prices have expired or not started yet', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-VALID-1', customerName: 'Test Customer' })
+
+    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2020-01-01', priceValidTo: '2020-12-31' })
+    await expect(addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))).rejects.toThrow(/expired on 2020-12-31/)
+    await expect(previewQuotePosition(ctx(), positionOn(family.id, line.id))).rejects.toThrow(QuoteValidationError)
+
+    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2999-01-01', priceValidTo: null })
+    await expect(addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))).rejects.toThrow(/valid from 2999-01-01/)
+
+    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2020-01-01', priceValidTo: null })
+    const detail = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
+    expect(detail.positions).toHaveLength(1)
+  })
+
+  it('still lets an existing position be edited after its family expires', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-VALID-2', customerName: 'Test Customer' })
+    const added = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
+    const position = added.positions[0]
+
+    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2020-01-01', priceValidTo: '2020-12-31' })
+
+    const updated = await updateQuotePosition(ctx(), actor, quote.id, position.id, { ...positionOn(family.id, line.id), quantity: 2 })
+    expect(updated.positions[0].quantity).toBe(2)
+    const preview = await previewQuotePosition(ctx(), positionOn(family.id, line.id), { quoteId: quote.id, positionId: position.id })
+    expect(preview.basePrice).toBe(555)
+  })
+
+  it('refuses to duplicate a position whose family has expired — the copy would be a new position', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-VALID-3', customerName: 'Test Customer' })
+    const added = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
+
+    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2020-01-01', priceValidTo: '2020-12-31' })
+
+    await expect(duplicatePosition(ctx(), actor, quote.id, added.positions[0].id)).rejects.toThrow(/expired on 2020-12-31/)
   })
 })

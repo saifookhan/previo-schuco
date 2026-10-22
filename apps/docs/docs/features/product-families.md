@@ -20,15 +20,39 @@ Every environment already has one: **Demo Window W70** (see [Demo data](../demo-
 
 | Action | How | Notes |
 |---|---|---|
-| Import from Excel | **Import from Excel** on the list | Creates a new family as an unpublished draft — format: [Excel import format](../excel-format.md) |
+| Import from Excel | **Import from Excel** on the list | Pick the file, check it, set price validity — see [Importing from Excel](#importing-from-excel) |
 | View | Click a family | Lines, characteristics, pricing matrices |
 | Edit pricing | **Edit** on a line, characteristic or matrix | Value, formula, discount, markup, installation hours |
 | Edit a matrix | Edit → add/remove rows and columns | Width × height grid |
 | Publish / unpublish | Actions menu | Only published families can be shared |
-| New version | **New version** on a published family | Published families are **locked for editing**; a new version is an editable draft copy that supersedes the old one |
+| New version | **New version** on the family's page | Same dialog as an import; the new version gets its own price validity and the old one keeps its dates |
 | Duplicate / delete | Actions menu | |
+| Change price validity | **Edit** next to the dates on the family's page | Owner (or super-admin) only |
 
 ![Product family detail](/img/screens/product-family-detail.png)
+
+## Importing from Excel
+
+1. Click **Import from Excel** and pick the `.xlsx` file. It is only **checked** — nothing is saved yet.
+2. A dialog shows what the file holds: the family name, how many product lines, characteristics, options, price
+   tables, relations and images, and anything worth checking (for example a Relations row naming a product line
+   that doesn't exist — that row will be skipped). A file that can't be imported is rejected here with the reason.
+3. Fill in:
+   - **Family name** — taken from the file; change it if you like.
+   - **Valid from** (required, today by default) and **Valid to** (empty = until further notice).
+   - **Publish right away** — otherwise it is saved as a draft.
+4. **Import family** saves it and opens its page.
+
+![Upload dialog](/img/screens/product-family-upload.png)
+
+File format: [Excel import format](../excel-format.md).
+
+## Price validity
+
+A family's prices can be used on **new quote positions** only from *Valid from* to *Valid to* (both days included,
+Italian time). Outside those days the family isn't offered in the quote builder and the API refuses it. Positions
+already on quotes keep their prices and can still be edited. The list shows the dates with an **Upcoming** or
+**Expired** badge; families imported before this existed have no dates and are always usable.
 
 ## Pricing fields
 

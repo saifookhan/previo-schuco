@@ -1,6 +1,9 @@
+import { sql } from 'drizzle-orm'
 import {
   AnyPgColumn,
   boolean,
+  check,
+  date,
   integer,
   jsonb,
   numeric,
@@ -67,11 +70,24 @@ export const productFamilies = pgTable('product_families', {
    * *client* company sees.
    */
   isPublished: boolean('is_published').notNull().default(false),
+  /**
+   * First day (inclusive) this family's prices may be used on new quote positions —
+   * set when uploading the Excel. Null on families imported before validity existed:
+   * no lower limit.
+   */
+  priceValidFrom: date('price_valid_from', { mode: 'string' }),
+  /** Last day (inclusive) the prices may be used; null = until further notice. */
+  priceValidTo: date('price_valid_to', { mode: 'string' }),
   /** Local-disk path for now (see ADR TBD) — swap for an S3 key without a schema change once that's decided. */
   sourceExcelPath: text('source_excel_path'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-})
+}, (table) => [
+  check(
+    'product_families_price_validity_check',
+    sql`${table.priceValidTo} IS NULL OR ${table.priceValidFrom} IS NULL OR ${table.priceValidTo} >= ${table.priceValidFrom}`,
+  ),
+])
 
 /** A product line (option) under a family — one row per "Product lines" sheet entry. */
 export const productLines = pgTable('product_lines', {

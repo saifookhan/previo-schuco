@@ -14,6 +14,7 @@ import {
   insertProductLine,
   insertProductLineCharacteristic,
   listVisibleProductFamilies,
+  setProductFamilyPriceValidity,
   setProductFamilyPublished,
   type CharacteristicRow,
   type PricingMatrixRow,
@@ -22,10 +23,16 @@ import {
   type ProductFamilySummary,
   type ProductLineRow,
 } from '@schuco/db'
-import type { AuditLogListResponse, RecordHistoryQuery } from '@schuco/contracts'
+import type {
+  AuditLogListResponse,
+  PriceValidityRequest,
+  ProductFamilyImportPreview,
+  ProductFamilyImportWarning,
+  RecordHistoryQuery,
+} from '@schuco/contracts'
 
 import { extractEmbeddedImages } from '../lib/excel-import/extract-embedded-images'
-import { parseProductFamilyWorkbook } from '../lib/excel-import'
+import { parseProductFamilyWorkbook, type ParsedWorkbook } from '../lib/excel-import'
 import { resolvePriceListType } from '../lib/excel-import/price-list-types'
 import type { RawPricingMatrix } from '../lib/excel-import/types'
 import {
@@ -66,33 +73,22 @@ const isMatrix = (value: number | RawPricingMatrix): value is RawPricingMatrix =
 const toStoredPct = (rawFraction: number | null | undefined): string | undefined =>
   rawFraction == null ? undefined : String(rawFraction * 100)
 
+const auditActor = (actor: ProductFamilyActor) => ({
+  actorType: 'user' as const,
+  actorUserId: actor.actorUserId,
+  actorCompanyId: actor.actorCompanyId,
+  requestId: actor.requestId,
+})
+
 /**
- * Imports a product family from an uploaded Excel workbook (ADR TBD):
- * saves the file (and any embedded images) to local disk, parses every
- * sheet, and inserts the family + product lines + characteristics +
- * pricing matrices + line/characteristic relations in one transaction.
- * The new family starts unpublished (`isPublished: false`) — a separate,
- * explicit `setPublished` call makes it visible to clients.
- * @param ctx - Tenant context resolved by `requireAuth`
- * @param actor - Who's importing, for the audit record
- * @param supplierCompanyId - The company this family belongs to (always the caller's own — ADR 0001, no path/body override)
- * @param file - The uploaded workbook
- * @param versionOptions - When set, this import becomes a new *version* of an existing family (see `createNewVersionFromExcel`) instead of a fresh one: `version` and `supersedesId` are stored as given, and the audit action is `product_family.new_version` instead of `product_family.import`.
+ * Parses every sheet and checks every Tipo_Listino — everything that can
+ * reject a workbook — without touching the disk or the DB.
  * @throws {ExcelImportError} the workbook is missing a required sheet, or uses an unrecognized Tipo_Listino
  */
-export const importProductFamilyFromExcel = async (
-  ctx: TenantContext,
-  actor: ProductFamilyActor,
-  supplierCompanyId: string,
-  file: { buffer: Buffer; originalName: string },
-  versionOptions?: { version: number; supersedesId: string },
-): Promise<ProductFamilySummary> => {
-  const extensionMatch = /\.[^.]+$/.exec(file.originalName)
-  const excelPath = await saveLocalFile('product-family-excel', file.buffer, extensionMatch?.[0] ?? '.xlsx')
-
+const readWorkbook = (buffer: Buffer): ParsedWorkbook => {
   let parsed
   try {
-    parsed = parseProductFamilyWorkbook(file.buffer)
+    parsed = parseProductFamilyWorkbook(buffer)
   } catch (error) {
     throw new ExcelImportError((error as Error).message)
   }
@@ -116,7 +112,110 @@ export const importProductFamilyFromExcel = async (
   } catch (error) {
     throw new ExcelImportError((error as Error).message)
   }
+  return parsed
+}
 
+/** Rows the import will skip or that look like a mistake in the workbook — shown before saving, never blocking. */
+const workbookWarnings = (parsed: ParsedWorkbook): ProductFamilyImportWarning[] => {
+  const warnings: ProductFamilyImportWarning[] = []
+  const lineNames = new Set<string>()
+  for (const line of parsed.productLines) {
+    if (lineNames.has(line.name)) {
+      warnings.push({ code: 'duplicateLineName', productLine: line.name })
+    }
+    lineNames.add(line.name)
+  }
+  const characteristicNames = new Set<string>()
+  for (const main of parsed.characteristics) {
+    if (characteristicNames.has(main.name)) {
+      warnings.push({ code: 'duplicateCharacteristicName', characteristic: main.name })
+    }
+    characteristicNames.add(main.name)
+  }
+  for (const relation of parsed.relations) {
+    const pair = { productLine: relation.productLineName, characteristic: relation.characteristicName }
+    if (!lineNames.has(relation.productLineName)) {
+      warnings.push({ code: 'relationUnknownLine', ...pair })
+    } else if (!characteristicNames.has(relation.characteristicName)) {
+      warnings.push({ code: 'relationUnknownCharacteristic', ...pair })
+    }
+  }
+  return warnings
+}
+
+/**
+ * What an uploaded workbook would import — the upload dialog shows it before
+ * the user picks dates and saves. Parsed in memory; nothing is stored.
+ * @throws {ExcelImportError} the workbook could not be imported as it is
+ */
+export const previewProductFamilyImport = async (file: {
+  buffer: Buffer
+  originalName: string
+}): Promise<ProductFamilyImportPreview> => {
+  const parsed = readWorkbook(file.buffer)
+  const images = await extractEmbeddedImages(file.buffer, 'Product Family')
+  const options = parsed.characteristics.flatMap((main) => main.subCharacters)
+  const priceTables =
+    parsed.productLines.filter((line) => isMatrix(line.listinoAcquisto)).length +
+    options.filter((sub) => isMatrix(sub.listinoAcquisto)).length
+  return {
+    fileName: file.originalName,
+    family: {
+      name: parsed.family.family_name!,
+      technicalName: parsed.family.technical_name ?? null,
+      category: parsed.family.category ?? null,
+      brand: parsed.family.brand ?? null,
+    },
+    counts: {
+      productLines: parsed.productLines.length,
+      characteristics: parsed.characteristics.length,
+      options: options.length,
+      priceTables,
+      relations: parsed.relations.length,
+      images: images.length,
+    },
+    warnings: workbookWarnings(parsed),
+  }
+}
+
+/** What the user confirmed in the upload dialog, plus — for a re-import — where the new version sits in the chain. */
+export interface ProductFamilyImportOptions {
+  /** Replaces the workbook's family name when non-blank. */
+  name?: string
+  priceValidFrom?: string | null
+  priceValidTo?: string | null
+  /** Publish as part of the import instead of saving a draft. */
+  publish?: boolean
+  /** Makes this import a new *version* of an existing family (see `createNewVersionFromExcel`). */
+  version?: { version: number; supersedesId: string }
+}
+
+/**
+ * Imports a product family from an uploaded Excel workbook (ADR TBD):
+ * parses every sheet, saves the file (and any embedded images) to local
+ * disk, and inserts the family + product lines + characteristics +
+ * pricing matrices + line/characteristic relations in one transaction.
+ * The new family is a draft unless `options.publish` says otherwise.
+ * @param ctx - Tenant context resolved by `requireAuth`
+ * @param actor - Who's importing, for the audit record
+ * @param supplierCompanyId - The company this family belongs to (always the caller's own — ADR 0001, no path/body override)
+ * @param file - The uploaded workbook
+ * @param options - Name override, price validity, publish, and `version` — which stores the given `version`/`supersedesId` and audits `product_family.new_version` instead of `product_family.import`.
+ * @throws {ExcelImportError} the workbook is missing a required sheet, or uses an unrecognized Tipo_Listino
+ */
+export const importProductFamilyFromExcel = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  supplierCompanyId: string,
+  file: { buffer: Buffer; originalName: string },
+  options: ProductFamilyImportOptions = {},
+): Promise<ProductFamilySummary> => {
+  const parsed = readWorkbook(file.buffer)
+  const versionOptions = options.version
+  const priceValidity = { priceValidFrom: options.priceValidFrom ?? null, priceValidTo: options.priceValidTo ?? null }
+
+  const extensionMatch = /\.[^.]+$/.exec(file.originalName)
+  const excelPath = await saveLocalFile('product-family-excel', file.buffer, extensionMatch?.[0] ?? '.xlsx')
   const images = await extractEmbeddedImages(file.buffer, 'Product Family')
   const savedImages = await Promise.all(
     images.map(async (image, index) => ({
@@ -128,7 +227,7 @@ export const importProductFamilyFromExcel = async (
   const family = await withTenantDb(ctx, async (tx) => {
     const familyId = await insertProductFamily(tx, {
       supplierCompanyId,
-      name: parsed.family.family_name!,
+      name: options.name?.trim() || parsed.family.family_name!,
       technicalName: parsed.family.technical_name ?? null,
       category: parsed.family.category ?? null,
       brand: parsed.family.brand ?? null,
@@ -137,6 +236,8 @@ export const importProductFamilyFromExcel = async (
       sourceExcelPath: excelPath,
       version: versionOptions?.version,
       supersedesId: versionOptions?.supersedesId,
+      ...priceValidity,
+      isPublished: options.publish ?? false,
     })
 
     for (const image of savedImages) {
@@ -239,28 +340,22 @@ export const importProductFamilyFromExcel = async (
       }
     }
 
-    await recordAuditEvent(
-      tx,
-      {
-        actorType: 'user',
-        actorUserId: actor.actorUserId,
-        actorCompanyId: actor.actorCompanyId,
-        requestId: actor.requestId,
+    await recordAuditEvent(tx, auditActor(actor), supplierCompanyId, {
+      action: versionOptions ? 'product_family.new_version' : 'product_family.import',
+      resourceType: 'product_family',
+      resourceId: familyId,
+      metadata: {
+        fileName: file.originalName,
+        productLinesCount: parsed.productLines.length,
+        characteristicsCount: parsed.characteristics.length,
+        imagesCount: savedImages.length,
+        ...priceValidity,
+        // Part of this entry, not a separate product_family.publish: both would share the
+        // transaction's timestamp, so their order in the history would be arbitrary.
+        published: options.publish ?? false,
+        ...(versionOptions ? { supersedesId: versionOptions.supersedesId, version: versionOptions.version } : {}),
       },
-      supplierCompanyId,
-      {
-        action: versionOptions ? 'product_family.new_version' : 'product_family.import',
-        resourceType: 'product_family',
-        resourceId: familyId,
-        metadata: {
-          fileName: file.originalName,
-          productLinesCount: parsed.productLines.length,
-          characteristicsCount: parsed.characteristics.length,
-          imagesCount: savedImages.length,
-          ...(versionOptions ? { supersedesId: versionOptions.supersedesId, version: versionOptions.version } : {}),
-        },
-      },
-    )
+    })
 
     const detail = await getProductFamilyDetailQuery(tx, familyId)
     return detail!.family
@@ -299,6 +394,7 @@ export const createNewVersionFromExcel = async (
   actor: ProductFamilyActor,
   existingFamilyId: string,
   file: { buffer: Buffer; originalName: string },
+  options: Omit<ProductFamilyImportOptions, 'version'> = {},
 ): Promise<ProductFamilySummary> => {
   const existing = await getProductFamilyDetail(ctx, existingFamilyId)
   if (!existing) {
@@ -308,8 +404,8 @@ export const createNewVersionFromExcel = async (
   const latest = await withTenantDb(ctx, (tx) => findLatestProductFamilyVersion(tx, existingFamilyId))
 
   return importProductFamilyFromExcel(ctx, actor, existing.family.supplierCompanyId, file, {
-    version: latest.version + 1,
-    supersedesId: latest.id,
+    ...options,
+    version: { version: latest.version + 1, supersedesId: latest.id },
   })
 }
 
@@ -345,6 +441,8 @@ export const duplicateProductFamily = async (
       brand: source.family.brand,
       description1: source.family.description1,
       description2: source.family.description2,
+      priceValidFrom: source.family.priceValidFrom,
+      priceValidTo: source.family.priceValidTo,
       duplicatedFromId: familyId,
     })
 
@@ -427,12 +525,7 @@ export const duplicateProductFamily = async (
 
     await recordAuditEvent(
       tx,
-      {
-        actorType: 'user',
-        actorUserId: actor.actorUserId,
-        actorCompanyId: actor.actorCompanyId,
-        requestId: actor.requestId,
-      },
+      auditActor(actor),
       source.family.supplierCompanyId,
       {
         action: 'product_family.duplicate',
@@ -464,12 +557,7 @@ export const setProductFamilyPublishedStatus = async (
     }
     await recordAuditEvent(
       tx,
-      {
-        actorType: 'user',
-        actorUserId: actor.actorUserId,
-        actorCompanyId: actor.actorCompanyId,
-        requestId: actor.requestId,
-      },
+      auditActor(actor),
       // The family's own supplierCompanyId, not ctx.effectiveCompanyId —
       // so a super-admin publish/unpublish is attributed to the actual
       // supplier tenant, not the super-admin's own platform company.
@@ -480,6 +568,36 @@ export const setProductFamilyPublishedStatus = async (
         resourceId: familyId,
       },
     )
+  })
+
+/**
+ * Changes the days a family's prices may be used on new quote positions.
+ * Positions already on quotes keep their snapshotted prices either way.
+ * @throws {ProductFamilyNotFoundError} no such family, or the caller doesn't own it (RLS blocked the UPDATE)
+ */
+export const setProductFamilyPriceValidityDates = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  validity: PriceValidityRequest,
+): Promise<PriceValidityRequest> =>
+  withTenantDb(ctx, async (tx) => {
+    const before = await getProductFamilyById(tx, familyId)
+    const updated = before ? await setProductFamilyPriceValidity(tx, familyId, validity) : null
+    if (!before || !updated) {
+      throw new ProductFamilyNotFoundError()
+    }
+    await recordAuditEvent(tx, auditActor(actor), updated.supplierCompanyId, {
+      action: 'product_family.price_validity_update',
+      resourceType: 'product_family',
+      resourceId: familyId,
+      metadata: {
+        ...validity,
+        previousPriceValidFrom: before.priceValidFrom,
+        previousPriceValidTo: before.priceValidTo,
+      },
+    })
+    return validity
   })
 
 /**
@@ -503,12 +621,7 @@ export const deleteProductFamily = async (
     }
     await recordAuditEvent(
       tx,
-      {
-        actorType: 'user',
-        actorUserId: actor.actorUserId,
-        actorCompanyId: actor.actorCompanyId,
-        requestId: actor.requestId,
-      },
+      auditActor(actor),
       ctx.effectiveCompanyId,
       {
         action: 'product_family.delete',
@@ -517,13 +630,6 @@ export const deleteProductFamily = async (
       },
     )
   })
-
-const auditActor = (actor: ProductFamilyActor) => ({
-  actorType: 'user' as const,
-  actorUserId: actor.actorUserId,
-  actorCompanyId: actor.actorCompanyId,
-  requestId: actor.requestId,
-})
 
 /**
  * Runs one pricing edit inside a single RLS transaction: loads the family
@@ -631,8 +737,8 @@ export const updateCharacteristic = async (
   )
 }
 
-/** The one rule for who may see a family's history — used by the history endpoint and the detail response's `canViewHistory`. */
-export const canViewProductFamilyHistory = (ctx: TenantContext, family: { supplierCompanyId: string }): boolean =>
+/** The owning company or a super-admin: who may see a family's history, upload a new version and change its price validity (the detail response's `canViewHistory` / `canManage`). */
+export const canManageProductFamily = (ctx: TenantContext, family: { supplierCompanyId: string }): boolean =>
   ctx.isSuperAdmin || family.supplierCompanyId === ctx.effectiveCompanyId
 
 /**
@@ -653,7 +759,7 @@ export const getProductFamilyHistory = (
     if (!family) {
       return null
     }
-    if (!canViewProductFamilyHistory(ctx, family)) {
+    if (!canManageProductFamily(ctx, family)) {
       throw new ProductFamilyHistoryForbiddenError('Only the owning company can see this family\'s history')
     }
     return listAuditPage(tx, { productFamilyId: familyId }, query.cursor, query.limit, toHistoryEntry)

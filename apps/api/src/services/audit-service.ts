@@ -87,7 +87,18 @@ const toEntry = (row: AuditLogRow): AuditLogEntry => ({
 })
 
 /** Metadata keys the record-history panels need; anything else (ids of other companies, discounts, file paths) stays in the audit log viewer. */
-const HISTORY_METADATA_KEYS = ['positionCode', 'reference', 'fileName', 'version', 'itemType', 'itemId', 'changed'] as const
+const HISTORY_METADATA_KEYS = [
+  'positionCode',
+  'reference',
+  'fileName',
+  'version',
+  'itemType',
+  'itemId',
+  'changed',
+  'priceValidFrom',
+  'priceValidTo',
+  'published',
+] as const
 
 /**
  * A history-panel entry: what the record's ordinary viewers (e.g. any user with

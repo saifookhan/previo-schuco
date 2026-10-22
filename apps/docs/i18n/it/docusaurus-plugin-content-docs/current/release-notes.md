@@ -9,6 +9,11 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 
 ## Ottobre 2026
 
+**Settimana del 20 ottobre**
+- **Caricamento Excel in due passi**: il file viene prima controllato e una finestra mostra cosa contiene; poi si impostano nome, **validità dei prezzi** (dal/al) e pubblicazione. Le nuove posizioni dei preventivi usano solo famiglie con prezzi validi oggi.
+- **Pagina Ruoli nascosta** — i ruoli personalizzati per ora non servono. La descrizione di ogni ruolo è in *Impostazioni → Diritti di accesso*: clicca la ⓘ accanto al nome del ruolo.
+- **Preventivo** (il vecchio editor demo) rimosso dalla barra laterale, si confondeva con Preventivi.
+
 **Settimana del 13 ottobre**
 - **Cronologia** su preventivi e famiglie di prodotto: chi ha modificato cosa, direttamente nella pagina.
 - **Registro attività**: *Impostazioni → Registro attività* (admin aziendali) e *Admin → Registro attività* (super-admin) — chi ha modificato cosa, e quando; inclusi accessi e accessi falliti.

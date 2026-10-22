@@ -219,6 +219,77 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           },
         ]),
       ),
+      '/api/product-families/import/preview': {
+        post: {
+          tags: ['Products'],
+          summary: 'Check a product family workbook without saving it',
+          description:
+            'Parses the uploaded Excel in memory and returns what it holds (family name, counts, warnings). Nothing is written. Needs catalog.edit.',
+          operationId: 'previewProductFamilyImport',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          requestBody: {
+            required: true,
+            content: { 'multipart/form-data': { schema: { type: 'object', required: ['file'], properties: { file: { type: 'string', format: 'binary' } } } } },
+          },
+          responses: {
+            '200': jsonResponse('What the workbook holds', 'ProductFamilyImportPreview'),
+            '400': { description: 'Missing file, or the workbook cannot be imported', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
+      ...Object.fromEntries(
+        (
+          [
+            ['/api/product-families/import', 'importProductFamily', 'Imports the workbook as a new product family.'],
+            [
+              '/api/product-families/{id}/new-version',
+              'createProductFamilyVersion',
+              'Imports the workbook as the next version of this family. The older version keeps its own dates.',
+            ],
+          ] as const
+        ).map(([path, operationId, description]) => [
+          path,
+          {
+            post: {
+              tags: ['Products'],
+              summary: 'Save an uploaded product family workbook',
+              description: `${description} Needs catalog.edit. Send the same file the preview checked, plus the fields the user confirmed.`,
+              operationId,
+              security: [{ bearerAuth: [] }, { devUserSub: [] }],
+              ...(path.includes('{id}')
+                ? { parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }] }
+                : {}),
+              requestBody: {
+                required: true,
+                content: { 'multipart/form-data': { schema: ref('ProductFamilyImportForm') } },
+              },
+              responses: {
+                '201': { description: 'Created; body is `{ family }`' },
+                '400': { description: 'Invalid fields, or the workbook cannot be imported', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+                ...errorResponses(),
+              },
+            },
+          },
+        ]),
+      ),
+      '/api/product-families/{id}/price-validity': {
+        put: {
+          tags: ['Products'],
+          summary: "Change the days a family's prices can be used on new quote positions",
+          description: 'Owning company (catalog.edit) or super-admin. Existing quote positions are not affected.',
+          operationId: 'setProductFamilyPriceValidity',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          requestBody: { required: true, content: { 'application/json': { schema: ref('PriceValidity') } } },
+          responses: {
+            '200': jsonResponse('The saved dates', 'PriceValidity'),
+            '400': { description: 'Invalid dates', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            '404': { description: 'No such family, or not owned by the caller', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
       '/api/products': {
         get: {
           tags: ['Products'],
@@ -674,6 +745,60 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
             nextCursor: { type: 'string', nullable: true },
           },
           required: ['entries', 'nextCursor'],
+        },
+        PriceValidity: {
+          type: 'object',
+          description: 'Both days inclusive, in Italian time (Europe/Rome). A null `priceValidTo` means until further notice.',
+          properties: {
+            priceValidFrom: { type: 'string', format: 'date' },
+            priceValidTo: { type: 'string', format: 'date', nullable: true },
+          },
+          required: ['priceValidFrom', 'priceValidTo'],
+        },
+        ProductFamilyImportForm: {
+          type: 'object',
+          required: ['file', 'priceValidFrom'],
+          properties: {
+            file: { type: 'string', format: 'binary' },
+            name: { type: 'string', description: "Overrides the workbook's family name; blank keeps it" },
+            priceValidFrom: { type: 'string', format: 'date' },
+            priceValidTo: { type: 'string', format: 'date', description: 'Blank = until further notice' },
+            publish: { type: 'string', enum: ['true', 'false'], description: 'Publish right away (default false: saved as a draft)' },
+          },
+        },
+        ProductFamilyImportPreview: {
+          type: 'object',
+          properties: {
+            fileName: { type: 'string' },
+            family: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                technicalName: { type: 'string', nullable: true },
+                category: { type: 'string', nullable: true },
+                brand: { type: 'string', nullable: true },
+              },
+            },
+            counts: {
+              type: 'object',
+              properties: Object.fromEntries(
+                ['productLines', 'characteristics', 'options', 'priceTables', 'relations', 'images'].map((key) => [key, { type: 'integer' }]),
+              ),
+            },
+            warnings: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string', enum: ['relationUnknownLine', 'relationUnknownCharacteristic', 'duplicateLineName', 'duplicateCharacteristicName'] },
+                  productLine: { type: 'string' },
+                  characteristic: { type: 'string' },
+                },
+                required: ['code'],
+              },
+            },
+          },
+          required: ['fileName', 'family', 'counts', 'warnings'],
         },
         Product: {
           type: 'object',

@@ -200,6 +200,14 @@
       "quote_edit": "Creare preventivi e modificarne le posizioni",
       "users_manage": "Invitare e gestire gli utenti della propria azienda",
       "catalog_share": "Condividere una famiglia con altre aziende e impostarne lo sconto predefinito"
+    },
+    "roleInfo": "Informazioni su {role}",
+    "customRole": "Ruolo personalizzato",
+    "roleDescriptions": {
+      "super-admin": "Operatori della piattaforma PREVIO / Schuco con accesso a tutte le aziende",
+      "company-admin": "Gestisce impostazioni aziendali, utenti e visibilità dei prodotti",
+      "super-user": "Coordinatore vendite — offerte del team nelle unità di business assegnate",
+      "user": "Venditore — solo le proprie offerte"
     }
   },
   "settingsCompany": {
@@ -241,17 +249,14 @@
     "status": "Stato",
     "published": "Pubblicato",
     "draft": "Bozza",
-    "importButton": "Importa da Excel",
-    "importing": "Importazione…",
-    "importFailed": "Importazione fallita",
-    "importFailedUnreachable": "Importazione fallita — server non raggiungibile",
     "errorLoading": "Impossibile caricare le famiglie di prodotto — il server potrebbe non essere raggiungibile. Prova ad aggiornare.",
     "version": "Versione",
     "tabOwn": "Le mie famiglie",
     "tabShared": "Condivise con me",
     "emptyShared": "Nessuna famiglia di prodotti è stata ancora condivisa con la tua azienda.",
     "owner": "Proprietario",
-    "yourDiscount": "Il tuo sconto"
+    "yourDiscount": "Il tuo sconto",
+    "priceValidity": "Validità prezzi"
   },
   "productFamilyActions": {
     "publish": "Pubblica",
@@ -278,11 +283,6 @@
   },
   "productFamilyVersion": {
     "versionBadge": "Versione {version}",
-    "newVersionButton": "Nuova versione",
-    "creatingNewVersion": "Creazione…",
-    "newVersionSuccess": "Versione {version} creata",
-    "newVersionFailed": "Impossibile creare la nuova versione",
-    "newVersionFailedUnreachable": "Impossibile creare la nuova versione — server non raggiungibile",
     "supersedes": "Sostituisce una versione precedente",
     "supersededBy": "Esiste una versione più recente",
     "viewPreviousVersion": "Vedi versione precedente",
@@ -590,8 +590,8 @@
       "quote_remove_position": "{code, select, none {Posizione eliminata} other {Posizione {code} eliminata}}",
       "quote_reorder_positions": "Posizioni riordinate",
       "quote_duplicate_position": "{code, select, none {Posizione duplicata} other {Posizione duplicata come {code}}}",
-      "product_family_import": "{fileName, select, none {Importata da Excel} other {Importata da Excel ({fileName})}}",
-      "product_family_new_version": "{version, plural, =0 {Nuova versione creata da Excel} other {Versione # creata da Excel}}",
+      "product_family_import": "{fileName, select, none {Importata da Excel} other {Importata da Excel ({fileName})}}{published, select, yes { e pubblicata} other {}}",
+      "product_family_new_version": "{version, plural, =0 {Nuova versione creata da Excel} other {Versione # creata da Excel}}{published, select, yes { e pubblicata} other {}}",
       "product_family_duplicate": "Creata come copia di un’altra famiglia",
       "product_family_publish": "Pubblicata",
       "product_family_unpublish": "Ritirata dalla pubblicazione",
@@ -599,7 +599,77 @@
       "product_family_line_update": "{item, select, none {Linea di prodotto modificata} other {Linea di prodotto {item} modificata}}: {fields}",
       "product_family_characteristic_update": "{item, select, none {Opzione modificata} other {Opzione {item} modificata}}: {fields}",
       "product_family_matrix_update": "{item, select, none {Tabella prezzi modificata} other {Tabella prezzi di {item} modificata}}",
-      "product_family_share_update": "{count, plural, =0 {Condivisione rimossa per tutte le aziende} one {Condivisa con # azienda} other {Condivisa con # aziende}}"
+      "product_family_share_update": "{count, plural, =0 {Condivisione rimossa per tutte le aziende} one {Condivisa con # azienda} other {Condivisa con # aziende}}",
+      "product_family_price_validity_update": "{validTo, select, none {Validità prezzi impostata: dal {validFrom}} other {Validità prezzi impostata: {validFrom} – {validTo}}}"
     }
+  },
+  "productFamilyUpload": {
+    "importButton": "Importa da Excel",
+    "newVersionButton": "Nuova versione",
+    "checking": "Controllo del file…",
+    "checkFailed": "Questo file non può essere importato",
+    "checkFailedUnreachable": "Impossibile controllare il file — server non raggiungibile",
+    "importTitle": "Importa famiglia di prodotti",
+    "versionTitle": "Nuova versione di {name}",
+    "dialogHint": "Non è ancora salvato nulla. Controlla cosa contiene il file, poi imposta la validità dei prezzi e conferma in basso.",
+    "changeFile": "Scegli un altro file",
+    "workbookFamily": "Famiglia nel file",
+    "counts": {
+      "productLines": "Linee di prodotto",
+      "characteristics": "Caratteristiche",
+      "options": "Opzioni",
+      "priceTables": "Tabelle prezzi",
+      "relations": "Relazioni",
+      "images": "Immagini"
+    },
+    "warningsTitle": "{count, plural, one {# cosa da controllare} other {# cose da controllare}}",
+    "warnings": {
+      "relationUnknownLine": "Relations: la linea di prodotto “{line}” non è nel foglio Product lines — riga saltata",
+      "relationUnknownCharacteristic": "Relations: la caratteristica “{characteristic}” (per “{line}”) non è nel foglio Caracteristics — riga saltata",
+      "duplicateLineName": "La linea di prodotto “{line}” compare più di una volta",
+      "duplicateCharacteristicName": "La caratteristica “{characteristic}” compare più di una volta"
+    },
+    "nameLabel": "Nome della famiglia",
+    "nameHint": "Preso dal file — puoi cambiarlo.",
+    "validityLegend": "Validità dei prezzi",
+    "validFrom": "Valido dal",
+    "validTo": "Valido fino al",
+    "validityHint": "Le nuove posizioni dei preventivi possono usare questi prezzi solo tra questi giorni (inclusi). Lascia vuoto “Valido fino al” per validità fino a nuovo avviso.",
+    "validFromRequired": "Scegli il primo giorno di validità dei prezzi",
+    "validToBeforeFrom": "“Valido fino al” deve essere uguale o successivo a “Valido dal”",
+    "publishLabel": "Pubblica subito",
+    "publishHint": "Altrimenti viene salvata come bozza, visibile solo alla tua azienda.",
+    "cancel": "Annulla",
+    "saving": "Salvataggio…",
+    "saveFamily": "Importa famiglia",
+    "saveVersion": "Crea versione",
+    "saveFailed": "Impossibile salvare",
+    "saveFailedUnreachable": "Impossibile salvare — server non raggiungibile",
+    "familySaved": "{name} importata",
+    "versionSaved": "Versione {version} creata"
+  },
+  "priceValidity": {
+    "range": "Prezzi validi dal {from} al {to}",
+    "fromOnly": "Prezzi validi dal {from}",
+    "toOnly": "Prezzi validi fino al {to}",
+    "fromOnlyShort": "dal {from}",
+    "toOnlyShort": "fino al {to}",
+    "notSet": "Nessuna validità prezzi impostata",
+    "upcoming": "Futura",
+    "expired": "Scaduta",
+    "edit": "Modifica",
+    "editTitle": "Validità dei prezzi",
+    "editHint": "Le nuove posizioni dei preventivi possono usare questi prezzi solo tra questi giorni. Le posizioni già nei preventivi mantengono i loro prezzi.",
+    "validFrom": "Valido dal",
+    "validTo": "Valido fino al",
+    "validToHint": "Lascia vuoto “Valido fino al” per validità fino a nuovo avviso.",
+    "validFromRequired": "Scegli il primo giorno di validità dei prezzi",
+    "validToBeforeFrom": "“Valido fino al” deve essere uguale o successivo a “Valido dal”",
+    "cancel": "Annulla",
+    "save": "Salva",
+    "saving": "Salvataggio…",
+    "saved": "Validità dei prezzi salvata",
+    "saveFailed": "Impossibile salvare",
+    "saveFailedUnreachable": "Impossibile salvare — server non raggiungibile"
   }
 }

@@ -23,6 +23,9 @@ export interface InsertProductFamilyInput {
   supersedesId?: string | null
   duplicatedFromId?: string | null
   version?: number
+  priceValidFrom?: string | null
+  priceValidTo?: string | null
+  isPublished?: boolean
 }
 
 /** Creates a product family row. Draft (`isPublished: false`) by default — the caller publishes explicitly once ready. */
@@ -115,6 +118,10 @@ export interface ProductFamilySummary {
   version: number
   supersedesId: string | null
   isPublished: boolean
+  /** ISO date (`YYYY-MM-DD`), inclusive; null = no lower limit. */
+  priceValidFrom: string | null
+  /** ISO date (`YYYY-MM-DD`), inclusive; null = until further notice. */
+  priceValidTo: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -264,6 +271,24 @@ export const setProductFamilyPublished = async (
   const [updated] = await db
     .update(productFamilies)
     .set({ isPublished, updatedAt: new Date() })
+    .where(eq(productFamilies.id, familyId))
+    .returning({ id: productFamilies.id, supplierCompanyId: productFamilies.supplierCompanyId })
+  return updated ?? null
+}
+
+/**
+ * Sets the days a family's prices may be used on new quote positions. Same
+ * contract as `setProductFamilyPublished`: `null` when nothing matched,
+ * including when RLS blocked the UPDATE because the caller doesn't own it.
+ */
+export const setProductFamilyPriceValidity = async (
+  db: DbLike,
+  familyId: string,
+  validity: { priceValidFrom: string; priceValidTo: string | null },
+): Promise<{ id: string; supplierCompanyId: string } | null> => {
+  const [updated] = await db
+    .update(productFamilies)
+    .set({ ...validity, updatedAt: new Date() })
     .where(eq(productFamilies.id, familyId))
     .returning({ id: productFamilies.id, supplierCompanyId: productFamilies.supplierCompanyId })
   return updated ?? null
