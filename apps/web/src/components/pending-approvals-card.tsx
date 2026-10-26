@@ -6,6 +6,7 @@ import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useLoadingTransition } from '@/components/ui/loading-region'
 import { useRouter } from '@/i18n/navigation'
 import type { AdminUserDto } from '@schuco/contracts'
 
@@ -17,6 +18,8 @@ interface PendingApprovalsCardProps {
 export const PendingApprovalsCard = ({ pending }: PendingApprovalsCardProps) => {
   const t = useTranslations('adminUsers')
   const router = useRouter()
+  // Refreshes run in the table's loading region, so the list shows it is reloading (ADR 0014).
+  const { startTransition } = useLoadingTransition()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -34,7 +37,7 @@ export const PendingApprovalsCard = ({ pending }: PendingApprovalsCardProps) => 
         setError(data.error ? `${t('decisionFailed')}: ${data.error}` : t('decisionFailed'))
         return
       }
-      router.refresh()
+      startTransition(() => router.refresh())
     } catch {
       setError(t('decisionFailedUnreachable'))
     } finally {

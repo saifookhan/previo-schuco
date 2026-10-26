@@ -76,6 +76,18 @@ sehen ihn — nicht die Unternehmen, mit denen die Familie geteilt wurde.
 - **Meine Familien** — Familien deines Unternehmens.
 - **Mit mir geteilt** — Familien, die andere Unternehmen mit dir geteilt haben, mit Besitzer und **deinem Rabatt**.
 
+## Filter
+
+Über der Liste, für den geöffneten Reiter:
+
+- **Suche** — Name, technischer Name, Kategorie, Marke (und Eigentümer unter *Mit mir geteilt*).
+- **Kategorie**, **Marke**, **Status** (veröffentlicht / Entwurf).
+- **Preisgültigkeit** — *Heute gültig* (was das Angebot anbietet; Familien ohne Daten zählen mit), *Demnächst*, *Abgelaufen*, *Ohne Daten*.
+- **Weitere Filter** — *Preise gültig am* bestimmten Tag, *Aktualisiert ab / bis*, *Nur neueste Versionen* (blendet Versionen aus, die eine neuere ersetzt); unter *Mit mir geteilt* zusätzlich **Eigentümer** und **Ihr Rabatt** (mit / ohne).
+- **Sortieren** — neueste zuerst (Standard), zuletzt aktualisiert, Name, Preise laufen zuerst ab.
+
+Die Filter sind Teil der Seitenadresse: Sie können sie speichern oder teilen, und **Zurück** macht die letzte Änderung rückgängig.
+
 ## Noch nicht umgesetzt
 
 Festlegen, welche Merkmale für welche Linien gelten, ohne die Excel-Datei neu zu importieren.

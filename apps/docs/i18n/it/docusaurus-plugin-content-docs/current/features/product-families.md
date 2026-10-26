@@ -75,6 +75,18 @@ alle condivisioni e ogni modifica di prezzo (quale linea o opzione, quali campi)
 - **Le mie famiglie** — le famiglie della tua azienda.
 - **Condivise con me** — famiglie che altre aziende hanno condiviso con te, con proprietario e **il tuo sconto**.
 
+## Filtri
+
+Sopra l'elenco, per la scheda aperta:
+
+- **Cerca** — nome, nome tecnico, categoria, marca (e proprietario in *Condivise con me*).
+- **Categoria**, **Marca**, **Stato** (pubblicata / bozza).
+- **Validità prezzi** — *Validi oggi* (quello che propone il preventivo; contano anche le famiglie senza date), *In arrivo*, *Scaduti*, *Senza date*.
+- **Altri filtri** — *Prezzi validi il* un certo giorno, *Aggiornata dal / al*, *Solo ultime versioni* (nasconde le versioni sostituite da una più recente); in *Condivise con me* anche **Proprietario** e **Il tuo sconto** (con / senza).
+- **Ordina** — più recenti prima (predefinito), aggiornate di recente, nome, prezzi in scadenza prima.
+
+I filtri fanno parte dell'indirizzo della pagina: puoi salvarlo o condividerlo, e **Indietro** annulla l'ultima modifica.
+
 ## Non ancora realizzato
 
 Modificare quali caratteristiche valgono per quali linee senza reimportare il file Excel.

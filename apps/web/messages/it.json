@@ -255,7 +255,7 @@
   "productFamilies": {
     "title": "Famiglie di prodotto",
     "subtitle": "Importa un catalogo fornitore da Excel, poi pubblicalo per permettere ai clienti di generare preventivi",
-    "familiesCount": "{count} famiglie",
+    "familiesCount": "{count, plural, one {# famiglia} other {# famiglie}}",
     "emptyState": "Nessuna famiglia di prodotto — importa un file Excel per iniziare.",
     "name": "Nome",
     "category": "Categoria",
@@ -270,7 +270,9 @@
     "emptyShared": "Nessuna famiglia di prodotti è stata ancora condivisa con la tua azienda.",
     "owner": "Proprietario",
     "yourDiscount": "Il tuo sconto",
-    "priceValidity": "Validità prezzi"
+    "priceValidity": "Validità prezzi",
+    "noMatches": "Nessuna famiglia corrisponde a questi filtri.",
+    "clearFilters": "Rimuovi filtri"
   },
   "productFamilyActions": {
     "publish": "Pubblica",
@@ -692,5 +694,44 @@
     "saved": "Validità dei prezzi salvata",
     "saveFailed": "Impossibile salvare",
     "saveFailedUnreachable": "Impossibile salvare — server non raggiungibile"
+  },
+  "productFamilyFilters": {
+    "search": "Cerca",
+    "searchPlaceholder": "Nome, nome tecnico, categoria, marca…",
+    "all": "Tutti",
+    "category": "Categoria",
+    "brand": "Marca",
+    "status": "Stato",
+    "statusPublished": "Pubblicata",
+    "statusDraft": "Bozza",
+    "validity": "Validità prezzi",
+    "validityOptions": {
+      "current": "Validi oggi",
+      "upcoming": "In arrivo",
+      "expired": "Scaduti",
+      "notSet": "Senza date"
+    },
+    "validOn": "Prezzi validi il",
+    "updatedFrom": "Aggiornata dal",
+    "updatedTo": "Aggiornata al",
+    "owner": "Proprietario",
+    "discount": "Il tuo sconto",
+    "discountWith": "Con sconto",
+    "discountWithout": "Senza sconto",
+    "latestOnly": "Solo ultime versioni",
+    "moreFilters": "Altri filtri",
+    "clear": "{count, plural, one {Rimuovi # filtro} other {Rimuovi # filtri}}",
+    "showing": "{shown} di {total}",
+    "sort": "Ordina",
+    "sortOptions": {
+      "name": "Nome (A–Z)",
+      "updated": "Aggiornate di recente",
+      "created": "Create di recente",
+      "validTo": "Prezzi in scadenza prima"
+    }
+  },
+  "loading": {
+    "loading": "Caricamento…",
+    "updating": "Aggiornamento…"
   }
 }

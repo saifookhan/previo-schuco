@@ -25,6 +25,7 @@ Ein kompletter Durchlauf der wichtigsten Abläufe. Mit den [Demo-Anmeldungen](./
 - [ ] Veröffentlichen — Bearbeiten ist nun gesperrt.
 - [ ] Eine **neue Version** erstellen, bearbeiten, veröffentlichen.
 - [ ] Die Demo-Familie mit Fabbrikka zu 5 % teilen.
+- [ ] Unter *Produktfamilien* jeden Filter und die Sortierung ausprobieren — Liste und „x von y“ aktualisieren sich; die URL in einem neuen Tab öffnen zeigt dieselben Filter; **Zurück** macht den letzten Filter rückgängig.
 
 ## Sichtbarkeit
 

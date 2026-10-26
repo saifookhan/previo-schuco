@@ -9,6 +9,10 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 
 ## Ottobre 2026
 
+**Settimana del 26 ottobre**
+- **Filtri in Famiglie di prodotto**: ricerca, categoria, marca, stato, validità prezzi, data di validità, periodo di aggiornamento, solo ultime versioni, proprietario e sconto (scheda condivise) e ordinamento. Restano nell’indirizzo della pagina.
+- **Indicatori di caricamento su ogni tabella**: un segnaposto al primo caricamento della pagina e una barra di avanzamento con “Aggiornamento…” quando una tabella si ricarica dopo un filtro, un ordinamento, una scheda o un’azione — le righe restano visibili.
+
 **Settimana del 20 ottobre**
 - **Caricamento Excel in due passi**: il file viene prima controllato e una finestra mostra cosa contiene; poi si impostano nome, **validità dei prezzi** (dal/al) e pubblicazione. Le nuove posizioni dei preventivi usano solo famiglie con prezzi validi oggi.
 - **Duplica** famiglia ora apre lo stesso tipo di finestra: nome, validità prezzi e pubblicazione.

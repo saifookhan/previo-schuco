@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useLoadingTransition } from '@/components/ui/loading-region'
 import { useRouter } from '@/i18n/navigation'
 import type { GrantableRolesResponse, UserDto } from '@schuco/contracts'
 
@@ -18,6 +19,8 @@ import type { GrantableRolesResponse, UserDto } from '@schuco/contracts'
 export const UserInviteButton = () => {
   const t = useTranslations('settingsUsers')
   const router = useRouter()
+  // Refreshes run in the table's loading region, so the list shows it is reloading (ADR 0014).
+  const { startTransition } = useLoadingTransition()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [availableRoles, setAvailableRoles] = useState<GrantableRolesResponse['roles']>([])
@@ -68,7 +71,7 @@ export const UserInviteButton = () => {
         return
       }
       setOpen(false)
-      router.refresh()
+      startTransition(() => router.refresh())
     } catch {
       setError(t('addUserFailedUnreachable'))
     } finally {

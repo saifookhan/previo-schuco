@@ -6,6 +6,7 @@ import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useLoadingTransition } from '@/components/ui/loading-region'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
@@ -33,6 +34,8 @@ export const ProductFamilyShareButton = ({
 }) => {
   const t = useTranslations('productFamilyShare')
   const router = useRouter()
+  // Refreshes run in the table's loading region, so the list shows it is reloading (ADR 0014).
+  const { startTransition } = useLoadingTransition()
   const { user, can } = useAuth()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -103,7 +106,7 @@ export const ProductFamilyShareButton = ({
       }
       showToast(t('saved', { count: shares.length }))
       setOpen(false)
-      router.refresh()
+      startTransition(() => router.refresh())
     } catch {
       setError(t('saveFailedUnreachable'))
     } finally {

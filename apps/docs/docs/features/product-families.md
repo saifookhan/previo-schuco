@@ -75,6 +75,18 @@ the family was shared with.
 - **Own** — families your company owns.
 - **Shared with me** — families other companies shared with you, with the owner and **your discount**.
 
+## Filters
+
+Above the list, for the tab you're on:
+
+- **Search** — name, technical name, category, brand (and owner on *Shared with me*).
+- **Category**, **Brand**, **Status** (published / draft).
+- **Price validity** — *Valid today* (what the quote builder offers; families without dates count), *Upcoming*, *Expired*, *No dates*.
+- **More filters** — *Prices valid on* a given day, *Updated from / to*, *Latest versions only* (hides versions a newer one replaces); on *Shared with me* also **Owner** and **Your discount** (with / without).
+- **Sort** — newest first (default), recently updated, name, prices ending soonest.
+
+Filters are part of the page address, so you can bookmark or share a filtered list, and **Back** undoes the last change.
+
 ## Not built yet
 
 Editing which characteristics apply to which lines without re-importing the Excel file.

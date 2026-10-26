@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { useRouter } from '@/i18n/navigation'
 import type { CompanyCapabilities, CompanyDto } from '@schuco/contracts'
 import { CompanyCapabilitiesField } from '@/components/company-capabilities-field'
+import { useLoadingTransition } from '@/components/ui/loading-region'
 import { hasAnyCapability } from '@/lib/company-capabilities'
 
 const DEFAULT_CAPABILITIES: CompanyCapabilities = { platform: false, manufacturer: false, supplier: false, client: true }
@@ -18,6 +19,8 @@ const DEFAULT_CAPABILITIES: CompanyCapabilities = { platform: false, manufacture
 export const CompanyCreateButton = () => {
   const t = useTranslations('adminCompanies')
   const router = useRouter()
+  // Refreshes run in the table's loading region, so the list shows it is reloading (ADR 0014).
+  const { startTransition } = useLoadingTransition()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,7 +55,7 @@ export const CompanyCreateButton = () => {
         return
       }
       setOpen(false)
-      router.refresh()
+      startTransition(() => router.refresh())
     } catch {
       setError(t('createFailedUnreachable'))
     } finally {

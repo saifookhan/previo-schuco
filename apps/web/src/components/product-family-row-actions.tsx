@@ -12,6 +12,7 @@ import {
   type ProductFamilyDetails,
 } from '@/components/product-family-details-fields'
 import { Button } from '@/components/ui/button'
+import { useLoadingTransition } from '@/components/ui/loading-region'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
@@ -40,6 +41,8 @@ export const ProductFamilyRowActions = ({
 }: ProductFamilyRowActionsProps) => {
   const t = useTranslations('productFamilyActions')
   const router = useRouter()
+  // Refreshes run in the table's loading region, so the list shows it is reloading (ADR 0014).
+  const { startTransition } = useLoadingTransition()
   const { user, can } = useAuth()
   const [busyAction, setBusyAction] = useState<'publish' | 'duplicate' | 'delete' | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -60,7 +63,7 @@ export const ProductFamilyRowActions = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isPublished: !isPublished }),
       })
-      router.refresh()
+      startTransition(() => router.refresh())
     } finally {
       setBusyAction(null)
     }
@@ -101,7 +104,7 @@ export const ProductFamilyRowActions = ({
       if (!response.ok || !data.family) {
         setCopyError(data.error ? `${t('duplicateFailed')}: ${data.error}` : t('duplicateFailed'))
         // The family may be gone (deleted elsewhere) — let the page behind the dialog catch up.
-        router.refresh()
+        startTransition(() => router.refresh())
         return
       }
       setCopyDetails(null)
@@ -109,7 +112,7 @@ export const ProductFamilyRowActions = ({
       router.push(`/app/product-families/${data.family.id}`)
       // Also busts the list page's client router cache, so it doesn't
       // show stale (pre-duplicate) data the next time it's visited.
-      router.refresh()
+      startTransition(() => router.refresh())
     } catch {
       setCopyError(t('duplicateFailedUnreachable'))
     } finally {
@@ -127,7 +130,7 @@ export const ProductFamilyRowActions = ({
         if (redirectAfterDeleteHref) {
           router.push(redirectAfterDeleteHref)
         }
-        router.refresh()
+        startTransition(() => router.refresh())
       } else {
         showToast(t('deleteFailed'), 'error')
         setConfirmingDelete(false)

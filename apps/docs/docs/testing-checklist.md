@@ -25,6 +25,7 @@ An end-to-end run through the main flows. Use [Demo logins](./demo-logins.md) to
 - [ ] Publish it — editing is now locked.
 - [ ] Create a **new version**, edit it, publish it.
 - [ ] Share the demo family with Fabbrikka at 5%.
+- [ ] On *Product families*, try each filter and the sort — the list and the “x of y” count update; copy the URL into a new tab and the same filters are applied; **Back** undoes the last filter.
 
 ## Visibility
 

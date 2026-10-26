@@ -8,6 +8,7 @@ import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useLoadingTransition } from '@/components/ui/loading-region'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
@@ -24,6 +25,8 @@ type Form = { name: string; roleIds: string[]; active: boolean }
 export const UserEditButton = ({ user: target }: { user: UserDto }) => {
   const t = useTranslations('settingsUsers')
   const router = useRouter()
+  // Refreshes run in the table's loading region, so the list shows it is reloading (ADR 0014).
+  const { startTransition } = useLoadingTransition()
   const { user, hasRole } = useAuth()
   const [form, setForm] = useState<Form | null>(null)
   const [availableRoles, setAvailableRoles] = useState<GrantableRolesResponse['roles']>([])
@@ -84,7 +87,7 @@ export const UserEditButton = ({ user: target }: { user: UserDto }) => {
       }
       setForm(null)
       showToast(t('editSaved', { email: target.email }))
-      router.refresh()
+      startTransition(() => router.refresh())
     } catch {
       setError(t('editFailedUnreachable'))
     } finally {

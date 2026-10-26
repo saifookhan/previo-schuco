@@ -7,6 +7,8 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { LoadingRegion } from '@/components/ui/loading-region'
+import { TableSkeleton } from '@/components/ui/table-skeleton'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import type { AuditLogEntry, AuditLogListResponse } from '@schuco/contracts'
@@ -88,6 +90,7 @@ export const AuditLogViewer = ({
 }) => {
   const scope = companies ? 'platform' : 'company'
   const t = useTranslations('auditLog')
+  const tLoading = useTranslations('loading')
   const format = useFormatter()
   const styles = TONES[tone]
 
@@ -95,7 +98,9 @@ export const AuditLogViewer = ({
   const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS)
   const [entries, setEntries] = useState<AuditLogEntry[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  /** `replace`: new filters (or the first load) — the table shows its loading state; `more`: "Load more" — a spinner under the rows (ADR 0014). */
+  const [loading, setLoading] = useState<false | 'replace' | 'more'>('replace')
+  const [loadedOnce, setLoadedOnce] = useState(false)
   const [error, setError] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   // Only the newest request may update the table — an older one (previous filter, a slow "load more")
@@ -106,8 +111,10 @@ export const AuditLogViewer = ({
     async (filters: Filters, cursor?: string) => {
       const requestNumber = ++latestRequest.current
       const isCurrent = () => requestNumber === latestRequest.current
-      setLoading(true)
+      setLoading(cursor ? 'more' : 'replace')
       setError(false)
+      // New filters: the old cursor belongs to the previous query, so "Load more" can't use it.
+      if (!cursor) setNextCursor(null)
       try {
         const response = await fetch(`/api/audit-log?${buildQuery(scope, filters, cursor)}`, { cache: 'no-store' })
         if (!isCurrent()) return
@@ -122,7 +129,10 @@ export const AuditLogViewer = ({
       } catch {
         if (isCurrent()) setError(true)
       } finally {
-        if (isCurrent()) setLoading(false)
+        if (isCurrent()) {
+          setLoading(false)
+          setLoadedOnce(true)
+        }
       }
     },
     [scope],
@@ -211,10 +221,10 @@ export const AuditLogViewer = ({
             />
           </div>
           <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-6">
-            <Button onClick={() => apply(draft)} disabled={loading}>
+            <Button onClick={() => apply(draft)} disabled={loading !== false}>
               {t('apply')}
             </Button>
-            <Button variant="outline" className={styles.outlineButton} onClick={() => apply(EMPTY_FILTERS)} disabled={loading}>
+            <Button variant="outline" className={styles.outlineButton} onClick={() => apply(EMPTY_FILTERS)} disabled={loading !== false}>
               {t('reset')}
             </Button>
             {applied.actor ? (
@@ -236,112 +246,118 @@ export const AuditLogViewer = ({
         </div>
       ) : null}
 
-      <Card className={styles.card}>
-        <CardHeader>
-          <CardTitle className={styles.title}>{t('entriesShown', { count: entries.length })}</CardTitle>
-        </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[900px] text-sm">
-            <thead>
-              <tr className={cn('border-b text-left', styles.border, styles.muted)}>
-                <th className="w-8 px-4 py-3" />
-                <th className="px-4 py-3 font-medium">{t('when')}</th>
-                <th className="px-4 py-3 font-medium">{t('who')}</th>
-                <th className="px-4 py-3 font-medium">{t('company')}</th>
-                <th className="px-4 py-3 font-medium">{t('action')}</th>
-                <th className="px-4 py-3 font-medium">{t('resource')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry) => {
-                const isOpen = expanded.has(entry.id)
-                const viaOtherCompany = entry.actorCompany && entry.actorCompany.id !== entry.company.id
-                return (
-                  <Fragment key={entry.id}>
-                    <tr className={cn('border-b align-top', styles.border, styles.rowHover)}>
-                      <td className="px-4 py-3">
-                        <button type="button" aria-label={t('details')} onClick={() => toggle(entry.id)} className={styles.muted}>
-                          {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        </button>
-                      </td>
-                      <td className={cn('whitespace-nowrap px-4 py-3', styles.text)}>
-                        {format.dateTime(new Date(entry.createdAt), { dateStyle: 'short', timeStyle: 'medium' })}
-                      </td>
-                      <td className="px-4 py-3">
-                        {entry.actor ? (
-                          <button
-                            type="button"
-                            className={cn('text-left hover:underline', styles.title)}
-                            title={t('filterByActor')}
-                            onClick={() => apply({ ...applied, actor: { id: entry.actor!.id, label: actorLabel(entry) } })}
-                          >
-                            {actorLabel(entry)}
-                          </button>
-                        ) : (
-                          <span className={styles.muted}>{actorLabel(entry)}</span>
-                        )}
-                        {entry.actor?.email && entry.actor.name ? <div className={cn('text-xs', styles.muted)}>{entry.actor.email}</div> : null}
-                      </td>
-                      <td className={cn('px-4 py-3', styles.text)}>
-                        {entry.company.name ?? entry.company.id.slice(0, 8)}
-                        {viaOtherCompany ? (
-                          <div className={cn('text-xs', styles.muted)}>
-                            {t('viaCompany', { name: entry.actorCompany!.name ?? entry.actorCompany!.id.slice(0, 8) })}
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3">
-                        <code className={cn('rounded px-1.5 py-0.5 font-mono text-xs', styles.code)}>{entry.action}</code>
-                      </td>
-                      <td className={cn('px-4 py-3', styles.text)}>
-                        {t.has(`resourceTypes.${entry.resourceType}`) ? t(`resourceTypes.${entry.resourceType}`) : entry.resourceType}
-                        {entry.resourceId ? <div className={cn('font-mono text-xs', styles.muted)}>{entry.resourceId}</div> : null}
-                      </td>
-                    </tr>
-                    {isOpen ? (
-                      <tr className={cn('border-b', styles.border)}>
-                        <td />
-                        <td colSpan={5} className="px-4 pb-4">
-                          <dl className={cn('grid gap-x-6 gap-y-1 text-xs sm:grid-cols-[max-content_1fr]', styles.text)}>
-                            <dt className={styles.muted}>{t('requestId')}</dt>
-                            <dd className="font-mono">{entry.requestId ?? '—'}</dd>
-                            {entry.jobId ? (
-                              <>
-                                <dt className={styles.muted}>{t('jobId')}</dt>
-                                <dd className="font-mono">{entry.jobId}</dd>
-                              </>
+      {!loadedOnce ? (
+        <TableSkeleton columns={6} tone={tone} label={tLoading('loading')} />
+      ) : (
+        <LoadingRegion pending={loading === 'replace'} tone={tone}>
+          <Card className={styles.card}>
+            <CardHeader>
+              <CardTitle className={styles.title}>{t('entriesShown', { count: entries.length })}</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto p-0">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead>
+                  <tr className={cn('border-b text-left', styles.border, styles.muted)}>
+                    <th className="w-8 px-4 py-3" />
+                    <th className="px-4 py-3 font-medium">{t('when')}</th>
+                    <th className="px-4 py-3 font-medium">{t('who')}</th>
+                    <th className="px-4 py-3 font-medium">{t('company')}</th>
+                    <th className="px-4 py-3 font-medium">{t('action')}</th>
+                    <th className="px-4 py-3 font-medium">{t('resource')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((entry) => {
+                    const isOpen = expanded.has(entry.id)
+                    const viaOtherCompany = entry.actorCompany && entry.actorCompany.id !== entry.company.id
+                    return (
+                      <Fragment key={entry.id}>
+                        <tr className={cn('border-b align-top', styles.border, styles.rowHover)}>
+                          <td className="px-4 py-3">
+                            <button type="button" aria-label={t('details')} onClick={() => toggle(entry.id)} className={styles.muted}>
+                              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </button>
+                          </td>
+                          <td className={cn('whitespace-nowrap px-4 py-3', styles.text)}>
+                            {format.dateTime(new Date(entry.createdAt), { dateStyle: 'short', timeStyle: 'medium' })}
+                          </td>
+                          <td className="px-4 py-3">
+                            {entry.actor ? (
+                              <button
+                                type="button"
+                                className={cn('text-left hover:underline', styles.title)}
+                                title={t('filterByActor')}
+                                onClick={() => apply({ ...applied, actor: { id: entry.actor!.id, label: actorLabel(entry) } })}
+                              >
+                                {actorLabel(entry)}
+                              </button>
+                            ) : (
+                              <span className={styles.muted}>{actorLabel(entry)}</span>
+                            )}
+                            {entry.actor?.email && entry.actor.name ? <div className={cn('text-xs', styles.muted)}>{entry.actor.email}</div> : null}
+                          </td>
+                          <td className={cn('px-4 py-3', styles.text)}>
+                            {entry.company.name ?? entry.company.id.slice(0, 8)}
+                            {viaOtherCompany ? (
+                              <div className={cn('text-xs', styles.muted)}>
+                                {t('viaCompany', { name: entry.actorCompany!.name ?? entry.actorCompany!.id.slice(0, 8) })}
+                              </div>
                             ) : null}
-                            <dt className={styles.muted}>{t('details')}</dt>
-                            <dd>
-                              {entry.metadata ? (
-                                <pre className={cn('overflow-x-auto rounded p-2 font-mono', styles.code)}>
-                                  {JSON.stringify(entry.metadata, null, 2)}
-                                </pre>
-                              ) : (
-                                '—'
-                              )}
-                            </dd>
-                          </dl>
-                        </td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
-                )
-              })}
-            </tbody>
-          </table>
-          {!loading && entries.length === 0 && !error ? <p className={cn('px-6 py-8 text-sm', styles.muted)}>{t('empty')}</p> : null}
-          <div className="flex justify-center p-4">
-            {loading ? (
-              <Loader2 className={cn('h-5 w-5 animate-spin', styles.muted)} />
-            ) : nextCursor ? (
-              <Button variant="outline" className={styles.outlineButton} onClick={() => void load(applied, nextCursor)}>
-                {t('loadMore')}
-              </Button>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
+                          </td>
+                          <td className="px-4 py-3">
+                            <code className={cn('rounded px-1.5 py-0.5 font-mono text-xs', styles.code)}>{entry.action}</code>
+                          </td>
+                          <td className={cn('px-4 py-3', styles.text)}>
+                            {t.has(`resourceTypes.${entry.resourceType}`) ? t(`resourceTypes.${entry.resourceType}`) : entry.resourceType}
+                            {entry.resourceId ? <div className={cn('font-mono text-xs', styles.muted)}>{entry.resourceId}</div> : null}
+                          </td>
+                        </tr>
+                        {isOpen ? (
+                          <tr className={cn('border-b', styles.border)}>
+                            <td />
+                            <td colSpan={5} className="px-4 pb-4">
+                              <dl className={cn('grid gap-x-6 gap-y-1 text-xs sm:grid-cols-[max-content_1fr]', styles.text)}>
+                                <dt className={styles.muted}>{t('requestId')}</dt>
+                                <dd className="font-mono">{entry.requestId ?? '—'}</dd>
+                                {entry.jobId ? (
+                                  <>
+                                    <dt className={styles.muted}>{t('jobId')}</dt>
+                                    <dd className="font-mono">{entry.jobId}</dd>
+                                  </>
+                                ) : null}
+                                <dt className={styles.muted}>{t('details')}</dt>
+                                <dd>
+                                  {entry.metadata ? (
+                                    <pre className={cn('overflow-x-auto rounded p-2 font-mono', styles.code)}>
+                                      {JSON.stringify(entry.metadata, null, 2)}
+                                    </pre>
+                                  ) : (
+                                    '—'
+                                  )}
+                                </dd>
+                              </dl>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+              {loading === false && entries.length === 0 && !error ? <p className={cn('px-6 py-8 text-sm', styles.muted)}>{t('empty')}</p> : null}
+              <div className="flex justify-center p-4">
+                {loading === 'more' ? (
+                  <Loader2 className={cn('h-5 w-5 animate-spin', styles.muted)} />
+                ) : loading === false && nextCursor ? (
+                  <Button variant="outline" className={styles.outlineButton} onClick={() => void load(applied, nextCursor)}>
+                    {t('loadMore')}
+                  </Button>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+        </LoadingRegion>
+      )}
     </div>
   )
 }

@@ -17,5 +17,6 @@ Index of ADRs for the multi-environment, multi-tenant architecture work. Each AD
 | [0011](./0011-secrets-config-management.md) | Secrets and config management | Superseded by 0013 |
 | [0012](./0012-testing-strategy-and-service-layer.md) | Repository/service layering, Vitest, no direct DB access from tests | Accepted |
 | [0013](./0013-single-server-docker-compose-deployment.md) | Single-server Docker Compose deployment; AWS, Terraform, Vercel and Cognito retired | Accepted |
+| [0014](./0014-table-loading-states.md) | Loading states for data tables: skeleton on first load, overlay on reload | Accepted |
 
 See also: [project-context.md](../project-context.md) (domain/roles), [technical-overview.md](../technical-overview.md) (system diagrams), [deployment.md](../deployment.md), [environments.md](../environments.md) (env/target composition), [infra-status.md](../infra-status.md) (what is actually running).

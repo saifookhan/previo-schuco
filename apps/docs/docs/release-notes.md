@@ -9,6 +9,10 @@ What changed, newest first. Use it to see what's new to test.
 
 ## October 2026
 
+**Week of 26 October**
+- **Filters on Product families**: search, category, brand, status, price validity, valid-on date, updated range, latest versions only, owner and discount (shared tab), and sorting. They are kept in the page address.
+- **Loading indicators on every table**: a placeholder while a page first loads, and a progress bar with “Updating…” while a table reloads after a filter, sort, tab or action — the rows stay visible.
+
 **Week of 20 October**
 - **Excel upload in two steps**: the file is checked first and a dialog shows what it holds; then set the name, **price validity** (from/to) and whether to publish. New quote positions only use families whose prices are valid today.
 - **Duplicate** a product family now opens the same kind of dialog: name, price validity and publish.

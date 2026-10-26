@@ -255,7 +255,7 @@
   "productFamilies": {
     "title": "Produktfamilien",
     "subtitle": "Importieren Sie einen Lieferantenkatalog aus Excel und veröffentlichen Sie ihn für Kundenangebote",
-    "familiesCount": "{count} Produktfamilien",
+    "familiesCount": "{count, plural, one {# Produktfamilie} other {# Produktfamilien}}",
     "emptyState": "Noch keine Produktfamilien — importieren Sie eine Excel-Datei, um zu starten.",
     "name": "Name",
     "category": "Kategorie",
@@ -270,7 +270,9 @@
     "emptyShared": "Mit Ihrem Unternehmen wurden noch keine Produktfamilien geteilt.",
     "owner": "Eigentümer",
     "yourDiscount": "Ihr Rabatt",
-    "priceValidity": "Preisgültigkeit"
+    "priceValidity": "Preisgültigkeit",
+    "noMatches": "Keine Produktfamilie passt zu diesen Filtern.",
+    "clearFilters": "Filter entfernen"
   },
   "productFamilyActions": {
     "publish": "Veröffentlichen",
@@ -692,5 +694,44 @@
     "saved": "Preisgültigkeit gespeichert",
     "saveFailed": "Speichern fehlgeschlagen",
     "saveFailedUnreachable": "Speichern fehlgeschlagen — Server nicht erreichbar"
+  },
+  "productFamilyFilters": {
+    "search": "Suche",
+    "searchPlaceholder": "Name, technischer Name, Kategorie, Marke…",
+    "all": "Alle",
+    "category": "Kategorie",
+    "brand": "Marke",
+    "status": "Status",
+    "statusPublished": "Veröffentlicht",
+    "statusDraft": "Entwurf",
+    "validity": "Preisgültigkeit",
+    "validityOptions": {
+      "current": "Heute gültig",
+      "upcoming": "Demnächst",
+      "expired": "Abgelaufen",
+      "notSet": "Ohne Daten"
+    },
+    "validOn": "Preise gültig am",
+    "updatedFrom": "Aktualisiert ab",
+    "updatedTo": "Aktualisiert bis",
+    "owner": "Eigentümer",
+    "discount": "Ihr Rabatt",
+    "discountWith": "Mit Rabatt",
+    "discountWithout": "Ohne Rabatt",
+    "latestOnly": "Nur neueste Versionen",
+    "moreFilters": "Weitere Filter",
+    "clear": "{count, plural, one {# Filter entfernen} other {# Filter entfernen}}",
+    "showing": "{shown} von {total}",
+    "sort": "Sortieren",
+    "sortOptions": {
+      "name": "Name (A–Z)",
+      "updated": "Zuletzt aktualisiert",
+      "created": "Zuletzt erstellt",
+      "validTo": "Preise laufen zuerst ab"
+    }
+  },
+  "loading": {
+    "loading": "Wird geladen…",
+    "updating": "Wird aktualisiert…"
   }
 }

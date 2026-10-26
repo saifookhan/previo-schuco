@@ -255,7 +255,7 @@
   "productFamilies": {
     "title": "Product families",
     "subtitle": "Import a supplier catalog from Excel, then publish it for clients to quote from",
-    "familiesCount": "{count} families",
+    "familiesCount": "{count, plural, one {# family} other {# families}}",
     "emptyState": "No product families yet — import an Excel workbook to get started.",
     "name": "Name",
     "category": "Category",
@@ -270,7 +270,9 @@
     "emptyShared": "No product families have been shared with your company yet.",
     "owner": "Owner",
     "yourDiscount": "Your discount",
-    "priceValidity": "Price validity"
+    "priceValidity": "Price validity",
+    "noMatches": "No product families match these filters.",
+    "clearFilters": "Clear filters"
   },
   "productFamilyActions": {
     "publish": "Publish",
@@ -692,5 +694,44 @@
     "saved": "Price validity saved",
     "saveFailed": "Could not save",
     "saveFailedUnreachable": "Could not save — could not reach the server"
+  },
+  "productFamilyFilters": {
+    "search": "Search",
+    "searchPlaceholder": "Name, technical name, category, brand…",
+    "all": "All",
+    "category": "Category",
+    "brand": "Brand",
+    "status": "Status",
+    "statusPublished": "Published",
+    "statusDraft": "Draft",
+    "validity": "Price validity",
+    "validityOptions": {
+      "current": "Valid today",
+      "upcoming": "Upcoming",
+      "expired": "Expired",
+      "notSet": "No dates"
+    },
+    "validOn": "Prices valid on",
+    "updatedFrom": "Updated from",
+    "updatedTo": "Updated to",
+    "owner": "Owner",
+    "discount": "Your discount",
+    "discountWith": "With a discount",
+    "discountWithout": "No discount",
+    "latestOnly": "Latest versions only",
+    "moreFilters": "More filters",
+    "clear": "{count, plural, one {Clear # filter} other {Clear # filters}}",
+    "showing": "{shown} of {total}",
+    "sort": "Sort",
+    "sortOptions": {
+      "name": "Name (A–Z)",
+      "updated": "Recently updated",
+      "created": "Recently created",
+      "validTo": "Prices ending soonest"
+    }
+  },
+  "loading": {
+    "loading": "Loading…",
+    "updating": "Updating…"
   }
 }

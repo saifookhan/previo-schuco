@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { useRouter } from '@/i18n/navigation'
 import type { CompanyDto } from '@schuco/contracts'
 import { CompanyCapabilitiesField } from '@/components/company-capabilities-field'
+import { useLoadingTransition } from '@/components/ui/loading-region'
 import { hasAnyCapability } from '@/lib/company-capabilities'
 
 interface CompanyRowActionsProps {
@@ -20,6 +21,8 @@ interface CompanyRowActionsProps {
 export const CompanyRowActions = ({ company }: CompanyRowActionsProps) => {
   const t = useTranslations('adminCompanies')
   const router = useRouter()
+  // Refreshes run in the table's loading region, so the list shows it is reloading (ADR 0014).
+  const { startTransition } = useLoadingTransition()
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [togglingActive, setTogglingActive] = useState(false)
@@ -55,7 +58,7 @@ export const CompanyRowActions = ({ company }: CompanyRowActionsProps) => {
         return
       }
       setEditOpen(false)
-      router.refresh()
+      startTransition(() => router.refresh())
     } catch {
       setError(t('saveFailedUnreachable'))
     } finally {
@@ -71,7 +74,7 @@ export const CompanyRowActions = ({ company }: CompanyRowActionsProps) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !company.isActive }),
       })
-      router.refresh()
+      startTransition(() => router.refresh())
     } finally {
       setTogglingActive(false)
     }

@@ -25,6 +25,7 @@ Un percorso completo dei flussi principali. Usa gli [Accessi demo](./demo-logins
 - [ ] Pubblicala — ora la modifica è bloccata.
 - [ ] Crea una **nuova versione**, modificala, pubblicala.
 - [ ] Condividi la famiglia demo con Fabbrikka al 5%.
+- [ ] In *Famiglie di prodotto*, prova ogni filtro e l’ordinamento — l’elenco e il conteggio “x di y” si aggiornano; copia l’URL in una nuova scheda e gli stessi filtri vengono applicati; **Indietro** annulla l’ultimo filtro.
 
 ## Visibilità
 

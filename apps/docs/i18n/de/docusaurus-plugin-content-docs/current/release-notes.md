@@ -9,6 +9,10 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 
 ## Oktober 2026
 
+**Woche vom 26. Oktober**
+- **Filter bei Produktfamilien**: Suche, Kategorie, Marke, Status, Preisgültigkeit, Gültigkeitstag, Aktualisierungszeitraum, nur neueste Versionen, Eigentümer und Rabatt (geteilter Reiter) sowie Sortierung. Sie bleiben in der Seitenadresse.
+- **Ladeanzeigen in jeder Tabelle**: ein Platzhalter beim ersten Laden der Seite und ein Fortschrittsbalken mit „Wird aktualisiert…“, wenn eine Tabelle nach Filter, Sortierung, Reiter oder Aktion neu lädt — die Zeilen bleiben sichtbar.
+
 **Woche vom 20. Oktober**
 - **Excel-Upload in zwei Schritten**: Die Datei wird zuerst geprüft und ein Dialog zeigt ihren Inhalt; dann Name, **Preisgültigkeit** (ab/bis) und Veröffentlichung festlegen. Neue Angebotspositionen verwenden nur Familien mit heute gültigen Preisen.
 - **Duplizieren** einer Produktfamilie öffnet jetzt denselben Dialog: Name, Preisgültigkeit und Veröffentlichung.
