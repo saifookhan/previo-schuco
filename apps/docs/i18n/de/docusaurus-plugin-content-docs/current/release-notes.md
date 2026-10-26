@@ -12,6 +12,7 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 **Woche vom 20. Oktober**
 - **Excel-Upload in zwei Schritten**: Die Datei wird zuerst geprüft und ein Dialog zeigt ihren Inhalt; dann Name, **Preisgültigkeit** (ab/bis) und Veröffentlichung festlegen. Neue Angebotspositionen verwenden nur Familien mit heute gültigen Preisen.
 - **Duplizieren** einer Produktfamilie öffnet jetzt denselben Dialog: Name, Preisgültigkeit und Veröffentlichung.
+- **Benutzer bearbeiten** unter *Einstellungen → Benutzer* (Stift in jeder Zeile): Name, Rollen, aktiv/inaktiv.
 - **Rollen-Seite ausgeblendet** — eigene Rollen werden vorerst nicht gebraucht. Die Beschreibung jeder Rolle steht unter *Einstellungen → Zugriffsrechte*: auf das ⓘ neben dem Rollennamen klicken.
 - **Angebot** (der alte Demo-Editor) aus der Seitenleiste entfernt, er wurde mit Angebote verwechselt.
 

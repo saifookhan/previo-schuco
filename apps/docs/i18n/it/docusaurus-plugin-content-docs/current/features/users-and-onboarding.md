@@ -23,3 +23,13 @@ Non esiste registrazione pubblica. Gli utenti entrano solo tramite **invito**.
 **Password dimenticata** nella pagina di login invia un link di reset allo stesso modo.
 
 Un utente può avere **più ruoli**; i suoi permessi sono l'unione di tutti.
+
+## Modificare un utente
+
+Clicca la **matita** sulla riga di un utente per cambiare **nome**, **ruoli** e se è **attivo**.
+
+- L'email non si può cambiare: è con quella che l'utente accede.
+- Un utente non attivo non può accedere e viene disconnesso al clic successivo. Spunta di nuovo **Attivo** per riammetterlo.
+- Attivo/non attivo si può cambiare solo dopo che l'utente ha accettato l'invito.
+- Non puoi disattivare te stesso né togliere il tuo ruolo *Company Admin* (o *Super Admin*), e un'azienda mantiene sempre almeno un admin aziendale attivo: così non resta mai bloccata fuori.
+- Un admin aziendale non può modificare un super-admin e può assegnare solo ruoli di cui ha i permessi.

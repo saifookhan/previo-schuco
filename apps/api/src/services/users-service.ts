@@ -9,10 +9,15 @@ import {
   listUsers,
   markInviteFailed,
   resetInvitePending,
+  lockActiveCompanyAdminIds,
   setUserRoles,
+  updateUserDetails,
+  type DbLike,
   type UserListRow,
   type UserProfile,
 } from '@schuco/db'
+
+import type { RolePermissionMatrix } from '@schuco/contracts'
 
 import { logger } from '../lib/logger'
 import { canGrantByPermissions, canGrantRoles } from '../lib/role-hierarchy'
@@ -57,6 +62,28 @@ export const listUsersForCompany = (ctx: TenantContext): Promise<UserListRow[]> 
  */
 export const listAllUsers = (ctx: TenantContext): Promise<UserListRow[]> =>
   withTenantDb(ctx, (tx) => listUsers(tx))
+
+/**
+ * Every role in `roleIds` exists and `callerRoleIds` may hand it out — by rank (`canGrantRoles`)
+ * and by permissions (`canGrantByPermissions`). The one rule both inviting and editing use.
+ * @throws {UnknownRoleError} a role doesn't exist
+ * @throws {RoleNotGrantableError} the caller may not grant one of them
+ */
+const assertRolesGrantable = async (
+  tx: DbLike,
+  callerRoleIds: string[],
+  roleIds: string[],
+  matrix: RolePermissionMatrix,
+): Promise<void> => {
+  const knownRoles = new Set((await listAllRoles(tx)).map((role) => role.id))
+  const unknownRole = roleIds.find((id) => !knownRoles.has(id))
+  if (unknownRole) {
+    throw new UnknownRoleError(`Unknown role '${unknownRole}'`)
+  }
+  if (!canGrantRoles(callerRoleIds, roleIds) || !canGrantByPermissions(callerRoleIds, roleIds, matrix)) {
+    throw new RoleNotGrantableError(`'${callerRoleIds.join(', ')}' cannot assign role(s) '${roleIds.join(', ')}'`)
+  }
+}
 
 export interface InviteUserInput {
   email: string
@@ -115,19 +142,8 @@ export const inviteUser = async (
   input: InviteUserInput,
   requiresApproval: boolean,
 ): Promise<UserProfile> => {
-  const knownRoles = new Set((await withTenantDb(ctx, (tx) => listAllRoles(tx))).map((role) => role.id))
-  const unknownRole = input.roleIds.find((id) => !knownRoles.has(id))
-  if (unknownRole) {
-    throw new UnknownRoleError(`Unknown role '${unknownRole}'`)
-  }
-  if (
-    !canGrantRoles(actor.callerRoleIds, input.roleIds) ||
-    !canGrantByPermissions(actor.callerRoleIds, input.roleIds, await getEffectiveRolePermissions())
-  ) {
-    throw new RoleNotGrantableError(
-      `'${actor.callerRoleIds.join(', ')}' cannot assign role(s) '${input.roleIds.join(', ')}'`,
-    )
-  }
+  const matrix = await getEffectiveRolePermissions()
+  await withTenantDb(ctx, (tx) => assertRolesGrantable(tx, actor.callerRoleIds, input.roleIds, matrix))
 
   let validBusinessUnitIds: string[] = []
   if (input.businessUnitIds?.length) {
@@ -202,6 +218,128 @@ export const inviteUser = async (
     await withTenantDb(ctx, (tx) => markInviteFailed(tx, created.id))
     return { ...created, status: 'invite_failed' }
   }
+}
+
+/** No such user in the caller's company (another company's users surface the same way). */
+export class UserNotFoundError extends Error {}
+
+/** The change is not allowed: locking yourself out, or activating an account whose invite isn't finished. */
+export class UserUpdateRejectedError extends Error {}
+
+export interface UpdateUserInput {
+  name: string | null
+  roleIds: string[]
+  /** Only switches between active and inactive. */
+  status?: 'active' | 'inactive'
+}
+
+/**
+ * Edits a user of the caller's company: name, roles, and active/inactive. Only a super-admin
+ * may touch a super-admin account; any role added or removed must be one the caller can grant.
+ * Nobody can deactivate themselves or drop their own super-admin/company-admin role, and the
+ * company always keeps at least one active company-admin. Saving with nothing changed writes
+ * nothing. An inactive user is signed out on their next request (`requireAuth` checks the status).
+ * @param ctx - Tenant context resolved by `requireAuth`
+ * @param actor - Who's editing, for authorization and the audit record
+ * @param userId - The user to edit
+ * @param input - New name, roles and optional status
+ * @throws {UserNotFoundError} no such user in the caller's company
+ * @throws {UnknownRoleError} a requested role doesn't exist
+ * @throws {RoleNotGrantableError} the caller may not grant the user's current or new roles
+ * @throws {UserUpdateRejectedError} self-lockout, removing the last active company-admin, or a status change on an unfinished invite
+ */
+export const updateCompanyUser = async (
+  ctx: TenantContext,
+  actor: InviteActor,
+  userId: string,
+  input: UpdateUserInput,
+): Promise<UserProfile> => {
+  const matrix = await getEffectiveRolePermissions()
+  return withTenantDb(ctx, async (tx) => {
+    const before = await getUserProfileById(tx, userId)
+    if (!before || before.company.id !== ctx.effectiveCompanyId) {
+      throw new UserNotFoundError('User not found')
+    }
+
+    const previousRoleIds = before.roles.map((role) => role.id)
+    // Only a super-admin touches a super-admin account at all — not even its name.
+    if (previousRoleIds.includes('super-admin') && !actor.callerRoleIds.includes('super-admin')) {
+      throw new RoleNotGrantableError('Only a super-admin can edit a super-admin')
+    }
+    // Roles kept as they are need no grant right (a name-only edit of a user with a custom role
+    // the caller lacks still works); every role added or taken away does.
+    const changedRoleIds = [
+      ...input.roleIds.filter((id) => !previousRoleIds.includes(id)),
+      ...previousRoleIds.filter((id) => !input.roleIds.includes(id)),
+    ]
+    if (changedRoleIds.length > 0) {
+      await assertRolesGrantable(tx, actor.callerRoleIds, changedRoleIds, matrix)
+    }
+
+    const statusChanged = input.status !== undefined && input.status !== before.status
+    if (statusChanged && before.status !== 'active' && before.status !== 'inactive') {
+      throw new UserUpdateRejectedError('This user has not accepted their invite yet')
+    }
+    if (userId === actor.actorUserId) {
+      if (input.status === 'inactive') {
+        throw new UserUpdateRejectedError('You cannot deactivate your own account')
+      }
+      const droppedAdminRole = ['super-admin', 'company-admin'].find(
+        (role) => previousRoleIds.includes(role) && !input.roleIds.includes(role),
+      )
+      if (droppedAdminRole) {
+        throw new UserUpdateRejectedError(`You cannot remove your own ${droppedAdminRole === 'super-admin' ? 'Super Admin' : 'Company Admin'} role`)
+      }
+    }
+    // The company must keep at least one active company-admin — also when two admins demote each other.
+    const wasActiveAdmin = before.status === 'active' && previousRoleIds.includes('company-admin')
+    const staysActiveAdmin = (statusChanged ? input.status : before.status) === 'active' && input.roleIds.includes('company-admin')
+    if (wasActiveAdmin && !staysActiveAdmin) {
+      const activeAdmins = await lockActiveCompanyAdminIds(tx, ctx.effectiveCompanyId)
+      if (activeAdmins.filter((id) => id !== userId).length === 0) {
+        throw new UserUpdateRejectedError('The company needs at least one active Company Admin')
+      }
+    }
+
+    const nameChanged = input.name !== before.name
+    if (!nameChanged && !statusChanged && changedRoleIds.length === 0) {
+      return before
+    }
+
+    if (nameChanged || statusChanged) {
+      await updateUserDetails(tx, userId, { name: input.name, status: statusChanged ? input.status : undefined })
+    }
+    if (changedRoleIds.length > 0) {
+      await setUserRoles(tx, userId, input.roleIds)
+    }
+    await recordAuditEvent(
+      tx,
+      {
+        actorType: 'user',
+        actorUserId: actor.actorUserId,
+        actorCompanyId: actor.actorCompanyId,
+        requestId: actor.requestId,
+      },
+      ctx.effectiveCompanyId,
+      {
+        action: 'user.update',
+        resourceType: 'user',
+        resourceId: userId,
+        metadata: {
+          email: before.email,
+          ...(nameChanged ? { name: input.name, previousName: before.name } : {}),
+          ...(changedRoleIds.length > 0 ? { roleIds: input.roleIds, previousRoleIds } : {}),
+          ...(statusChanged ? { status: input.status, previousStatus: before.status } : {}),
+        },
+      },
+    )
+
+    const after = await getUserProfileById(tx, userId)
+    if (!after) {
+      throw new Error('Failed to reload the updated user')
+    }
+    return after
+  })
 }
 
 export interface ApprovalActor {

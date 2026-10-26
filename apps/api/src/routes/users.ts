@@ -1,4 +1,10 @@
-import { inviteUserRequestSchema, inviteUserResponseSchema, usersListResponseSchema } from '@schuco/contracts'
+import {
+  inviteUserRequestSchema,
+  inviteUserResponseSchema,
+  updateUserRequestSchema,
+  updateUserResponseSchema,
+  usersListResponseSchema,
+} from '@schuco/contracts'
 import { Hono } from 'hono'
 
 import { profileToUserDto, toUserDto } from '../lib/user-dto'
@@ -7,11 +13,15 @@ import {
   InviteConflictError,
   RoleNotGrantableError,
   UnknownRoleError,
+  UserNotFoundError,
+  UserUpdateRejectedError,
   inviteUser,
   listUsersForCompany,
+  updateCompanyUser,
 } from '../services/users-service'
+import { isUuid } from '../lib/uuid'
 import type { AuthVariables } from '../middleware/auth'
-import { requireAuth, requireRoles } from '../middleware/auth'
+import { requireAuth, requirePermission, requireRoles } from '../middleware/auth'
 
 /** Tenant-scoped user management for company admins. */
 export const users = new Hono<{ Variables: AuthVariables }>()
@@ -92,4 +102,52 @@ users.post('/', requireAuth, requireRoles(['company-admin']), async (c) => {
   }
 
   return c.json(parsed.data, 201)
+})
+
+/**
+ * Edit a user of the caller's company (or, for a super-admin, the company they act as):
+ * name, roles, active/inactive. Email is the sign-in identity and isn't editable here.
+ */
+// Same gate as the role list the edit dialog loads (GET /api/roles), plus the admin roles.
+users.patch('/:id', requireAuth, requireRoles(['company-admin', 'super-admin']), requirePermission('users.manage'), async (c) => {
+  const id = c.req.param('id') ?? ''
+  if (!isUuid(id)) {
+    return c.json({ error: 'User not found' }, 404)
+  }
+  const parsedBody = updateUserRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsedBody.success) {
+    return c.json({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request body', details: parsedBody.error.issues }, 400)
+  }
+
+  let profile
+  try {
+    profile = await updateCompanyUser(
+      { effectiveCompanyId: c.get('effectiveCompanyId'), isSuperAdmin: c.get('isSuperAdmin') },
+      {
+        actorUserId: c.get('actorUserId'),
+        actorCompanyId: c.get('user').company.id,
+        callerRoleIds: c.get('user').roles.map((r) => r.id),
+        requestId: c.get('requestId'),
+      },
+      id,
+      parsedBody.data,
+    )
+  } catch (error) {
+    if (error instanceof UserNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+    if (error instanceof UnknownRoleError || error instanceof UserUpdateRejectedError) {
+      return c.json({ error: error.message }, 400)
+    }
+    if (error instanceof RoleNotGrantableError) {
+      return c.json({ error: error.message }, 403)
+    }
+    throw error
+  }
+
+  const parsed = updateUserResponseSchema.safeParse({ user: profileToUserDto(profile) })
+  if (!parsed.success) {
+    return c.json({ error: 'Internal response validation failed' }, 500)
+  }
+  return c.json(parsed.data)
 })

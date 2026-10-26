@@ -149,6 +149,25 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           },
         },
       },
+      '/api/users/{id}': {
+        patch: {
+          tags: ['Users'],
+          summary: 'Edit a company user',
+          description:
+            "Company-admin (own company) or super-admin (acting company). Changes the name, roles and active/inactive status; email can't be changed. Every role added or removed must be one the caller can grant. Only a super-admin may edit a super-admin. Nobody can deactivate themselves or remove their own Super Admin / Company Admin role, and the company keeps at least one active Company Admin.",
+          operationId: 'updateCompanyUser',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          requestBody: { required: true, content: { 'application/json': { schema: ref('UpdateUserRequest') } } },
+          responses: {
+            '200': jsonResponse('The user as saved', 'UpdateUserResponse'),
+            '400': { description: 'Invalid fields, unknown role, a self-lockout, or removing the last active Company Admin', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            '403': { description: "The caller can't grant these roles", content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            '404': { description: "No such user in the caller's company", content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
       '/api/admin/users': {
         get: {
           tags: ['Admin'],
@@ -685,6 +704,20 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
               type: 'array',
               items: { $ref: '#/components/schemas/BusinessUnitScope' },
             },
+          },
+        },
+        UpdateUserResponse: {
+          type: 'object',
+          required: ['user'],
+          properties: { user: { $ref: '#/components/schemas/UserDto' } },
+        },
+        UpdateUserRequest: {
+          type: 'object',
+          required: ['name', 'roleIds'],
+          properties: {
+            name: { type: 'string', maxLength: 200, description: 'Blank clears the name' },
+            roleIds: { type: 'array', minItems: 1, items: { type: 'string' } },
+            status: { type: 'string', enum: ['active', 'inactive'], description: 'Only for users who have accepted their invite' },
           },
         },
         AdminUserDto: {

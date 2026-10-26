@@ -23,3 +23,13 @@ Es gibt keine öffentliche Registrierung. Benutzer kommen nur per **Einladung** 
 **Passwort vergessen** auf der Anmeldeseite schickt auf dieselbe Weise einen Reset-Link.
 
 Ein Benutzer kann **mehrere Rollen** haben; seine Berechtigungen sind die Vereinigung aller.
+
+## Benutzer bearbeiten
+
+Klicken Sie auf den **Stift** in der Zeile eines Benutzers, um **Name**, **Rollen** und **Aktiv**-Status zu ändern.
+
+- Die E-Mail lässt sich nicht ändern – damit meldet sich der Benutzer an.
+- Ein inaktiver Benutzer kann sich nicht anmelden und wird beim nächsten Klick abgemeldet. Mit **Aktiv** wird er wieder zugelassen.
+- Aktiv/inaktiv lässt sich erst ändern, wenn der Benutzer die Einladung angenommen hat.
+- Sie können sich nicht selbst deaktivieren oder Ihre eigene *Company-Admin*- (bzw. *Super-Admin*-)Rolle entfernen, und ein Unternehmen behält immer mindestens einen aktiven Unternehmensadmin – so sperrt es sich nie aus.
+- Ein Unternehmensadmin kann keinen Super-Admin bearbeiten und nur Rollen vergeben, deren Berechtigungen er selbst hat.

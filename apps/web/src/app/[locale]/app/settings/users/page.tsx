@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchFromApiResult } from '@/lib/api/server-client'
+import { UserEditButton } from '@/components/user-edit-button'
 import { UserInviteButton } from '@/components/user-invite-button'
 import type { UsersListResponse } from '@schuco/contracts'
 
@@ -53,6 +54,9 @@ const UsersPage = async () => {
                 <th className="px-6 py-3 font-medium">{t('email')}</th>
                 <th className="px-6 py-3 font-medium">{t('role')}</th>
                 <th className="px-6 py-3 font-medium">{t('status')}</th>
+                <th className="px-6 py-3 font-medium">
+                  <span className="sr-only">{t('actions')}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -69,6 +73,9 @@ const UsersPage = async () => {
                   </td>
                   <td className="px-6 py-4">
                     <Badge variant={statusVariant(user.status)}>{user.status}</Badge>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <UserEditButton user={user} />
                   </td>
                 </tr>
               ))}

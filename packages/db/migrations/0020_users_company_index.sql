@@ -1,0 +1,1 @@
+CREATE INDEX "users_company_id_idx" ON "users" USING btree ("company_id");

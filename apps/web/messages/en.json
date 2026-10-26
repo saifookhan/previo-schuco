@@ -137,7 +137,21 @@
     "noUsersFound": "No users yet.",
     "rolesRequired": "Select at least one role",
     "rolesLoading": "Loading roles…",
-    "rolesLoadFailed": "Could not load roles — try again"
+    "rolesLoadFailed": "Could not load roles — try again",
+    "actions": "Actions",
+    "edit": "Edit",
+    "editUser": "Edit {email}",
+    "editTitle": "Edit user",
+    "editSaved": "Saved {email}",
+    "editFailed": "Could not save the user",
+    "editFailedUnreachable": "Could not save the user — could not reach the server",
+    "saving": "Saving…",
+    "save": "Save",
+    "activeLabel": "Active",
+    "activeHint": "Inactive users cannot sign in; they are signed out right away.",
+    "activeSelfHint": "You cannot deactivate your own account.",
+    "statusPendingHint": "Active/inactive can be changed once the user has accepted the invite.",
+    "ownAdminRoleHint": "You cannot remove your own admin role."
   },
   "settingsRoles": {
     "title": "Roles",

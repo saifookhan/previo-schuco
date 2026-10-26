@@ -134,6 +134,13 @@
       "when": 1792663809824,
       "tag": "0019_product_family_price_validity",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792767335469,
+      "tag": "0020_users_company_index",
+      "breakpoints": true
     }
   ]
 }

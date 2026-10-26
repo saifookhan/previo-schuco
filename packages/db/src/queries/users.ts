@@ -323,6 +323,43 @@ export const setUserRoles = async (db: DbLike, userId: string, roleIds: string[]
 }
 
 /**
+ * Sets a user's name and, when given, status. Roles are changed separately with `setUserRoles`.
+ * @param db - RLS-scoped transaction
+ * @param userId - The user's internal id
+ * @param input - New name (null clears it) and optional status
+ */
+export const updateUserDetails = async (
+  db: DbLike,
+  userId: string,
+  input: { name: string | null; status?: UserStatus },
+): Promise<void> => {
+  await db
+    .update(users)
+    .set({ name: input.name, ...(input.status ? { status: input.status } : {}), updatedAt: new Date() })
+    .where(eq(users.id, userId))
+}
+
+/**
+ * Ids of the company's active users who hold the company-admin role (primary or additional),
+ * locked FOR UPDATE until the transaction ends, so two admins demoting or deactivating each
+ * other at the same moment can't both get past a "keep at least one admin" check.
+ * @param db - RLS-scoped transaction
+ * @param companyId - The company
+ */
+export const lockActiveCompanyAdminIds = async (db: DbLike, companyId: string): Promise<string[]> => {
+  const rows = await db.execute<{ id: string }>(sql`
+    SELECT u.id FROM users u
+    WHERE u.company_id = ${companyId}
+      AND u.status = 'active'
+      AND (
+        u.role_id = 'company-admin'
+        OR EXISTS (SELECT 1 FROM user_additional_roles r WHERE r.user_id = u.id AND r.role_id = 'company-admin')
+      )
+    FOR UPDATE OF u`)
+  return rows.map((row) => row.id)
+}
+
+/**
  * Mark an invite as failed after the Cognito call errors — a distinct,
  * queryable, retryable state, never left silently as 'invited' forever
  * (ADR 0004's reconciliation strategy).

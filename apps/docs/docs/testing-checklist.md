@@ -50,6 +50,7 @@ An end-to-end run through the main flows. Use [Demo logins](./demo-logins.md) to
 - [ ] As super-admin, approve it → invite email appears in Mailpit.
 - [ ] Set password from the email link, then log in with it.
 - [ ] Forgot password → reset email in Mailpit → new password works.
+- [ ] *Settings → Users*: edit another user (name, role, untick **Active**) — the row updates; that user can no longer sign in until reactivated. On your own row the *Company Admin* role and **Active** are locked.
 
 ## Roles & access — as `admin@schuco-demo.it`
 

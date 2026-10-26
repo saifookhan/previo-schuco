@@ -50,6 +50,7 @@ Un percorso completo dei flussi principali. Usa gli [Accessi demo](./demo-logins
 - [ ] Come super-admin, approvalo → l'email di invito compare in Mailpit.
 - [ ] Imposta la password dal link nell'email, poi accedi con essa.
 - [ ] Password dimenticata → email di reset in Mailpit → la nuova password funziona.
+- [ ] *Impostazioni → Utenti*: modifica un altro utente (nome, ruolo, togli **Attivo**) — la riga si aggiorna; quell’utente non può più accedere finché non viene riattivato. Sulla tua riga il ruolo *Company Admin* e **Attivo** sono bloccati.
 
 ## Ruoli e accessi — come `admin@schuco-demo.it`
 

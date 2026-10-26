@@ -50,6 +50,7 @@ Ein kompletter Durchlauf der wichtigsten Abläufe. Mit den [Demo-Anmeldungen](./
 - [ ] Als Super-Admin freigeben → die Einladung erscheint in Mailpit.
 - [ ] Passwort über den Link in der E-Mail festlegen, dann damit anmelden.
 - [ ] Passwort vergessen → Reset-E-Mail in Mailpit → das neue Passwort funktioniert.
+- [ ] *Einstellungen → Benutzer*: einen anderen Benutzer bearbeiten (Name, Rolle, **Aktiv** abwählen) — die Zeile wird aktualisiert; der Benutzer kann sich erst nach Reaktivierung wieder anmelden. In der eigenen Zeile sind die *Company-Admin*-Rolle und **Aktiv** gesperrt.
 
 ## Rollen & Zugriff — als `admin@schuco-demo.it`
 

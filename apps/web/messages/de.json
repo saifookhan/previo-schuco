@@ -137,7 +137,21 @@
     "noUsersFound": "Noch keine Benutzer.",
     "rolesRequired": "Mindestens eine Rolle auswählen",
     "rolesLoading": "Rollen werden geladen…",
-    "rolesLoadFailed": "Rollen konnten nicht geladen werden — bitte erneut versuchen"
+    "rolesLoadFailed": "Rollen konnten nicht geladen werden — bitte erneut versuchen",
+    "actions": "Aktionen",
+    "edit": "Bearbeiten",
+    "editUser": "{email} bearbeiten",
+    "editTitle": "Benutzer bearbeiten",
+    "editSaved": "{email} gespeichert",
+    "editFailed": "Benutzer konnte nicht gespeichert werden",
+    "editFailedUnreachable": "Benutzer konnte nicht gespeichert werden – Server nicht erreichbar",
+    "saving": "Wird gespeichert…",
+    "save": "Speichern",
+    "activeLabel": "Aktiv",
+    "activeHint": "Inaktive Benutzer können sich nicht anmelden und werden sofort abgemeldet.",
+    "activeSelfHint": "Sie können Ihr eigenes Konto nicht deaktivieren.",
+    "statusPendingHint": "Aktiv/inaktiv lässt sich ändern, sobald der Benutzer die Einladung angenommen hat.",
+    "ownAdminRoleHint": "Sie können Ihre eigene Admin-Rolle nicht entfernen."
   },
   "settingsRoles": {
     "title": "Rollen",

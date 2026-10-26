@@ -34,6 +34,8 @@ export {
   splitRoleIds,
   setUserPassword,
   setUserRoles,
+  updateUserDetails,
+  lockActiveCompanyAdminIds,
   syncUserFromCognito,
   withRlsTransaction,
   withSystemTransaction,

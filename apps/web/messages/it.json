@@ -137,7 +137,21 @@
     "noUsersFound": "Nessun utente ancora.",
     "rolesRequired": "Seleziona almeno un ruolo",
     "rolesLoading": "Caricamento ruoli…",
-    "rolesLoadFailed": "Impossibile caricare i ruoli — riprova"
+    "rolesLoadFailed": "Impossibile caricare i ruoli — riprova",
+    "actions": "Azioni",
+    "edit": "Modifica",
+    "editUser": "Modifica {email}",
+    "editTitle": "Modifica utente",
+    "editSaved": "Salvato {email}",
+    "editFailed": "Impossibile salvare l’utente",
+    "editFailedUnreachable": "Impossibile salvare l’utente — server non raggiungibile",
+    "saving": "Salvataggio…",
+    "save": "Salva",
+    "activeLabel": "Attivo",
+    "activeHint": "Gli utenti non attivi non possono accedere; vengono disconnessi subito.",
+    "activeSelfHint": "Non puoi disattivare il tuo account.",
+    "statusPendingHint": "Attivo/non attivo si può cambiare dopo che l’utente ha accettato l’invito.",
+    "ownAdminRoleHint": "Non puoi rimuovere il tuo ruolo di amministratore."
   },
   "settingsRoles": {
     "title": "Ruoli",

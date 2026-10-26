@@ -76,3 +76,31 @@ export const inviteUserResponseSchema = z.object({
 })
 
 export type InviteUserResponse = z.infer<typeof inviteUserResponseSchema>
+
+/**
+ * PATCH /api/users/:id body (company-admin, own company). Email is the sign-in identity
+ * and isn't editable. `status` only switches an account between active and inactive —
+ * an invite still in progress keeps its own status.
+ */
+export const updateUserRequestSchema = z.object({
+  /** Blank clears the name. */
+  name: z
+    .string()
+    .trim()
+    .max(200)
+    .transform((name) => name || null),
+  roleIds: z
+    .array(roleIdSchema)
+    .min(1)
+    .transform((ids) => [...new Set(ids)]),
+  status: z.enum(['active', 'inactive']).optional(),
+})
+
+export type UpdateUserRequest = z.infer<typeof updateUserRequestSchema>
+
+/** PATCH /api/users/:id response: the user as saved. */
+export const updateUserResponseSchema = z.object({
+  user: userDtoSchema,
+})
+
+export type UpdateUserResponse = z.infer<typeof updateUserResponseSchema>
