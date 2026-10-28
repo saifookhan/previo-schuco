@@ -50,8 +50,7 @@ const errorResponses = (): Record<string, unknown> => ({
  * @param options - Server URLs for each deployable service
  */
 export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument => {
-  const calculationUrl = options.calculationUrl ?? 'http://localhost:3002'
-  const filesUrl = options.filesUrl ?? 'http://localhost:3003'
+  const apiUrl = options.apiUrl || '/'
 
   return {
     openapi: '3.0.3',
@@ -61,33 +60,22 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
       description: [
         'OpenAPI specification for the PREVIO Schuco platform.',
         '',
-        '**Services**',
-        '- **Core API (BFF)** — auth, RBAC, quotes orchestration (`apps/api`)',
-        '- **Calculation Service** — quote pricing engine (`apps/calculation-service`, Phase 3)',
-        '- **Files Service** — S3 uploads, PDF render, import/export (`apps/files-service`, Phase 4)',
+        'Every path below is served by the host this document was loaded from.',
+        'Try it out uses that host (a relative server URL), not a localhost port.',
         '',
         '**Authentication**',
-        '- Production: `Authorization: Bearer <Cognito JWT>`',
-        '- Local dev (no Cognito): `X-Dev-User-Sub: <cognito-sub>` from seed users',
+        '- `Authorization: Bearer <session JWT>`',
+        '- When `ALLOW_DEV_LOGIN=true`: `X-Dev-User-Sub` of a seeded demo user',
       ].join('\n'),
     },
-    servers: [
-      { url: options.apiUrl, description: 'Core API (BFF)' },
-      { url: calculationUrl, description: 'Calculation Service (Phase 3 — planned)' },
-      { url: filesUrl, description: 'Files Service (Phase 4 — planned)' },
-    ],
+    servers: [{ url: apiUrl, description: 'This server' }],
     tags: [
       { name: 'Platform', description: 'Health checks and API documentation' },
       { name: 'Auth & RBAC', description: 'Session user profile and tenant context' },
       { name: 'Users', description: 'Tenant-scoped user management (company-admin)' },
       { name: 'Admin', description: 'Cross-tenant platform administration (super-admin)' },
-      { name: 'Products', description: 'Product catalog' },
-      { name: 'Quotes', description: 'Quote listing, detail, and creation (Core API)' },
-      { name: 'Calculation', description: 'Quote pricing — in-process today, HTTP service Phase 3' },
-      {
-        name: 'Files',
-        description: 'Uploads, PDF generation, Excel import/export — Phase 4',
-      },
+      { name: 'Products', description: 'Product families (the catalog)' },
+      { name: 'Quotes', description: 'Sales quotes built from the product-family catalog' },
     ],
     paths: {
       '/health': {
@@ -327,260 +315,108 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           },
         },
       },
-      '/api/products': {
+      '/api/product-families': {
         get: {
           tags: ['Products'],
-          summary: 'List product catalog',
-          operationId: 'listProducts',
+          summary: 'List product families visible to the caller',
+          description: "The caller's own families, plus published families shared with them. Needs catalog.view. Same payload the /app/product-families page loads.",
+          operationId: 'listProductFamilies',
           security: [{ bearerAuth: [] }, { devUserSub: [] }],
           responses: {
             '200': {
-              description: 'Product catalog',
+              description: 'Product families',
               content: {
                 'application/json': {
-                  schema: { type: 'array', items: ref('Product') },
-                },
-              },
-            },
-            ...errorResponses(),
-          },
-        },
-      },
-      '/api/quotes': {
-        get: {
-          tags: ['Quotes'],
-          summary: 'List recent quotes',
-          operationId: 'listQuotes',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          responses: {
-            '200': {
-              description: 'Recent quotes (demo + session)',
-              content: {
-                'application/json': {
-                  schema: { type: 'array', items: ref('Quote') },
-                },
-              },
-            },
-            ...errorResponses(),
-          },
-        },
-        post: {
-          tags: ['Quotes'],
-          summary: 'Create quote',
-          description: 'Calculates pricing and stores a session quote (demo — not persisted to RDS).',
-          operationId: 'createQuote',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: ref('CreateQuoteRequest') } },
-          },
-          responses: {
-            '200': jsonResponse('Created quote with calculation', 'CreateQuoteResponse'),
-            '400': {
-              description: 'Validation error',
-              content: { 'application/json': { schema: ref('ValidationError') } },
-            },
-            ...errorResponses(),
-          },
-        },
-      },
-      '/api/quotes/{reference}': {
-        get: {
-          tags: ['Quotes'],
-          summary: 'Get quote by reference',
-          operationId: 'getQuoteByReference',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          parameters: [
-            {
-              name: 'reference',
-              in: 'path',
-              required: true,
-              schema: { type: 'string' },
-              example: 'PRV-2026-0042',
-            },
-          ],
-          responses: {
-            '200': jsonResponse('Quote with product families', 'QuoteDetailResponse'),
-            '404': {
-              description: 'Quote not found',
-              content: { 'application/json': { schema: ref('ErrorResponse') } },
-            },
-            ...errorResponses(),
-          },
-        },
-      },
-      '/api/calculate': {
-        post: {
-          tags: ['Calculation'],
-          summary: 'Calculate quote (Core API)',
-          description:
-            'Runs pricing in-process via `@schuco/calculation`. Phase 3 will delegate to calculation-service.',
-          operationId: 'calculateQuote',
-          servers: [{ url: options.apiUrl, description: 'Core API (BFF)' }],
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: ref('QuoteConfiguration') } },
-          },
-          responses: {
-            '200': jsonResponse('Calculation result', 'QuoteResult'),
-            '400': {
-              description: 'Validation error',
-              content: { 'application/json': { schema: ref('ValidationError') } },
-            },
-            ...errorResponses(),
-          },
-        },
-      },
-      '/calculate': {
-        post: {
-          tags: ['Calculation'],
-          summary: 'Calculate quote (Calculation Service)',
-          description: 'Phase 3 HTTP service — internal ALB only; not exposed to web clients.',
-          operationId: 'calculateQuoteService',
-          servers: [{ url: calculationUrl, description: 'Calculation Service' }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: ref('QuoteConfiguration') } },
-          },
-          responses: {
-            '200': jsonResponse('Calculation result', 'QuoteResult'),
-            '400': {
-              description: 'Validation error',
-              content: { 'application/json': { schema: ref('ValidationError') } },
-            },
-          },
-        },
-      },
-      '/validate': {
-        post: {
-          tags: ['Calculation'],
-          summary: 'Validate quote configuration',
-          description: 'Phase 3 — returns feasibility errors without full pricing.',
-          operationId: 'validateConfiguration',
-          servers: [{ url: calculationUrl, description: 'Calculation Service' }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: ref('QuoteConfiguration') } },
-          },
-          responses: {
-            '200': jsonResponse('Validation result', 'ValidateConfigurationResponse'),
-          },
-        },
-      },
-      '/upload': {
-        post: {
-          tags: ['Files'],
-          summary: 'Initiate file upload',
-          description: 'Phase 4 — returns presigned S3 URL for direct upload.',
-          operationId: 'initiateUpload',
-          servers: [{ url: filesUrl, description: 'Files Service' }],
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: ref('UploadRequest') } },
-          },
-          responses: {
-            '200': jsonResponse('Presigned upload URL', 'UploadResponse'),
-            ...errorResponses(),
-          },
-        },
-      },
-      '/files/{id}': {
-        get: {
-          tags: ['Files'],
-          summary: 'Get file metadata and download URL',
-          operationId: 'getFile',
-          servers: [{ url: filesUrl, description: 'Files Service' }],
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          parameters: [
-            {
-              name: 'id',
-              in: 'path',
-              required: true,
-              schema: { type: 'string', format: 'uuid' },
-            },
-          ],
-          responses: {
-            '200': jsonResponse('File metadata', 'FileMetadata'),
-            '404': {
-              description: 'File not found',
-              content: { 'application/json': { schema: ref('ErrorResponse') } },
-            },
-            ...errorResponses(),
-          },
-        },
-      },
-      '/pdf/render': {
-        post: {
-          tags: ['Files'],
-          summary: 'Render quote PDF',
-          description: 'Phase 4 — generates preventivo PDF from quote reference.',
-          operationId: 'renderPdf',
-          servers: [{ url: filesUrl, description: 'Files Service' }],
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: ref('RenderPdfRequest') } },
-          },
-          responses: {
-            '200': jsonResponse('PDF download URL', 'RenderPdfResponse'),
-            ...errorResponses(),
-          },
-        },
-      },
-      '/import/excel': {
-        post: {
-          tags: ['Files'],
-          summary: 'Import quotes from Excel',
-          description: 'Phase 4 — multipart upload of Excel workbook.',
-          operationId: 'importExcel',
-          servers: [{ url: filesUrl, description: 'Files Service' }],
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              'multipart/form-data': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    file: { type: 'string', format: 'binary' },
+                  schema: {
+                    type: 'object',
+                    required: ['families'],
+                    properties: { families: { type: 'array', items: { type: 'object' } } },
                   },
-                  required: ['file'],
                 },
               },
             },
-          },
-          responses: {
-            '200': jsonResponse('Import summary', 'ImportExcelResponse'),
             ...errorResponses(),
           },
         },
       },
-      '/export/excel/{reference}': {
+      '/api/product-families/{id}': {
         get: {
-          tags: ['Files'],
-          summary: 'Export quote to Excel',
-          operationId: 'exportExcel',
-          servers: [{ url: filesUrl, description: 'Files Service' }],
+          tags: ['Products'],
+          summary: 'Product family detail',
+          description: 'Lines, characteristics, matrices, relations and images. An id that is not a UUID is 404, the same as an unknown id.',
+          operationId: 'getProductFamily',
           security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          parameters: [
-            {
-              name: 'reference',
-              in: 'path',
-              required: true,
-              schema: { type: 'string' },
-            },
-          ],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          responses: {
+            '200': { description: 'Family detail' },
+            '404': { description: 'No such family, or the id is not a UUID', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
+      '/api/product-families/{id}/shares': {
+        get: {
+          tags: ['Products'],
+          summary: 'Companies this family is shared with',
+          description: 'Owning company (catalog.share). This is the path the app calls — there is no separate shares collection.',
+          operationId: 'getProductFamilyShares',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          responses: {
+            '200': jsonResponse('Current shares and companies that could be added', 'FamilySharesResponse'),
+            '404': { description: 'No such family, or not owned by the caller', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+        put: {
+          tags: ['Products'],
+          summary: 'Replace the companies this family is shared with',
+          operationId: 'updateProductFamilyShares',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          requestBody: { required: true, content: { 'application/json': { schema: ref('UpdateFamilySharesRequest') } } },
+          responses: {
+            '200': jsonResponse('Shares after the update', 'FamilySharesResponse'),
+            '400': { description: 'Invalid body', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            '404': { description: 'No such family, or not owned by the caller', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
+      '/api/sales-quotes': {
+        get: {
+          tags: ['Quotes'],
+          summary: "List the caller's sales quotes",
+          description: 'Catalog-backed quotes (quote.view). There is no /api/quotes collection.',
+          operationId: 'listSalesQuotes',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
           responses: {
             '200': {
-              description: 'Excel workbook',
+              description: 'Sales quotes',
               content: {
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
-                  schema: { type: 'string', format: 'binary' },
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    required: ['quotes'],
+                    properties: { quotes: { type: 'array', items: { type: 'object' } } },
+                  },
                 },
               },
             },
+            ...errorResponses(),
+          },
+        },
+      },
+      '/api/sales-quotes/{id}': {
+        get: {
+          tags: ['Quotes'],
+          summary: 'Sales quote detail',
+          operationId: 'getSalesQuote',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          responses: {
+            '200': { description: 'Quote and its positions' },
+            '404': { description: 'No such quote, or the id is not a UUID', content: { 'application/json': { schema: ref('ErrorResponse') } } },
             ...errorResponses(),
           },
         },
@@ -592,16 +428,62 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'AWS Cognito access token',
+          description: 'Session JWT minted by the web app',
         },
         devUserSub: {
           type: 'apiKey',
           in: 'header',
           name: 'X-Dev-User-Sub',
-          description: 'Local dev only — Cognito sub from seed users when Cognito is not configured',
+          description: 'Only when ALLOW_DEV_LOGIN=true — sub of a seeded demo user',
         },
       },
       schemas: {
+        FamilySharesResponse: {
+          type: 'object',
+          required: ['shares', 'targets'],
+          properties: {
+            shares: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['companyId', 'companyName', 'discountPct'],
+                properties: {
+                  companyId: { type: 'string', format: 'uuid' },
+                  companyName: { type: 'string' },
+                  discountPct: { type: 'number' },
+                },
+              },
+            },
+            targets: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['id', 'name'],
+                properties: {
+                  id: { type: 'string', format: 'uuid' },
+                  name: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        UpdateFamilySharesRequest: {
+          type: 'object',
+          required: ['shares'],
+          properties: {
+            shares: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['companyId', 'discountPct'],
+                properties: {
+                  companyId: { type: 'string', format: 'uuid' },
+                  discountPct: { type: 'number', minimum: 0, maximum: 100 },
+                },
+              },
+            },
+          },
+        },
         ErrorResponse: {
           type: 'object',
           properties: {

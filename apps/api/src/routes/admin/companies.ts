@@ -10,6 +10,7 @@ import type { Context } from 'hono'
 import { Hono } from 'hono'
 
 import { toCompanyDto } from '../../lib/company-dto'
+import { rejectNonUuidParams } from '../../lib/uuid'
 import type { AuthVariables } from '../../middleware/auth'
 import { requireAuth, requireRoles } from '../../middleware/auth'
 import {
@@ -23,6 +24,9 @@ import {
 
 /** Platform-wide company CRUD for super-admins — create/list/update/deactivate. No hard delete: a company's users/catalog/quotes cascade off it (see the companies-service module doc). */
 export const adminCompanies = new Hono<{ Variables: AuthVariables }>()
+
+adminCompanies.use('/:id', rejectNonUuidParams)
+adminCompanies.use('/:id/*', rejectNonUuidParams)
 
 const ctxFrom = (c: Context<{ Variables: AuthVariables }>) => ({
   effectiveCompanyId: c.get('effectiveCompanyId'),

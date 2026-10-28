@@ -38,7 +38,7 @@ Production is a single self-hosted server running Docker Compose. See [deploymen
 | Permissions | ✅ Editable role × permission matrix | Effective permissions = roles' permissions ∩ the company's capabilities (manufacturer / supplier / client / platform) |
 | Super-admin tenant override (`X-Tenant-Id`) | ✅ | [ADR 0008](./adr/0008-super-admin-tenant-override-header.md) |
 | Audit log | ✅ | Append-only, written in the same transaction as the change ([ADR 0010](./adr/0010-tenant-aware-audit-logging.md)) |
-| Demo-user login shortcut | ⚠️ On by default | `ALLOW_DEV_LOGIN` defaults to `true`; **set it to `false` before real customers use the server** |
+| Demo-user login shortcut | Off on the public web container unless `ALLOW_DEV_LOGIN=true` | The login form and `POST /api/auth/dev-login` both read that flag at request time. The `api` container still defaults it to `true` when unset (local `pnpm dev`). Set `ALLOW_DEV_LOGIN=false` in the server `.env` so the API also rejects `X-Dev-User-Sub`. |
 
 ## Email
 

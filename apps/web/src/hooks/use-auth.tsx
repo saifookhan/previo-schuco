@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 
@@ -52,21 +53,26 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
+  // Set for the whole sign-out so an in-flight session read cannot paint the user back in.
+  const signingOut = useRef(false)
 
   const refresh = useCallback(async () => {
+    if (signingOut.current) return
     setLoading(true)
     try {
-      const response = await fetch('/api/auth/session')
+      const response = await fetch('/api/auth/session', { cache: 'no-store' })
+      if (signingOut.current) return
       if (!response.ok) {
         setUser(null)
         return
       }
       const data = (await response.json()) as { user: AuthUser | null }
+      if (signingOut.current) return
       setUser(data.user)
     } catch {
-      setUser(null)
+      if (!signingOut.current) setUser(null)
     } finally {
-      setLoading(false)
+      if (!signingOut.current) setLoading(false)
     }
   }, [])
 
@@ -75,10 +81,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [refresh])
 
   const signOut = useCallback(async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    signingOut.current = true
     setUser(null)
-    window.location.href = '/login'
-  }, [])
+    try {
+      const response = await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' })
+      if (!response.ok) {
+        signingOut.current = false
+        await refresh()
+        return
+      }
+      // The logout response's Set-Cookie is applied before this fetch resolves.
+      // A follow-up session read proves the jar no longer has the cookie, so the
+      // navigation to /login cannot race ahead of the clear and bounce back to
+      // /app/dashboard on a still-live session (middleware redirects /login → dashboard
+      // whenever the cookie is present).
+      const session = await fetch('/api/auth/session', { cache: 'no-store' })
+      if (session.ok) {
+        signingOut.current = false
+        await refresh()
+        return
+      }
+    } catch {
+      signingOut.current = false
+      await refresh()
+      return
+    }
+    window.location.replace('/login')
+  }, [refresh])
 
   const hasRole = useCallback(
     (...roles: RoleId[]) => (user ? user.roles.some((r) => roles.includes(r.id)) : false),

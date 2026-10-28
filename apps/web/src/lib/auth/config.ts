@@ -1,3 +1,5 @@
+import { isDevLoginAllowed as readDevLoginAllowed } from '@schuco/env/dev-login'
+
 /**
  * App auth environment configuration. Cognito is gone (see the auth
  * rework this replaced) — the platform authenticates with our own
@@ -9,9 +11,8 @@ export const authConfig = {
   authSecret: process.env.AUTH_SECRET ?? 'dev-insecure-secret-change-me',
 }
 
-/** Allow seed-user dev login on hosted previews (e.g. Vercel dev). Server-only check. */
-export const isDevLoginAllowed = (): boolean =>
-  process.env.NODE_ENV !== 'production' || process.env.ALLOW_DEV_LOGIN === 'true'
-
-/** Client-visible flag to show the dev-login form alongside real email+password login. */
-export const isDevLoginUiEnabled = (): boolean => process.env.NEXT_PUBLIC_ALLOW_DEV_LOGIN === 'true'
+/**
+ * Server-side gate for POST /api/auth/dev-login and for forwarding a
+ * dev-login session to the API. Same rule as `@schuco/env/dev-login`.
+ */
+export const isDevLoginAllowed = (): boolean => readDevLoginAllowed()

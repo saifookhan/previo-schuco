@@ -75,7 +75,7 @@ const UsersPage = async () => {
                         ))}
                       </td>
                       <td className="px-6 py-4">
-                        <Badge variant={statusVariant(user.status)}>{user.status}</Badge>
+                        <Badge variant={statusVariant(user.status)}>{t(`statusValue.${user.status}`)}</Badge>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <UserEditButton user={user} />

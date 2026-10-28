@@ -32,6 +32,7 @@ import type {
   RecordHistoryQuery,
 } from '@schuco/contracts'
 
+import { isUuid } from '../lib/uuid'
 import { extractEmbeddedImages } from '../lib/excel-import/extract-embedded-images'
 import { parseProductFamilyWorkbook, type ParsedWorkbook } from '../lib/excel-import'
 import { resolvePriceListType } from '../lib/excel-import/price-list-types'
@@ -371,7 +372,10 @@ export const listProductFamilies = (ctx: TenantContext): Promise<ProductFamilyLi
 export const getProductFamilyDetail = (
   ctx: TenantContext,
   familyId: string,
-): Promise<ProductFamilyDetail | null> => withTenantDb(ctx, (tx) => getProductFamilyDetailQuery(tx, familyId))
+): Promise<ProductFamilyDetail | null> => {
+  if (!isUuid(familyId)) return Promise.resolve(null)
+  return withTenantDb(ctx, (tx) => getProductFamilyDetailQuery(tx, familyId))
+}
 
 /**
  * Re-imports an updated Excel workbook as a new *version* of an existing

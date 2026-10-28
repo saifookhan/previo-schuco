@@ -125,6 +125,13 @@
     "email": "Email",
     "role": "Ruoli",
     "status": "Stato",
+    "statusValue": {
+      "active": "Attivo",
+      "inactive": "Non attivo",
+      "pending_approval": "In attesa di approvazione",
+      "invited": "Invitato",
+      "invite_failed": "Invito non riuscito"
+    },
     "addUserTitle": "Aggiungi utente",
     "addUserHint": "In attesa dell'approvazione di un super-admin prima che venga inviata qualsiasi email di invito.",
     "emailRequired": "L'email è obbligatoria",

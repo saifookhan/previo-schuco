@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
-import { authConfig } from '@/lib/auth/config'
-import { getSession, getSessionToken } from '@/lib/auth/session'
+import { authConfig, isDevLoginAllowed } from '@/lib/auth/config'
+import { attachClearedSession, getSession, getSessionToken } from '@/lib/auth/session'
 
 /**
  * Return current session user profile from API /api/me.
@@ -10,6 +10,12 @@ export const GET = async (): Promise<NextResponse> => {
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ user: null }, { status: 401 })
+  }
+
+  // Drop a dev-login cookie once the shortcut is off, so an old session
+  // cannot keep calling the API as that seeded user.
+  if (session.isDevLogin && !isDevLoginAllowed()) {
+    return attachClearedSession(NextResponse.json({ user: null }, { status: 401 }))
   }
 
   const headers: Record<string, string> = {

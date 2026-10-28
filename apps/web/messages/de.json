@@ -125,6 +125,13 @@
     "email": "E-Mail",
     "role": "Rollen",
     "status": "Status",
+    "statusValue": {
+      "active": "Aktiv",
+      "inactive": "Inaktiv",
+      "pending_approval": "Genehmigung ausstehend",
+      "invited": "Eingeladen",
+      "invite_failed": "Einladung fehlgeschlagen"
+    },
     "addUserTitle": "Benutzer hinzufügen",
     "addUserHint": "Wartet auf die Genehmigung eines Super-Admins, bevor eine Einladungs-E-Mail gesendet wird.",
     "emailRequired": "E-Mail ist erforderlich",

@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
 
 import { authConfig } from './config'
 
@@ -30,6 +31,19 @@ const getSecretKey = (): Uint8Array =>
 const cookieSecure = (): boolean =>
   process.env.COOKIE_SECURE === 'false' ? false : process.env.NODE_ENV === 'production'
 
+/** Attributes shared by setting and clearing the session cookie. A clear that omits `path` or flips `secure` does not match the cookie the browser stored, so the session survives logout. */
+const sessionCookieBase = (): {
+  httpOnly: true
+  secure: boolean
+  sameSite: 'lax'
+  path: '/'
+} => ({
+  httpOnly: true,
+  secure: cookieSecure(),
+  sameSite: 'lax',
+  path: '/',
+})
+
 /**
  * Sign and persist the session as an HTTP-only cookie. The signed JWT
  * string itself doubles as the Bearer token apps/api's `requireAuth`
@@ -47,12 +61,24 @@ export const setSession = async (payload: Omit<SessionPayload, 'exp'>): Promise<
 
   const cookieStore = await cookies()
   cookieStore.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: cookieSecure(),
-    sameSite: 'lax',
-    path: '/',
+    ...sessionCookieBase(),
     expires: new Date(exp * 1000),
   })
+}
+
+/**
+ * Expire the session cookie on `response` itself. Prefer this in route
+ * handlers over `cookies().delete()`: that helper does not repeat `path`
+ * / `secure` / `sameSite`, and Next can drop the side-channel write when
+ * the handler returns its own `NextResponse`.
+ */
+export const attachClearedSession = (response: NextResponse): NextResponse => {
+  response.cookies.set(SESSION_COOKIE, '', {
+    ...sessionCookieBase(),
+    maxAge: 0,
+    expires: new Date(0),
+  })
+  return response
 }
 
 /** Read and verify the session cookie, decoded. */
@@ -77,10 +103,14 @@ export const getSessionToken = async (): Promise<string | null> => {
   return cookieStore.get(SESSION_COOKIE)?.value ?? null
 }
 
-/** Clear the session cookie. */
+/** Clear the session cookie. Same attributes as `setSession`, or the browser keeps the original. */
 export const clearSession = async (): Promise<void> => {
   const cookieStore = await cookies()
-  cookieStore.delete(SESSION_COOKIE)
+  cookieStore.set(SESSION_COOKIE, '', {
+    ...sessionCookieBase(),
+    maxAge: 0,
+    expires: new Date(0),
+  })
 }
 
 /** Cookie name checked by edge middleware. */

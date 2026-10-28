@@ -16,7 +16,7 @@ import {
   type QuoteActor,
 } from '../services/quotes-service'
 import { renderQuotePdf } from '../lib/quote-pdf'
-import { isUuid } from '../lib/uuid'
+import { isUuid, rejectNonUuidParams } from '../lib/uuid'
 import type { AuthVariables } from '../middleware/auth'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { respondWithRecordHistory } from './record-history'
@@ -29,6 +29,9 @@ import { respondWithRecordHistory } from './record-history'
  * it, priced against its own product-family catalog.
  */
 export const salesQuotes = new Hono<{ Variables: AuthVariables }>()
+
+salesQuotes.use('/:id', rejectNonUuidParams)
+salesQuotes.use('/:id/*', rejectNonUuidParams)
 
 const actorFrom = (c: Context<{ Variables: AuthVariables }>): QuoteActor => ({
   actorUserId: c.get('actorUserId'),

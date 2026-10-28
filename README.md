@@ -111,7 +111,7 @@ docker compose --profile selfhost up -d --build
 That's it — the whole app (Postgres, Redis, Mailpit, API, worker, web) comes up, and the browser only ever talks to the `web` container (every `/api/*` route in `apps/web` proxies to the `api` service over Docker's internal network — nothing but port 3000 needs to be reachable from outside).
 
 - App: `http://<server-ip>:3000`
-- Login: same seeded demo users as above (dev-login stays enabled in this profile even though it runs in production mode — see `ALLOW_DEV_LOGIN` below)
+- Login: email + password. The password-less seeded shortcut is **off** unless `ALLOW_DEV_LOGIN=true` (see below) — the login form and `POST /api/auth/dev-login` share that flag.
 
 **Env vars this profile reads** (all have sane defaults for an IP-only demo box; override by exporting them before `docker compose up`, or in a `.env` file next to `docker-compose.yml`):
 
@@ -120,7 +120,7 @@ That's it — the whole app (Postgres, Redis, Mailpit, API, worker, web) comes u
 | `AUTH_SECRET` | *(insecure placeholder — always override this one)* | Always — `openssl rand -base64 32`. Shared by the `web` and `api` services (same var, same value — apps/web signs sessions, apps/api verifies them) |
 | `COOKIE_SECURE` | `false` | Set to `true` once this sits behind HTTPS (a reverse proxy with a real cert) — otherwise leave `false`, or logins won't persist over plain HTTP |
 | `APP_PUBLIC_URL` | `http://localhost:3000` | Set to `http://<server-ip>:3000` (or your domain) once you're not just hitting it from the same box — also what invite/reset-password email links point at |
-| `ALLOW_DEV_LOGIN` | `true` | Set to `false` for a deployment real customers will use — leaves the password-less seed-user shortcut disabled |
+| `ALLOW_DEV_LOGIN` | `false` on the public `web` container; `true` on the `api` container when unset | Set to `true` to enable the password-less seed-user shortcut (login form and `POST /api/auth/dev-login`). Set to `false` to turn it off for both containers, including the API's `X-Dev-User-Sub` header. Local `pnpm dev` follows `NEXT_PUBLIC_ALLOW_DEV_LOGIN` in `.env.local` when this is unset |
 | `APP_DB_PASSWORD` | `previo_app` | Change for anything beyond a throwaway demo |
 | `RESEND_API_KEY` | *(unset)* | A [Resend](https://resend.com) API key for real outbound email — takes priority over the `mailpit` catcher below whenever it's set. Set this for any deployment real customers will use |
 | `RESEND_FROM_EMAIL` | `PREVIO <onboarding@resend.dev>` | Resend's shared test sender works until you verify your own domain with them |

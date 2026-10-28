@@ -11,8 +11,10 @@ Il database contiene aziende demo e un utente per ogni ruolo. Nella pagina di lo
 ![Pagina di login con la sezione di accesso demo](/img/screens/login.png)
 
 :::warning
-L'accesso demo è controllato da `ALLOW_DEV_LOGIN` (attivo di default). Va impostato a `false`
-prima che clienti reali usino il server — a quel punto la sezione scompare e resta solo email + password.
+L'accesso demo è controllato da `ALLOW_DEV_LOGIN`. In locale è attivo
+(`NEXT_PUBLIC_ALLOW_DEV_LOGIN=true`); sul container web pubblico è **spento**
+finché non si imposta `ALLOW_DEV_LOGIN=true`. Con il flag spento la sezione sparisce
+e `POST /api/auth/dev-login` risponde 403 — resta solo email + password.
 :::
 
 ## Aziende demo

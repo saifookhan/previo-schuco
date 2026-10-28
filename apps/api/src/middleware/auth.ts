@@ -2,6 +2,8 @@ import type { Context, Next } from 'hono'
 import { computePermissions, type Permission } from '@schuco/contracts'
 import { getCompanyById, getUserProfileByCognitoSub, getUserProfileById, withSystemTransaction, type UserProfile } from '@schuco/db'
 
+import { isDevLoginAllowed } from '@schuco/env/dev-login'
+
 import { getDb } from '../lib/db'
 import { isUuid } from '../lib/uuid'
 import type { RequestVariables } from './request-context'
@@ -22,12 +24,13 @@ const TENANT_OVERRIDE_HEADER = 'x-tenant-id'
 
 /**
  * Resolve dev-mode user sub (the seeded demo users — see demo-users.ts).
- * Gated the same way apps/web's own dev-login UI is: never in production
- * unless explicitly opted into (see docker-compose's `selfhost` profile).
+ * Same switch as POST /api/auth/dev-login: `ALLOW_DEV_LOGIN=true`.
+ * `NODE_ENV` is not a switch — a non-production process must not accept
+ * the header just because it isn't production.
  * @param c - Hono context
  */
 const resolveDevSub = (c: Context): string | null => {
-  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_LOGIN !== 'true') {
+  if (!isDevLoginAllowed()) {
     return null
   }
 
