@@ -32,6 +32,7 @@ import {
   previewProductFamilyImport,
   setProductFamilyPriceValidityDates,
   setProductFamilyPublishedStatus,
+  setProductFamilyReadyForInvoicingStatus,
   updateCharacteristic,
   updatePricingMatrix,
   updateProductLine,
@@ -378,6 +379,32 @@ productFamilies.patch('/:id/publish', requireAuth, requirePermission('catalog.ed
     await setProductFamilyPublishedStatus(ctx, actorFrom(c), id, body.isPublished)
   } catch (error) {
     return editErrorResponse(c, error)
+  }
+  return c.json({ ok: true })
+})
+
+/** Marks the family ready (or not) for invoicing: only ready families can be added to quotes. */
+productFamilies.patch('/:id/ready-for-invoicing', requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const id = c.req.param('id') ?? ''
+  if (!isUuid(id)) {
+    return c.json({ error: 'Not found' }, 404)
+  }
+  const body = await c.req.json().catch(() => null)
+  if (typeof body?.readyForInvoicing !== 'boolean') {
+    return c.json({ error: '"readyForInvoicing" (boolean) is required' }, 400)
+  }
+
+  const ctx = {
+    effectiveCompanyId: c.get('effectiveCompanyId'),
+    isSuperAdmin: c.get('isSuperAdmin'),
+  }
+  try {
+    await setProductFamilyReadyForInvoicingStatus(ctx, actorFrom(c), id, body.readyForInvoicing)
+  } catch (error) {
+    if (error instanceof ProductFamilyNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+    throw error
   }
   return c.json({ ok: true })
 })

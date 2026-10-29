@@ -272,7 +272,8 @@
     "yourDiscount": "Your discount",
     "priceValidity": "Price validity",
     "noMatches": "No product families match these filters.",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "readyForInvoicing": "Ready for invoicing"
   },
   "productFamilyActions": {
     "publish": "Publish",
@@ -623,7 +624,9 @@
       "product_family_characteristic_update": "{item, select, none {An option was edited} other {Option {item} edited}}: {fields}",
       "product_family_matrix_update": "{item, select, none {A price table was edited} other {Price table of {item} edited}}",
       "product_family_share_update": "{count, plural, =0 {Sharing removed for every company} one {Shared with # company} other {Shared with # companies}}",
-      "product_family_price_validity_update": "{validTo, select, none {Price validity set: from {validFrom}} other {Price validity set: {validFrom} – {validTo}}}"
+      "product_family_price_validity_update": "{validTo, select, none {Price validity set: from {validFrom}} other {Price validity set: {validFrom} – {validTo}}}",
+      "product_family_ready_for_invoicing": "Marked ready for invoicing",
+      "product_family_not_ready_for_invoicing": "Marked not ready for invoicing"
     }
   },
   "productFamilyUpload": {
@@ -669,7 +672,16 @@
     "saveFailed": "Could not save",
     "saveFailedUnreachable": "Could not save — could not reach the server",
     "familySaved": "Imported {name}",
-    "versionSaved": "Created version {version}"
+    "versionSaved": "Created version {version}",
+    "readyForInvoicingLabel": "Ready for invoicing",
+    "readyForInvoicingHint": "Only families ready for invoicing can be added to quotes. You can change it later in the list."
+  },
+  "productFamilyInvoicing": {
+    "title": "Ready for invoicing",
+    "label": "Ready for invoicing: {name}",
+    "yes": "Yes",
+    "no": "No",
+    "saveFailed": "Could not change \"Ready for invoicing\" for {name}"
   },
   "priceValidity": {
     "range": "Prices valid {from} – {to}",
@@ -728,7 +740,10 @@
       "updated": "Recently updated",
       "created": "Recently created",
       "validTo": "Prices ending soonest"
-    }
+    },
+    "invoicing": "Ready for invoicing",
+    "invoicingReady": "Yes",
+    "invoicingNotReady": "No"
   },
   "loading": {
     "loading": "Loading…",

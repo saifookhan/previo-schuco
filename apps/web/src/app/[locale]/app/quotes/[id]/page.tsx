@@ -35,10 +35,11 @@ const QuoteDetailPage = async ({ params }: QuoteDetailPageProps) => {
     )
   }
 
-  // New positions can only come from published families whose prices are valid today (the API enforces the same).
+  // New positions can only come from published families that are ready for invoicing and whose
+  // prices are valid today (the API enforces the same).
   const today = priceValidityToday()
   const families = (familiesResult.data?.families ?? []).filter(
-    (f) => f.isPublished && priceValidityStatus(f, today) === 'current',
+    (f) => f.isPublished && f.readyForInvoicing && priceValidityStatus(f, today) === 'current',
   )
 
   return <QuoteBuilder initialDetail={quoteResult.data} families={families} />

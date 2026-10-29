@@ -10,6 +10,7 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 ## Oktober 2026
 
 **Woche vom 26. Oktober**
+- **Bereit zur Fakturierung** bei Produktfamilien (Ja / Nein in der Liste, auf der Seite der Familie und in den Upload- und Kopier-Dialogen): nur bereite Familien werden im Angebot angeboten. Bestehende Familien wurden als bereit markiert; neue starten als nicht bereit, Kopien und neue Versionen übernehmen die Einstellung des Originals.
 - **Filter bei Produktfamilien**: Suche, Kategorie, Marke, Status, Preisgültigkeit, Gültigkeitstag, Aktualisierungszeitraum, nur neueste Versionen, Eigentümer und Rabatt (geteilter Reiter) sowie Sortierung. Sie bleiben in der Seitenadresse.
 - **Ladeanzeigen in jeder Tabelle**: ein Platzhalter beim ersten Laden der Seite und ein Fortschrittsbalken mit „Wird aktualisiert…“, wenn eine Tabelle nach Filter, Sortierung, Reiter oder Aktion neu lädt — die Zeilen bleiben sichtbar.
 

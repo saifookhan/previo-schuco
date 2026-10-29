@@ -26,6 +26,7 @@ Ein kompletter Durchlauf der wichtigsten Abläufe. Mit den [Demo-Anmeldungen](./
 - [ ] Eine **neue Version** erstellen, bearbeiten, veröffentlichen.
 - [ ] Die Demo-Familie mit Fabbrikka zu 5 % teilen.
 - [ ] Unter *Produktfamilien* jeden Filter und die Sortierung ausprobieren — Liste und „x von y“ aktualisieren sich; die URL in einem neuen Tab öffnen zeigt dieselben Filter; **Zurück** macht den letzten Filter rückgängig.
+- [ ] **Bereit zur Fakturierung** einer Familie auf **Nein** setzen — das Angebot bietet sie nicht mehr an, eine bestehende Position bleibt bearbeitbar; zurück auf **Ja** und sie wird wieder angeboten. Eine neu importierte Familie startet mit **Nein**, wenn im Dialog nicht angekreuzt.
 
 ## Sichtbarkeit
 

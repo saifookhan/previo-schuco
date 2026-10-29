@@ -62,6 +62,7 @@ export const productFamilyImportFieldsSchema = z
     priceValidFrom: isoDateSchema,
     priceValidTo: optionalField(isoDateSchema),
     publish: optionalField(z.enum(['true', 'false'])).transform((value) => value === 'true'),
+    readyForInvoicing: optionalField(z.enum(['true', 'false'])).transform((value) => value === 'true'),
   })
   .refine(validToNotBeforeFrom, VALID_TO_MESSAGE)
 
@@ -76,6 +77,8 @@ export const duplicateProductFamilyRequestSchema = z
     name: z.string().trim().min(1, 'Name is required').max(200),
     ...priceValidityFields,
     publish: z.boolean(),
+    /** Offer the copy for new quote positions; not ready when left out. */
+    readyForInvoicing: z.boolean().default(false),
   })
   .refine(validToNotBeforeFrom, VALID_TO_MESSAGE)
 

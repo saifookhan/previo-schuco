@@ -8,6 +8,8 @@ export interface ProductFamilySummary {
   version: number
   supersedesId: string | null
   isPublished: boolean
+  /** Only families ready for invoicing are offered for new quote positions. */
+  readyForInvoicing: boolean
   /** `YYYY-MM-DD`, inclusive; null = no lower limit (families imported before validity existed). */
   priceValidFrom: string | null
   /** `YYYY-MM-DD`, inclusive; null = until further notice. */

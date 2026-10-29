@@ -116,6 +116,7 @@ export {
   listVisibleProductFamilies,
   setProductFamilyPriceValidity,
   setProductFamilyPublished,
+  setProductFamilyReadyForInvoicing,
   type CharacteristicRow,
   type InsertCharacteristicInput,
   type InsertPricingMatrixInput,

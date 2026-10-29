@@ -327,6 +327,31 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           },
         },
       },
+      '/api/product-families/{id}/ready-for-invoicing': {
+        patch: {
+          tags: ['Products'],
+          summary: 'Mark a product family ready (or not) for invoicing',
+          description:
+            'Only families that are ready for invoicing (and published, with prices valid today) can be added to quotes. Owning company (catalog.edit) or super-admin. Existing quote positions are not affected.',
+          operationId: 'setProductFamilyReadyForInvoicing',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { type: 'object', required: ['readyForInvoicing'], properties: { readyForInvoicing: { type: 'boolean' } } },
+              },
+            },
+          },
+          responses: {
+            '200': { description: 'Saved; body is `{ ok: true }`' },
+            '400': { description: 'Missing or invalid `readyForInvoicing`', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            '404': { description: 'No such family, or not owned by the caller', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
       '/api/products': {
         get: {
           tags: ['Products'],
@@ -814,6 +839,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
             priceValidFrom: { type: 'string', format: 'date' },
             priceValidTo: { type: 'string', format: 'date', nullable: true, description: 'Null means until further notice' },
             publish: { type: 'boolean', description: 'Publish the copy right away instead of saving a draft' },
+            readyForInvoicing: { type: 'boolean', default: false, description: 'Offer the copy for new quote positions' },
           },
         },
         ProductFamilyImportForm: {
@@ -825,6 +851,11 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
             priceValidFrom: { type: 'string', format: 'date' },
             priceValidTo: { type: 'string', format: 'date', description: 'Blank = until further notice' },
             publish: { type: 'string', enum: ['true', 'false'], description: 'Publish right away (default false: saved as a draft)' },
+            readyForInvoicing: {
+              type: 'string',
+              enum: ['true', 'false'],
+              description: 'Offer the family for new quote positions (default false)',
+            },
           },
         },
         ProductFamilyImportPreview: {

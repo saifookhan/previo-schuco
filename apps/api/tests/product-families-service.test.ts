@@ -20,6 +20,7 @@ import {
   listProductFamilies,
   previewProductFamilyImport,
   setProductFamilyPriceValidityDates,
+  setProductFamilyReadyForInvoicingStatus,
   setProductFamilyPublishedStatus,
   updateCharacteristic,
   updatePricingMatrix,
@@ -191,8 +192,9 @@ describe('duplicateProductFamily + setProductFamilyPublishedStatus', () => {
       priceValidFrom: '2027-01-01',
       priceValidTo: null,
       publish: true,
+      readyForInvoicing: true,
     })
-    expect(copy).toMatchObject({ name: 'NEST 2027', priceValidFrom: '2027-01-01', priceValidTo: null, isPublished: true })
+    expect(copy).toMatchObject({ name: 'NEST 2027', priceValidFrom: '2027-01-01', priceValidTo: null, isPublished: true, readyForInvoicing: true })
 
     const originalAfter = await getProductFamilyDetail(ctx, original.id)
     expect(originalAfter!.family).toMatchObject({ priceValidFrom: '2026-01-01', priceValidTo: '2026-12-31', isPublished: false })
@@ -201,7 +203,13 @@ describe('duplicateProductFamily + setProductFamilyPublishedStatus', () => {
       tx.select().from(auditLog).where(and(eq(auditLog.resourceType, 'product_family'), eq(auditLog.resourceId, copy.id))),
     )
     expect(entries.map((entry) => entry.action)).toEqual(['product_family.duplicate'])
-    expect(entries[0].metadata).toMatchObject({ duplicatedFromId: original.id, priceValidFrom: '2027-01-01', priceValidTo: null, published: true })
+    expect(entries[0].metadata).toMatchObject({
+      duplicatedFromId: original.id,
+      priceValidFrom: '2027-01-01',
+      priceValidTo: null,
+      published: true,
+      readyForInvoicing: true,
+    })
   })
 
   it('throws ProductFamilyNotFoundError copying a family the caller cannot see', async () => {
@@ -212,6 +220,7 @@ describe('duplicateProductFamily + setProductFamilyPublishedStatus', () => {
         priceValidFrom: '2027-01-01',
         priceValidTo: null,
         publish: false,
+        readyForInvoicing: false,
       }),
     ).rejects.toThrow(ProductFamilyNotFoundError)
   })
@@ -535,15 +544,21 @@ describe('upload dialog: preview, then save with the confirmed fields', () => {
       actor,
       supplierCompanyId,
       { buffer: fixtureBuffer, originalName: 'product-family-sample.xlsx' },
-      { name: '  NEST 2027  ', priceValidFrom: '2027-01-01', priceValidTo: '2027-12-31', publish: true },
+      { name: '  NEST 2027  ', priceValidFrom: '2027-01-01', priceValidTo: '2027-12-31', publish: true, readyForInvoicing: true },
     )
-    expect(family).toMatchObject({ name: 'NEST 2027', priceValidFrom: '2027-01-01', priceValidTo: '2027-12-31', isPublished: true })
+    expect(family).toMatchObject({
+      name: 'NEST 2027',
+      priceValidFrom: '2027-01-01',
+      priceValidTo: '2027-12-31',
+      isPublished: true,
+      readyForInvoicing: true,
+    })
 
     const entries = await withSystemTransaction(db, (tx) =>
       tx.select().from(auditLog).where(and(eq(auditLog.resourceType, 'product_family'), eq(auditLog.resourceId, family.id))),
     )
     expect(entries.map((entry) => entry.action)).toEqual(['product_family.import'])
-    expect(entries[0].metadata).toMatchObject({ priceValidFrom: '2027-01-01', priceValidTo: '2027-12-31', published: true })
+    expect(entries[0].metadata).toMatchObject({ priceValidFrom: '2027-01-01', priceValidTo: '2027-12-31', published: true, readyForInvoicing: true })
   })
 
   it('gives a new version its own dates and leaves the older version untouched', async () => {
@@ -559,6 +574,35 @@ describe('upload dialog: preview, then save with the confirmed fields', () => {
     expect(v2).toMatchObject({ version: v1.version + 1, priceValidFrom: '2027-01-01', priceValidTo: null, isPublished: false })
     const v1After = await getProductFamilyDetail(ctx(), v1.id)
     expect(v1After!.family).toMatchObject({ priceValidFrom: '2026-01-01', priceValidTo: null })
+  })
+
+  it('starts a new family not ready for invoicing; only the owner changes it, and each change is audited', async () => {
+    const family = await importProductFamilyFromExcel(ctx(), actor, supplierCompanyId, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+    expect(family.readyForInvoicing).toBe(false)
+
+    await setProductFamilyReadyForInvoicingStatus(ctx(), actor, family.id, true)
+    expect((await getProductFamilyDetail(ctx(), family.id))!.family.readyForInvoicing).toBe(true)
+
+    const stranger = { effectiveCompanyId: '00000000-0000-4000-8000-000000000000', isSuperAdmin: false }
+    await expect(setProductFamilyReadyForInvoicingStatus(stranger, actor, family.id, false)).rejects.toThrow(ProductFamilyNotFoundError)
+    expect((await getProductFamilyDetail(ctx(), family.id))!.family.readyForInvoicing).toBe(true)
+
+    await setProductFamilyReadyForInvoicingStatus(ctx(), actor, family.id, false)
+    const entries = await withSystemTransaction(db, (tx) =>
+      tx
+        .select()
+        .from(auditLog)
+        .where(and(eq(auditLog.resourceType, 'product_family'), eq(auditLog.resourceId, family.id)))
+        .orderBy(auditLog.createdAt),
+    )
+    expect(entries.map((entry) => entry.action)).toEqual([
+      'product_family.import',
+      'product_family.ready_for_invoicing',
+      'product_family.not_ready_for_invoicing',
+    ])
   })
 
   it('changes the dates later for the owner only', async () => {

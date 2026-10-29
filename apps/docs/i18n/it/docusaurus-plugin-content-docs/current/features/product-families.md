@@ -29,6 +29,7 @@ Ogni ambiente ne ha già una: **Demo Window W70** (vedi [Dati demo](../demo-data
 | Duplica | Icona copia nelle azioni | Una finestra chiede nome, validità prezzi e pubblicazione della copia (parte dalle date dell'originale, non pubblicata) |
 | Elimina | Menu azioni | |
 | Cambia validità prezzi | **Modifica** accanto alle date nella pagina della famiglia | Solo il proprietario (o il super-admin) |
+| Pronta per la fatturazione | **Sì / No** nell'elenco (o nella pagina della famiglia) | Solo le famiglie pronte per la fatturazione sono proposte nel preventivo. Solo il proprietario |
 
 ![Dettaglio famiglia di prodotto](/img/screens/product-family-detail.png)
 
@@ -42,6 +43,7 @@ Ogni ambiente ne ha già una: **Demo Window W70** (vedi [Dati demo](../demo-data
    - **Nome della famiglia** — preso dal file; puoi cambiarlo.
    - **Valido dal** (obbligatorio, oggi di default) e **Valido fino al** (vuoto = fino a nuovo avviso).
    - **Pubblica subito** — altrimenti viene salvata in bozza.
+   - **Pronta per la fatturazione** — spuntala per proporre la famiglia nel preventivo; le nuove famiglie partono non pronte, copie e nuove versioni dall'impostazione dell'originale.
 4. **Importa famiglia** la salva e apre la sua pagina.
 
 ![Finestra di caricamento](/img/screens/product-family-upload.png)
@@ -54,6 +56,14 @@ I prezzi di una famiglia si possono usare nelle **nuove posizioni dei preventivi
 al* (giorni inclusi, ora italiana). Fuori da questi giorni la famiglia non è proposta nel preventivo e l'API la
 rifiuta. Le posizioni già nei preventivi mantengono i loro prezzi e restano modificabili. L'elenco mostra le date con
 il badge **Futura** o **Scaduta**; le famiglie importate prima di questa funzione non hanno date e sono sempre usabili.
+
+## Pronta per la fatturazione
+
+Solo le famiglie segnate **Pronta per la fatturazione** (e pubblicate, con prezzi validi oggi) sono proposte quando
+si aggiunge una posizione a un preventivo; l'API rifiuta le altre. Si cambia con il menu **Sì / No** nell'elenco o
+nella pagina della famiglia — solo l'azienda proprietaria può farlo. Una famiglia nuova parte **non pronta**; una copia o una nuova
+versione parte dall'impostazione dell'originale (modificabile nella finestra). Quelle esistenti prima di questa impostazione sono state segnate pronte. Le posizioni già nei
+preventivi non cambiano e restano modificabili. Ogni modifica compare nella cronologia della famiglia.
 
 ## Campi di prezzo
 
@@ -82,6 +92,7 @@ Sopra l'elenco, per la scheda aperta:
 - **Cerca** — nome, nome tecnico, categoria, marca (e proprietario in *Condivise con me*).
 - **Categoria**, **Marca**, **Stato** (pubblicata / bozza).
 - **Validità prezzi** — *Validi oggi* (quello che propone il preventivo; contano anche le famiglie senza date), *In arrivo*, *Scaduti*, *Senza date*.
+- **Pronta per la fatturazione** (in *Più filtri*) — Sì / No.
 - **Altri filtri** — *Prezzi validi il* un certo giorno, *Aggiornata dal / al*, *Solo ultime versioni* (nasconde le versioni sostituite da una più recente); in *Condivise con me* anche **Proprietario** e **Il tuo sconto** (con / senza).
 - **Ordina** — più recenti prima (predefinito), aggiornate di recente, nome, prezzi in scadenza prima.
 

@@ -10,6 +10,7 @@ What changed, newest first. Use it to see what's new to test.
 ## October 2026
 
 **Week of 26 October**
+- **Ready for invoicing** on product families (Yes / No in the list, the family's page, and the upload and copy dialogs): only ready families are offered in the quote builder. Existing families were marked ready; new ones start not ready, copies and new versions keep the original's setting.
 - **Filters on Product families**: search, category, brand, status, price validity, valid-on date, updated range, latest versions only, owner and discount (shared tab), and sorting. They are kept in the page address.
 - **Loading indicators on every table**: a placeholder while a page first loads, and a progress bar with “Updating…” while a table reloads after a filter, sort, tab or action — the rows stay visible.
 

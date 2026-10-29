@@ -22,6 +22,8 @@ interface ProductFamilyRowActionsProps {
   familyId: string
   familyName: string
   isPublished: boolean
+  /** Whether the family is ready for invoicing — the copy dialog starts from it. */
+  readyForInvoicing: boolean
   /** The family's dates, which the copy dialog starts from. */
   validity: { priceValidFrom: string | null; priceValidTo: string | null }
   /** Where to navigate after a successful delete. Omit to just refresh in place (list page); pass the list route from the detail page, since staying put would 404. */
@@ -36,6 +38,7 @@ export const ProductFamilyRowActions = ({
   familyId,
   familyName,
   isPublished,
+  readyForInvoicing,
   validity,
   redirectAfterDeleteHref,
 }: ProductFamilyRowActionsProps) => {
@@ -79,6 +82,7 @@ export const ProductFamilyRowActions = ({
       priceValidFrom: expired ? today : (validity.priceValidFrom ?? today),
       priceValidTo: expired ? '' : (validity.priceValidTo ?? ''),
       publish: false,
+      readyForInvoicing,
     })
   }
 
@@ -98,6 +102,7 @@ export const ProductFamilyRowActions = ({
           priceValidFrom: copyDetails.priceValidFrom,
           priceValidTo: copyDetails.priceValidTo || null,
           publish: copyDetails.publish,
+          readyForInvoicing: copyDetails.readyForInvoicing,
         }),
       })
       const data = (await response.json().catch(() => ({}))) as { error?: string; family?: { id: string; name: string } }

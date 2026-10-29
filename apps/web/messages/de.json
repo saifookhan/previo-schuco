@@ -272,7 +272,8 @@
     "yourDiscount": "Ihr Rabatt",
     "priceValidity": "Preisgültigkeit",
     "noMatches": "Keine Produktfamilie passt zu diesen Filtern.",
-    "clearFilters": "Filter entfernen"
+    "clearFilters": "Filter entfernen",
+    "readyForInvoicing": "Bereit zur Fakturierung"
   },
   "productFamilyActions": {
     "publish": "Veröffentlichen",
@@ -623,7 +624,9 @@
       "product_family_characteristic_update": "{item, select, none {Option bearbeitet} other {Option {item} bearbeitet}}: {fields}",
       "product_family_matrix_update": "{item, select, none {Preistabelle bearbeitet} other {Preistabelle von {item} bearbeitet}}",
       "product_family_share_update": "{count, plural, =0 {Freigabe für alle Unternehmen entfernt} one {Mit # Unternehmen geteilt} other {Mit # Unternehmen geteilt}}",
-      "product_family_price_validity_update": "{validTo, select, none {Preisgültigkeit festgelegt: ab {validFrom}} other {Preisgültigkeit festgelegt: {validFrom} – {validTo}}}"
+      "product_family_price_validity_update": "{validTo, select, none {Preisgültigkeit festgelegt: ab {validFrom}} other {Preisgültigkeit festgelegt: {validFrom} – {validTo}}}",
+      "product_family_ready_for_invoicing": "Als bereit zur Fakturierung markiert",
+      "product_family_not_ready_for_invoicing": "Als nicht bereit zur Fakturierung markiert"
     }
   },
   "productFamilyUpload": {
@@ -669,7 +672,16 @@
     "saveFailed": "Speichern fehlgeschlagen",
     "saveFailedUnreachable": "Speichern fehlgeschlagen — Server nicht erreichbar",
     "familySaved": "{name} importiert",
-    "versionSaved": "Version {version} erstellt"
+    "versionSaved": "Version {version} erstellt",
+    "readyForInvoicingLabel": "Bereit zur Fakturierung",
+    "readyForInvoicingHint": "Nur Familien, die bereit zur Fakturierung sind, können zu Angeboten hinzugefügt werden. Sie können das später in der Liste ändern."
+  },
+  "productFamilyInvoicing": {
+    "title": "Bereit zur Fakturierung",
+    "label": "Bereit zur Fakturierung: {name}",
+    "yes": "Ja",
+    "no": "Nein",
+    "saveFailed": "„Bereit zur Fakturierung“ für {name} konnte nicht geändert werden"
   },
   "priceValidity": {
     "range": "Preise gültig {from} – {to}",
@@ -728,7 +740,10 @@
       "updated": "Zuletzt aktualisiert",
       "created": "Zuletzt erstellt",
       "validTo": "Preise laufen zuerst ab"
-    }
+    },
+    "invoicing": "Bereit zur Fakturierung",
+    "invoicingReady": "Ja",
+    "invoicingNotReady": "Nein"
   },
   "loading": {
     "loading": "Wird geladen…",

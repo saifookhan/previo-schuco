@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Link } from '@/i18n/navigation'
 import { fetchFromApiResult } from '@/lib/api/server-client'
+import { ProductFamilyInvoicingSelect } from '@/components/product-family-invoicing-select'
 import { ProductFamilyImageGallery } from '@/components/product-family-image-gallery'
 import { ProductFamilyMatrixPreview } from '@/components/product-family-matrix-preview'
 import { ProductFamilyPriceValidity } from '@/components/product-family-price-validity'
@@ -28,6 +29,7 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
   const tList = await getTranslations('productFamilies')
   const tVersion = await getTranslations('productFamilyVersion')
   const tEdit = await getTranslations('productFamilyEdit')
+  const tInvoicing = await getTranslations('productFamilyInvoicing')
   const result = await fetchFromApiResult<ProductFamilyDetail>(`/api/product-families/${id}`)
 
   if (result.status !== 'ok') {
@@ -98,6 +100,10 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
             {[family.technicalName, family.category, family.brand].filter(Boolean).join(' · ') || '—'}
           </p>
           <ProductFamilyPriceValidity familyId={family.id} validity={family} canEdit={canManage} today={priceValidityToday()} />
+          <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+            <span>{tInvoicing('title')}</span>
+            <ProductFamilyInvoicingSelect familyId={family.id} familyName={family.name} ready={family.readyForInvoicing} canEdit={canManage} />
+          </div>
           {family.supersedesId ? (
             <Link
               href={`/app/product-families/${family.supersedesId}`}
@@ -113,10 +119,15 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
             familyId={family.id}
             familyName={family.name}
             isPublished={family.isPublished}
+            readyForInvoicing={family.readyForInvoicing}
             validity={family}
             redirectAfterDeleteHref="/app/product-families"
           />
-          {canManage ? <ProductFamilyUploadButton version={{ familyId: family.id, familyName: family.name }} /> : null}
+          {canManage ? (
+            <ProductFamilyUploadButton
+              version={{ familyId: family.id, familyName: family.name, readyForInvoicing: family.readyForInvoicing }}
+            />
+          ) : null}
           <ProductFamilyShareButton familyId={family.id} familyName={family.name} isPublished={family.isPublished} />
         </div>
       </div>

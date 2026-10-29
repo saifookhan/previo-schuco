@@ -5,9 +5,21 @@ import { useTranslations } from 'next-intl'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-export type ProductFamilyDetails = { name: string; priceValidFrom: string; priceValidTo: string; publish: boolean }
+export type ProductFamilyDetails = {
+  name: string
+  priceValidFrom: string
+  priceValidTo: string
+  publish: boolean
+  readyForInvoicing: boolean
+}
 
-export const EMPTY_PRODUCT_FAMILY_DETAILS: ProductFamilyDetails = { name: '', priceValidFrom: '', priceValidTo: '', publish: false }
+export const EMPTY_PRODUCT_FAMILY_DETAILS: ProductFamilyDetails = {
+  name: '',
+  priceValidFrom: '',
+  priceValidTo: '',
+  publish: false,
+  readyForInvoicing: false,
+}
 
 /** Returns a check for the dates' problem, if any — Save stays disabled while there is one. */
 export const useProductFamilyDetailsError = () => {
@@ -20,7 +32,7 @@ export const useProductFamilyDetailsError = () => {
 }
 
 /**
- * Name, price validity and "Publish right away" — what the upload and copy dialogs both ask
+ * Name, price validity, "Publish right away" and "Ready for invoicing" — what the upload and copy dialogs both ask
  * before a new family is saved.
  */
 export const ProductFamilyDetailsFields = ({
@@ -89,6 +101,19 @@ export const ProductFamilyDetailsFields = ({
         <span>
           {t('publishLabel')}
           <span className="block text-xs text-slate-500">{t('publishHint')}</span>
+        </span>
+      </label>
+
+      <label className="flex items-start gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 rounded border-slate-300"
+          checked={details.readyForInvoicing}
+          onChange={(e) => set('readyForInvoicing', e.target.checked)}
+        />
+        <span>
+          {t('readyForInvoicingLabel')}
+          <span className="block text-xs text-slate-500">{t('readyForInvoicingHint')}</span>
         </span>
       </label>
     </>

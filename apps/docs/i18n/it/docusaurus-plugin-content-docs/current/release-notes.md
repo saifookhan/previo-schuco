@@ -10,6 +10,7 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 ## Ottobre 2026
 
 **Settimana del 26 ottobre**
+- **Pronta per la fatturazione** sulle famiglie di prodotto (Sì / No nell'elenco, nella pagina della famiglia e nelle finestre di caricamento e copia): solo le famiglie pronte sono proposte nel preventivo. Le famiglie esistenti sono state segnate pronte; le nuove partono non pronte, copie e nuove versioni mantengono l'impostazione dell'originale.
 - **Filtri in Famiglie di prodotto**: ricerca, categoria, marca, stato, validità prezzi, data di validità, periodo di aggiornamento, solo ultime versioni, proprietario e sconto (scheda condivise) e ordinamento. Restano nell’indirizzo della pagina.
 - **Indicatori di caricamento su ogni tabella**: un segnaposto al primo caricamento della pagina e una barra di avanzamento con “Aggiornamento…” quando una tabella si ricarica dopo un filtro, un ordinamento, una scheda o un’azione — le righe restano visibili.
 

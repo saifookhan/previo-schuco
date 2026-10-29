@@ -19,7 +19,7 @@ import { priceValidityToday, type ProductFamilyImportPreview } from '@schuco/con
 
 interface ProductFamilyUploadButtonProps {
   /** Upload as a new version of this family; omit to import a new family. */
-  version?: { familyId: string; familyName: string }
+  version?: { familyId: string; familyName: string; readyForInvoicing: boolean }
 }
 
 const COUNT_KEYS = ['productLines', 'characteristics', 'options', 'priceTables', 'relations', 'images'] as const
@@ -27,7 +27,7 @@ const COUNT_KEYS = ['productLines', 'characteristics', 'options', 'priceTables',
 /**
  * Excel upload in two steps: the picked file is first checked in memory by the
  * API (nothing saved), then a dialog shows what it holds and asks for the name,
- * price validity and whether to publish. Only "Save" stores anything — the same
+ * price validity, whether to publish and whether it is ready for invoicing. Only "Save" stores anything — the same
  * file is sent again with the confirmed fields.
  */
 export const ProductFamilyUploadButton = ({ version }: ProductFamilyUploadButtonProps) => {
@@ -38,7 +38,9 @@ export const ProductFamilyUploadButton = ({ version }: ProductFamilyUploadButton
   const [checking, setChecking] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<ProductFamilyImportPreview | null>(null)
-  const [fields, setFields] = useState<ProductFamilyDetails>(EMPTY_PRODUCT_FAMILY_DETAILS)
+  // A new version starts as ready for invoicing as the version it replaces; a new family starts not ready.
+  const initialFields: ProductFamilyDetails = { ...EMPTY_PRODUCT_FAMILY_DETAILS, readyForInvoicing: version?.readyForInvoicing ?? false }
+  const [fields, setFields] = useState<ProductFamilyDetails>(initialFields)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const dateError = useProductFamilyDetailsError()(fields)
@@ -51,7 +53,7 @@ export const ProductFamilyUploadButton = ({ version }: ProductFamilyUploadButton
     setPreview(null)
     setFile(null)
     setError(null)
-    setFields(EMPTY_PRODUCT_FAMILY_DETAILS)
+    setFields(initialFields)
   }
 
   const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,6 +103,7 @@ export const ProductFamilyUploadButton = ({ version }: ProductFamilyUploadButton
       formData.append('priceValidFrom', fields.priceValidFrom)
       formData.append('priceValidTo', fields.priceValidTo)
       formData.append('publish', String(fields.publish))
+      formData.append('readyForInvoicing', String(fields.readyForInvoicing))
       const url = version ? `/api/product-families/${version.familyId}/new-version` : '/api/product-families/import'
       const response = await fetch(url, { method: 'POST', body: formData })
       const data = (await response.json()) as { error?: string; family?: { id: string; name: string; version: number } }

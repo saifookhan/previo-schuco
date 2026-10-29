@@ -23,7 +23,7 @@ const SELECT_CLASS =
   'h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand'
 
 /** Filters that live under "More filters"; it opens by itself when one of them is set. */
-const MORE_KEYS = ['validOn', 'updatedFrom', 'updatedTo', 'latestOnly', 'owner', 'discount'] as const
+const MORE_KEYS = ['invoicing', 'validOn', 'updatedFrom', 'updatedTo', 'latestOnly', 'owner', 'discount'] as const
 
 /**
  * Filter bar for the product families list. Every change rewrites the URL's search params
@@ -100,7 +100,7 @@ export const ProductFamilyFiltersBar = ({
     // Re-runs only when the typed text changes; `apply` and the filters are read fresh via `latest`.
   }, [q])
 
-  const select = <K extends 'category' | 'brand' | 'status' | 'validity' | 'owner' | 'discount'>(
+  const select = <K extends 'category' | 'brand' | 'status' | 'validity' | 'invoicing' | 'owner' | 'discount'>(
     key: K,
     label: string,
     options: Array<{ value: string; label: string }>,
@@ -180,7 +180,11 @@ export const ProductFamilyFiltersBar = ({
       </div>
 
       {moreOpen ? (
-        <div className="grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 lg:grid-cols-4">
+          {select('invoicing', t('invoicing'), [
+            { value: 'ready', label: t('invoicingReady') },
+            { value: 'notReady', label: t('invoicingNotReady') },
+          ])}
           {dateInput('validOn', t('validOn'))}
           {dateInput('updatedFrom', t('updatedFrom'), { max: filters.updatedTo })}
           {dateInput('updatedTo', t('updatedTo'), { min: filters.updatedFrom })}

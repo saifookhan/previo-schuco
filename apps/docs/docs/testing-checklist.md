@@ -26,6 +26,7 @@ An end-to-end run through the main flows. Use [Demo logins](./demo-logins.md) to
 - [ ] Create a **new version**, edit it, publish it.
 - [ ] Share the demo family with Fabbrikka at 5%.
 - [ ] On *Product families*, try each filter and the sort — the list and the “x of y” count update; copy the URL into a new tab and the same filters are applied; **Back** undoes the last filter.
+- [ ] Set a family's **Ready for invoicing** to **No** — the quote builder no longer offers it, and an existing position from it can still be edited; set it back to **Yes** and it is offered again. A newly imported family starts at **No** unless ticked in the dialog.
 
 ## Visibility
 

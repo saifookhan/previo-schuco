@@ -16,6 +16,7 @@ import {
   listVisibleProductFamilies,
   setProductFamilyPriceValidity,
   setProductFamilyPublished,
+  setProductFamilyReadyForInvoicing,
   type CharacteristicRow,
   type PricingMatrixRow,
   type ProductFamilyDetail,
@@ -187,6 +188,8 @@ export interface ProductFamilyImportOptions {
   priceValidTo?: string | null
   /** Publish as part of the import instead of saving a draft. */
   publish?: boolean
+  /** Offer the family for new quote positions right away. */
+  readyForInvoicing?: boolean
   /** Makes this import a new *version* of an existing family (see `createNewVersionFromExcel`). */
   version?: { version: number; supersedesId: string }
 }
@@ -239,6 +242,7 @@ export const importProductFamilyFromExcel = async (
       supersedesId: versionOptions?.supersedesId,
       ...priceValidity,
       isPublished: options.publish ?? false,
+      readyForInvoicing: options.readyForInvoicing ?? false,
     })
 
     for (const image of savedImages) {
@@ -354,6 +358,7 @@ export const importProductFamilyFromExcel = async (
         // Part of this entry, not a separate product_family.publish: both would share the
         // transaction's timestamp, so their order in the history would be arbitrary.
         published: options.publish ?? false,
+        readyForInvoicing: options.readyForInvoicing ?? false,
         ...(versionOptions ? { supersedesId: versionOptions.supersedesId, version: versionOptions.version } : {}),
       },
     })
@@ -435,7 +440,7 @@ export const duplicateProductFamily = async (
     if (!source) {
       throw new ProductFamilyNotFoundError()
     }
-    const { priceValidFrom, priceValidTo, publish: published } = options
+    const { priceValidFrom, priceValidTo, publish: published, readyForInvoicing } = options
 
     const newFamilyId = await insertProductFamily(tx, {
       supplierCompanyId: source.family.supplierCompanyId,
@@ -448,6 +453,7 @@ export const duplicateProductFamily = async (
       priceValidFrom,
       priceValidTo,
       isPublished: published,
+      readyForInvoicing,
       duplicatedFromId: familyId,
     })
 
@@ -536,7 +542,7 @@ export const duplicateProductFamily = async (
         action: 'product_family.duplicate',
         resourceType: 'product_family',
         resourceId: newFamilyId,
-        metadata: { duplicatedFromId: familyId, priceValidFrom, priceValidTo, published },
+        metadata: { duplicatedFromId: familyId, priceValidFrom, priceValidTo, published, readyForInvoicing },
       },
     )
 
@@ -573,6 +579,29 @@ export const setProductFamilyPublishedStatus = async (
         resourceId: familyId,
       },
     )
+  })
+
+/**
+ * Marks a family ready (or not) for invoicing — only ready families are offered for
+ * new quote positions. Positions already on quotes are left as they are.
+ * @throws {ProductFamilyNotFoundError} no such family, or the caller doesn't own it (RLS blocked the UPDATE)
+ */
+export const setProductFamilyReadyForInvoicingStatus = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  readyForInvoicing: boolean,
+): Promise<void> =>
+  withTenantDb(ctx, async (tx) => {
+    const updated = await setProductFamilyReadyForInvoicing(tx, familyId, readyForInvoicing)
+    if (!updated) {
+      throw new ProductFamilyNotFoundError()
+    }
+    await recordAuditEvent(tx, auditActor(actor), updated.supplierCompanyId, {
+      action: readyForInvoicing ? 'product_family.ready_for_invoicing' : 'product_family.not_ready_for_invoicing',
+      resourceType: 'product_family',
+      resourceId: familyId,
+    })
   })
 
 /**

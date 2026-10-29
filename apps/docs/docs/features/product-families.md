@@ -29,6 +29,7 @@ Every environment already has one: **Demo Window W70** (see [Demo data](../demo-
 | Duplicate | Copy icon in the actions | A dialog asks for the copy's name, price validity and whether to publish it (starts from the original's dates, unpublished) |
 | Delete | Actions menu | |
 | Change price validity | **Edit** next to the dates on the family's page | Owner (or super-admin) only |
+| Ready for invoicing | **Yes / No** in the list (or on the family's page) | Only families ready for invoicing are offered in the quote builder. Owner only |
 
 ![Product family detail](/img/screens/product-family-detail.png)
 
@@ -42,6 +43,7 @@ Every environment already has one: **Demo Window W70** (see [Demo data](../demo-
    - **Family name** — taken from the file; change it if you like.
    - **Valid from** (required, today by default) and **Valid to** (empty = until further notice).
    - **Publish right away** — otherwise it is saved as a draft.
+   - **Ready for invoicing** — tick it to offer the family in the quote builder; new families start not ready, copies and new versions start with the original's setting.
 4. **Import family** saves it and opens its page.
 
 ![Upload dialog](/img/screens/product-family-upload.png)
@@ -54,6 +56,14 @@ A family's prices can be used on **new quote positions** only from *Valid from* 
 Italian time). Outside those days the family isn't offered in the quote builder and the API refuses it. Positions
 already on quotes keep their prices and can still be edited. The list shows the dates with an **Upcoming** or
 **Expired** badge; families imported before this existed have no dates and are always usable.
+
+## Ready for invoicing
+
+Only families marked **Ready for invoicing** (and published, with prices valid today) are offered when adding a
+position to a quote; the API refuses the others. Change it with the **Yes / No** dropdown in the list or on the
+family's page — only the owning company can. A new family starts **not ready**; a copy or a new version starts
+with the original's setting (change it in the dialog). Families that existed before this setting were marked ready. Positions already on quotes are not affected and can still be
+edited. Each change is recorded in the family's history.
 
 ## Pricing fields
 
@@ -82,6 +92,7 @@ Above the list, for the tab you're on:
 - **Search** — name, technical name, category, brand (and owner on *Shared with me*).
 - **Category**, **Brand**, **Status** (published / draft).
 - **Price validity** — *Valid today* (what the quote builder offers; families without dates count), *Upcoming*, *Expired*, *No dates*.
+- **Ready for invoicing** (under *More filters*) — Yes / No.
 - **More filters** — *Prices valid on* a given day, *Updated from / to*, *Latest versions only* (hides versions a newer one replaces); on *Shared with me* also **Owner** and **Your discount** (with / without).
 - **Sort** — newest first (default), recently updated, name, prices ending soonest.
 

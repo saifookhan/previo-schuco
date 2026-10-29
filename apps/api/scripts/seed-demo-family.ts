@@ -56,10 +56,14 @@ const main = async () => {
   const ctx = { effectiveCompanyId: supplier.companyId, isSuperAdmin: false }
   const actor = { actorUserId: supplier.userId, actorCompanyId: supplier.companyId, requestId: 'seed-demo-family' }
 
-  const family = await importProductFamilyFromExcel(ctx, actor, supplier.companyId, {
-    buffer: buildSampleWorkbook(),
-    originalName: 'previo-sample-family.xlsx',
-  })
+  const family = await importProductFamilyFromExcel(
+    ctx,
+    actor,
+    supplier.companyId,
+    { buffer: buildSampleWorkbook(), originalName: 'previo-sample-family.xlsx' },
+    // Ready, so the demo has something to add to quotes.
+    { readyForInvoicing: true },
+  )
   // Import, publish and share are separate transactions. The "already exists" check above only
   // looks at the name, so a half-finished family would be skipped forever — remove it instead,
   // and the next run starts over.

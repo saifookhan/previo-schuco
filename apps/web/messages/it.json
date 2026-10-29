@@ -272,7 +272,8 @@
     "yourDiscount": "Il tuo sconto",
     "priceValidity": "Validità prezzi",
     "noMatches": "Nessuna famiglia corrisponde a questi filtri.",
-    "clearFilters": "Rimuovi filtri"
+    "clearFilters": "Rimuovi filtri",
+    "readyForInvoicing": "Pronta per la fatturazione"
   },
   "productFamilyActions": {
     "publish": "Pubblica",
@@ -623,7 +624,9 @@
       "product_family_characteristic_update": "{item, select, none {Opzione modificata} other {Opzione {item} modificata}}: {fields}",
       "product_family_matrix_update": "{item, select, none {Tabella prezzi modificata} other {Tabella prezzi di {item} modificata}}",
       "product_family_share_update": "{count, plural, =0 {Condivisione rimossa per tutte le aziende} one {Condivisa con # azienda} other {Condivisa con # aziende}}",
-      "product_family_price_validity_update": "{validTo, select, none {Validità prezzi impostata: dal {validFrom}} other {Validità prezzi impostata: {validFrom} – {validTo}}}"
+      "product_family_price_validity_update": "{validTo, select, none {Validità prezzi impostata: dal {validFrom}} other {Validità prezzi impostata: {validFrom} – {validTo}}}",
+      "product_family_ready_for_invoicing": "Segnata come pronta per la fatturazione",
+      "product_family_not_ready_for_invoicing": "Segnata come non pronta per la fatturazione"
     }
   },
   "productFamilyUpload": {
@@ -669,7 +672,16 @@
     "saveFailed": "Impossibile salvare",
     "saveFailedUnreachable": "Impossibile salvare — server non raggiungibile",
     "familySaved": "{name} importata",
-    "versionSaved": "Versione {version} creata"
+    "versionSaved": "Versione {version} creata",
+    "readyForInvoicingLabel": "Pronta per la fatturazione",
+    "readyForInvoicingHint": "Solo le famiglie pronte per la fatturazione possono essere aggiunte ai preventivi. Puoi cambiarlo in seguito dalla lista."
+  },
+  "productFamilyInvoicing": {
+    "title": "Pronta per la fatturazione",
+    "label": "Pronta per la fatturazione: {name}",
+    "yes": "Sì",
+    "no": "No",
+    "saveFailed": "Impossibile modificare \"Pronta per la fatturazione\" per {name}"
   },
   "priceValidity": {
     "range": "Prezzi validi dal {from} al {to}",
@@ -728,7 +740,10 @@
       "updated": "Aggiornate di recente",
       "created": "Create di recente",
       "validTo": "Prezzi in scadenza prima"
-    }
+    },
+    "invoicing": "Pronta per la fatturazione",
+    "invoicingReady": "Sì",
+    "invoicingNotReady": "No"
   },
   "loading": {
     "loading": "Caricamento…",

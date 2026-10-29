@@ -17,6 +17,7 @@ const family = (overrides: Partial<FilterableProductFamily> & { id: string; name
   category: null,
   brand: null,
   isPublished: true,
+  readyForInvoicing: true,
   supersedesId: null,
   priceValidFrom: null,
   priceValidTo: null,
@@ -28,7 +29,7 @@ const family = (overrides: Partial<FilterableProductFamily> & { id: string; name
 const TODAY = '2026-06-15'
 const families = [
   family({ id: 'a', name: 'Alpha Window', technicalName: 'W70', category: 'Finestre', brand: 'Schüco', priceValidFrom: '2026-01-01', priceValidTo: '2026-12-31', updatedAt: '2026-05-01T09:00:00.000Z' }),
-  family({ id: 'b', name: 'beta door', category: 'Porte', brand: 'Acme', isPublished: false, priceValidFrom: '2027-01-01', createdAt: '2026-03-01T00:00:00.000Z' }),
+  family({ id: 'b', name: 'beta door', category: 'Porte', brand: 'Acme', isPublished: false, readyForInvoicing: false, priceValidFrom: '2027-01-01', createdAt: '2026-03-01T00:00:00.000Z' }),
   family({ id: 'c', name: 'Gamma Tenda', category: 'Tende', brand: 'Acme', priceValidFrom: '2025-01-01', priceValidTo: '2025-12-31', ownerCompanyName: 'Schuco Demo', shareDiscountPct: 10 }),
   family({ id: 'd', name: 'Alpha Window', category: 'Finestre', brand: 'Schüco', supersedesId: 'a', ownerCompanyName: 'Other Co', updatedAt: '2026-06-10T09:00:00.000Z' }),
 ]
@@ -47,6 +48,8 @@ describe('filterProductFamilies', () => {
     expect(ids({ category: 'Finestre' })).toEqual(['a', 'd'])
     expect(ids({ brand: 'Acme', status: 'published' })).toEqual(['c'])
     expect(ids({ status: 'draft' })).toEqual(['b'])
+    expect(ids({ invoicing: 'notReady' })).toEqual(['b'])
+    expect(ids({ invoicing: 'ready' })).toEqual(['a', 'd', 'c'])
   })
 
   it('filters by price validity today, and by the day the prices must be valid on', () => {
@@ -94,12 +97,13 @@ describe('URL round trip', () => {
       validity: 'bogus',
       validOn: 'not-a-date',
       latestOnly: '1',
+      invoicing: 'ready',
       sort: 'updated',
       tab: 'shared',
     })
-    expect(filters).toMatchObject({ q: 'window', status: 'published', validity: '', validOn: '', latestOnly: true, sort: 'updated' })
-    expect(productFamilyFiltersToParams(filters).toString()).toBe('q=window&status=published&latestOnly=1&sort=updated')
-    expect(activeProductFamilyFilterCount(filters)).toBe(3)
+    expect(filters).toMatchObject({ q: 'window', status: 'published', validity: '', validOn: '', invoicing: 'ready', latestOnly: true, sort: 'updated' })
+    expect(productFamilyFiltersToParams(filters).toString()).toBe('q=window&status=published&invoicing=ready&latestOnly=1&sort=updated')
+    expect(activeProductFamilyFilterCount(filters)).toBe(4)
     expect(parseProductFamilyFilters({}).sort).toBe('created')
     // Owner/discount only exist on the shared tab.
     expect(parseProductFamilyFilters({ owner: 'Acme', discount: 'with' })).toMatchObject({ owner: '', discount: '' })

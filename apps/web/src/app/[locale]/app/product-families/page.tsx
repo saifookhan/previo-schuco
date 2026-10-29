@@ -9,6 +9,7 @@ import { Link } from '@/i18n/navigation'
 import { fetchFromApi, fetchFromApiResult } from '@/lib/api/server-client'
 import { cn } from '@/lib/utils'
 import { ProductFamilyFiltersBar } from '@/components/product-family-filters'
+import { ProductFamilyInvoicingSelect } from '@/components/product-family-invoicing-select'
 import { PriceValidityCell } from '@/components/product-family-price-validity'
 import { ProductFamilyRowActions } from '@/components/product-family-row-actions'
 import { ProductFamilyShareButton } from '@/components/product-family-share-button'
@@ -128,7 +129,7 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<Rec
                   ) : null}
                 </div>
               ) : (
-                <table className="w-full min-w-[880px] text-sm">
+                <table className="w-full min-w-[1000px] text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 text-left text-slate-500">
                       <th className="px-6 py-3 font-medium">{t('name')}</th>
@@ -138,6 +139,7 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<Rec
                       {activeTab === 'shared' ? <th className="px-6 py-3 font-medium">{t('yourDiscount')}</th> : null}
                       <th className="px-6 py-3 font-medium">{t('status')}</th>
                       <th className="px-6 py-3 font-medium">{t('priceValidity')}</th>
+                      <th className="px-6 py-3 font-medium">{t('readyForInvoicing')}</th>
                       <th className="px-6 py-3 font-medium">{t('version')}</th>
                       <th className="px-6 py-3 font-medium" />
                     </tr>
@@ -172,6 +174,14 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<Rec
                           <PriceValidityCell validity={family} today={today} />
                         </td>
                         <td className="px-6 py-4">
+                          <ProductFamilyInvoicingSelect
+                            familyId={family.id}
+                            familyName={family.name}
+                            ready={family.readyForInvoicing}
+                            canEdit={activeTab === 'own'}
+                          />
+                        </td>
+                        <td className="px-6 py-4">
                           <Badge variant="muted">{tVersion('versionBadge', { version: family.version })}</Badge>
                           {family.supersedesId ? (
                             <Link
@@ -196,6 +206,7 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<Rec
                                 familyId={family.id}
                                 familyName={family.name}
                                 isPublished={family.isPublished}
+                                readyForInvoicing={family.readyForInvoicing}
                                 validity={family}
                               />
                             ) : null}

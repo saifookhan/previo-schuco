@@ -26,6 +26,7 @@ export interface InsertProductFamilyInput {
   priceValidFrom?: string | null
   priceValidTo?: string | null
   isPublished?: boolean
+  readyForInvoicing?: boolean
 }
 
 /** Creates a product family row. Draft (`isPublished: false`) by default — the caller publishes explicitly once ready. */
@@ -118,6 +119,8 @@ export interface ProductFamilySummary {
   version: number
   supersedesId: string | null
   isPublished: boolean
+  /** Only families ready for invoicing are offered for new quote positions. */
+  readyForInvoicing: boolean
   /** ISO date (`YYYY-MM-DD`), inclusive; null = no lower limit. */
   priceValidFrom: string | null
   /** ISO date (`YYYY-MM-DD`), inclusive; null = until further notice. */
@@ -271,6 +274,24 @@ export const setProductFamilyPublished = async (
   const [updated] = await db
     .update(productFamilies)
     .set({ isPublished, updatedAt: new Date() })
+    .where(eq(productFamilies.id, familyId))
+    .returning({ id: productFamilies.id, supplierCompanyId: productFamilies.supplierCompanyId })
+  return updated ?? null
+}
+
+/**
+ * Marks a family ready (or not) for invoicing. Same contract as
+ * `setProductFamilyPublished`: `null` when nothing matched, including when RLS
+ * blocked the UPDATE because the caller doesn't own it.
+ */
+export const setProductFamilyReadyForInvoicing = async (
+  db: DbLike,
+  familyId: string,
+  readyForInvoicing: boolean,
+): Promise<{ id: string; supplierCompanyId: string } | null> => {
+  const [updated] = await db
+    .update(productFamilies)
+    .set({ readyForInvoicing, updatedAt: new Date() })
     .where(eq(productFamilies.id, familyId))
     .returning({ id: productFamilies.id, supplierCompanyId: productFamilies.supplierCompanyId })
   return updated ?? null

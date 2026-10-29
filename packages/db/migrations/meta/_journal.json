@@ -141,6 +141,13 @@
       "when": 1792767335469,
       "tag": "0020_users_company_index",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793288937162,
+      "tag": "0021_product_family_ready_for_invoicing",
+      "breakpoints": true
     }
   ]
 }

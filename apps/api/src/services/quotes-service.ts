@@ -240,15 +240,19 @@ interface PricedPosition {
 }
 
 /**
- * New quote positions may only use a family whose prices are valid today
- * (Italian time); positions already on a quote keep theirs.
- * @throws {QuoteValidationError} the family's price validity hasn't started yet or has ended
+ * New quote positions may only use a family that is ready for invoicing and whose
+ * prices are valid today (Italian time); positions already on a quote keep theirs.
+ * @throws {QuoteValidationError} the family isn't ready for invoicing, or its price validity hasn't started yet or has ended
  */
-const assertPricesValidToday = (family: {
+const assertUsableForNewPositions = (family: {
   name: string
+  readyForInvoicing: boolean
   priceValidFrom: string | null
   priceValidTo: string | null
 }): void => {
+  if (!family.readyForInvoicing) {
+    throw new QuoteValidationError(`"${family.name}" is not ready for invoicing`)
+  }
   const validity = priceValidityStatus(family, priceValidityToday())
   if (validity === 'upcoming') {
     throw new QuoteValidationError(`The prices of "${family.name}" are valid from ${family.priceValidFrom}`)
@@ -266,10 +270,10 @@ const assertPricesValidToday = (family: {
  * with). Shared by `addQuotePosition` and `updateQuotePosition` — pricing
  * is snapshotted into the row either way, never recomputed from the live
  * catalog on a later read.
- * Only a family whose prices are valid today can be used — except by
+ * Only a family that is ready for invoicing and whose prices are valid today can be used — except by
  * `keepFamilyId`: an existing position may be edited without switching away
  * from the (possibly expired) family it was priced from.
- * @throws {QuoteValidationError} bad input, the family/line/characteristic isn't visible to the caller, or the family's prices aren't valid today
+ * @throws {QuoteValidationError} bad input, the family/line/characteristic isn't visible to the caller, or the family isn't ready for invoicing or its prices aren't valid today
  */
 export const priceQuotePosition = async (
   ctx: TenantContext,
@@ -304,7 +308,7 @@ export const priceQuotePosition = async (
     throw new QuoteValidationError('Product family not found or not visible')
   }
   if (family.family.id !== keepFamilyId) {
-    assertPricesValidToday(family.family)
+    assertUsableForNewPositions(family.family)
   }
   const line = family.lines.find((l) => l.id === input.productLineId)
   if (!line) {
@@ -799,10 +803,10 @@ export const duplicatePosition = async (
     if (!source) {
       throw new QuoteValidationError('Position not found in this quote')
     }
-    // A duplicate is a new position, so the same price-validity rule as adding one applies.
+    // A duplicate is a new position, so the same rules as adding one apply.
     const sourceFamily = await getProductFamilyById(tx, source.productFamilyId)
     if (sourceFamily) {
-      assertPricesValidToday(sourceFamily)
+      assertUsableForNewPositions(sourceFamily)
     }
 
     // Always auto-numbered, never the source's own code — a custom name is

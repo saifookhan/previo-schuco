@@ -26,6 +26,7 @@ Un percorso completo dei flussi principali. Usa gli [Accessi demo](./demo-logins
 - [ ] Crea una **nuova versione**, modificala, pubblicala.
 - [ ] Condividi la famiglia demo con Fabbrikka al 5%.
 - [ ] In *Famiglie di prodotto*, prova ogni filtro e l’ordinamento — l’elenco e il conteggio “x di y” si aggiornano; copia l’URL in una nuova scheda e gli stessi filtri vengono applicati; **Indietro** annulla l’ultimo filtro.
+- [ ] Imposta **Pronta per la fatturazione** di una famiglia su **No** — il preventivo non la propone più e una posizione esistente resta modificabile; rimettila su **Sì** e torna disponibile. Una famiglia appena importata parte da **No** se non spuntata nella finestra.
 
 ## Visibilità
 

@@ -26,6 +26,7 @@ import {
   importProductFamilyFromExcel,
   setProductFamilyPriceValidityDates,
   setProductFamilyPublishedStatus,
+  setProductFamilyReadyForInvoicingStatus,
 } from '../src/services/product-families-service'
 import {
   QuoteValidationError,
@@ -58,10 +59,13 @@ const actor = { actorUserId: '', actorCompanyId: '', requestId: 'test-request' }
 
 const ctx = () => ({ effectiveCompanyId: supplierCompanyId, isSuperAdmin: false })
 const importFreshFamily = () =>
-  importProductFamilyFromExcel(ctx(), actor, supplierCompanyId, {
-    buffer: fixtureBuffer,
-    originalName: 'product-family-sample.xlsx',
-  })
+  importProductFamilyFromExcel(
+    ctx(),
+    actor,
+    supplierCompanyId,
+    { buffer: fixtureBuffer, originalName: 'product-family-sample.xlsx' },
+    { readyForInvoicing: true },
+  )
 /** Shares a family `supplierCompanyId` → `linkedClientCompanyId` at the given default discount. */
 const shareWithLinkedCompany = (familyId: string, discountPct = '0') =>
   withSystemTransaction(db, (tx) =>
@@ -858,6 +862,23 @@ describe('price validity', () => {
     await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2020-01-01', priceValidTo: null })
     const detail = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
     expect(detail.positions).toHaveLength(1)
+  })
+
+  it('refuses new positions from a family that is not ready for invoicing, but keeps existing ones editable', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-INVOICING', customerName: 'Test Customer' })
+    const added = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
+
+    await setProductFamilyReadyForInvoicingStatus(ctx(), actor, family.id, false)
+    await expect(addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))).rejects.toThrow(/not ready for invoicing/)
+    await expect(duplicatePosition(ctx(), actor, quote.id, added.positions[0].id)).rejects.toThrow(/not ready for invoicing/)
+    const updated = await updateQuotePosition(ctx(), actor, quote.id, added.positions[0].id, { ...positionOn(family.id, line.id), quantity: 2 })
+    expect(updated.positions[0].quantity).toBe(2)
+
+    await setProductFamilyReadyForInvoicingStatus(ctx(), actor, family.id, true)
+    const detail = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
+    expect(detail.positions).toHaveLength(2)
   })
 
   it('still lets an existing position be edited after its family expires', async () => {

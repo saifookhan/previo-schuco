@@ -21,6 +21,8 @@ export interface ProductFamilyFilters {
   validity: '' | ProductFamilyValidityFilter
   /** `YYYY-MM-DD`: only families whose prices can be used on that day. */
   validOn: string
+  /** Whether the family is offered for new quote positions. */
+  invoicing: '' | 'ready' | 'notReady'
   /** Shared tab: the owning company's name. */
   owner: string
   /** Shared tab: whether the family was shared with a discount. */
@@ -40,6 +42,7 @@ export const EMPTY_PRODUCT_FAMILY_FILTERS: ProductFamilyFilters = {
   status: '',
   validity: '',
   validOn: '',
+  invoicing: '',
   owner: '',
   discount: '',
   latestOnly: false,
@@ -56,6 +59,7 @@ export interface FilterableProductFamily {
   category: string | null
   brand: string | null
   isPublished: boolean
+  readyForInvoicing: boolean
   supersedesId: string | null
   priceValidFrom: string | null
   priceValidTo: string | null
@@ -84,6 +88,7 @@ export const parseProductFamilyFilters = (
   status: oneOf(one(params.status), ['published', 'draft'] as const),
   validity: oneOf(one(params.validity), PRODUCT_FAMILY_VALIDITY_FILTERS),
   validOn: day(one(params.validOn)),
+  invoicing: oneOf(one(params.invoicing), ['ready', 'notReady'] as const),
   owner: tab === 'shared' ? one(params.owner) : '',
   discount: tab === 'shared' ? oneOf(one(params.discount), ['with', 'without'] as const) : '',
   latestOnly: one(params.latestOnly) === '1',
@@ -150,6 +155,7 @@ export const filterProductFamilies = <T extends FilterableProductFamily>(
     if (filters.brand && family.brand !== filters.brand) return false
     if (filters.status && family.isPublished !== (filters.status === 'published')) return false
     if (filters.validity && !matchesValidity(family, filters.validity, today)) return false
+    if (filters.invoicing && family.readyForInvoicing !== (filters.invoicing === 'ready')) return false
     if (filters.validOn && priceValidityStatus(family, filters.validOn) !== 'current') return false
     if (filters.owner && family.ownerCompanyName !== filters.owner) return false
     if (filters.discount && Boolean(family.shareDiscountPct) !== (filters.discount === 'with')) return false

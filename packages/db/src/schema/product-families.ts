@@ -71,6 +71,12 @@ export const productFamilies = pgTable('product_families', {
    */
   isPublished: boolean('is_published').notNull().default(false),
   /**
+   * "Ready for invoicing": only such families are offered for new quote positions
+   * (on top of being published and in price validity). New families start not
+   * ready; families that existed before the flag were set ready by its migration.
+   */
+  readyForInvoicing: boolean('ready_for_invoicing').notNull().default(false),
+  /**
    * First day (inclusive) this family's prices may be used on new quote positions —
    * set when uploading the Excel. Null on families imported before validity existed:
    * no lower limit.
