@@ -16,6 +16,8 @@ import { calculate } from './routes/calculate'
 import { createDocsRoutes } from './routes/docs'
 import { health } from './routes/health'
 import { me } from './routes/me'
+import { notifications } from './routes/notifications'
+import { partners } from './routes/partners'
 import { productFamilies } from './routes/product-families'
 import { products } from './routes/products'
 import { quotes } from './routes/quotes'
@@ -52,6 +54,8 @@ app.route('/api/product-families', productFamilies)
 app.route('/api/quotes', quotes)
 app.route('/api/sales-quotes', salesQuotes)
 app.route('/api/calculate', calculate)
+app.route('/api/partners', partners)
+app.route('/api/notifications', notifications)
 app.route('/', createDocsRoutes(apiPublicUrl))
 
 serve({ fetch: app.fetch, port }, () => {

@@ -17,6 +17,7 @@ import { AUTH_TOKEN_TTL_MS, generateRawToken, hashToken } from '../lib/auth-toke
 import { hashPassword, isPasswordStrongEnough, verifyPassword } from '../lib/password'
 import { sendInviteEmail, sendPasswordResetEmail } from '../lib/email'
 import { logger } from '../lib/logger'
+import { appPublicUrl } from '../lib/urls'
 import { recordAuditEvent } from './audit-service'
 
 /** Email/password didn't match a real, loggable-in account. Deliberately the same message for "no such email" and "wrong password" — never confirm which one it was. */
@@ -29,8 +30,6 @@ export class AccountNotActiveError extends Error {}
 export class InvalidTokenError extends Error {}
 
 export class WeakPasswordError extends Error {}
-
-const appPublicUrl = (): string => process.env.APP_PUBLIC_URL ?? 'http://localhost:3000'
 
 /** Request metadata the auth audit entries carry (these routes run before `requireAuth`, so it's passed in). */
 export interface AuthRequestContext {

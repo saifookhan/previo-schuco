@@ -13,6 +13,10 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 - **Produktfamilien-Liste, neue Spalten** (aus dem Mock-up des Kunden): **Mit Preisliste** (Ja / Nein), **Gültig ab** und **Gültig bis** als Datumsfelder, **Bereit zur Fakturierung** und **In Bibliothek** (Ja / Nein) — alle direkt in der Zeile änderbar.
 - **In Bibliothek**: jedes Unternehmen wählt, welche Familien (eigene oder geteilte) sein Angebot anbietet; für andere Benutzer verschwinden Familien außerhalb der Bibliothek aus dem Katalog.
 - **Mit Preisliste**: nur informativ; das Angebot markiert Familien ohne Preisliste.
+- Seite **Partner** (Seitenleiste): mit Kunden und Lieferanten verbinden — **Verbinden**, **Annehmen** / **Ablehnen**, **Verbindung entfernen**, mit Suche nach Name, Niederlassung oder Adresse. Familien können jetzt nur noch mit verbundenen Unternehmen geteilt werden; Unternehmen, die bereits Familien teilten, wurden automatisch verbunden. Das Entfernen einer Verbindung beendet die Freigaben zwischen den beiden Unternehmen.
+- **Benachrichtigungen**: eine Glocke neben Ihrem Namen für Verbindungsanfragen, Antworten und Entfernungen (direkt dort annehmen oder ablehnen); eine Anfrage sendet auch eine E-Mail.
+- **Freigabe-Dialog**: Suchfeld, das nur verbundene Partner listet.
+- Neue Berechtigung `partners.manage` (Unternehmensadmins und Manager).
 
 ## Oktober 2026
 

@@ -24,12 +24,20 @@ An end-to-end run through the main flows. Use [Demo logins](./demo-logins.md) to
 - [ ] Edit a line price, a characteristic and a pricing matrix; save.
 - [ ] Publish it — editing is now locked.
 - [ ] Create a **new version**, edit it, publish it.
-- [ ] Share the demo family with Fabbrikka at 5%.
+- [ ] Share the demo family with Fabbrikka at 5% (if Fabbrikka isn't offered, connect with it on *Partners* first).
 - [ ] On *Product families*, try each filter and the sort — the list and the “x of y” count update; copy the URL into a new tab and the same filters are applied; **Back** undoes the last filter.
 - [ ] Set a family's **Ready for invoicing** to **No** — the quote builder no longer offers it, and an existing position from it can still be edited; set it back to **Yes** and it is offered again. A newly imported family starts at **No** unless ticked in the dialog.
 - [ ] In the list, change a family's **Valid to** to yesterday and leave the field — it shows **Expired** and the quote builder no longer offers it; try emptying **Valid from** — an error is shown and the date comes back.
 - [ ] Set **With price list** to **No** — the quote builder shows the family as *(no price list)* with a reminder, and it can still be added.
 - [ ] As `admin@suppli-demo.it`, set **In library** to **No** on a family — the quote builder no longer offers it; sign in as a sales user of the same company — the family is not in the list; the company that shared it (or owns it) still sees it in its own library.
+
+## Partners
+
+- [ ] As `admin@technometal-demo.it`, *Partners* shows only *Suppliers*; search by a branch's city finds the company; **Connect** with the platform company → **Pending**.
+- [ ] As `admin@schuco-demo.it`, the bell shows 1 and Mailpit has the request email; **Accept** from the bell → the card shows **Connected**; Technometal's bell says it was accepted.
+- [ ] Send a request and **Withdraw** it; send one and **Refuse** it — the sender is told and can ask again.
+- [ ] As `admin@suppli-demo.it`, the share dialog's search lists only connected companies; **Remove connection** with a company you share with → after confirming, the shared families disappear for it.
+- [ ] As `sales@technometal-demo.it`, no *Partners* menu and no bell.
 
 ## Visibility
 

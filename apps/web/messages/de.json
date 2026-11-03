@@ -63,7 +63,8 @@
     "closeMenu": "Menü schließen",
     "quotes": "Angebote",
     "adminCompanies": "Unternehmen",
-    "auditLog": "Aktivitätsprotokoll"
+    "auditLog": "Aktivitätsprotokoll",
+    "partners": "Partner"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -205,7 +206,8 @@
       "quote_view": "Angebote ansehen",
       "quote_edit": "Angebote erstellen und bearbeiten",
       "users_manage": "Firmenbenutzer verwalten",
-      "catalog_share": "Produktfamilien teilen"
+      "catalog_share": "Produktfamilien teilen",
+      "partners_manage": "Partner verwalten"
     },
     "permissionHints": {
       "catalog_view": "Produktfamilien und Preise durchsuchen",
@@ -213,7 +215,8 @@
       "quote_view": "Angebote öffnen und PDFs herunterladen",
       "quote_edit": "Angebote erstellen und deren Positionen bearbeiten",
       "users_manage": "Benutzer des eigenen Unternehmens einladen und verwalten",
-      "catalog_share": "Eine Familie mit anderen Unternehmen teilen und deren Standardrabatt festlegen"
+      "catalog_share": "Eine Familie mit anderen Unternehmen teilen und deren Standardrabatt festlegen",
+      "partners_manage": "Sich auf der Partner-Seite mit Kunden und Lieferanten verbinden"
     },
     "roleInfo": "Über {role}",
     "customRole": "Eigene Rolle",
@@ -534,8 +537,6 @@
     "title": "„{name}“ teilen",
     "hint": "Legen Sie fest, welche Unternehmen diese Familie nutzen dürfen. Der Rabatt ist der Standardwert ihrer Angebotspositionen – er kann weiterhin geändert werden.",
     "share": "Teilen",
-    "companyPlaceholder": "Unternehmen auswählen…",
-    "add": "Hinzufügen",
     "company": "Unternehmen",
     "discount": "Standardrabatt",
     "empty": "Noch mit keinem Unternehmen geteilt.",
@@ -551,7 +552,12 @@
     "saveFailed": "Freigabe konnte nicht gespeichert werden",
     "saveFailedUnreachable": "Freigabe konnte nicht gespeichert werden — Server nicht erreichbar",
     "discountInvalid": "Jeder Rabatt muss eine Zahl von 0 bis 100 sein",
-    "publishFirst": "Veröffentlichen Sie diese Familie zuerst, um sie zu teilen"
+    "publishFirst": "Veröffentlichen Sie diese Familie zuerst, um sie zu teilen",
+    "searchPlaceholder": "Partner suchen…",
+    "noPartners": "Sie können nur mit Unternehmen teilen, mit denen Sie verbunden sind.",
+    "managePartners": "Partner verwalten",
+    "noMatches": "Kein Partner entspricht Ihrer Suche.",
+    "allAdded": "Alle Partner sind bereits in der Liste."
   },
   "auditLog": {
     "title": "Aktivitätsprotokoll",
@@ -772,5 +778,61 @@
   "loading": {
     "loading": "Wird geladen…",
     "updating": "Wird aktualisiert…"
+  },
+  "partners": {
+    "title": "Partner",
+    "subtitle": "Unternehmen finden und Geschäftsverbindungen verwalten",
+    "tabClients": "Kunden",
+    "tabSuppliers": "Lieferanten",
+    "search": "Suchen",
+    "searchPlaceholder": "Unternehmen nach Name, Niederlassung oder Adresse suchen…",
+    "clientsCount": "{count, plural, one {# Kunde} other {# Kunden}}",
+    "suppliersCount": "{count, plural, one {# Lieferant} other {# Lieferanten}}",
+    "clientsHint": "Unternehmen, mit denen Sie Ihre Produktfamilien teilen können",
+    "suppliersHint": "Unternehmen, die ihre Produktfamilien mit Ihnen teilen können",
+    "status": {
+      "none": "Nicht verbunden",
+      "sent": "Ausstehend",
+      "received": "Anfrage erhalten",
+      "connected": "Verbunden"
+    },
+    "connect": "Verbinden",
+    "requestSent": "Anfrage gesendet",
+    "withdraw": "Zurückziehen",
+    "accept": "Anfrage annehmen",
+    "reject": "Ablehnen",
+    "remove": "Verbindung entfernen",
+    "removeTitle": "Verbindung mit {name} entfernen?",
+    "removeDescription": "Sie können dann keine Produktfamilien mehr miteinander teilen. Bereits zwischen Ihren Unternehmen geteilte Familien werden nicht mehr geteilt.",
+    "cancel": "Abbrechen",
+    "done": {
+      "sent": "Anfrage an {name} gesendet",
+      "connected": "Sie sind jetzt mit {name} verbunden",
+      "rejected": "Anfrage von {name} abgelehnt",
+      "withdrawn": "Anfrage an {name} zurückgezogen",
+      "removed": "Verbindung mit {name} entfernt"
+    },
+    "actionFailed": "Die Verbindung konnte nicht aktualisiert werden",
+    "noMatches": "Kein Unternehmen entspricht Ihrer Suche.",
+    "empty": "Noch keine Unternehmen zum Verbinden.",
+    "errorLoading": "Partner konnten nicht geladen werden."
+  },
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "open": "Benachrichtigungen",
+    "unread": "{count} neu",
+    "empty": "Noch keine Benachrichtigungen.",
+    "markAllRead": "Alle als gelesen markieren",
+    "loadFailed": "Benachrichtigungen konnten nicht geladen werden",
+    "unknownCompany": "Ein Unternehmen",
+    "openPartners": "Partner öffnen",
+    "accept": "Annehmen",
+    "reject": "Ablehnen",
+    "types": {
+      "partner_request_received": "<b>{company}</b> möchte sich mit Ihrem Unternehmen verbinden.",
+      "partner_request_accepted": "<b>{company}</b> hat Ihre Anfrage angenommen. Sie sind jetzt verbunden.",
+      "partner_request_rejected": "<b>{company}</b> hat Ihre Verbindungsanfrage abgelehnt.",
+      "partner_connection_removed": "<b>{company}</b> hat die Verbindung mit Ihrem Unternehmen entfernt."
+    }
   }
 }

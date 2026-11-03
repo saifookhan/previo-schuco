@@ -103,3 +103,20 @@ export const sendPasswordResetEmail = (input: { to: string; resetUrl: string }):
       <p>This link expires in 1 hour. If you didn't request this, you can ignore this email.</p>
     `,
   })
+
+const escapeHtml = (text: string): string =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+
+/** "<Company> wants to connect with your company" email, to the admins and managers of the company that was asked. */
+export const sendPartnerRequestEmail = (input: { to: string; fromCompanyName: string; partnersUrl: string }): Promise<SendEmailResult> =>
+  sendEmail({
+    to: input.to,
+    subject: `${input.fromCompanyName} wants to connect with your company on PREVIO`,
+    devLogLabel: 'partner request email',
+    devLogLink: input.partnersUrl,
+    html: `
+      <p>${escapeHtml(input.fromCompanyName)} wants to connect with your company on PREVIO.</p>
+      <p>Once you accept, you can share product families with each other.</p>
+      <p><a href="${input.partnersUrl}">Open Partners to accept or refuse</a></p>
+    `,
+  })

@@ -13,6 +13,10 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 - **Elenco famiglie di prodotto, nuove colonne** (dal mock-up del cliente): **Con listino** (Sì / No), **Data inizio** e **Data fine validità** come campi data, **Pronta per la fatturazione** e **In libreria** (Sì / No) — tutte modificabili direttamente nella riga.
 - **In libreria**: ogni azienda sceglie quali famiglie (proprie o condivise) propone il suo preventivo; per gli altri utenti le famiglie fuori dalla libreria spariscono dal catalogo.
 - **Con listino**: solo informativo; il preventivo segnala le famiglie senza listino.
+- Pagina **Partner** (barra laterale): connettiti con clienti e fornitori — **Connetti**, **Accetta** / **Rifiuta**, **Rimuovi connessione**, con ricerca per nome, sede o indirizzo. Le famiglie ora si condividono solo con aziende connesse; le aziende che si condividevano già famiglie sono state connesse automaticamente. Rimuovere una connessione interrompe le condivisioni tra le due aziende.
+- **Notifiche**: una campanella accanto al tuo nome per richieste di connessione, risposte e rimozioni (accetta o rifiuta direttamente lì); una richiesta invia anche un'email.
+- **Finestra di condivisione**: casella di ricerca che elenca solo i partner connessi.
+- Nuovo permesso `partners.manage` (admin aziendali e manager).
 
 ## Ottobre 2026
 

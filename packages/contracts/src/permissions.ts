@@ -12,6 +12,7 @@ export const PERMISSIONS = [
   'quote.view',
   'quote.edit',
   'users.manage',
+  'partners.manage',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
@@ -22,8 +23,8 @@ export type RolePermissionMatrix = Record<string, readonly Permission[]>
 /** Default role → permissions, used until a super-admin saves a custom matrix. */
 export const ROLE_PERMISSIONS: RolePermissionMatrix = {
   'super-admin': PERMISSIONS,
-  'company-admin': ['catalog.view', 'catalog.edit', 'catalog.share', 'quote.view', 'quote.edit', 'users.manage'],
-  'super-user': ['catalog.view', 'catalog.edit', 'catalog.share', 'quote.view', 'quote.edit'],
+  'company-admin': ['catalog.view', 'catalog.edit', 'catalog.share', 'quote.view', 'quote.edit', 'users.manage', 'partners.manage'],
+  'super-user': ['catalog.view', 'catalog.edit', 'catalog.share', 'quote.view', 'quote.edit', 'partners.manage'],
   user: ['catalog.view', 'quote.view', 'quote.edit'],
 }
 
@@ -32,14 +33,15 @@ export const ROLE_PERMISSIONS: RolePermissionMatrix = {
  * a role grants it AND the user's company has a capability that unlocks it.
  * Manufacturers own, edit and share product families; suppliers browse
  * the families shared with them, quote from them and may share them onward;
- * clients only browse. Writes mirror the database RLS (catalog writes need manufacturer,
+ * clients only browse. Every kind of company manages its own partner
+ * connections. Writes mirror the database RLS (catalog writes need manufacturer,
  * quote writes need supplier) — keep them in sync.
  */
 export const CAPABILITY_PERMISSIONS: Record<keyof CompanyCapabilities, readonly Permission[]> = {
-  platform: ['catalog.view', 'quote.view', 'users.manage'],
-  manufacturer: ['catalog.view', 'catalog.edit', 'catalog.share', 'users.manage'],
-  supplier: ['catalog.view', 'catalog.share', 'quote.view', 'quote.edit', 'users.manage'],
-  client: ['catalog.view', 'users.manage'],
+  platform: ['catalog.view', 'quote.view', 'users.manage', 'partners.manage'],
+  manufacturer: ['catalog.view', 'catalog.edit', 'catalog.share', 'users.manage', 'partners.manage'],
+  supplier: ['catalog.view', 'catalog.share', 'quote.view', 'quote.edit', 'users.manage', 'partners.manage'],
+  client: ['catalog.view', 'users.manage', 'partners.manage'],
 }
 
 /**

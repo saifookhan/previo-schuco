@@ -7,7 +7,8 @@ title: Familien teilen
 
 Ein Unternehmen entscheidet, wer jede seiner Produktfamilien nutzen darf und mit welchem Standardrabatt.
 
-**Wo:** Familienliste oder Familienseite → **Teilen** · benötigt `catalog.share`.
+**Wo:** Familienliste oder Familienseite → **Teilen** · benötigt `catalog.share`. Teilen ist nur mit Unternehmen
+möglich, mit denen Sie auf der Seite [Partner](./partners.md) verbunden sind; die Suche im Dialog listet nur diese.
 
 ![Teilen-Dialog](/img/screens/share-dialog.png)
 
@@ -30,6 +31,7 @@ Die Demo-Familie *Demo Window W70* ist bereits mit Technometal zu 10 % geteilt.
 
    ![Reiter Mit mir geteilt](/img/screens/product-families-shared.png)
 
-2. Als `admin@suppli-demo.it`: sie zusätzlich mit **Fabbrikka** zu 5 % teilen.
+2. Als `admin@suppli-demo.it`: sie zusätzlich mit **Fabbrikka** zu 5 % teilen (falls Fabbrikka nicht erscheint,
+   zuerst unter *Partner* verbinden).
 3. Als `admin@fabbrikka-demo.it`: sie erscheint nun mit 5 %. Freigabe wieder entfernen → sie ist weg.
 4. Wieder als Suppli: Veröffentlichung zurückziehen → sie verschwindet für Technometal.

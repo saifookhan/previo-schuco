@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   Building2,
   FileSpreadsheet,
+  Handshake,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -20,6 +21,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { NotificationBell } from '@/components/notifications'
 import { Toaster } from '@/components/toaster'
 import { hasMinimumRole, useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
@@ -41,6 +43,13 @@ const mainNav = [
     icon: FileSpreadsheet,
     minRole: 'user' as RoleId,
     permission: 'quote.view' as Permission,
+  },
+  {
+    href: '/app/partners',
+    labelKey: 'partners',
+    icon: Handshake,
+    minRole: 'company-admin' as RoleId,
+    permission: 'partners.manage' as Permission,
   },
 ]
 
@@ -97,6 +106,7 @@ export const AppShell = ({ children }: AppShellProps) => {
         </button>
         <Building2 className="h-5 w-5 text-brand" />
         <span className="font-bold text-slate-900">PREVIO</span>
+        <NotificationBell className="ml-auto" align="right" />
       </div>
 
       {mobileOpen ? (
@@ -129,9 +139,12 @@ export const AppShell = ({ children }: AppShellProps) => {
         </div>
 
         {!loading && user ? (
-          <div className="border-b border-slate-100 px-5 py-3 text-xs text-slate-500">
-            <p className="font-medium text-slate-700">{user.name ?? user.email}</p>
-            <p>{user.roles.map((role) => role.name).join(', ')}</p>
+          <div className="flex items-start justify-between gap-2 border-b border-slate-100 px-5 py-3 text-xs text-slate-500">
+            <div className="min-w-0">
+              <p className="font-medium text-slate-700">{user.name ?? user.email}</p>
+              <p>{user.roles.map((role) => role.name).join(', ')}</p>
+            </div>
+            <NotificationBell className="-mr-1.5 hidden md:block" />
           </div>
         ) : null}
 

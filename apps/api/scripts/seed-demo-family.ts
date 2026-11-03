@@ -4,7 +4,7 @@ import { buildSampleWorkbook, SAMPLE_FAMILY_NAME } from './sample-workbook'
 
 // Same order as src/index.ts: resolve env before anything that reads it loads.
 bootstrapApiEnv()
-const { companies, productFamilies, users, withSystemTransaction } = await import('@schuco/db')
+const { companies, companyConnections, productFamilies, users, withSystemTransaction } = await import('@schuco/db')
 const { and, eq } = await import('drizzle-orm')
 const { getDb } = await import('../src/lib/db')
 const { updateFamilyShares } = await import('../src/services/family-shares-service')
@@ -14,8 +14,9 @@ const { deleteProductFamily, importProductFamilyFromExcel, setProductFamilyPubli
 
 /**
  * Gives a fresh demo database something to quote from: imports the sample
- * workbook as Suppli (the seeded manufacturer + supplier), publishes it and
- * shares it with Technometal at 10%. Goes through the real services, so it
+ * workbook as Suppli (the seeded manufacturer + supplier), connects Suppli
+ * with Technometal (Partners), publishes the family and shares it with
+ * Technometal at 10%. Goes through the real services, so it
  * is audited like a manual import. Safe to re-run — skips when Suppli
  * already has a family with the sample's name.
  *
@@ -70,6 +71,13 @@ const main = async () => {
   try {
     await setProductFamilyPublishedStatus(ctx, actor, family.id, true)
     if (technometal) {
+      // Families can only be shared with a connected company.
+      await withSystemTransaction(db, (tx) =>
+        tx
+          .insert(companyConnections)
+          .values({ requesterCompanyId: supplier.companyId, addresseeCompanyId: technometal.id, status: 'accepted', respondedAt: new Date() })
+          .onConflictDoNothing(),
+      )
       await updateFamilyShares(ctx, actor, family.id, [{ companyId: technometal.id, discountPct: SHARE_DISCOUNT_PCT }])
     }
   } catch (error) {

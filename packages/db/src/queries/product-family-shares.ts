@@ -1,7 +1,7 @@
-import { and, asc, eq, inArray, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, eq, exists, inArray, notInArray, or, sql } from 'drizzle-orm'
 
 import type { DbLike } from '../client'
-import { companies, companyDirectory, productFamilyShares } from '../schema'
+import { companies, companyConnections, companyDirectory, productFamilyShares } from '../schema'
 
 export interface FamilyShareRow {
   companyId: string
@@ -47,16 +47,49 @@ export const listOutgoingFamilyShares = async (
 }
 
 /**
- * Companies that can receive a share: active suppliers and clients. Reads
- * across tenants, so call it from a system transaction; the caller removes
- * itself and the family owner.
+ * Companies `sharerCompanyId` can share a family with: active suppliers and
+ * clients it is connected to (Partners page). Reads across tenants, so call it
+ * from a system transaction; the caller removes the family owner.
  */
-export const listFamilyShareTargets = (db: DbLike): Promise<FamilyShareTarget[]> =>
+export const listFamilyShareTargets = (db: DbLike, sharerCompanyId: string): Promise<FamilyShareTarget[]> =>
   db
     .select({ id: companies.id, name: companies.name })
     .from(companies)
-    .where(and(eq(companies.isActive, true), or(eq(companies.isSupplier, true), eq(companies.isClient, true))))
+    .where(
+      and(
+        eq(companies.isActive, true),
+        or(eq(companies.isSupplier, true), eq(companies.isClient, true)),
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(companyConnections)
+            .where(
+              and(
+                eq(companyConnections.status, 'accepted'),
+                or(
+                  and(eq(companyConnections.requesterCompanyId, sharerCompanyId), eq(companyConnections.addresseeCompanyId, companies.id)),
+                  and(eq(companyConnections.addresseeCompanyId, sharerCompanyId), eq(companyConnections.requesterCompanyId, companies.id)),
+                ),
+              ),
+            ),
+        ),
+      ),
+    )
     .orderBy(asc(companies.name))
+
+/** Deletes every share between two companies, in both directions (their connection was removed). Returns how many. */
+export const deleteSharesBetween = async (db: DbLike, companyId: string, otherCompanyId: string): Promise<number> => {
+  const rows = await db
+    .delete(productFamilyShares)
+    .where(
+      or(
+        and(eq(productFamilyShares.fromCompanyId, companyId), eq(productFamilyShares.toCompanyId, otherCompanyId)),
+        and(eq(productFamilyShares.fromCompanyId, otherCompanyId), eq(productFamilyShares.toCompanyId, companyId)),
+      ),
+    )
+    .returning({ id: productFamilyShares.id })
+  return rows.length
+}
 
 /**
  * Replaces the set of shares `fromCompanyId` made of this family: recipients

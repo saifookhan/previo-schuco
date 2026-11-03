@@ -7,7 +7,8 @@ title: Family sharing
 
 A company decides who can use each of its product families, and at which default discount.
 
-**Where:** family list or family page → **Share** · needs `catalog.share`.
+**Where:** family list or family page → **Share** · needs `catalog.share`. You can only share with companies
+you are connected with on the [Partners](./partners.md) page; the dialog's search lists only those.
 
 ![Share dialog](/img/screens/share-dialog.png)
 
@@ -30,6 +31,7 @@ The demo family *Demo Window W70* is already shared with Technometal at 10%.
 
    ![Shared with me tab](/img/screens/product-families-shared.png)
 
-2. As `admin@suppli-demo.it`: share it with **Fabbrikka** at 5% too.
+2. As `admin@suppli-demo.it`: share it with **Fabbrikka** at 5% too (connect with Fabbrikka on *Partners* first
+   if it isn't listed).
 3. As `admin@fabbrikka-demo.it`: it now shows with 5%. Remove the share again → it is gone.
 4. Back as Suppli: unpublish it → it disappears for Technometal.

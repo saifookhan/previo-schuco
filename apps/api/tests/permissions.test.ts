@@ -1,4 +1,4 @@
-import { computePermissions } from '@schuco/contracts'
+import { computePermissions, partnerSidesOf } from '@schuco/contracts'
 import { describe, expect, it } from 'vitest'
 
 const caps = (c: Partial<Record<'platform' | 'manufacturer' | 'supplier' | 'client', boolean>>) => ({
@@ -54,5 +54,29 @@ describe('computePermissions', () => {
     expect(computePermissions(['company-admin'], caps({ supplier: true }))).toContain('catalog.share')
     expect(computePermissions(['company-admin'], caps({ client: true }))).not.toContain('catalog.share')
     expect(computePermissions(['user'], caps({ supplier: true }))).not.toContain('catalog.share')
+  })
+
+  it('admins and managers of every kind of company manage partners; plain users do not', () => {
+    for (const kind of ['manufacturer', 'supplier', 'client', 'platform'] as const) {
+      expect(computePermissions(['company-admin'], caps({ [kind]: true }))).toContain('partners.manage')
+      expect(computePermissions(['super-user'], caps({ [kind]: true }))).toContain('partners.manage')
+      expect(computePermissions(['user'], caps({ [kind]: true }))).not.toContain('partners.manage')
+    }
+  })
+})
+
+describe('partnerSidesOf', () => {
+  it('a client sees suppliers, a manufacturer sees clients, and it is symmetric', () => {
+    const client = caps({ client: true })
+    const manufacturer = caps({ manufacturer: true })
+    const supplier = caps({ supplier: true })
+    expect(partnerSidesOf(client, manufacturer)).toEqual({ isClient: false, isSupplier: true })
+    expect(partnerSidesOf(manufacturer, client)).toEqual({ isClient: true, isSupplier: false })
+    expect(partnerSidesOf(client, caps({ client: true }))).toEqual({ isClient: false, isSupplier: false })
+    expect(partnerSidesOf(manufacturer, caps({ manufacturer: true }))).toEqual({ isClient: false, isSupplier: false })
+    // A supplier is on both sides: it gets families from manufacturers and passes them on.
+    expect(partnerSidesOf(supplier, manufacturer)).toEqual({ isClient: false, isSupplier: true })
+    expect(partnerSidesOf(supplier, client)).toEqual({ isClient: true, isSupplier: false })
+    expect(partnerSidesOf(caps({ platform: true }), supplier)).toEqual({ isClient: true, isSupplier: false })
   })
 })

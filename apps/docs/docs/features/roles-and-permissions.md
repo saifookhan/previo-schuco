@@ -15,14 +15,15 @@ title: Roles & permissions
 | `quote.view` | See quotes |
 | `quote.edit` | Create and edit quotes |
 | `users.manage` | Invite users in your company |
+| `partners.manage` | Connect with clients and suppliers ([Partners](./partners.md)) |
 
 ## Default roles
 
 | Role | Default permissions |
 |---|---|
 | Super admin | Everything, across all companies (cannot be changed) |
-| Company admin | All six (always keeps `users.manage`) |
-| Super user | catalog view/edit/share, quote view/edit |
+| Company admin | All seven (always keeps `users.manage`) |
+| Super user | catalog view/edit/share, quote view/edit, partners |
 | User | catalog view, quote view/edit |
 
 A super-admin can change these in **Settings → Access rights** (role × permission matrix). Click the ⓘ
@@ -37,10 +38,10 @@ A permission only takes effect if the user's **company** also has a capability t
 
 | Capability | Unlocks |
 |---|---|
-| Manufacturer | catalog view, edit, share · users |
-| Supplier | catalog view, share · quote view, edit · users |
-| Client | catalog view · users |
-| Platform | catalog view · quote view · users |
+| Manufacturer | catalog view, edit, share · users · partners |
+| Supplier | catalog view, share · quote view, edit · users · partners |
+| Client | catalog view · users · partners |
+| Platform | catalog view · quote view · users · partners |
 
 **Effective permissions = role permissions ∩ company capabilities.** Example: Marco Rossi has the *User*
 role (which includes `quote.edit`), but Technometal is only a *client*, so he cannot create quotes.

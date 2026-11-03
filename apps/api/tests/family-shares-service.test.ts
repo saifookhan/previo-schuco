@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   auditLog,
   companies,
+  companyConnections,
   createDb,
   productFamilies,
   roles,
@@ -72,6 +73,13 @@ beforeAll(async () => {
       })
       .returning({ id: users.id })
     actorUserId = user.id
+    // Only connected companies can share with each other (Partners page).
+    const connect = (a: string, b: string) =>
+      tx.insert(companyConnections).values({ requesterCompanyId: a, addresseeCompanyId: b, status: 'accepted' })
+    await connect(manufacturer, supplier)
+    await connect(client, manufacturer)
+    await connect(supplier, outsider)
+    await connect(manufacturer, platformOnly)
     const [family] = await tx
       .insert(productFamilies)
       .values({ supplierCompanyId: manufacturer, name: 'Share Test Family', isPublished: true })
@@ -162,13 +170,14 @@ describe('family shares', () => {
     }
   })
 
-  it('lists every supplier/client except the sharer and the owner as possible recipients', async () => {
+  it('lists only connected suppliers/clients as possible recipients', async () => {
     const { shares, targets } = await getFamilyShares(ctxOf(manufacturer), familyId)
     expect(shares).toEqual([])
     const ids = targets.map((t) => t.id)
-    expect(ids).toEqual(expect.arrayContaining([supplier, client, outsider]))
+    expect(ids).toEqual(expect.arrayContaining([supplier, client]))
+    expect(ids).not.toContain(outsider) // not connected with the manufacturer
     expect(ids).not.toContain(manufacturer)
-    expect(ids).not.toContain(platformOnly) // platform-only companies cannot receive shares
+    expect(ids).not.toContain(platformOnly) // connected, but platform-only companies cannot receive shares
   })
 
   it('shares with chosen companies at their own discounts and reads them back with names', async () => {
@@ -213,6 +222,7 @@ describe('family shares', () => {
       updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), familyId, [{ companyId, discountPct: 1 }])
     await expect(bad(manufacturer)).rejects.toThrow(FamilyShareValidationError) // itself
     await expect(bad(platformOnly)).rejects.toThrow(FamilyShareValidationError) // not a supplier or client
+    await expect(bad(outsider)).rejects.toThrow(FamilyShareValidationError) // not connected
     await expect(bad('00000000-0000-0000-0000-000000000000')).rejects.toThrow(FamilyShareValidationError)
   })
 })

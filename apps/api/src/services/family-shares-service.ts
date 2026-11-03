@@ -4,6 +4,7 @@ import {
   isFamilySharedWith,
   listFamilyShareTargets,
   listOutgoingFamilyShares,
+  lockConnectedCompanyIds,
   replaceOutgoingFamilyShares,
   withSystemTransaction,
   type FamilyShareRow,
@@ -17,7 +18,7 @@ import { recordAuditEvent } from './audit-service'
 /** The family doesn't exist or the caller's company can't reach it (so can't share it). */
 export class FamilyShareNotFoundError extends Error {}
 
-/** A requested recipient breaks a rule (unknown/inactive, not a supplier or client, the sharer itself, or the family's owner). */
+/** A requested recipient breaks a rule (unknown/inactive, not a supplier or client, not connected with the sharer, or the family's owner). */
 export class FamilyShareValidationError extends Error {}
 
 export interface FamilyShareActor {
@@ -31,10 +32,10 @@ export interface FamilyShares {
   targets: FamilyShareTarget[]
 }
 
-/** Companies that may receive a share of `ownerCompanyId`'s family from `sharerCompanyId`. Listed across tenants, so system-scoped — returns names only. */
+/** Companies that may receive a share of `ownerCompanyId`'s family from `sharerCompanyId`: its connected partners. Listed across tenants, so system-scoped — returns names only. */
 const shareTargetsFor = async (ownerCompanyId: string, sharerCompanyId: string): Promise<FamilyShareTarget[]> => {
-  const all = await withSystemTransaction(getDb(), (tx) => listFamilyShareTargets(tx))
-  return all.filter((company) => company.id !== sharerCompanyId && company.id !== ownerCompanyId)
+  const all = await withSystemTransaction(getDb(), (tx) => listFamilyShareTargets(tx, sharerCompanyId))
+  return all.filter((company) => company.id !== ownerCompanyId)
 }
 
 /** The default discount this family was shared with the caller's company at, or null when it is the company's own or was shared at 0%. */
@@ -67,7 +68,7 @@ export const getFamilyShares = async (ctx: TenantContext, familyId: string): Pro
  * Replaces the set of companies the caller's company shares this family with
  * (each with a default discount). Only published families can be shared with new
  * companies. The sharer is the owner or any company that was itself shared the
- * family (onward sharing).
+ * family (onward sharing). Recipients must be connected with the sharer (Partners page).
  * @throws {FamilyShareNotFoundError} unknown family, or one the caller's company cannot reach
  * @throws {FamilyShareValidationError} a recipient is not allowed
  */
@@ -79,16 +80,22 @@ export const updateFamilyShares = async (
 ): Promise<FamilyShares> => {
   // Cross-tenant list, read first: the reach check, validation and write below must share ONE
   // tenant transaction, so a share revoked mid-request can't be written to afterwards.
-  const everyTarget = await withSystemTransaction(getDb(), (tx) => listFamilyShareTargets(tx))
+  const everyTarget = await withSystemTransaction(getDb(), (tx) => listFamilyShareTargets(tx, ctx.effectiveCompanyId))
 
   await withTenantDb(ctx, async (tx) => {
     const detail = await getProductFamilyDetail(tx, familyId)
     if (!detail || !(await isFamilySharedWith(tx, familyId, ctx.effectiveCompanyId))) {
       throw new FamilyShareNotFoundError('Product family not found')
     }
+    // Locked: a connection can't be removed while these shares are written (removing waits for this transaction).
+    const connected = await lockConnectedCompanyIds(
+      tx,
+      ctx.effectiveCompanyId,
+      requested.map((share) => share.companyId),
+    )
     const allowed = new Set(
       everyTarget
-        .filter((c) => c.id !== ctx.effectiveCompanyId && c.id !== detail.family.supplierCompanyId)
+        .filter((c) => c.id !== detail.family.supplierCompanyId && connected.has(c.id))
         .map((c) => c.id),
     )
     for (const share of requested) {

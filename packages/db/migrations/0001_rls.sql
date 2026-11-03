@@ -299,11 +299,37 @@ CREATE POLICY product_family_library_hidden_own ON product_family_library_hidden
     AND app_can_view_product_family(product_family_id)
   );
 
+-- company_connections: each side of a connection (or request) sees it and may change it.
+-- The partners service decides which change each side may make.
+ALTER TABLE company_connections ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS company_connections_parties ON company_connections;
+CREATE POLICY company_connections_parties ON company_connections
+  FOR ALL
+  USING (
+    app_is_super_admin()
+    OR requester_company_id = app_current_company_id()
+    OR addressee_company_id = app_current_company_id()
+  )
+  WITH CHECK (
+    app_is_super_admin()
+    OR requester_company_id = app_current_company_id()
+    OR addressee_company_id = app_current_company_id()
+  );
+
+-- notifications: a company's own users' notifications. The service narrows to the user.
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS notifications_own_company ON notifications;
+CREATE POLICY notifications_own_company ON notifications
+  FOR ALL
+  USING (app_is_super_admin() OR company_id = app_current_company_id())
+  WITH CHECK (app_is_super_admin() OR company_id = app_current_company_id());
+
 -- Other companies' names (and only names): a view that runs with its owner's
 -- rights, so it can show id + name without opening the companies row itself
 -- (VAT number, capabilities, ...) to partners. Visible: self, companies the
--- caller shares families with in either direction, and owners of published
--- families that reach the caller.
+-- caller is connected to or has a pending request with, companies the caller
+-- shares families with in either direction, and owners of published families
+-- that reach the caller.
 DROP POLICY IF EXISTS companies_share_partner_read ON companies;
 DROP POLICY IF EXISTS companies_family_owner_read ON companies;
 CREATE OR REPLACE VIEW company_directory AS
@@ -311,6 +337,11 @@ SELECT c.id, c.name
 FROM companies c
 WHERE app_is_super_admin()
    OR c.id = app_current_company_id()
+   OR EXISTS (
+     SELECT 1 FROM company_connections cc
+     WHERE (cc.requester_company_id = app_current_company_id() AND cc.addressee_company_id = c.id)
+        OR (cc.addressee_company_id = app_current_company_id() AND cc.requester_company_id = c.id)
+   )
    OR EXISTS (
      SELECT 1 FROM product_family_shares s
      WHERE (s.from_company_id = app_current_company_id() AND s.to_company_id = c.id)

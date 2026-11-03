@@ -15,14 +15,15 @@ title: Ruoli e permessi
 | `quote.view` | Vedere i preventivi |
 | `quote.edit` | Creare e modificare preventivi |
 | `users.manage` | Invitare utenti nella propria azienda |
+| `partners.manage` | Connettersi con clienti e fornitori ([Partner](./partners.md)) |
 
 ## Ruoli predefiniti
 
 | Ruolo | Permessi predefiniti |
 |---|---|
 | Super admin | Tutto, su tutte le aziende (non modificabile) |
-| Admin aziendale | Tutti e sei (mantiene sempre `users.manage`) |
-| Super user | catalogo vedere/modificare/condividere, preventivi vedere/modificare |
+| Admin aziendale | Tutti e sette (mantiene sempre `users.manage`) |
+| Super user | catalogo vedere/modificare/condividere, preventivi vedere/modificare, partner |
 | User | catalogo vedere, preventivi vedere/modificare |
 
 Un super-admin può cambiarli in **Impostazioni → Diritti di accesso** (matrice ruolo × permesso). Clicca
@@ -37,10 +38,10 @@ Un permesso vale solo se anche l'**azienda** dell'utente ha una capacità che lo
 
 | Capacità | Sblocca |
 |---|---|
-| Manufacturer | catalogo vedere, modificare, condividere · utenti |
-| Supplier | catalogo vedere, condividere · preventivi vedere, modificare · utenti |
-| Client | catalogo vedere · utenti |
-| Platform | catalogo vedere · preventivi vedere · utenti |
+| Manufacturer | catalogo vedere, modificare, condividere · utenti · partner |
+| Supplier | catalogo vedere, condividere · preventivi vedere, modificare · utenti · partner |
+| Client | catalogo vedere · utenti · partner |
+| Platform | catalogo vedere · preventivi vedere · utenti · partner |
 
 **Permessi effettivi = permessi del ruolo ∩ capacità dell'azienda.** Esempio: Marco Rossi ha il ruolo
 *User* (che include `quote.edit`), ma Technometal è solo *client*, quindi non può creare preventivi.

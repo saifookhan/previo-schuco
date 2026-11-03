@@ -13,6 +13,7 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: [
         'features/product-families',
+        'features/partners',
         'features/sharing',
         'features/quotes',
         'features/users-and-onboarding',

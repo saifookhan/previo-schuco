@@ -24,12 +24,20 @@ Ein kompletter Durchlauf der wichtigsten Abläufe. Mit den [Demo-Anmeldungen](./
 - [ ] Einen Linienpreis, ein Merkmal und eine Preistabelle bearbeiten; speichern.
 - [ ] Veröffentlichen — Bearbeiten ist nun gesperrt.
 - [ ] Eine **neue Version** erstellen, bearbeiten, veröffentlichen.
-- [ ] Die Demo-Familie mit Fabbrikka zu 5 % teilen.
+- [ ] Die Demo-Familie mit Fabbrikka zu 5 % teilen (wird Fabbrikka nicht angeboten, zuerst unter *Partner* verbinden).
 - [ ] Unter *Produktfamilien* jeden Filter und die Sortierung ausprobieren — Liste und „x von y“ aktualisieren sich; die URL in einem neuen Tab öffnen zeigt dieselben Filter; **Zurück** macht den letzten Filter rückgängig.
 - [ ] **Bereit zur Fakturierung** einer Familie auf **Nein** setzen — das Angebot bietet sie nicht mehr an, eine bestehende Position bleibt bearbeitbar; zurück auf **Ja** und sie wird wieder angeboten. Eine neu importierte Familie startet mit **Nein**, wenn im Dialog nicht angekreuzt.
 - [ ] In der Liste **Gültig bis** einer Familie auf gestern setzen und das Feld verlassen — sie zeigt **Abgelaufen** und das Angebot bietet sie nicht mehr an; **Gültig ab** leeren — ein Fehler erscheint und das Datum kommt zurück.
 - [ ] **Mit Preisliste** auf **Nein** setzen — das Angebot zeigt die Familie als *(ohne Preisliste)* mit Hinweis, und sie kann trotzdem hinzugefügt werden.
 - [ ] Als `admin@suppli-demo.it` bei einer Familie **In Bibliothek** auf **Nein** setzen — das Angebot bietet sie nicht mehr an; als Vertriebsbenutzer desselben Unternehmens anmelden — die Familie ist nicht in der Liste; das Unternehmen, das sie geteilt hat (oder Eigentümer ist), sieht sie weiter in seiner eigenen Bibliothek.
+
+## Partner
+
+- [ ] Als `admin@technometal-demo.it` zeigt *Partner* nur *Lieferanten*; die Suche nach der Stadt einer Niederlassung findet das Unternehmen; **Verbinden** mit dem Plattform-Unternehmen → **Ausstehend**.
+- [ ] Als `admin@schuco-demo.it` zeigt die Glocke 1 und Mailpit hat die Anfrage-E-Mail; über die Glocke **annehmen** → die Karte zeigt **Verbunden**; Technometals Glocke meldet die Annahme.
+- [ ] Eine Anfrage senden und **zurückziehen**; eine senden und **ablehnen** — der Absender wird benachrichtigt und kann erneut anfragen.
+- [ ] Als `admin@suppli-demo.it` listet die Suche im Freigabe-Dialog nur verbundene Unternehmen; **Verbindung entfernen** mit einem Unternehmen, mit dem Sie teilen → nach der Bestätigung verschwinden die geteilten Familien für dieses.
+- [ ] Als `sales@technometal-demo.it` kein Menü *Partner* und keine Glocke.
 
 ## Sichtbarkeit
 

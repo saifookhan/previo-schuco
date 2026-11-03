@@ -45,6 +45,25 @@ const errorResponses = (): Record<string, unknown> => ({
   },
 })
 
+/** One connection change on the Partners page (`/api/partners/{companyId}/...`). */
+const partnerAction = (summary: string, description: string, operationId: string, ok: string): Record<string, unknown> => ({
+  tags: ['Partners'],
+  summary,
+  description,
+  operationId,
+  security: [{ bearerAuth: [] }, { devUserSub: [] }],
+  parameters: [{ name: 'companyId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+  responses: {
+    '200': { description: ok },
+    '404': {
+      description: 'Unknown or inactive company, or one that cannot be a client or supplier of the caller',
+      content: { 'application/json': { schema: ref('ErrorResponse') } },
+    },
+    '409': { description: 'The connection is not in a state that allows this', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+    ...errorResponses(),
+  },
+})
+
 /**
  * Build the PREVIO OpenAPI document covering the core API and planned microservices.
  * @param options - Server URLs for each deployable service
@@ -82,6 +101,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
       { name: 'Users', description: 'Tenant-scoped user management (company-admin)' },
       { name: 'Admin', description: 'Cross-tenant platform administration (super-admin)' },
       { name: 'Products', description: 'Product catalog' },
+      { name: 'Partners', description: 'Connections between clients and suppliers, and the notifications about them' },
       { name: 'Quotes', description: 'Quote listing, detail, and creation (Core API)' },
       { name: 'Calculation', description: 'Quote pricing — in-process today, HTTP service Phase 3' },
       {
@@ -400,6 +420,68 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
             '404': { description: 'No such family, or not visible to the caller', content: { 'application/json': { schema: ref('ErrorResponse') } } },
             ...errorResponses(),
           },
+        },
+      },
+      '/api/partners': {
+        get: {
+          tags: ['Partners'],
+          summary: "Companies the caller's company can connect with, and the status of each connection",
+          description:
+            "Clients can receive the caller's product families; suppliers can share theirs with it. Statuses: none, sent (the caller asked), received (waiting for the caller), connected. Only connected companies can share families. Needs partners.manage.",
+          operationId: 'listPartners',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          responses: {
+            '200': { description: '`{ tabs: { clients, suppliers }, companies: [{ id, name, address, branches, isClient, isSupplier, status }] }`' },
+            ...errorResponses(),
+          },
+        },
+      },
+      '/api/partners/{companyId}/request': {
+        post: partnerAction(
+          'Ask a company to connect',
+          "Accepts its request instead when it already asked. The other company's partner managers get a notification and an email. Needs partners.manage.",
+          'requestPartnerConnection',
+          '`{ status }`: sent, or connected',
+        ),
+      },
+      '/api/partners/{companyId}/accept': {
+        post: partnerAction('Accept the request a company sent', 'Needs partners.manage.', 'acceptPartnerConnection', '`{ status: "connected" }`'),
+      },
+      '/api/partners/{companyId}/reject': {
+        post: partnerAction(
+          'Refuse the request a company sent',
+          'The other company is told and may ask again. Needs partners.manage.',
+          'rejectPartnerConnection',
+          '`{ status: "none" }`',
+        ),
+      },
+      '/api/partners/{companyId}': {
+        delete: partnerAction(
+          'Withdraw a request, or remove a connection',
+          'Removing a connection also stops every family share between the two companies, both ways. Needs partners.manage.',
+          'removePartnerConnection',
+          '`{ status: "none" }`',
+        ),
+      },
+      '/api/notifications': {
+        get: {
+          tags: ['Partners'],
+          summary: "The signed-in user's newest notifications and unread count",
+          operationId: 'listNotifications',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          responses: {
+            '200': { description: '`{ notifications: [{ id, type, otherCompanyId, otherCompanyName, actionable, readAt, createdAt }], unreadCount }`' },
+            ...errorResponses(),
+          },
+        },
+      },
+      '/api/notifications/read': {
+        post: {
+          tags: ['Partners'],
+          summary: "Mark all of the signed-in user's notifications read",
+          operationId: 'markNotificationsRead',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          responses: { '200': { description: '`{ ok: true }`' }, ...errorResponses() },
         },
       },
       '/api/products': {

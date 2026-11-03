@@ -63,7 +63,8 @@
     "closeMenu": "Close menu",
     "quotes": "Quotes",
     "adminCompanies": "Companies",
-    "auditLog": "Audit log"
+    "auditLog": "Audit log",
+    "partners": "Partners"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -205,7 +206,8 @@
       "quote_view": "View quotes",
       "quote_edit": "Create and edit quotes",
       "users_manage": "Manage company users",
-      "catalog_share": "Share product families"
+      "catalog_share": "Share product families",
+      "partners_manage": "Manage partners"
     },
     "permissionHints": {
       "catalog_view": "Browse product families and their prices",
@@ -213,7 +215,8 @@
       "quote_view": "Open quotes and download PDFs",
       "quote_edit": "Create quotes and edit their positions",
       "users_manage": "Invite and manage users of their own company",
-      "catalog_share": "Share a family with other companies and set their default discount"
+      "catalog_share": "Share a family with other companies and set their default discount",
+      "partners_manage": "Connect with clients and suppliers on the Partners page"
     },
     "roleInfo": "About {role}",
     "customRole": "Custom role",
@@ -534,8 +537,6 @@
     "title": "Share “{name}”",
     "hint": "Choose which companies can use this family. The discount is the default their quote positions start with — they can still change it.",
     "share": "Share",
-    "companyPlaceholder": "Select a company…",
-    "add": "Add",
     "company": "Company",
     "discount": "Default discount",
     "empty": "Not shared with any company yet.",
@@ -551,7 +552,12 @@
     "saveFailed": "Could not save sharing",
     "saveFailedUnreachable": "Could not save sharing — could not reach the server",
     "discountInvalid": "Each discount must be a number from 0 to 100",
-    "publishFirst": "Publish this family first to share it"
+    "publishFirst": "Publish this family first to share it",
+    "searchPlaceholder": "Search a partner…",
+    "noPartners": "You can only share with companies you are connected with.",
+    "managePartners": "Manage partners",
+    "noMatches": "No partner matches your search.",
+    "allAdded": "Every partner is already in the list."
   },
   "auditLog": {
     "title": "Audit log",
@@ -772,5 +778,61 @@
   "loading": {
     "loading": "Loading…",
     "updating": "Updating…"
+  },
+  "partners": {
+    "title": "Partners",
+    "subtitle": "Find companies and manage your business connections",
+    "tabClients": "Clients",
+    "tabSuppliers": "Suppliers",
+    "search": "Search",
+    "searchPlaceholder": "Search a company by name, branch or address…",
+    "clientsCount": "{count, plural, one {# client} other {# clients}}",
+    "suppliersCount": "{count, plural, one {# supplier} other {# suppliers}}",
+    "clientsHint": "Companies you can share your product families with",
+    "suppliersHint": "Companies that can share their product families with you",
+    "status": {
+      "none": "Not connected",
+      "sent": "Pending",
+      "received": "Request received",
+      "connected": "Connected"
+    },
+    "connect": "Connect",
+    "requestSent": "Request sent",
+    "withdraw": "Withdraw",
+    "accept": "Accept request",
+    "reject": "Refuse",
+    "remove": "Remove connection",
+    "removeTitle": "Remove the connection with {name}?",
+    "removeDescription": "You will no longer be able to share product families with each other. Families already shared between your two companies stop being shared.",
+    "cancel": "Cancel",
+    "done": {
+      "sent": "Request sent to {name}",
+      "connected": "You are now connected with {name}",
+      "rejected": "Request from {name} refused",
+      "withdrawn": "Request to {name} withdrawn",
+      "removed": "Connection with {name} removed"
+    },
+    "actionFailed": "Could not update the connection",
+    "noMatches": "No company matches your search.",
+    "empty": "No companies to connect with yet.",
+    "errorLoading": "Could not load partners."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "open": "Notifications",
+    "unread": "{count} new",
+    "empty": "No notifications yet.",
+    "markAllRead": "Mark all as read",
+    "loadFailed": "Could not load notifications",
+    "unknownCompany": "A company",
+    "openPartners": "Open Partners",
+    "accept": "Accept",
+    "reject": "Refuse",
+    "types": {
+      "partner_request_received": "<b>{company}</b> wants to connect with your company.",
+      "partner_request_accepted": "<b>{company}</b> accepted your request. You are now connected.",
+      "partner_request_rejected": "<b>{company}</b> refused your connection request.",
+      "partner_connection_removed": "<b>{company}</b> removed the connection with your company."
+    }
   }
 }

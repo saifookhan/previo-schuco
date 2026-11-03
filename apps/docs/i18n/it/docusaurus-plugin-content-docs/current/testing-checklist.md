@@ -24,12 +24,20 @@ Un percorso completo dei flussi principali. Usa gli [Accessi demo](./demo-logins
 - [ ] Modifica il prezzo di una linea, una caratteristica e una tabella prezzi; salva.
 - [ ] Pubblicala — ora la modifica è bloccata.
 - [ ] Crea una **nuova versione**, modificala, pubblicala.
-- [ ] Condividi la famiglia demo con Fabbrikka al 5%.
+- [ ] Condividi la famiglia demo con Fabbrikka al 5% (se Fabbrikka non compare, prima connettiti in *Partner*).
 - [ ] In *Famiglie di prodotto*, prova ogni filtro e l’ordinamento — l’elenco e il conteggio “x di y” si aggiornano; copia l’URL in una nuova scheda e gli stessi filtri vengono applicati; **Indietro** annulla l’ultimo filtro.
 - [ ] Imposta **Pronta per la fatturazione** di una famiglia su **No** — il preventivo non la propone più e una posizione esistente resta modificabile; rimettila su **Sì** e torna disponibile. Una famiglia appena importata parte da **No** se non spuntata nella finestra.
 - [ ] Nell'elenco, cambia la **Data fine validità** di una famiglia a ieri ed esci dal campo — compare **Scaduta** e il preventivo non la propone più; prova a svuotare la **Data inizio validità** — compare un errore e la data torna com'era.
 - [ ] Imposta **Con listino** su **No** — il preventivo mostra la famiglia come *(senza listino)* con un promemoria, e si può comunque aggiungere.
 - [ ] Come `admin@suppli-demo.it`, imposta **In libreria** su **No** per una famiglia — il preventivo non la propone più; accedi come utente commerciale della stessa azienda — la famiglia non è nell'elenco; l'azienda che l'ha condivisa (o che ne è proprietaria) la vede ancora nella propria libreria.
+
+## Partner
+
+- [ ] Come `admin@technometal-demo.it`, *Partner* mostra solo *Fornitori*; cercando la città di una sede si trova l'azienda; **Connetti** con l'azienda piattaforma → **In attesa**.
+- [ ] Come `admin@schuco-demo.it`, la campanella mostra 1 e Mailpit ha l'email di richiesta; **Accetta** dalla campanella → la scheda mostra **Connesso**; la campanella di Technometal dice che è stata accettata.
+- [ ] Invia una richiesta e **Annulla richiesta**; inviane una e **Rifiuta** — chi l'ha inviata viene avvisato e può chiedere di nuovo.
+- [ ] Come `admin@suppli-demo.it`, la ricerca della finestra di condivisione elenca solo aziende connesse; **Rimuovi connessione** con un'azienda con cui condividi → dopo la conferma, le famiglie condivise spariscono per lei.
+- [ ] Come `sales@technometal-demo.it`, niente menu *Partner* e niente campanella.
 
 ## Visibilità
 

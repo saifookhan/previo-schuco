@@ -20,3 +20,6 @@ export const userStatusEnum = pgEnum('user_status', [
 
 /** What an auth_tokens row is for — an invite-accept link (first password) or a forgotten-password reset link. Same table, same expiry/single-use semantics either way. */
 export const authTokenPurposeEnum = pgEnum('auth_token_purpose', ['invite', 'password_reset'])
+
+/** A connection between two companies: requested by one side and waiting for the other, or accepted by both. A refused, withdrawn or removed connection is deleted, not kept with a status. */
+export const companyConnectionStatusEnum = pgEnum('company_connection_status', ['pending', 'accepted'])

@@ -1,6 +1,6 @@
 'use client'
 
-import { Loader2, Plus, Share2, Trash2, X } from 'lucide-react'
+import { Loader2, Search, Share2, Trash2, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useLoadingTransition } from '@/components/ui/loading-region'
 import { useAuth } from '@/hooks/use-auth'
-import { useRouter } from '@/i18n/navigation'
+import { Link, useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
 import type { FamilySharesResponse } from '@schuco/contracts'
 
@@ -19,10 +19,7 @@ interface Row {
   discount: string
 }
 
-const selectClassName =
-  'h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand'
-
-/** "Share" button + dialog: choose which companies get this family, each with a default discount. */
+/** "Share" button + dialog: choose which connected partners get this family, each with a default discount. */
 export const ProductFamilyShareButton = ({
   familyId,
   familyName,
@@ -46,7 +43,8 @@ export const ProductFamilyShareButton = ({
   const [error, setError] = useState<string | null>(null)
   const [rows, setRows] = useState<Row[]>([])
   const [targets, setTargets] = useState<Array<{ id: string; name: string }>>([])
-  const [pickedId, setPickedId] = useState('')
+  const [query, setQuery] = useState('')
+  const [listOpen, setListOpen] = useState(false)
 
   if (!user || !can('catalog.share')) {
     return null
@@ -56,7 +54,8 @@ export const ProductFamilyShareButton = ({
     setOpen(true)
     setLoading(true)
     setError(null)
-    setPickedId('')
+    setQuery('')
+    setListOpen(false)
     try {
       const response = await fetch(`/api/product-families/${familyId}/shares`, { cache: 'no-store' })
       const data = (await response.json().catch(() => ({}))) as Partial<FamilySharesResponse> & { error?: string }
@@ -79,13 +78,9 @@ export const ProductFamilyShareButton = ({
     }
   }
 
-  const addPicked = () => {
-    const target = targets.find((c) => c.id === pickedId)
-    if (!target) {
-      return
-    }
+  const add = (target: { id: string; name: string }) => {
     setRows((prev) => [...prev, { companyId: target.id, companyName: target.name, discount: '0' }])
-    setPickedId('')
+    setQuery('')
   }
 
   const save = async () => {
@@ -118,6 +113,7 @@ export const ProductFamilyShareButton = ({
   }
 
   const available = targets.filter((c) => !rows.some((row) => row.companyId === c.id))
+  const matching = available.filter((c) => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
 
   return (
     <>
@@ -165,25 +161,68 @@ export const ProductFamilyShareButton = ({
               </div>
             ) : (
               <>
-                <div className="flex gap-2">
-                  <select
-                    className={selectClassName}
-                    value={pickedId}
-                    onChange={(e) => setPickedId(e.target.value)}
-                    aria-label={t('companyPlaceholder')}
-                  >
-                    <option value="">{t('companyPlaceholder')}</option>
-                    {available.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <Button type="button" variant="outline" className="gap-1.5" disabled={!pickedId} onClick={addPicked}>
-                    <Plus className="h-4 w-4" />
-                    {t('add')}
-                  </Button>
-                </div>
+                {targets.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">
+                    {t('noPartners')}{' '}
+                    <Link href="/app/partners" className="font-medium text-brand hover:underline">
+                      {t('managePartners')}
+                    </Link>
+                  </p>
+                ) : (
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      type="search"
+                      className="pl-9"
+                      value={query}
+                      placeholder={t('searchPlaceholder')}
+                      aria-label={t('searchPlaceholder')}
+                      role="combobox"
+                      aria-expanded={listOpen}
+                      aria-controls="share-partner-list"
+                      onFocus={() => setListOpen(true)}
+                      onBlur={() => setListOpen(false)}
+                      onChange={(e) => {
+                        setQuery(e.target.value)
+                        setListOpen(true)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && matching[0]) {
+                          e.preventDefault()
+                          add(matching[0])
+                        } else if (e.key === 'Escape' && listOpen) {
+                          e.stopPropagation()
+                          setListOpen(false)
+                        }
+                      }}
+                    />
+                    {listOpen ? (
+                      <ul
+                        id="share-partner-list"
+                        role="listbox"
+                        className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg"
+                      >
+                        {matching.length === 0 ? (
+                          <li className="px-3 py-2 text-sm text-slate-400">{available.length === 0 ? t('allAdded') : t('noMatches')}</li>
+                        ) : (
+                          matching.map((c) => (
+                            <li key={c.id} role="option" aria-selected={false}>
+                              <button
+                                type="button"
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                                // Keep the focus in the search box, so its blur doesn't close the list before the click lands.
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => add(c)}
+                              >
+                                {c.name}
+                              </button>
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    ) : null}
+                  </div>
+                )}
 
                 <div className="mt-4 rounded-lg border border-slate-200">
                   {rows.length === 0 ? (

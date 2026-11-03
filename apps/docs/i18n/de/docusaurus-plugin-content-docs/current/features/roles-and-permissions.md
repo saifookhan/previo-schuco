@@ -15,14 +15,15 @@ title: Rollen & Berechtigungen
 | `quote.view` | Angebote ansehen |
 | `quote.edit` | Angebote erstellen und bearbeiten |
 | `users.manage` | Benutzer ins eigene Unternehmen einladen |
+| `partners.manage` | Mit Kunden und Lieferanten verbinden ([Partner](./partners.md)) |
 
 ## Standardrollen
 
 | Rolle | Standardberechtigungen |
 |---|---|
 | Super-Admin | Alles, über alle Unternehmen (nicht änderbar) |
-| Unternehmensadmin | Alle sechs (behält immer `users.manage`) |
-| Super-User | Katalog ansehen/bearbeiten/teilen, Angebote ansehen/bearbeiten |
+| Unternehmensadmin | Alle sieben (behält immer `users.manage`) |
+| Super-User | Katalog ansehen/bearbeiten/teilen, Angebote ansehen/bearbeiten, Partner |
 | User | Katalog ansehen, Angebote ansehen/bearbeiten |
 
 Ein Super-Admin kann diese unter **Einstellungen → Zugriffsrechte** (Matrix Rolle × Berechtigung) ändern. Ein
@@ -37,10 +38,10 @@ Eine Berechtigung wirkt nur, wenn auch das **Unternehmen** des Benutzers eine F�
 
 | Fähigkeit | Schaltet frei |
 |---|---|
-| Manufacturer | Katalog ansehen, bearbeiten, teilen · Benutzer |
-| Supplier | Katalog ansehen, teilen · Angebote ansehen, bearbeiten · Benutzer |
-| Client | Katalog ansehen · Benutzer |
-| Platform | Katalog ansehen · Angebote ansehen · Benutzer |
+| Manufacturer | Katalog ansehen, bearbeiten, teilen · Benutzer · Partner |
+| Supplier | Katalog ansehen, teilen · Angebote ansehen, bearbeiten · Benutzer · Partner |
+| Client | Katalog ansehen · Benutzer · Partner |
+| Platform | Katalog ansehen · Angebote ansehen · Benutzer · Partner |
 
 **Effektive Berechtigungen = Rollenberechtigungen ∩ Unternehmensfähigkeiten.** Beispiel: Marco Rossi hat die
 Rolle *User* (die `quote.edit` enthält), aber Technometal ist nur *client*, daher kann er keine Angebote erstellen.

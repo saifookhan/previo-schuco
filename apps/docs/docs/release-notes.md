@@ -13,6 +13,10 @@ What changed, newest first. Use it to see what's new to test.
 - **Product families list, new columns** (from the client's mock-up): **With price list** (Yes / No), **Valid from** and **Valid to** as date fields, **Ready for invoicing** and **In library** (Yes / No) — all changed right in the row.
 - **In library**: each company chooses which families (its own or shared with it) its quote builder offers; for other users, families out of the library disappear from the catalog.
 - **With price list**: information only; the quote builder marks families without a price list.
+- **Partners** page (sidebar): connect with clients and suppliers — **Connect**, **Accept** / **Refuse**, **Remove connection**, with search by name, branch or address. Families can now only be shared with connected companies; companies that already shared families were connected automatically. Removing a connection stops the shares between the two companies.
+- **Notifications**: a bell next to your name for connection requests, answers and removals (accept or refuse right there); a request also sends an email.
+- **Share dialog**: search box listing only your connected partners.
+- New permission `partners.manage` (company admins and managers).
 
 ## October 2026
 

@@ -30,3 +30,15 @@ export const proxyJson = async (request: Request, apiPath: string, method: 'PATC
   const data = await response.json().catch(() => ({ error: 'Invalid response from API' }))
   return NextResponse.json(data, { status: response.status })
 }
+
+/** Forwards a request without a body (GET, a POST that needs none, DELETE) to the core API, same pass-through as `proxyJson`. */
+export const proxyEmpty = async (apiPath: string, method: 'GET' | 'POST' | 'DELETE'): Promise<NextResponse> => {
+  const headers = await buildAuthHeaders()
+  if (!headers) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  }
+
+  const response = await fetch(`${authConfig.apiUrl}${apiPath}`, { method, headers, cache: 'no-store' })
+  const data = await response.json().catch(() => ({ error: 'Invalid response from API' }))
+  return NextResponse.json(data, { status: response.status })
+}

@@ -80,6 +80,7 @@ export {
   type RoleRow,
 } from './queries/role-permissions'
 export {
+  deleteSharesBetween,
   getIncomingShareDiscounts,
   isFamilySharedWith,
   listFamilyShareTargets,
@@ -89,6 +90,25 @@ export {
   type FamilyShareTarget,
 } from './queries/product-family-shares'
 export { filterBusinessUnitIdsByCompany } from './queries/business-units'
+export {
+  acceptConnection,
+  deleteConnection,
+  getCompanyConnectionForUpdate,
+  insertConnectionRequest,
+  listCompanyConnections,
+  listPartnerDirectory,
+  lockConnectedCompanyIds,
+  type CompanyConnectionRow,
+  type PartnerDirectoryEntry,
+} from './queries/partners'
+export {
+  countUnreadNotifications,
+  insertNotifications,
+  listUserNotifications,
+  markAllNotificationsRead,
+  type InsertNotificationInput,
+  type NotificationRow,
+} from './queries/notifications'
 export {
   hasRecentAuditEntry,
   listAuditLogEntries,
