@@ -270,10 +270,14 @@
     "emptyShared": "Mit Ihrem Unternehmen wurden noch keine Produktfamilien geteilt.",
     "owner": "Eigentümer",
     "yourDiscount": "Ihr Rabatt",
-    "priceValidity": "Preisgültigkeit",
     "noMatches": "Keine Produktfamilie passt zu diesen Filtern.",
     "clearFilters": "Filter entfernen",
-    "readyForInvoicing": "Bereit zur Fakturierung"
+    "readyForInvoicing": "Bereit zur Fakturierung",
+    "hasPriceList": "Mit Preisliste",
+    "validFrom": "Gültig ab",
+    "validTo": "Gültig bis",
+    "inLibrary": "In Bibliothek",
+    "actions": "Aktionen"
   },
   "productFamilyActions": {
     "publish": "Veröffentlichen",
@@ -454,7 +458,9 @@
     "introTitle": "Einleitung",
     "summaryTitle": "Zusammenfassung und Abschluss",
     "fieldPaymentTerms": "Zahlungsbedingungen",
-    "validityNote": "Angebot gültig für {days} Tage ab Ausstellungsdatum."
+    "validityNote": "Angebot gültig für {days} Tage ab Ausstellungsdatum.",
+    "familyWithoutPriceList": "{name} (ohne Preisliste)",
+    "familyWithoutPriceListHint": "Diese Familie hat keine Preisliste — prüfen Sie die Preise, bevor Sie das Angebot senden."
   },
   "adminCompanies": {
     "title": "Unternehmen",
@@ -626,7 +632,11 @@
       "product_family_share_update": "{count, plural, =0 {Freigabe für alle Unternehmen entfernt} one {Mit # Unternehmen geteilt} other {Mit # Unternehmen geteilt}}",
       "product_family_price_validity_update": "{validTo, select, none {Preisgültigkeit festgelegt: ab {validFrom}} other {Preisgültigkeit festgelegt: {validFrom} – {validTo}}}",
       "product_family_ready_for_invoicing": "Als bereit zur Fakturierung markiert",
-      "product_family_not_ready_for_invoicing": "Als nicht bereit zur Fakturierung markiert"
+      "product_family_not_ready_for_invoicing": "Als nicht bereit zur Fakturierung markiert",
+      "product_family_price_list_set": "Als mit Preisliste markiert",
+      "product_family_price_list_unset": "Als ohne Preisliste markiert",
+      "product_family_library_add": "Wieder in die Firmenbibliothek aufgenommen",
+      "product_family_library_remove": "Aus der Firmenbibliothek genommen"
     }
   },
   "productFamilyUpload": {
@@ -676,19 +686,29 @@
     "readyForInvoicingLabel": "Bereit zur Fakturierung",
     "readyForInvoicingHint": "Nur Familien, die bereit zur Fakturierung sind, können zu Angeboten hinzugefügt werden. Sie können das später in der Liste ändern."
   },
-  "productFamilyInvoicing": {
-    "title": "Bereit zur Fakturierung",
-    "label": "Bereit zur Fakturierung: {name}",
+  "productFamilyFlags": {
     "yes": "Ja",
     "no": "Nein",
-    "saveFailed": "„Bereit zur Fakturierung“ für {name} konnte nicht geändert werden"
+    "hasPriceList": {
+      "title": "Mit Preisliste",
+      "label": "Mit Preisliste: {name}",
+      "saveFailed": "„Mit Preisliste“ für {name} konnte nicht geändert werden"
+    },
+    "readyForInvoicing": {
+      "title": "Bereit zur Fakturierung",
+      "label": "Bereit zur Fakturierung: {name}",
+      "saveFailed": "„Bereit zur Fakturierung“ für {name} konnte nicht geändert werden"
+    },
+    "inLibrary": {
+      "title": "In Bibliothek",
+      "label": "In Bibliothek: {name}",
+      "saveFailed": "„In Bibliothek“ für {name} konnte nicht geändert werden"
+    }
   },
   "priceValidity": {
     "range": "Preise gültig {from} – {to}",
     "fromOnly": "Preise gültig ab {from}",
     "toOnly": "Preise gültig bis {to}",
-    "fromOnlyShort": "ab {from}",
-    "toOnlyShort": "bis {to}",
     "notSet": "Keine Preisgültigkeit festgelegt",
     "upcoming": "Demnächst",
     "expired": "Abgelaufen",
@@ -705,7 +725,9 @@
     "saving": "Wird gespeichert…",
     "saved": "Preisgültigkeit gespeichert",
     "saveFailed": "Speichern fehlgeschlagen",
-    "saveFailedUnreachable": "Speichern fehlgeschlagen — Server nicht erreichbar"
+    "saveFailedUnreachable": "Speichern fehlgeschlagen — Server nicht erreichbar",
+    "validFromOf": "Gültig ab: {name}",
+    "validToOf": "Gültig bis: {name}"
   },
   "productFamilyFilters": {
     "search": "Suche",
@@ -742,8 +764,10 @@
       "validTo": "Preise laufen zuerst ab"
     },
     "invoicing": "Bereit zur Fakturierung",
-    "invoicingReady": "Ja",
-    "invoicingNotReady": "Nein"
+    "priceList": "Mit Preisliste",
+    "library": "In Bibliothek",
+    "yes": "Ja",
+    "no": "Nein"
   },
   "loading": {
     "loading": "Wird geladen…",

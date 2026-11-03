@@ -25,11 +25,14 @@ import {
   deleteProductFamily,
   duplicateProductFamily,
   getProductFamilyDetail,
+  getProductFamilyDetailWithLibrary,
   canManageProductFamily,
   getProductFamilyHistory,
   importProductFamilyFromExcel,
   listProductFamilies,
   previewProductFamilyImport,
+  setProductFamilyHasPriceListStatus,
+  setProductFamilyLibraryStatus,
   setProductFamilyPriceValidityDates,
   setProductFamilyPublishedStatus,
   setProductFamilyReadyForInvoicingStatus,
@@ -46,7 +49,7 @@ import {
 } from '../lib/product-family-edit'
 import { isUuid } from '../lib/uuid'
 import type { AuthVariables } from '../middleware/auth'
-import { requireAuth, requirePermission } from '../middleware/auth'
+import { hasPermission, requireAuth, requirePermission } from '../middleware/auth'
 import { respondWithRecordHistory } from './record-history'
 
 /** Product family catalog: import from Excel, list/detail, duplicate, publish toggle (Phase 2). */
@@ -199,13 +202,22 @@ productFamilies.put('/:id/price-validity', requireAuth, requirePermission('catal
   }
 })
 
-/** Lists product families visible to the caller (own company's, plus published families shared with it). */
+/**
+ * Who manages the company library ("In libreria"), and still sees families taken out of it:
+ * admins and managers — the same people who can share families, in every kind of company.
+ */
+const LIBRARY_PERMISSION = 'catalog.share'
+
+/**
+ * Lists product families visible to the caller (own company's, plus published families shared with it).
+ * Families the company took out of its library are left out for everyone but its library managers.
+ */
 productFamilies.get('/', requireAuth, requirePermission('catalog.view'), async (c) => {
   const ctx = {
     effectiveCompanyId: c.get('effectiveCompanyId'),
     isSuperAdmin: c.get('isSuperAdmin'),
   }
-  const families = await listProductFamilies(ctx)
+  const families = await listProductFamilies(ctx, { includeOutOfLibrary: await hasPermission(c, LIBRARY_PERMISSION) })
   return c.json({ families })
 })
 
@@ -219,7 +231,9 @@ productFamilies.get('/:id', requireAuth, requirePermission('catalog.view'), asyn
     effectiveCompanyId: c.get('effectiveCompanyId'),
     isSuperAdmin: c.get('isSuperAdmin'),
   }
-  const detail = await getProductFamilyDetail(ctx, id)
+  // Also for a family out of the company's library: the quote builder loads it to edit positions
+  // already priced from it. The list and the quote builder's choices are where it is hidden.
+  const detail = await getProductFamilyDetailWithLibrary(ctx, id)
   if (!detail) {
     return c.json({ error: 'Not found' }, 404)
   }
@@ -400,6 +414,62 @@ productFamilies.patch('/:id/ready-for-invoicing', requireAuth, requirePermission
   }
   try {
     await setProductFamilyReadyForInvoicingStatus(ctx, actorFrom(c), id, body.readyForInvoicing)
+  } catch (error) {
+    if (error instanceof ProductFamilyNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+    throw error
+  }
+  return c.json({ ok: true })
+})
+
+/** Sets whether the family has a price list ("Con listino") — information for the quote builder (owner or super-admin). */
+productFamilies.patch('/:id/has-price-list', requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const id = c.req.param('id') ?? ''
+  if (!isUuid(id)) {
+    return c.json({ error: 'Not found' }, 404)
+  }
+  const body = await c.req.json().catch(() => null)
+  if (typeof body?.hasPriceList !== 'boolean') {
+    return c.json({ error: '"hasPriceList" (boolean) is required' }, 400)
+  }
+
+  const ctx = {
+    effectiveCompanyId: c.get('effectiveCompanyId'),
+    isSuperAdmin: c.get('isSuperAdmin'),
+  }
+  try {
+    await setProductFamilyHasPriceListStatus(ctx, actorFrom(c), id, body.hasPriceList)
+  } catch (error) {
+    if (error instanceof ProductFamilyNotFoundError) {
+      return c.json({ error: error.message }, 404)
+    }
+    throw error
+  }
+  return c.json({ ok: true })
+})
+
+/**
+ * Puts the family in, or takes it out of, the caller's company library ("In libreria"). Works
+ * on the company's own families and on those shared with it; out of the library, the company's
+ * quote builder no longer offers the family.
+ */
+productFamilies.patch('/:id/library', requireAuth, requirePermission(LIBRARY_PERMISSION), async (c) => {
+  const id = c.req.param('id') ?? ''
+  if (!isUuid(id)) {
+    return c.json({ error: 'Not found' }, 404)
+  }
+  const body = await c.req.json().catch(() => null)
+  if (typeof body?.inLibrary !== 'boolean') {
+    return c.json({ error: '"inLibrary" (boolean) is required' }, 400)
+  }
+
+  const ctx = {
+    effectiveCompanyId: c.get('effectiveCompanyId'),
+    isSuperAdmin: c.get('isSuperAdmin'),
+  }
+  try {
+    await setProductFamilyLibraryStatus(ctx, actorFrom(c), id, body.inLibrary)
   } catch (error) {
     if (error instanceof ProductFamilyNotFoundError) {
       return c.json({ error: error.message }, 404)

@@ -28,8 +28,10 @@ Jede Umgebung hat bereits eine: **Demo Window W70** (siehe [Demo-Daten](../demo-
 | Neue Version | **Neue Version** auf der Seite der Familie | Derselbe Dialog wie beim Import; die neue Version bekommt eine eigene Preisgültigkeit, die alte behält ihre Daten |
 | Duplizieren | Kopier-Symbol in den Aktionen | Ein Dialog fragt nach Name, Preisgültigkeit und Veröffentlichung der Kopie (startet mit den Daten des Originals, unveröffentlicht) |
 | Löschen | Aktionsmenü | |
-| Preisgültigkeit ändern | **Bearbeiten** neben den Daten auf der Seite der Familie | Nur Eigentümer (oder Super-Admin) |
+| Preisgültigkeit ändern | Die Felder **Gültig ab / Gültig bis** in der Liste, oder **Bearbeiten** neben den Daten auf der Seite der Familie | Nur Eigentümer (oder Super-Admin) |
 | Bereit zur Fakturierung | **Ja / Nein** in der Liste (oder auf der Seite der Familie) | Nur Familien, die bereit zur Fakturierung sind, werden im Angebot angeboten. Nur Eigentümer |
+| Mit Preisliste | **Ja / Nein** in der Liste (oder auf der Seite der Familie) | Ob hinter der Familie Preise stehen — wird im Angebot angezeigt. Nur Eigentümer |
+| In Bibliothek | **Ja / Nein** in der Liste (oder auf der Seite der Familie) | Ob das Angebot Ihres Unternehmens die Familie anbietet — für eigene und geteilte Familien. Administratoren und Manager |
 
 ![Produktfamilie im Detail](/img/screens/product-family-detail.png)
 
@@ -57,6 +59,8 @@ Die Preise einer Familie können in **neuen Angebotspositionen** nur von *Gülti
 die API lehnt sie ab. Positionen, die schon in Angeboten stehen, behalten ihre Preise und bleiben bearbeitbar. Die Liste
 zeigt die Daten mit dem Badge **Demnächst** oder **Abgelaufen**; vor dieser Funktion importierte Familien haben keine
 Daten und sind immer verwendbar.
+In der Liste ändert der Eigentümer die Daten direkt in der Zeile: gespeichert wird beim Verlassen des Feldes (oder mit
+Enter). *Gültig ab* kann nicht geleert werden; ein leeres *Gültig bis* bedeutet bis auf Weiteres.
 
 ## Bereit zur Fakturierung
 
@@ -66,6 +70,27 @@ einer Position zu einem Angebot angeboten; die API lehnt die anderen ab. Geände
 neue Version übernimmt die Einstellung des Originals (im Dialog änderbar). Familien, die vor dieser Einstellung existierten, wurden als bereit
 markiert. Positionen, die schon in Angeboten sind, bleiben unverändert und bearbeitbar. Jede Änderung steht im Verlauf
 der Familie.
+
+## Mit Preisliste
+
+**Mit Preisliste** (Ja / Nein) gibt an, ob hinter der Familie Preise stehen. Es wird vom Eigentümer-Unternehmen von
+Hand gesetzt — es kommt nicht aus der Excel-Datei — und ist für jede Familie **Ja**, bis jemand es ändert; eine Kopie
+übernimmt die Einstellung des Originals. Es ist nur eine Information: im Angebot wird eine Familie ohne Preisliste als
+*(ohne Preisliste)* markiert und zeigt einen Hinweis, die Preise zu prüfen, kann aber trotzdem verwendet werden.
+
+## In Bibliothek
+
+**In Bibliothek** (Ja / Nein) ist die eigene Wahl Ihres Unternehmens, welche Familien sein Angebot anbietet — nützlich,
+wenn ein Lieferant viele Familien teilt, die Sie nicht verwenden. Es gilt für eigene und für mit Ihnen geteilte
+Familien, und jedes Unternehmen entscheidet selbst: eine geteilte Familie aus Ihrer Bibliothek zu nehmen, ändert sie
+für niemand anderen.
+
+- Außerhalb der Bibliothek wird die Familie beim Hinzufügen einer Position zu einem Angebot nicht mehr angeboten (auch
+  die API lehnt sie ab), für alle in Ihrem Unternehmen. Positionen, die schon in Angeboten sind, bleiben unverändert
+  und bearbeitbar.
+- Nur Administratoren und Manager (wer Familien teilen darf) ändern es, und nur sie sehen Familien außerhalb der
+  Bibliothek noch in der Liste — für die anderen Benutzer verschwinden sie aus dem Katalog.
+- Jede Familie ist in der Bibliothek, bis jemand sie herausnimmt, auch später mit Ihnen geteilte Familien.
 
 ## Preisfelder
 
@@ -95,6 +120,7 @@ sehen ihn — nicht die Unternehmen, mit denen die Familie geteilt wurde.
 - **Kategorie**, **Marke**, **Status** (veröffentlicht / Entwurf).
 - **Preisgültigkeit** — *Heute gültig* (was das Angebot anbietet; Familien ohne Daten zählen mit), *Demnächst*, *Abgelaufen*, *Ohne Daten*.
 - **Bereit zur Fakturierung** (unter *Weitere Filter*) — Ja / Nein.
+- **Mit Preisliste** und **In Bibliothek** (unter *Weitere Filter*) — Ja / Nein.
 - **Weitere Filter** — *Preise gültig am* bestimmten Tag, *Aktualisiert ab / bis*, *Nur neueste Versionen* (blendet Versionen aus, die eine neuere ersetzt); unter *Mit mir geteilt* zusätzlich **Eigentümer** und **Ihr Rabatt** (mit / ohne).
 - **Sortieren** — neueste zuerst (Standard), zuletzt aktualisiert, Name, Preise laufen zuerst ab.
 

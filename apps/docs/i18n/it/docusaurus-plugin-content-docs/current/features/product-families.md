@@ -28,8 +28,10 @@ Ogni ambiente ne ha già una: **Demo Window W70** (vedi [Dati demo](../demo-data
 | Nuova versione | **Nuova versione** nella pagina della famiglia | Stessa finestra dell'importazione; la nuova versione ha la sua validità prezzi e quella vecchia mantiene le sue date |
 | Duplica | Icona copia nelle azioni | Una finestra chiede nome, validità prezzi e pubblicazione della copia (parte dalle date dell'originale, non pubblicata) |
 | Elimina | Menu azioni | |
-| Cambia validità prezzi | **Modifica** accanto alle date nella pagina della famiglia | Solo il proprietario (o il super-admin) |
+| Cambia validità prezzi | I campi **Data inizio / fine validità** nell'elenco, o **Modifica** accanto alle date nella pagina della famiglia | Solo il proprietario (o il super-admin) |
 | Pronta per la fatturazione | **Sì / No** nell'elenco (o nella pagina della famiglia) | Solo le famiglie pronte per la fatturazione sono proposte nel preventivo. Solo il proprietario |
+| Con listino | **Sì / No** nell'elenco (o nella pagina della famiglia) | Se dietro la famiglia ci sono dei prezzi — mostrato nel preventivo. Solo il proprietario |
+| In libreria | **Sì / No** nell'elenco (o nella pagina della famiglia) | Se il preventivo della tua azienda propone la famiglia — per le tue famiglie e per quelle condivise. Amministratori e responsabili |
 
 ![Dettaglio famiglia di prodotto](/img/screens/product-family-detail.png)
 
@@ -56,6 +58,8 @@ I prezzi di una famiglia si possono usare nelle **nuove posizioni dei preventivi
 al* (giorni inclusi, ora italiana). Fuori da questi giorni la famiglia non è proposta nel preventivo e l'API la
 rifiuta. Le posizioni già nei preventivi mantengono i loro prezzi e restano modificabili. L'elenco mostra le date con
 il badge **Futura** o **Scaduta**; le famiglie importate prima di questa funzione non hanno date e sono sempre usabili.
+Nell'elenco il proprietario cambia le date direttamente nella riga: la modifica si salva quando esci dal campo (o con
+Invio). La *Data inizio validità* non si può svuotare; svuotare la *Data fine validità* significa fino a nuovo avviso.
 
 ## Pronta per la fatturazione
 
@@ -64,6 +68,25 @@ si aggiunge una posizione a un preventivo; l'API rifiuta le altre. Si cambia con
 nella pagina della famiglia — solo l'azienda proprietaria può farlo. Una famiglia nuova parte **non pronta**; una copia o una nuova
 versione parte dall'impostazione dell'originale (modificabile nella finestra). Quelle esistenti prima di questa impostazione sono state segnate pronte. Le posizioni già nei
 preventivi non cambiano e restano modificabili. Ogni modifica compare nella cronologia della famiglia.
+
+## Con listino
+
+**Con listino** (Sì / No) indica se dietro la famiglia ci sono dei prezzi. Si imposta a mano dall'azienda proprietaria —
+non viene dal file Excel — ed è **Sì** per ogni famiglia finché qualcuno non lo cambia; una copia mantiene
+l'impostazione dell'originale. È solo un'informazione: nel preventivo una famiglia senza listino è segnata
+*(senza listino)* con un promemoria di controllare i prezzi, ma si può comunque usare.
+
+## In libreria
+
+**In libreria** (Sì / No) è la scelta della tua azienda su quali famiglie propone il suo preventivo — utile quando un
+fornitore condivide molte famiglie che non usate. Vale per le tue famiglie e per quelle condivise con te, e ogni
+azienda decide per sé: togliere dalla libreria una famiglia condivisa non la cambia per nessun altro.
+
+- Fuori dalla libreria, la famiglia non è più proposta quando si aggiunge una posizione a un preventivo (anche l'API la
+  rifiuta), per tutti nella tua azienda. Le posizioni già nei preventivi non cambiano e restano modificabili.
+- Solo amministratori e responsabili (chi può condividere famiglie) lo cambiano, e solo loro vedono ancora nell'elenco
+  le famiglie fuori dalla libreria — per gli altri utenti spariscono dal catalogo.
+- Ogni famiglia è in libreria finché qualcuno non la toglie, anche quelle condivise con te più avanti.
 
 ## Campi di prezzo
 
@@ -93,6 +116,7 @@ Sopra l'elenco, per la scheda aperta:
 - **Categoria**, **Marca**, **Stato** (pubblicata / bozza).
 - **Validità prezzi** — *Validi oggi* (quello che propone il preventivo; contano anche le famiglie senza date), *In arrivo*, *Scaduti*, *Senza date*.
 - **Pronta per la fatturazione** (in *Più filtri*) — Sì / No.
+- **Con listino** e **In libreria** (in *Più filtri*) — Sì / No.
 - **Altri filtri** — *Prezzi validi il* un certo giorno, *Aggiornata dal / al*, *Solo ultime versioni* (nasconde le versioni sostituite da una più recente); in *Condivise con me* anche **Proprietario** e **Il tuo sconto** (con / senza).
 - **Ordina** — più recenti prima (predefinito), aggiornate di recente, nome, prezzi in scadenza prima.
 

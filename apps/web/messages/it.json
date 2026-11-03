@@ -270,10 +270,14 @@
     "emptyShared": "Nessuna famiglia di prodotti è stata ancora condivisa con la tua azienda.",
     "owner": "Proprietario",
     "yourDiscount": "Il tuo sconto",
-    "priceValidity": "Validità prezzi",
     "noMatches": "Nessuna famiglia corrisponde a questi filtri.",
     "clearFilters": "Rimuovi filtri",
-    "readyForInvoicing": "Pronta per la fatturazione"
+    "readyForInvoicing": "Pronta per la fatturazione",
+    "hasPriceList": "Con listino",
+    "validFrom": "Data inizio validità",
+    "validTo": "Data fine validità",
+    "inLibrary": "In libreria",
+    "actions": "Azioni"
   },
   "productFamilyActions": {
     "publish": "Pubblica",
@@ -454,7 +458,9 @@
     "introTitle": "Introduzione",
     "summaryTitle": "Riepilogo e chiusura",
     "fieldPaymentTerms": "Termini di pagamento",
-    "validityNote": "Preventivo valido per {days} giorni dalla data di emissione."
+    "validityNote": "Preventivo valido per {days} giorni dalla data di emissione.",
+    "familyWithoutPriceList": "{name} (senza listino)",
+    "familyWithoutPriceListHint": "Questa famiglia non ha un listino — controlla i prezzi prima di inviare il preventivo."
   },
   "adminCompanies": {
     "title": "Aziende",
@@ -626,7 +632,11 @@
       "product_family_share_update": "{count, plural, =0 {Condivisione rimossa per tutte le aziende} one {Condivisa con # azienda} other {Condivisa con # aziende}}",
       "product_family_price_validity_update": "{validTo, select, none {Validità prezzi impostata: dal {validFrom}} other {Validità prezzi impostata: {validFrom} – {validTo}}}",
       "product_family_ready_for_invoicing": "Segnata come pronta per la fatturazione",
-      "product_family_not_ready_for_invoicing": "Segnata come non pronta per la fatturazione"
+      "product_family_not_ready_for_invoicing": "Segnata come non pronta per la fatturazione",
+      "product_family_price_list_set": "Segnata con listino",
+      "product_family_price_list_unset": "Segnata senza listino",
+      "product_family_library_add": "Rimessa nella libreria aziendale",
+      "product_family_library_remove": "Tolta dalla libreria aziendale"
     }
   },
   "productFamilyUpload": {
@@ -676,19 +686,29 @@
     "readyForInvoicingLabel": "Pronta per la fatturazione",
     "readyForInvoicingHint": "Solo le famiglie pronte per la fatturazione possono essere aggiunte ai preventivi. Puoi cambiarlo in seguito dalla lista."
   },
-  "productFamilyInvoicing": {
-    "title": "Pronta per la fatturazione",
-    "label": "Pronta per la fatturazione: {name}",
+  "productFamilyFlags": {
     "yes": "Sì",
     "no": "No",
-    "saveFailed": "Impossibile modificare \"Pronta per la fatturazione\" per {name}"
+    "hasPriceList": {
+      "title": "Con listino",
+      "label": "Con listino: {name}",
+      "saveFailed": "Impossibile modificare \"Con listino\" per {name}"
+    },
+    "readyForInvoicing": {
+      "title": "Pronta per la fatturazione",
+      "label": "Pronta per la fatturazione: {name}",
+      "saveFailed": "Impossibile modificare \"Pronta per la fatturazione\" per {name}"
+    },
+    "inLibrary": {
+      "title": "In libreria",
+      "label": "In libreria: {name}",
+      "saveFailed": "Impossibile modificare \"In libreria\" per {name}"
+    }
   },
   "priceValidity": {
     "range": "Prezzi validi dal {from} al {to}",
     "fromOnly": "Prezzi validi dal {from}",
     "toOnly": "Prezzi validi fino al {to}",
-    "fromOnlyShort": "dal {from}",
-    "toOnlyShort": "fino al {to}",
     "notSet": "Nessuna validità prezzi impostata",
     "upcoming": "Futura",
     "expired": "Scaduta",
@@ -705,7 +725,9 @@
     "saving": "Salvataggio…",
     "saved": "Validità dei prezzi salvata",
     "saveFailed": "Impossibile salvare",
-    "saveFailedUnreachable": "Impossibile salvare — server non raggiungibile"
+    "saveFailedUnreachable": "Impossibile salvare — server non raggiungibile",
+    "validFromOf": "Data inizio validità: {name}",
+    "validToOf": "Data fine validità: {name}"
   },
   "productFamilyFilters": {
     "search": "Cerca",
@@ -742,8 +764,10 @@
       "validTo": "Prezzi in scadenza prima"
     },
     "invoicing": "Pronta per la fatturazione",
-    "invoicingReady": "Sì",
-    "invoicingNotReady": "No"
+    "priceList": "Con listino",
+    "library": "In libreria",
+    "yes": "Sì",
+    "no": "No"
   },
   "loading": {
     "loading": "Caricamento…",

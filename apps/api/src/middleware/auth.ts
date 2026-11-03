@@ -141,19 +141,27 @@ export const requireRoles = (allowedRoles: string[]) =>
   }
 
 /**
- * Require an effective permission (role grants it AND the company's
- * capabilities unlock it — see `computePermissions`). Preferred over
+ * Whether the signed-in user has an effective permission (role grants it AND the
+ * company's capabilities unlock it — see `computePermissions`). For routes whose
+ * answer differs by permission; `requirePermission` gates a whole route.
+ */
+export const hasPermission = async (c: Context, permission: Permission): Promise<boolean> => {
+  const user = c.get('user') as UserProfile | undefined
+  if (!user) {
+    return false
+  }
+  const matrix = await getEffectiveRolePermissions()
+  return computePermissions(user.roles.map((r) => r.id), user.company.capabilities, matrix).includes(permission)
+}
+
+/**
+ * Require an effective permission (see `hasPermission`). Preferred over
  * `requireRoles` for anything gated by what a company can do.
  * @param permission - The permission the route needs
  */
 export const requirePermission = (permission: Permission) =>
   async (c: Context, next: Next): Promise<Response | void> => {
-    const user = c.get('user') as UserProfile | undefined
-    if (!user) {
-      return c.json({ error: 'Forbidden' }, 403)
-    }
-    const matrix = await getEffectiveRolePermissions()
-    if (!computePermissions(user.roles.map((r) => r.id), user.company.capabilities, matrix).includes(permission)) {
+    if (!(await hasPermission(c, permission))) {
       return c.json({ error: 'Forbidden' }, 403)
     }
     await next()

@@ -28,8 +28,10 @@ Every environment already has one: **Demo Window W70** (see [Demo data](../demo-
 | New version | **New version** on the family's page | Same dialog as an import; the new version gets its own price validity and the old one keeps its dates |
 | Duplicate | Copy icon in the actions | A dialog asks for the copy's name, price validity and whether to publish it (starts from the original's dates, unpublished) |
 | Delete | Actions menu | |
-| Change price validity | **Edit** next to the dates on the family's page | Owner (or super-admin) only |
+| Change price validity | The **Valid from / Valid to** fields in the list, or **Edit** next to the dates on the family's page | Owner (or super-admin) only |
 | Ready for invoicing | **Yes / No** in the list (or on the family's page) | Only families ready for invoicing are offered in the quote builder. Owner only |
+| With price list | **Yes / No** in the list (or on the family's page) | Whether there are prices behind the family — shown in the quote builder. Owner only |
+| In library | **Yes / No** in the list (or on the family's page) | Whether your company's quote builder offers the family — for your own families and for shared ones. Admins and managers |
 
 ![Product family detail](/img/screens/product-family-detail.png)
 
@@ -56,6 +58,8 @@ A family's prices can be used on **new quote positions** only from *Valid from* 
 Italian time). Outside those days the family isn't offered in the quote builder and the API refuses it. Positions
 already on quotes keep their prices and can still be edited. The list shows the dates with an **Upcoming** or
 **Expired** badge; families imported before this existed have no dates and are always usable.
+In the list, the owner changes the dates right in the row: the change is saved when you leave the field (or press
+Enter). *Valid from* can't be emptied; emptying *Valid to* means until further notice.
 
 ## Ready for invoicing
 
@@ -64,6 +68,25 @@ position to a quote; the API refuses the others. Change it with the **Yes / No**
 family's page — only the owning company can. A new family starts **not ready**; a copy or a new version starts
 with the original's setting (change it in the dialog). Families that existed before this setting were marked ready. Positions already on quotes are not affected and can still be
 edited. Each change is recorded in the family's history.
+
+## With price list
+
+**With price list** (Yes / No) says whether there are prices behind the family. It is set by hand by the owning
+company — it doesn't come from the Excel file — and is **Yes** for every family until someone changes it; a copy keeps
+the original's setting. It is information only: in the quote builder a family without a price list is marked
+*(no price list)* and shows a reminder to check the prices, but it can still be used.
+
+## In library
+
+**In library** (Yes / No) is your company's own choice of which families its quote builder offers — useful when a
+supplier shares many families you don't use. It works on your own families and on families shared with you, and
+each company decides for itself: taking a shared family out of your library doesn't change it for anyone else.
+
+- Out of the library, the family is no longer offered when adding a position to a quote (the API refuses it too),
+  for everyone in your company. Positions already on quotes are not affected and can still be edited.
+- Only admins and managers (whoever can share families) change it, and only they still see families that are out of
+  the library in the list — for the other users they disappear from the catalog.
+- Every family is in the library until someone takes it out, including families shared with you later.
 
 ## Pricing fields
 
@@ -93,6 +116,7 @@ Above the list, for the tab you're on:
 - **Category**, **Brand**, **Status** (published / draft).
 - **Price validity** — *Valid today* (what the quote builder offers; families without dates count), *Upcoming*, *Expired*, *No dates*.
 - **Ready for invoicing** (under *More filters*) — Yes / No.
+- **With price list** and **In library** (under *More filters*) — Yes / No.
 - **More filters** — *Prices valid on* a given day, *Updated from / to*, *Latest versions only* (hides versions a newer one replaces); on *Shared with me* also **Owner** and **Your discount** (with / without).
 - **Sort** — newest first (default), recently updated, name, prices ending soonest.
 

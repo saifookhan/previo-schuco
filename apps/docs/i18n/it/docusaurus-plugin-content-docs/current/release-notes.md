@@ -7,6 +7,13 @@ title: Note di rilascio
 
 Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testare.
 
+## Novembre 2026
+
+**Settimana del 2 novembre**
+- **Elenco famiglie di prodotto, nuove colonne** (dal mock-up del cliente): **Con listino** (Sì / No), **Data inizio** e **Data fine validità** come campi data, **Pronta per la fatturazione** e **In libreria** (Sì / No) — tutte modificabili direttamente nella riga.
+- **In libreria**: ogni azienda sceglie quali famiglie (proprie o condivise) propone il suo preventivo; per gli altri utenti le famiglie fuori dalla libreria spariscono dal catalogo.
+- **Con listino**: solo informativo; il preventivo segnala le famiglie senza listino.
+
 ## Ottobre 2026
 
 **Settimana del 26 ottobre**

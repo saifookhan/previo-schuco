@@ -18,6 +18,8 @@ const family = (overrides: Partial<FilterableProductFamily> & { id: string; name
   brand: null,
   isPublished: true,
   readyForInvoicing: true,
+  hasPriceList: true,
+  inLibrary: true,
   supersedesId: null,
   priceValidFrom: null,
   priceValidTo: null,
@@ -30,7 +32,7 @@ const TODAY = '2026-06-15'
 const families = [
   family({ id: 'a', name: 'Alpha Window', technicalName: 'W70', category: 'Finestre', brand: 'Schüco', priceValidFrom: '2026-01-01', priceValidTo: '2026-12-31', updatedAt: '2026-05-01T09:00:00.000Z' }),
   family({ id: 'b', name: 'beta door', category: 'Porte', brand: 'Acme', isPublished: false, readyForInvoicing: false, priceValidFrom: '2027-01-01', createdAt: '2026-03-01T00:00:00.000Z' }),
-  family({ id: 'c', name: 'Gamma Tenda', category: 'Tende', brand: 'Acme', priceValidFrom: '2025-01-01', priceValidTo: '2025-12-31', ownerCompanyName: 'Schuco Demo', shareDiscountPct: 10 }),
+  family({ id: 'c', name: 'Gamma Tenda', hasPriceList: false, inLibrary: false, category: 'Tende', brand: 'Acme', priceValidFrom: '2025-01-01', priceValidTo: '2025-12-31', ownerCompanyName: 'Schuco Demo', shareDiscountPct: 10 }),
   family({ id: 'd', name: 'Alpha Window', category: 'Finestre', brand: 'Schüco', supersedesId: 'a', ownerCompanyName: 'Other Co', updatedAt: '2026-06-10T09:00:00.000Z' }),
 ]
 const ids = (filters: Partial<ProductFamilyFilters>) =>
@@ -50,6 +52,10 @@ describe('filterProductFamilies', () => {
     expect(ids({ status: 'draft' })).toEqual(['b'])
     expect(ids({ invoicing: 'notReady' })).toEqual(['b'])
     expect(ids({ invoicing: 'ready' })).toEqual(['a', 'd', 'c'])
+    expect(ids({ priceList: 'without' })).toEqual(['c'])
+    expect(ids({ priceList: 'with' })).toEqual(['a', 'd', 'b'])
+    expect(ids({ library: 'out' })).toEqual(['c'])
+    expect(ids({ library: 'in' })).toEqual(['a', 'd', 'b'])
   })
 
   it('filters by price validity today, and by the day the prices must be valid on', () => {

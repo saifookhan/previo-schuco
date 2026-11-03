@@ -287,6 +287,18 @@ CREATE POLICY product_family_shares_write ON product_family_shares
   USING (app_is_super_admin() OR from_company_id = app_current_company_id())
   WITH CHECK (app_is_super_admin() OR from_company_id = app_current_company_id());
 
+-- product_family_library_hidden: each company's own "In libreria: No" choices.
+-- Only that company reads or writes them, and only for families it can see.
+ALTER TABLE product_family_library_hidden ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS product_family_library_hidden_own ON product_family_library_hidden;
+CREATE POLICY product_family_library_hidden_own ON product_family_library_hidden
+  FOR ALL
+  USING (app_is_super_admin() OR company_id = app_current_company_id())
+  WITH CHECK (
+    (app_is_super_admin() OR company_id = app_current_company_id())
+    AND app_can_view_product_family(product_family_id)
+  );
+
 -- Other companies' names (and only names): a view that runs with its owner's
 -- rights, so it can show id + name without opening the companies row itself
 -- (VAT number, capabilities, ...) to partners. Visible: self, companies the

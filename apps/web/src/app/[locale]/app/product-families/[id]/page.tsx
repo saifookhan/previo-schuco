@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Link } from '@/i18n/navigation'
 import { fetchFromApiResult } from '@/lib/api/server-client'
-import { ProductFamilyInvoicingSelect } from '@/components/product-family-invoicing-select'
+import { ProductFamilyFlagSelect } from '@/components/product-family-flag-select'
 import { ProductFamilyImageGallery } from '@/components/product-family-image-gallery'
 import { ProductFamilyMatrixPreview } from '@/components/product-family-matrix-preview'
 import { ProductFamilyPriceValidity } from '@/components/product-family-price-validity'
@@ -29,7 +29,7 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
   const tList = await getTranslations('productFamilies')
   const tVersion = await getTranslations('productFamilyVersion')
   const tEdit = await getTranslations('productFamilyEdit')
-  const tInvoicing = await getTranslations('productFamilyInvoicing')
+  const tFlags = await getTranslations('productFamilyFlags')
   const result = await fetchFromApiResult<ProductFamilyDetail>(`/api/product-families/${id}`)
 
   if (result.status !== 'ok') {
@@ -100,9 +100,20 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
             {[family.technicalName, family.category, family.brand].filter(Boolean).join(' · ') || '—'}
           </p>
           <ProductFamilyPriceValidity familyId={family.id} validity={family} canEdit={canManage} today={priceValidityToday()} />
-          <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
-            <span>{tInvoicing('title')}</span>
-            <ProductFamilyInvoicingSelect familyId={family.id} familyName={family.name} ready={family.readyForInvoicing} canEdit={canManage} />
+          <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600">
+            {(
+              [
+                ['hasPriceList', family.hasPriceList, canManage],
+                ['readyForInvoicing', family.readyForInvoicing, canManage],
+                // The caller's own company library, also for a family shared with it (the select checks who may).
+                ['inLibrary', detail.inLibrary, true],
+              ] as const
+            ).map(([flag, value, canEdit]) => (
+              <div key={flag} className="flex items-center gap-2">
+                <span>{tFlags(`${flag}.title`)}</span>
+                <ProductFamilyFlagSelect flag={flag} familyId={family.id} familyName={family.name} value={value} canEdit={canEdit} />
+              </div>
+            ))}
           </div>
           {family.supersedesId ? (
             <Link

@@ -16,7 +16,12 @@ import {
 } from '@schuco/db'
 
 import { getDb } from '../src/lib/db'
-import { listProductFamilies } from '../src/services/product-families-service'
+import { ProductFamilyNotFoundError } from '../src/lib/product-family-edit'
+import {
+  isFamilyInCompanyLibrary,
+  listProductFamilies,
+  setProductFamilyLibraryStatus,
+} from '../src/services/product-families-service'
 import {
   FamilyShareNotFoundError,
   FamilyShareValidationError,
@@ -209,5 +214,65 @@ describe('family shares', () => {
     await expect(bad(manufacturer)).rejects.toThrow(FamilyShareValidationError) // itself
     await expect(bad(platformOnly)).rejects.toThrow(FamilyShareValidationError) // not a supplier or client
     await expect(bad('00000000-0000-0000-0000-000000000000')).rejects.toThrow(FamilyShareValidationError)
+  })
+})
+
+describe('company library ("In libreria")', () => {
+  it('lets each company take a family out of its own library, without touching anyone else’s', async () => {
+    const [family] = await withSystemTransaction(db, (tx) =>
+      tx
+        .insert(productFamilies)
+        .values({ supplierCompanyId: manufacturer, name: 'Library Test Family', isPublished: true })
+        .returning({ id: productFamilies.id }),
+    )
+    await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), family.id, [{ companyId: supplier, discountPct: 0 }])
+    const inLibraryOf = async (companyId: string) =>
+      (await listProductFamilies(ctxOf(companyId))).find((f) => f.id === family.id)?.inLibrary
+
+    expect(await inLibraryOf(manufacturer)).toBe(true)
+    expect(await inLibraryOf(supplier)).toBe(true)
+
+    await setProductFamilyLibraryStatus(ctxOf(supplier), actorOf(supplier), family.id, false)
+    expect(await inLibraryOf(supplier)).toBe(false)
+    expect(await isFamilyInCompanyLibrary(ctxOf(supplier), family.id)).toBe(false)
+    expect(await inLibraryOf(manufacturer)).toBe(true)
+
+    // Same choice again: nothing changes, nothing more is recorded.
+    await setProductFamilyLibraryStatus(ctxOf(supplier), actorOf(supplier), family.id, false)
+    await setProductFamilyLibraryStatus(ctxOf(supplier), actorOf(supplier), family.id, true)
+    expect(await inLibraryOf(supplier)).toBe(true)
+
+    const entries = await withSystemTransaction(db, (tx) =>
+      tx.select().from(auditLog).where(eq(auditLog.resourceId, family.id)).orderBy(auditLog.createdAt),
+    )
+    const libraryEntries = entries.filter((entry) => entry.action.startsWith('product_family.library_'))
+    expect(libraryEntries.map((entry) => [entry.action, entry.effectiveCompanyId])).toEqual([
+      ['product_family.library_remove', supplier],
+      ['product_family.library_add', supplier],
+    ])
+  })
+
+  it('refuses a company that cannot see the family, also for a super-admin acting as that company', async () => {
+    await expect(setProductFamilyLibraryStatus(ctxOf(outsider), actorOf(outsider), familyId, false)).rejects.toThrow(
+      ProductFamilyNotFoundError,
+    )
+    const superAdminAsOutsider = { effectiveCompanyId: outsider, isSuperAdmin: true }
+    await expect(setProductFamilyLibraryStatus(superAdminAsOutsider, actorOf(outsider), familyId, false)).rejects.toThrow(
+      ProductFamilyNotFoundError,
+    )
+  })
+
+  it('leaves families out of the library out of the list only when asked to', async () => {
+    const [family] = await withSystemTransaction(db, (tx) =>
+      tx
+        .insert(productFamilies)
+        .values({ supplierCompanyId: supplier, name: 'Library List Family', isPublished: true })
+        .returning({ id: productFamilies.id }),
+    )
+    await setProductFamilyLibraryStatus(ctxOf(supplier), actorOf(supplier), family.id, false)
+    const ids = async (includeOutOfLibrary: boolean) =>
+      (await listProductFamilies(ctxOf(supplier), { includeOutOfLibrary })).map((f) => f.id)
+    expect(await ids(true)).toContain(family.id)
+    expect(await ids(false)).not.toContain(family.id)
   })
 })

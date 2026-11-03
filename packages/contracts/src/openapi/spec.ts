@@ -352,6 +352,56 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           },
         },
       },
+      '/api/product-families/{id}/has-price-list': {
+        patch: {
+          tags: ['Products'],
+          summary: 'Set whether a product family has a price list ("Con listino")',
+          description:
+            'Information shown in the quote builder; it does not stop the family from being quoted. Owning company (catalog.edit) or super-admin.',
+          operationId: 'setProductFamilyHasPriceList',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { type: 'object', required: ['hasPriceList'], properties: { hasPriceList: { type: 'boolean' } } },
+              },
+            },
+          },
+          responses: {
+            '200': { description: 'Saved; body is `{ ok: true }`' },
+            '400': { description: 'Missing or invalid `hasPriceList`', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            '404': { description: 'No such family, or not owned by the caller', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
+      '/api/product-families/{id}/library': {
+        patch: {
+          tags: ['Products'],
+          summary: 'Put a product family in, or take it out of, the caller\'s company library ("In libreria")',
+          description:
+            "Each company decides for itself, for its own families and those shared with it. Out of the library, the company's quote builder no longer offers the family and only users with catalog.share see it in the list; existing quote positions are not affected. Needs catalog.share.",
+          operationId: 'setProductFamilyLibrary',
+          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { type: 'object', required: ['inLibrary'], properties: { inLibrary: { type: 'boolean' } } },
+              },
+            },
+          },
+          responses: {
+            '200': { description: 'Saved; body is `{ ok: true }`' },
+            '400': { description: 'Missing or invalid `inLibrary`', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            '404': { description: 'No such family, or not visible to the caller', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
       '/api/products': {
         get: {
           tags: ['Products'],

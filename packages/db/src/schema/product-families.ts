@@ -77,6 +77,11 @@ export const productFamilies = pgTable('product_families', {
    */
   readyForInvoicing: boolean('ready_for_invoicing').notNull().default(false),
   /**
+   * "Con listino": whether there are prices (a price list) behind the family. Set by
+   * hand by the owner, shown as information in the quote builder; it doesn't block anything.
+   */
+  hasPriceList: boolean('has_price_list').notNull().default(true),
+  /**
    * First day (inclusive) this family's prices may be used on new quote positions —
    * set when uploading the Excel. Null on families imported before validity existed:
    * no lower limit.

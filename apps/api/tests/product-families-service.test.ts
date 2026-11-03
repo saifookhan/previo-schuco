@@ -19,6 +19,7 @@ import {
   ExcelImportError,
   listProductFamilies,
   previewProductFamilyImport,
+  setProductFamilyHasPriceListStatus,
   setProductFamilyPriceValidityDates,
   setProductFamilyReadyForInvoicingStatus,
   setProductFamilyPublishedStatus,
@@ -603,6 +604,37 @@ describe('upload dialog: preview, then save with the confirmed fields', () => {
       'product_family.ready_for_invoicing',
       'product_family.not_ready_for_invoicing',
     ])
+  })
+
+  it('sets "with price list" for the owner only, records it, and a copy keeps it', async () => {
+    const family = await importProductFamilyFromExcel(ctx(), actor, supplierCompanyId, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+    expect(family.hasPriceList).toBe(true)
+
+    await setProductFamilyHasPriceListStatus(ctx(), actor, family.id, false)
+    expect((await getProductFamilyDetail(ctx(), family.id))!.family.hasPriceList).toBe(false)
+
+    const stranger = { effectiveCompanyId: '00000000-0000-4000-8000-000000000000', isSuperAdmin: false }
+    await expect(setProductFamilyHasPriceListStatus(stranger, actor, family.id, true)).rejects.toThrow(ProductFamilyNotFoundError)
+
+    const copy = await duplicateProductFamily(ctx(), actor, family.id, {
+      name: 'No price list copy',
+      priceValidFrom: '2027-01-01',
+      priceValidTo: null,
+      publish: false,
+      readyForInvoicing: false,
+    })
+    expect(copy.hasPriceList).toBe(false)
+    // Set by hand, so a new version keeps it too.
+    const v2 = await createNewVersionFromExcel(ctx(), actor, family.id, { buffer: fixtureBuffer, originalName: 'v2.xlsx' }, { priceValidFrom: '2027-01-01' })
+    expect(v2.hasPriceList).toBe(false)
+
+    const entries = await withSystemTransaction(db, (tx) =>
+      tx.select().from(auditLog).where(and(eq(auditLog.resourceType, 'product_family'), eq(auditLog.resourceId, family.id))),
+    )
+    expect(entries.map((entry) => entry.action)).toContain('product_family.price_list_unset')
   })
 
   it('changes the dates later for the owner only', async () => {

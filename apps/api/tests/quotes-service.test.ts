@@ -25,6 +25,7 @@ import {
   getProductFamilyDetail,
   importProductFamilyFromExcel,
   setProductFamilyPriceValidityDates,
+  setProductFamilyLibraryStatus,
   setProductFamilyPublishedStatus,
   setProductFamilyReadyForInvoicingStatus,
 } from '../src/services/product-families-service'
@@ -879,6 +880,22 @@ describe('price validity', () => {
     await setProductFamilyReadyForInvoicingStatus(ctx(), actor, family.id, true)
     const detail = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
     expect(detail.positions).toHaveLength(2)
+  })
+
+  it("refuses new positions from a family taken out of the company's library, but keeps existing ones editable", async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-LIBRARY', customerName: 'Test Customer' })
+    const added = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
+
+    await setProductFamilyLibraryStatus(ctx(), actor, family.id, false)
+    await expect(addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))).rejects.toThrow(/not in your company's library/)
+    await expect(duplicatePosition(ctx(), actor, quote.id, added.positions[0].id)).rejects.toThrow(/not in your company's library/)
+    const updated = await updateQuotePosition(ctx(), actor, quote.id, added.positions[0].id, { ...positionOn(family.id, line.id), quantity: 3 })
+    expect(updated.positions[0].quantity).toBe(3)
+
+    await setProductFamilyLibraryStatus(ctx(), actor, family.id, true)
+    expect((await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))).positions).toHaveLength(2)
   })
 
   it('still lets an existing position be edited after its family expires', async () => {

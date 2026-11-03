@@ -7,6 +7,13 @@ title: Release notes
 
 What changed, newest first. Use it to see what's new to test.
 
+## November 2026
+
+**Week of 2 November**
+- **Product families list, new columns** (from the client's mock-up): **With price list** (Yes / No), **Valid from** and **Valid to** as date fields, **Ready for invoicing** and **In library** (Yes / No) — all changed right in the row.
+- **In library**: each company chooses which families (its own or shared with it) its quote builder offers; for other users, families out of the library disappear from the catalog.
+- **With price list**: information only; the quote builder marks families without a price list.
+
 ## October 2026
 
 **Week of 26 October**

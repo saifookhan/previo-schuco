@@ -7,6 +7,13 @@ title: Versionshinweise
 
 Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 
+## November 2026
+
+**Woche vom 2. November**
+- **Produktfamilien-Liste, neue Spalten** (aus dem Mock-up des Kunden): **Mit Preisliste** (Ja / Nein), **Gültig ab** und **Gültig bis** als Datumsfelder, **Bereit zur Fakturierung** und **In Bibliothek** (Ja / Nein) — alle direkt in der Zeile änderbar.
+- **In Bibliothek**: jedes Unternehmen wählt, welche Familien (eigene oder geteilte) sein Angebot anbietet; für andere Benutzer verschwinden Familien außerhalb der Bibliothek aus dem Katalog.
+- **Mit Preisliste**: nur informativ; das Angebot markiert Familien ohne Preisliste.
+
 ## Oktober 2026
 
 **Woche vom 26. Oktober**

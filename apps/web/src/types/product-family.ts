@@ -10,6 +10,8 @@ export interface ProductFamilySummary {
   isPublished: boolean
   /** Only families ready for invoicing are offered for new quote positions. */
   readyForInvoicing: boolean
+  /** "Con listino": there are prices behind the family. Information only. */
+  hasPriceList: boolean
   /** `YYYY-MM-DD`, inclusive; null = no lower limit (families imported before validity existed). */
   priceValidFrom: string | null
   /** `YYYY-MM-DD`, inclusive; null = until further notice. */
@@ -20,6 +22,8 @@ export interface ProductFamilySummary {
   ownerCompanyName?: string | null
   /** List endpoint only: default discount this family was shared with the caller at; null for the caller's own. */
   shareDiscountPct?: number | null
+  /** List endpoint only: whether the family is in the caller's company library ("In libreria"). */
+  inLibrary?: boolean
 }
 
 export interface ProductFamilyImage {
@@ -88,4 +92,6 @@ export interface ProductFamilyDetail {
   canManage: boolean
   /** Default discount this family was shared with the caller's company at (null if own or shared at 0%). */
   shareDiscountPct?: number | null
+  /** Whether the family is in the caller's company library ("In libreria"). */
+  inLibrary: boolean
 }

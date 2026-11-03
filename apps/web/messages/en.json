@@ -270,10 +270,14 @@
     "emptyShared": "No product families have been shared with your company yet.",
     "owner": "Owner",
     "yourDiscount": "Your discount",
-    "priceValidity": "Price validity",
     "noMatches": "No product families match these filters.",
     "clearFilters": "Clear filters",
-    "readyForInvoicing": "Ready for invoicing"
+    "readyForInvoicing": "Ready for invoicing",
+    "hasPriceList": "With price list",
+    "validFrom": "Valid from",
+    "validTo": "Valid to",
+    "inLibrary": "In library",
+    "actions": "Actions"
   },
   "productFamilyActions": {
     "publish": "Publish",
@@ -454,7 +458,9 @@
     "introTitle": "Introduction",
     "summaryTitle": "Summary and closing",
     "fieldPaymentTerms": "Payment terms",
-    "validityNote": "Quote valid for {days} days from issue date."
+    "validityNote": "Quote valid for {days} days from issue date.",
+    "familyWithoutPriceList": "{name} (no price list)",
+    "familyWithoutPriceListHint": "This family has no price list behind it — check the prices before sending the quote."
   },
   "adminCompanies": {
     "title": "Companies",
@@ -626,7 +632,11 @@
       "product_family_share_update": "{count, plural, =0 {Sharing removed for every company} one {Shared with # company} other {Shared with # companies}}",
       "product_family_price_validity_update": "{validTo, select, none {Price validity set: from {validFrom}} other {Price validity set: {validFrom} – {validTo}}}",
       "product_family_ready_for_invoicing": "Marked ready for invoicing",
-      "product_family_not_ready_for_invoicing": "Marked not ready for invoicing"
+      "product_family_not_ready_for_invoicing": "Marked not ready for invoicing",
+      "product_family_price_list_set": "Marked as having a price list",
+      "product_family_price_list_unset": "Marked as having no price list",
+      "product_family_library_add": "Put back in the company library",
+      "product_family_library_remove": "Taken out of the company library"
     }
   },
   "productFamilyUpload": {
@@ -676,19 +686,29 @@
     "readyForInvoicingLabel": "Ready for invoicing",
     "readyForInvoicingHint": "Only families ready for invoicing can be added to quotes. You can change it later in the list."
   },
-  "productFamilyInvoicing": {
-    "title": "Ready for invoicing",
-    "label": "Ready for invoicing: {name}",
+  "productFamilyFlags": {
     "yes": "Yes",
     "no": "No",
-    "saveFailed": "Could not change \"Ready for invoicing\" for {name}"
+    "hasPriceList": {
+      "title": "With price list",
+      "label": "With price list: {name}",
+      "saveFailed": "Could not change \"With price list\" for {name}"
+    },
+    "readyForInvoicing": {
+      "title": "Ready for invoicing",
+      "label": "Ready for invoicing: {name}",
+      "saveFailed": "Could not change \"Ready for invoicing\" for {name}"
+    },
+    "inLibrary": {
+      "title": "In library",
+      "label": "In library: {name}",
+      "saveFailed": "Could not change \"In library\" for {name}"
+    }
   },
   "priceValidity": {
     "range": "Prices valid {from} – {to}",
     "fromOnly": "Prices valid from {from}",
     "toOnly": "Prices valid until {to}",
-    "fromOnlyShort": "from {from}",
-    "toOnlyShort": "until {to}",
     "notSet": "No price validity set",
     "upcoming": "Upcoming",
     "expired": "Expired",
@@ -705,7 +725,9 @@
     "saving": "Saving…",
     "saved": "Price validity saved",
     "saveFailed": "Could not save",
-    "saveFailedUnreachable": "Could not save — could not reach the server"
+    "saveFailedUnreachable": "Could not save — could not reach the server",
+    "validFromOf": "Valid from: {name}",
+    "validToOf": "Valid to: {name}"
   },
   "productFamilyFilters": {
     "search": "Search",
@@ -742,8 +764,10 @@
       "validTo": "Prices ending soonest"
     },
     "invoicing": "Ready for invoicing",
-    "invoicingReady": "Yes",
-    "invoicingNotReady": "No"
+    "priceList": "With price list",
+    "library": "In library",
+    "yes": "Yes",
+    "no": "No"
   },
   "loading": {
     "loading": "Loading…",

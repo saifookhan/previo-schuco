@@ -7,6 +7,7 @@ import {
   pricingMatrices,
   productFamilies,
   productFamilyImages,
+  productFamilyLibraryHidden,
   productLineCharacteristics,
   productLines,
 } from '../schema'
@@ -27,6 +28,7 @@ export interface InsertProductFamilyInput {
   priceValidTo?: string | null
   isPublished?: boolean
   readyForInvoicing?: boolean
+  hasPriceList?: boolean
 }
 
 /** Creates a product family row. Draft (`isPublished: false`) by default — the caller publishes explicitly once ready. */
@@ -121,6 +123,8 @@ export interface ProductFamilySummary {
   isPublished: boolean
   /** Only families ready for invoicing are offered for new quote positions. */
   readyForInvoicing: boolean
+  /** "Con listino": there are prices behind the family. Information only. */
+  hasPriceList: boolean
   /** ISO date (`YYYY-MM-DD`), inclusive; null = no lower limit. */
   priceValidFrom: string | null
   /** ISO date (`YYYY-MM-DD`), inclusive; null = until further notice. */
@@ -134,6 +138,8 @@ export interface ProductFamilyListItem extends ProductFamilySummary {
   ownerCompanyName: string | null
   /** Default discount the family was shared with the caller at (highest if several companies shared it); null for the caller's own families. */
   shareDiscountPct: number | null
+  /** Whether the family is in the listing company's library ("In libreria"). */
+  inLibrary: boolean
 }
 
 /**
@@ -155,6 +161,10 @@ export const listVisibleProductFamilies = (db: DbLike, companyId: string): Promi
         SELECT max(s.discount_pct)::float FROM product_family_shares s
         WHERE s.product_family_id = ${productFamilies.id} AND s.to_company_id = ${companyId}::uuid
           AND app_family_reaches_company(s.product_family_id, s.from_company_id)
+      )`,
+      inLibrary: sql<boolean>`NOT EXISTS (
+        SELECT 1 FROM product_family_library_hidden h
+        WHERE h.company_id = ${companyId}::uuid AND h.product_family_id = ${productFamilies.id}
       )`,
     })
     .from(productFamilies)
@@ -295,6 +305,55 @@ export const setProductFamilyReadyForInvoicing = async (
     .where(eq(productFamilies.id, familyId))
     .returning({ id: productFamilies.id, supplierCompanyId: productFamilies.supplierCompanyId })
   return updated ?? null
+}
+
+/**
+ * Sets whether the family has a price list ("Con listino"). Same contract as
+ * `setProductFamilyPublished`: `null` when nothing matched, including when RLS
+ * blocked the UPDATE because the caller doesn't own it.
+ */
+export const setProductFamilyHasPriceList = async (
+  db: DbLike,
+  familyId: string,
+  hasPriceList: boolean,
+): Promise<{ id: string; supplierCompanyId: string } | null> => {
+  const [updated] = await db
+    .update(productFamilies)
+    .set({ hasPriceList, updatedAt: new Date() })
+    .where(eq(productFamilies.id, familyId))
+    .returning({ id: productFamilies.id, supplierCompanyId: productFamilies.supplierCompanyId })
+  return updated ?? null
+}
+
+/** Whether `familyId` is in `companyId`'s library — true unless the company took it out. */
+export const isProductFamilyInLibrary = async (db: DbLike, companyId: string, familyId: string): Promise<boolean> => {
+  const [hidden] = await db
+    .select({ companyId: productFamilyLibraryHidden.companyId })
+    .from(productFamilyLibraryHidden)
+    .where(and(eq(productFamilyLibraryHidden.companyId, companyId), eq(productFamilyLibraryHidden.productFamilyId, familyId)))
+  return !hidden
+}
+
+/**
+ * Puts a family back in, or takes it out of, a company's library. Idempotent.
+ * RLS only lets a company write its own rows, for families it can see.
+ */
+export const setProductFamilyInLibrary = async (
+  db: DbLike,
+  input: { companyId: string; familyId: string; inLibrary: boolean; userId: string | null },
+): Promise<void> => {
+  if (input.inLibrary) {
+    await db
+      .delete(productFamilyLibraryHidden)
+      .where(
+        and(eq(productFamilyLibraryHidden.companyId, input.companyId), eq(productFamilyLibraryHidden.productFamilyId, input.familyId)),
+      )
+    return
+  }
+  await db
+    .insert(productFamilyLibraryHidden)
+    .values({ companyId: input.companyId, productFamilyId: input.familyId, hiddenByUserId: input.userId })
+    .onConflictDoNothing()
 }
 
 /**

@@ -11,6 +11,7 @@ import {
   insertQuotePositionCharacteristic,
   getIncomingShareDiscounts,
   isFamilySharedWith,
+  isProductFamilyInLibrary,
   listQuotes,
   quoteExists,
   recalculateQuoteTotal,
@@ -240,16 +241,25 @@ interface PricedPosition {
 }
 
 /**
- * New quote positions may only use a family that is ready for invoicing and whose
- * prices are valid today (Italian time); positions already on a quote keep theirs.
- * @throws {QuoteValidationError} the family isn't ready for invoicing, or its price validity hasn't started yet or has ended
+ * New quote positions may only use a family that is in the quoting company's library,
+ * ready for invoicing, and whose prices are valid today (Italian time); positions
+ * already on a quote keep theirs.
+ * @throws {QuoteValidationError} the family is out of the company's library, isn't ready for invoicing, or its price validity hasn't started yet or has ended
  */
-const assertUsableForNewPositions = (family: {
-  name: string
-  readyForInvoicing: boolean
-  priceValidFrom: string | null
-  priceValidTo: string | null
-}): void => {
+const assertUsableForNewPositions = async (
+  tx: Parameters<typeof getProductFamilyDetail>[0],
+  companyId: string,
+  family: {
+    id: string
+    name: string
+    readyForInvoicing: boolean
+    priceValidFrom: string | null
+    priceValidTo: string | null
+  },
+): Promise<void> => {
+  if (!(await isProductFamilyInLibrary(tx, companyId, family.id))) {
+    throw new QuoteValidationError(`"${family.name}" is not in your company's library`)
+  }
   if (!family.readyForInvoicing) {
     throw new QuoteValidationError(`"${family.name}" is not ready for invoicing`)
   }
@@ -270,10 +280,10 @@ const assertUsableForNewPositions = (family: {
  * with). Shared by `addQuotePosition` and `updateQuotePosition` — pricing
  * is snapshotted into the row either way, never recomputed from the live
  * catalog on a later read.
- * Only a family that is ready for invoicing and whose prices are valid today can be used — except by
+ * Only a family in the company's library, ready for invoicing and with prices valid today can be used — except by
  * `keepFamilyId`: an existing position may be edited without switching away
  * from the (possibly expired) family it was priced from.
- * @throws {QuoteValidationError} bad input, the family/line/characteristic isn't visible to the caller, or the family isn't ready for invoicing or its prices aren't valid today
+ * @throws {QuoteValidationError} bad input, the family/line/characteristic isn't visible to the caller, or the family is out of the company's library, isn't ready for invoicing, or its prices aren't valid today
  */
 export const priceQuotePosition = async (
   ctx: TenantContext,
@@ -308,7 +318,7 @@ export const priceQuotePosition = async (
     throw new QuoteValidationError('Product family not found or not visible')
   }
   if (family.family.id !== keepFamilyId) {
-    assertUsableForNewPositions(family.family)
+    await assertUsableForNewPositions(tx, ctx.effectiveCompanyId, family.family)
   }
   const line = family.lines.find((l) => l.id === input.productLineId)
   if (!line) {
@@ -806,7 +816,7 @@ export const duplicatePosition = async (
     // A duplicate is a new position, so the same rules as adding one apply.
     const sourceFamily = await getProductFamilyById(tx, source.productFamilyId)
     if (sourceFamily) {
-      assertUsableForNewPositions(sourceFamily)
+      await assertUsableForNewPositions(tx, ctx.effectiveCompanyId, sourceFamily)
     }
 
     // Always auto-numbered, never the source's own code — a custom name is

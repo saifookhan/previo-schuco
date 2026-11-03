@@ -14,6 +14,10 @@ import {
   insertProductLine,
   insertProductLineCharacteristic,
   listVisibleProductFamilies,
+  isFamilySharedWith,
+  isProductFamilyInLibrary,
+  setProductFamilyHasPriceList,
+  setProductFamilyInLibrary,
   setProductFamilyPriceValidity,
   setProductFamilyPublished,
   setProductFamilyReadyForInvoicing,
@@ -190,6 +194,8 @@ export interface ProductFamilyImportOptions {
   publish?: boolean
   /** Offer the family for new quote positions right away. */
   readyForInvoicing?: boolean
+  /** "Con listino"; a new family has one unless told otherwise. */
+  hasPriceList?: boolean
   /** Makes this import a new *version* of an existing family (see `createNewVersionFromExcel`). */
   version?: { version: number; supersedesId: string }
 }
@@ -243,6 +249,7 @@ export const importProductFamilyFromExcel = async (
       ...priceValidity,
       isPublished: options.publish ?? false,
       readyForInvoicing: options.readyForInvoicing ?? false,
+      hasPriceList: options.hasPriceList ?? true,
     })
 
     for (const image of savedImages) {
@@ -370,8 +377,17 @@ export const importProductFamilyFromExcel = async (
   return family
 }
 
-export const listProductFamilies = (ctx: TenantContext): Promise<ProductFamilyListItem[]> =>
-  withTenantDb(ctx, (tx) => listVisibleProductFamilies(tx, ctx.effectiveCompanyId))
+/**
+ * Families visible to the caller's company. Those it took out of its library are left out
+ * unless `includeOutOfLibrary` — for its library managers (admins and managers).
+ */
+export const listProductFamilies = async (
+  ctx: TenantContext,
+  { includeOutOfLibrary = true }: { includeOutOfLibrary?: boolean } = {},
+): Promise<ProductFamilyListItem[]> => {
+  const families = await withTenantDb(ctx, (tx) => listVisibleProductFamilies(tx, ctx.effectiveCompanyId))
+  return includeOutOfLibrary ? families : families.filter((family) => family.inLibrary)
+}
 
 export const getProductFamilyDetail = (
   ctx: TenantContext,
@@ -410,6 +426,8 @@ export const createNewVersionFromExcel = async (
   const latest = await withTenantDb(ctx, (tx) => findLatestProductFamilyVersion(tx, existingFamilyId))
 
   return importProductFamilyFromExcel(ctx, actor, existing.family.supplierCompanyId, file, {
+    // Set by hand, not from the file, so the new version keeps the one it replaces has.
+    hasPriceList: latest.hasPriceList,
     ...options,
     version: { version: latest.version + 1, supersedesId: latest.id },
   })
@@ -454,6 +472,7 @@ export const duplicateProductFamily = async (
       priceValidTo,
       isPublished: published,
       readyForInvoicing,
+      hasPriceList: source.family.hasPriceList,
       duplicatedFromId: familyId,
     })
 
@@ -599,6 +618,83 @@ export const setProductFamilyReadyForInvoicingStatus = async (
     }
     await recordAuditEvent(tx, auditActor(actor), updated.supplierCompanyId, {
       action: readyForInvoicing ? 'product_family.ready_for_invoicing' : 'product_family.not_ready_for_invoicing',
+      resourceType: 'product_family',
+      resourceId: familyId,
+    })
+  })
+
+/**
+ * Sets whether the family has a price list ("Con listino") — information shown in
+ * the quote builder; it doesn't stop the family from being quoted.
+ * @throws {ProductFamilyNotFoundError} no such family, or the caller doesn't own it (RLS blocked the UPDATE)
+ */
+export const setProductFamilyHasPriceListStatus = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  hasPriceList: boolean,
+): Promise<void> =>
+  withTenantDb(ctx, async (tx) => {
+    const updated = await setProductFamilyHasPriceList(tx, familyId, hasPriceList)
+    if (!updated) {
+      throw new ProductFamilyNotFoundError()
+    }
+    await recordAuditEvent(tx, auditActor(actor), updated.supplierCompanyId, {
+      action: hasPriceList ? 'product_family.price_list_set' : 'product_family.price_list_unset',
+      resourceType: 'product_family',
+      resourceId: familyId,
+    })
+  })
+
+/** Whether the family is in the caller's company library ("In libreria"). */
+export const isFamilyInCompanyLibrary = (ctx: TenantContext, familyId: string): Promise<boolean> =>
+  withTenantDb(ctx, (tx) => isProductFamilyInLibrary(tx, ctx.effectiveCompanyId, familyId))
+
+/** `getProductFamilyDetail` plus whether the family is in the caller's company library, in one transaction. */
+export const getProductFamilyDetailWithLibrary = (
+  ctx: TenantContext,
+  familyId: string,
+): Promise<(ProductFamilyDetail & { inLibrary: boolean }) | null> =>
+  withTenantDb(ctx, async (tx) => {
+    const detail = await getProductFamilyDetailQuery(tx, familyId)
+    return detail ? { ...detail, inLibrary: await isProductFamilyInLibrary(tx, ctx.effectiveCompanyId, familyId) } : null
+  })
+
+/**
+ * Puts a family back in, or takes it out of, the caller's company library ("In libreria").
+ * Out of the library, the company's quote builder no longer offers it; positions already
+ * on quotes are not affected. Works on the company's own families and on families shared
+ * with it — each company decides for itself.
+ * @throws {ProductFamilyNotFoundError} the family doesn't exist or the caller's company can't see it
+ */
+export const setProductFamilyLibraryStatus = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  inLibrary: boolean,
+): Promise<void> =>
+  withTenantDb(ctx, async (tx) => {
+    const family = await getProductFamilyById(tx, familyId)
+    // Checked here, not left to RLS: a super-admin acting as the company would see every family.
+    const visible =
+      !!family &&
+      (family.supplierCompanyId === ctx.effectiveCompanyId ||
+        (family.isPublished && (await isFamilySharedWith(tx, familyId, ctx.effectiveCompanyId))))
+    if (!visible) {
+      throw new ProductFamilyNotFoundError()
+    }
+    if ((await isProductFamilyInLibrary(tx, ctx.effectiveCompanyId, familyId)) === inLibrary) {
+      return
+    }
+    await setProductFamilyInLibrary(tx, {
+      companyId: ctx.effectiveCompanyId,
+      familyId,
+      inLibrary,
+      userId: actor.actorUserId || null,
+    })
+    // Filed under the company that decided, not the family's owner: it's that company's library.
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: inLibrary ? 'product_family.library_add' : 'product_family.library_remove',
       resourceType: 'product_family',
       resourceId: familyId,
     })

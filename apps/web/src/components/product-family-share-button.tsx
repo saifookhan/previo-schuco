@@ -27,10 +27,13 @@ export const ProductFamilyShareButton = ({
   familyId,
   familyName,
   isPublished,
+  iconOnly = false,
 }: {
   familyId: string
   familyName: string
   isPublished: boolean
+  /** Just the icon, for the families table where space is tight. */
+  iconOnly?: boolean
 }) => {
   const t = useTranslations('productFamilyShare')
   const router = useRouter()
@@ -120,15 +123,16 @@ export const ProductFamilyShareButton = ({
     <>
       <Button
         type="button"
-        variant="outline"
-        size="sm"
+        variant={iconOnly ? 'icon' : 'outline'}
+        size={iconOnly ? 'icon' : 'sm'}
         className="gap-1.5"
         disabled={!isPublished}
-        title={isPublished ? undefined : t('publishFirst')}
+        aria-label={iconOnly ? t('share') : undefined}
+        title={isPublished ? (iconOnly ? t('share') : undefined) : t('publishFirst')}
         onClick={() => void openDialog()}
       >
         <Share2 className="h-3.5 w-3.5" />
-        {t('share')}
+        {iconOnly ? null : t('share')}
       </Button>
 
       {open ? (

@@ -605,7 +605,8 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                       <option value="">{t('selectFamily')}</option>
                       {families.map((f) => (
                         <option key={f.id} value={f.id}>
-                          {f.name}
+                          {/* "Con listino: No" is information for whoever quotes; the family can still be used. */}
+                          {f.hasPriceList ? f.name : t('familyWithoutPriceList', { name: f.name })}
                         </option>
                       ))}
                       {/* An edited position's family may no longer be offered (expired or unpublished); keep it selectable. */}
@@ -613,6 +614,9 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                         <option value={familyId}>{family.family.name}</option>
                       ) : null}
                     </select>
+                    {family && !family.family.hasPriceList ? (
+                      <p className="text-xs text-amber-700">{t('familyWithoutPriceListHint')}</p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-1.5">

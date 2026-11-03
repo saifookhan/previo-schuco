@@ -23,6 +23,10 @@ export interface ProductFamilyFilters {
   validOn: string
   /** Whether the family is offered for new quote positions. */
   invoicing: '' | 'ready' | 'notReady'
+  /** "Con listino": whether there are prices behind the family. */
+  priceList: '' | 'with' | 'without'
+  /** "In libreria": whether the family is in the company's library. */
+  library: '' | 'in' | 'out'
   /** Shared tab: the owning company's name. */
   owner: string
   /** Shared tab: whether the family was shared with a discount. */
@@ -43,6 +47,8 @@ export const EMPTY_PRODUCT_FAMILY_FILTERS: ProductFamilyFilters = {
   validity: '',
   validOn: '',
   invoicing: '',
+  priceList: '',
+  library: '',
   owner: '',
   discount: '',
   latestOnly: false,
@@ -60,6 +66,9 @@ export interface FilterableProductFamily {
   brand: string | null
   isPublished: boolean
   readyForInvoicing: boolean
+  hasPriceList: boolean
+  /** In the company's library; the list endpoint always sends it. */
+  inLibrary?: boolean
   supersedesId: string | null
   priceValidFrom: string | null
   priceValidTo: string | null
@@ -89,6 +98,8 @@ export const parseProductFamilyFilters = (
   validity: oneOf(one(params.validity), PRODUCT_FAMILY_VALIDITY_FILTERS),
   validOn: day(one(params.validOn)),
   invoicing: oneOf(one(params.invoicing), ['ready', 'notReady'] as const),
+  priceList: oneOf(one(params.priceList), ['with', 'without'] as const),
+  library: oneOf(one(params.library), ['in', 'out'] as const),
   owner: tab === 'shared' ? one(params.owner) : '',
   discount: tab === 'shared' ? oneOf(one(params.discount), ['with', 'without'] as const) : '',
   latestOnly: one(params.latestOnly) === '1',
@@ -156,6 +167,8 @@ export const filterProductFamilies = <T extends FilterableProductFamily>(
     if (filters.status && family.isPublished !== (filters.status === 'published')) return false
     if (filters.validity && !matchesValidity(family, filters.validity, today)) return false
     if (filters.invoicing && family.readyForInvoicing !== (filters.invoicing === 'ready')) return false
+    if (filters.priceList && family.hasPriceList !== (filters.priceList === 'with')) return false
+    if (filters.library && (family.inLibrary ?? true) !== (filters.library === 'in')) return false
     if (filters.validOn && priceValidityStatus(family, filters.validOn) !== 'current') return false
     if (filters.owner && family.ownerCompanyName !== filters.owner) return false
     if (filters.discount && Boolean(family.shareDiscountPct) !== (filters.discount === 'with')) return false
