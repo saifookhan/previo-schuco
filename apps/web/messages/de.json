@@ -3,45 +3,8 @@
     "title": "Schuco — Demo Angebot",
     "description": "Schuco Angebotsplattform"
   },
-  "header": {
-    "clientLabel": "Kunde / Firma",
-    "projectLabel": "Projekt / Baustelle",
-    "totalLabel": "Angebotssumme ohne MwSt.",
-    "printSettings": "Druckeinstellungen",
-    "preview": "Vorschau in neuem Tab öffnen",
-    "export": "Datei exportieren"
-  },
-  "intro": {
-    "title": "Einleitung",
-    "preview": "Sehr geehrter Kunde, wie besprochen, freuen wir uns…",
-    "body": "Sehr geehrter Kunde,\n\nwie besprochen, freuen wir uns, Ihnen dieses Angebot für die Lieferung und Montage von Schüco-Fenstersystemen für Ihr Projekt zu unterbreiten.\n\nFür Rückfragen stehen wir Ihnen gerne zur Verfügung."
-  },
-  "family": {
-    "placeholder": "Produktfamilienname",
-    "valid": "Produkt ist gültig",
-    "invalid": "Produkt ist nicht mehr gültig…",
-    "markAlternative": "Als Alternative markieren",
-    "duplicate": "Familie duplizieren",
-    "delete": "Familie löschen",
-    "expand": "Familie erweitern",
-    "drag": "Zum Sortieren ziehen",
-    "std": "STD",
-    "alt": "ALT"
-  },
-  "actions": {
-    "addFamily": "Produktfamilie hinzufügen",
-    "addFamilyHint": "Öffnet ein Popup zum Filtern und Suchen von Produkten aus der Datenbank oder zum Einfügen eines leeren Produkts"
-  },
-  "summary": {
-    "title": "Zusammenfassung und Abschluss"
-  },
   "language": {
     "label": "Sprache"
-  },
-  "demo": {
-    "reference": "PRV-2026-014",
-    "client": "Hr. Marco Rossi",
-    "project": "Villa Rossi — Komplettsanierung"
   },
   "nav": {
     "main": "Hauptmenü",
@@ -126,6 +89,13 @@
     "email": "E-Mail",
     "role": "Rollen",
     "status": "Status",
+    "statusValue": {
+      "active": "Aktiv",
+      "inactive": "Inaktiv",
+      "pending_approval": "Genehmigung ausstehend",
+      "invited": "Eingeladen",
+      "invite_failed": "Einladung fehlgeschlagen"
+    },
     "addUserTitle": "Benutzer hinzufügen",
     "addUserHint": "Wartet auf die Genehmigung eines Super-Admins, bevor eine Einladungs-E-Mail gesendet wird.",
     "emailRequired": "E-Mail ist erforderlich",

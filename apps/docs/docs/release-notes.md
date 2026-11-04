@@ -17,6 +17,7 @@ What changed, newest first. Use it to see what's new to test.
 - **Notifications**: a bell next to your name for connection requests, answers and removals (accept or refuse right there); a request also sends an email.
 - **Share dialog**: search box listing only your connected partners.
 - New permission `partners.manage` (company admins and managers).
+- **Fixes from the 28 October test round**: the password-less demo login is off unless the server turns it on; pages you have no rights for (Users, Company, Audit log, Access rights, and the others in the sidebar) now send you to the Dashboard instead of showing load errors; the Dashboard only offers quick actions you can use; a missing upload file or a malformed address gives a clear error instead of a server error; user statuses are translated; signing out always takes you to the login page; the old demo **Invoice** page is gone (its address opens Quotes).
 
 ## October 2026
 

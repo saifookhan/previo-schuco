@@ -14,10 +14,6 @@ export type OpenApiDocument = {
 export type OpenApiOptions = {
   /** Core BFF base URL (apps/api). */
   apiUrl: string
-  /** Calculation service base URL (Phase 3, optional). */
-  calculationUrl?: string
-  /** Files service base URL (Phase 4, optional). */
-  filesUrl?: string
 }
 
 const ref = (name: string): { $ref: string } => ({ $ref: `#/components/schemas/${name}` })
@@ -51,7 +47,7 @@ const partnerAction = (summary: string, description: string, operationId: string
   summary,
   description,
   operationId,
-  security: [{ bearerAuth: [] }, { devUserSub: [] }],
+  security: [{ bearerAuth: [] }],
   parameters: [{ name: 'companyId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
   responses: {
     '200': { description: ok },
@@ -65,12 +61,11 @@ const partnerAction = (summary: string, description: string, operationId: string
 })
 
 /**
- * Build the PREVIO OpenAPI document covering the core API and planned microservices.
- * @param options - Server URLs for each deployable service
+ * Build the PREVIO OpenAPI document for the core API.
+ * @param options - Base URL of the API (relative when served by the deployment itself)
  */
 export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument => {
-  const calculationUrl = options.calculationUrl ?? 'http://localhost:3002'
-  const filesUrl = options.filesUrl ?? 'http://localhost:3003'
+  const apiUrl = options.apiUrl || '/'
 
   return {
     openapi: '3.0.3',
@@ -80,34 +75,22 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
       description: [
         'OpenAPI specification for the PREVIO Schuco platform.',
         '',
-        '**Services**',
-        '- **Core API (BFF)** — auth, RBAC, quotes orchestration (`apps/api`)',
-        '- **Calculation Service** — quote pricing engine (`apps/calculation-service`, Phase 3)',
-        '- **Files Service** — S3 uploads, PDF render, import/export (`apps/files-service`, Phase 4)',
+        'Every path below is served by the host this document was loaded from.',
+        'Try it out uses that host (a relative server URL), not a localhost port.',
         '',
         '**Authentication**',
-        '- Production: `Authorization: Bearer <Cognito JWT>`',
-        '- Local dev (no Cognito): `X-Dev-User-Sub: <cognito-sub>` from seed users',
+        '- `Authorization: Bearer <session JWT>` (a demo-login session too, while `ALLOW_DEV_LOGIN=true`)',
       ].join('\n'),
     },
-    servers: [
-      { url: options.apiUrl, description: 'Core API (BFF)' },
-      { url: calculationUrl, description: 'Calculation Service (Phase 3 — planned)' },
-      { url: filesUrl, description: 'Files Service (Phase 4 — planned)' },
-    ],
+    servers: [{ url: apiUrl, description: 'This server' }],
     tags: [
       { name: 'Platform', description: 'Health checks and API documentation' },
       { name: 'Auth & RBAC', description: 'Session user profile and tenant context' },
       { name: 'Users', description: 'Tenant-scoped user management (company-admin)' },
       { name: 'Admin', description: 'Cross-tenant platform administration (super-admin)' },
-      { name: 'Products', description: 'Product catalog' },
+      { name: 'Products', description: 'Product families (the catalog)' },
       { name: 'Partners', description: 'Connections between clients and suppliers, and the notifications about them' },
-      { name: 'Quotes', description: 'Quote listing, detail, and creation (Core API)' },
-      { name: 'Calculation', description: 'Quote pricing — in-process today, HTTP service Phase 3' },
-      {
-        name: 'Files',
-        description: 'Uploads, PDF generation, Excel import/export — Phase 4',
-      },
+      { name: 'Quotes', description: 'Sales quotes built from the product-family catalog' },
     ],
     paths: {
       '/health': {
@@ -149,7 +132,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           summary: 'Current authenticated user',
           description: 'Returns user profile with role, company, and business unit scopes.',
           operationId: 'getMe',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           responses: {
             '200': jsonResponse('Authenticated user profile', 'MeResponse'),
             ...errorResponses(),
@@ -162,7 +145,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           summary: 'List company users',
           description: 'Returns users in the authenticated company-admin tenant. Excludes cognitoSub and cross-company fields.',
           operationId: 'listCompanyUsers',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           responses: {
             '200': jsonResponse('Tenant user list', 'UsersListResponse'),
             ...errorResponses(),
@@ -176,7 +159,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           description:
             "Company-admin (own company) or super-admin (acting company). Changes the name, roles and active/inactive status; email can't be changed. Every role added or removed must be one the caller can grant. Only a super-admin may edit a super-admin. Nobody can deactivate themselves or remove their own Super Admin / Company Admin role, and the company keeps at least one active Company Admin.",
           operationId: 'updateCompanyUser',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
           requestBody: { required: true, content: { 'application/json': { schema: ref('UpdateUserRequest') } } },
           responses: {
@@ -194,7 +177,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           summary: 'List all platform users',
           description: 'Cross-tenant user directory for super-admins. Includes cognitoSub, company, and timestamps.',
           operationId: 'listAdminUsers',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           responses: {
             '200': jsonResponse('Platform user list', 'AdminUsersListResponse'),
             ...errorResponses(),
@@ -208,7 +191,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           description:
             'Newest first, keyset-paged via `nextCursor`. Company admins see their own company; super-admins see every company and may filter with `companyId`. A date-only `to` includes that whole day.',
           operationId: 'listAuditLog',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           parameters: [
             ...['companyId', 'actorUserId', 'resourceType', 'resourceId', 'requestId', 'from', 'to', 'cursor'].map((name) => ({
               name,
@@ -243,7 +226,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
               summary: 'Record history (read-only)',
               description: `${description} Newest first, paged via \`nextCursor\`.`,
               operationId,
-              security: [{ bearerAuth: [] }, { devUserSub: [] }],
+              security: [{ bearerAuth: [] }],
               parameters: [
                 { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
                 { name: 'cursor', in: 'query', required: false, schema: { type: 'string' } },
@@ -265,7 +248,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           description:
             'Parses the uploaded Excel in memory and returns what it holds (family name, counts, warnings). Nothing is written. Needs catalog.edit.',
           operationId: 'previewProductFamilyImport',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
             content: { 'multipart/form-data': { schema: { type: 'object', required: ['file'], properties: { file: { type: 'string', format: 'binary' } } } } },
@@ -295,7 +278,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
               summary: 'Save an uploaded product family workbook',
               description: `${description} Needs catalog.edit. Send the same file the preview checked, plus the fields the user confirmed.`,
               operationId,
-              security: [{ bearerAuth: [] }, { devUserSub: [] }],
+              security: [{ bearerAuth: [] }],
               ...(path.includes('{id}')
                 ? { parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }] }
                 : {}),
@@ -319,7 +302,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           description:
             'Deep-copies the family (lines, characteristics, price tables, relations, images) under the name, price validity and publish choice the user confirmed. Needs catalog.edit on the owning company.',
           operationId: 'duplicateProductFamily',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
           requestBody: { required: true, content: { 'application/json': { schema: ref('DuplicateProductFamilyRequest') } } },
           responses: {
@@ -336,7 +319,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           summary: "Change the days a family's prices can be used on new quote positions",
           description: 'Owning company (catalog.edit) or super-admin. Existing quote positions are not affected.',
           operationId: 'setProductFamilyPriceValidity',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
           requestBody: { required: true, content: { 'application/json': { schema: ref('PriceValidity') } } },
           responses: {
@@ -354,7 +337,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           description:
             'Only families that are ready for invoicing (and published, with prices valid today) can be added to quotes. Owning company (catalog.edit) or super-admin. Existing quote positions are not affected.',
           operationId: 'setProductFamilyReadyForInvoicing',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
           requestBody: {
             required: true,
@@ -379,7 +362,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           description:
             'Information shown in the quote builder; it does not stop the family from being quoted. Owning company (catalog.edit) or super-admin.',
           operationId: 'setProductFamilyHasPriceList',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
           requestBody: {
             required: true,
@@ -404,7 +387,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           description:
             "Each company decides for itself, for its own families and those shared with it. Out of the library, the company's quote builder no longer offers the family and only users with catalog.share see it in the list; existing quote positions are not affected. Needs catalog.share.",
           operationId: 'setProductFamilyLibrary',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
           requestBody: {
             required: true,
@@ -429,7 +412,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           description:
             "Clients can receive the caller's product families; suppliers can share theirs with it. Statuses: none, sent (the caller asked), received (waiting for the caller), connected. Only connected companies can share families. Needs partners.manage.",
           operationId: 'listPartners',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           responses: {
             '200': { description: '`{ tabs: { clients, suppliers }, companies: [{ id, name, address, branches, isClient, isSupplier, status }] }`' },
             ...errorResponses(),
@@ -468,7 +451,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           tags: ['Partners'],
           summary: "The signed-in user's newest notifications and unread count",
           operationId: 'listNotifications',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           responses: {
             '200': { description: '`{ notifications: [{ id, type, otherCompanyId, otherCompanyName, actionable, readAt, createdAt }], unreadCount }`' },
             ...errorResponses(),
@@ -480,264 +463,112 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           tags: ['Partners'],
           summary: "Mark all of the signed-in user's notifications read",
           operationId: 'markNotificationsRead',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          security: [{ bearerAuth: [] }],
           responses: { '200': { description: '`{ ok: true }`' }, ...errorResponses() },
         },
       },
-      '/api/products': {
+      '/api/product-families': {
         get: {
           tags: ['Products'],
-          summary: 'List product catalog',
-          operationId: 'listProducts',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
+          summary: 'List product families visible to the caller',
+          description: "The caller's own families, plus published families shared with them. Needs catalog.view. Same payload the /app/product-families page loads.",
+          operationId: 'listProductFamilies',
+          security: [{ bearerAuth: [] }],
           responses: {
             '200': {
-              description: 'Product catalog',
+              description: 'Product families',
               content: {
                 'application/json': {
-                  schema: { type: 'array', items: ref('Product') },
-                },
-              },
-            },
-            ...errorResponses(),
-          },
-        },
-      },
-      '/api/quotes': {
-        get: {
-          tags: ['Quotes'],
-          summary: 'List recent quotes',
-          operationId: 'listQuotes',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          responses: {
-            '200': {
-              description: 'Recent quotes (demo + session)',
-              content: {
-                'application/json': {
-                  schema: { type: 'array', items: ref('Quote') },
-                },
-              },
-            },
-            ...errorResponses(),
-          },
-        },
-        post: {
-          tags: ['Quotes'],
-          summary: 'Create quote',
-          description: 'Calculates pricing and stores a session quote (demo — not persisted to RDS).',
-          operationId: 'createQuote',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: ref('CreateQuoteRequest') } },
-          },
-          responses: {
-            '200': jsonResponse('Created quote with calculation', 'CreateQuoteResponse'),
-            '400': {
-              description: 'Validation error',
-              content: { 'application/json': { schema: ref('ValidationError') } },
-            },
-            ...errorResponses(),
-          },
-        },
-      },
-      '/api/quotes/{reference}': {
-        get: {
-          tags: ['Quotes'],
-          summary: 'Get quote by reference',
-          operationId: 'getQuoteByReference',
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          parameters: [
-            {
-              name: 'reference',
-              in: 'path',
-              required: true,
-              schema: { type: 'string' },
-              example: 'PRV-2026-0042',
-            },
-          ],
-          responses: {
-            '200': jsonResponse('Quote with product families', 'QuoteDetailResponse'),
-            '404': {
-              description: 'Quote not found',
-              content: { 'application/json': { schema: ref('ErrorResponse') } },
-            },
-            ...errorResponses(),
-          },
-        },
-      },
-      '/api/calculate': {
-        post: {
-          tags: ['Calculation'],
-          summary: 'Calculate quote (Core API)',
-          description:
-            'Runs pricing in-process via `@schuco/calculation`. Phase 3 will delegate to calculation-service.',
-          operationId: 'calculateQuote',
-          servers: [{ url: options.apiUrl, description: 'Core API (BFF)' }],
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: ref('QuoteConfiguration') } },
-          },
-          responses: {
-            '200': jsonResponse('Calculation result', 'QuoteResult'),
-            '400': {
-              description: 'Validation error',
-              content: { 'application/json': { schema: ref('ValidationError') } },
-            },
-            ...errorResponses(),
-          },
-        },
-      },
-      '/calculate': {
-        post: {
-          tags: ['Calculation'],
-          summary: 'Calculate quote (Calculation Service)',
-          description: 'Phase 3 HTTP service — internal ALB only; not exposed to web clients.',
-          operationId: 'calculateQuoteService',
-          servers: [{ url: calculationUrl, description: 'Calculation Service' }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: ref('QuoteConfiguration') } },
-          },
-          responses: {
-            '200': jsonResponse('Calculation result', 'QuoteResult'),
-            '400': {
-              description: 'Validation error',
-              content: { 'application/json': { schema: ref('ValidationError') } },
-            },
-          },
-        },
-      },
-      '/validate': {
-        post: {
-          tags: ['Calculation'],
-          summary: 'Validate quote configuration',
-          description: 'Phase 3 — returns feasibility errors without full pricing.',
-          operationId: 'validateConfiguration',
-          servers: [{ url: calculationUrl, description: 'Calculation Service' }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: ref('QuoteConfiguration') } },
-          },
-          responses: {
-            '200': jsonResponse('Validation result', 'ValidateConfigurationResponse'),
-          },
-        },
-      },
-      '/upload': {
-        post: {
-          tags: ['Files'],
-          summary: 'Initiate file upload',
-          description: 'Phase 4 — returns presigned S3 URL for direct upload.',
-          operationId: 'initiateUpload',
-          servers: [{ url: filesUrl, description: 'Files Service' }],
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: ref('UploadRequest') } },
-          },
-          responses: {
-            '200': jsonResponse('Presigned upload URL', 'UploadResponse'),
-            ...errorResponses(),
-          },
-        },
-      },
-      '/files/{id}': {
-        get: {
-          tags: ['Files'],
-          summary: 'Get file metadata and download URL',
-          operationId: 'getFile',
-          servers: [{ url: filesUrl, description: 'Files Service' }],
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          parameters: [
-            {
-              name: 'id',
-              in: 'path',
-              required: true,
-              schema: { type: 'string', format: 'uuid' },
-            },
-          ],
-          responses: {
-            '200': jsonResponse('File metadata', 'FileMetadata'),
-            '404': {
-              description: 'File not found',
-              content: { 'application/json': { schema: ref('ErrorResponse') } },
-            },
-            ...errorResponses(),
-          },
-        },
-      },
-      '/pdf/render': {
-        post: {
-          tags: ['Files'],
-          summary: 'Render quote PDF',
-          description: 'Phase 4 — generates preventivo PDF from quote reference.',
-          operationId: 'renderPdf',
-          servers: [{ url: filesUrl, description: 'Files Service' }],
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: ref('RenderPdfRequest') } },
-          },
-          responses: {
-            '200': jsonResponse('PDF download URL', 'RenderPdfResponse'),
-            ...errorResponses(),
-          },
-        },
-      },
-      '/import/excel': {
-        post: {
-          tags: ['Files'],
-          summary: 'Import quotes from Excel',
-          description: 'Phase 4 — multipart upload of Excel workbook.',
-          operationId: 'importExcel',
-          servers: [{ url: filesUrl, description: 'Files Service' }],
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              'multipart/form-data': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    file: { type: 'string', format: 'binary' },
+                  schema: {
+                    type: 'object',
+                    required: ['families'],
+                    properties: { families: { type: 'array', items: { type: 'object' } } },
                   },
-                  required: ['file'],
                 },
               },
             },
-          },
-          responses: {
-            '200': jsonResponse('Import summary', 'ImportExcelResponse'),
             ...errorResponses(),
           },
         },
       },
-      '/export/excel/{reference}': {
+      '/api/product-families/{id}': {
         get: {
-          tags: ['Files'],
-          summary: 'Export quote to Excel',
-          operationId: 'exportExcel',
-          servers: [{ url: filesUrl, description: 'Files Service' }],
-          security: [{ bearerAuth: [] }, { devUserSub: [] }],
-          parameters: [
-            {
-              name: 'reference',
-              in: 'path',
-              required: true,
-              schema: { type: 'string' },
-            },
-          ],
+          tags: ['Products'],
+          summary: 'Product family detail',
+          description: 'Lines, characteristics, matrices, relations and images. An id that is not a UUID is 404, the same as an unknown id.',
+          operationId: 'getProductFamily',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          responses: {
+            '200': { description: 'Family detail' },
+            '404': { description: 'No such family, or the id is not a UUID', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
+      '/api/product-families/{id}/shares': {
+        get: {
+          tags: ['Products'],
+          summary: 'Companies this family is shared with',
+          description: 'Owning company (catalog.share). This is the path the app calls — there is no separate shares collection.',
+          operationId: 'getProductFamilyShares',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          responses: {
+            '200': jsonResponse('Current shares and companies that could be added', 'FamilySharesResponse'),
+            '404': { description: 'No such family, or not owned by the caller', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+        put: {
+          tags: ['Products'],
+          summary: 'Replace the companies this family is shared with',
+          operationId: 'updateProductFamilyShares',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          requestBody: { required: true, content: { 'application/json': { schema: ref('UpdateFamilySharesRequest') } } },
+          responses: {
+            '200': jsonResponse('Shares after the update', 'FamilySharesResponse'),
+            '400': { description: 'Invalid body', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            '404': { description: 'No such family, or not owned by the caller', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
+      '/api/sales-quotes': {
+        get: {
+          tags: ['Quotes'],
+          summary: "List the caller's sales quotes",
+          description: 'Catalog-backed quotes (quote.view). There is no /api/quotes collection.',
+          operationId: 'listSalesQuotes',
+          security: [{ bearerAuth: [] }],
           responses: {
             '200': {
-              description: 'Excel workbook',
+              description: 'Sales quotes',
               content: {
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
-                  schema: { type: 'string', format: 'binary' },
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    required: ['quotes'],
+                    properties: { quotes: { type: 'array', items: { type: 'object' } } },
+                  },
                 },
               },
             },
+            ...errorResponses(),
+          },
+        },
+      },
+      '/api/sales-quotes/{id}': {
+        get: {
+          tags: ['Quotes'],
+          summary: 'Sales quote detail',
+          operationId: 'getSalesQuote',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          responses: {
+            '200': { description: 'Quote and its positions' },
+            '404': { description: 'No such quote, or the id is not a UUID', content: { 'application/json': { schema: ref('ErrorResponse') } } },
             ...errorResponses(),
           },
         },
@@ -749,16 +580,56 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'AWS Cognito access token',
-        },
-        devUserSub: {
-          type: 'apiKey',
-          in: 'header',
-          name: 'X-Dev-User-Sub',
-          description: 'Local dev only — Cognito sub from seed users when Cognito is not configured',
+          description: 'Session JWT minted by the web app',
         },
       },
       schemas: {
+        FamilySharesResponse: {
+          type: 'object',
+          required: ['shares', 'targets'],
+          properties: {
+            shares: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['companyId', 'companyName', 'discountPct'],
+                properties: {
+                  companyId: { type: 'string', format: 'uuid' },
+                  companyName: { type: 'string' },
+                  discountPct: { type: 'number' },
+                },
+              },
+            },
+            targets: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['id', 'name'],
+                properties: {
+                  id: { type: 'string', format: 'uuid' },
+                  name: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        UpdateFamilySharesRequest: {
+          type: 'object',
+          required: ['shares'],
+          properties: {
+            shares: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['companyId', 'discountPct'],
+                properties: {
+                  companyId: { type: 'string', format: 'uuid' },
+                  discountPct: { type: 'number', minimum: 0, maximum: 100 },
+                },
+              },
+            },
+          },
+        },
         ErrorResponse: {
           type: 'object',
           properties: {

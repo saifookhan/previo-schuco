@@ -17,6 +17,7 @@ import type { AdminUsersListResponse } from '@schuco/contracts'
 const AdminUsersPage = async () => {
   const t = await getTranslations('adminUsers')
   const tCompanies = await getTranslations('adminCompanies')
+  const tStatus = await getTranslations('settingsUsers.statusValue')
   const [result, pendingResult] = await Promise.all([
     fetchFromApiResult<AdminUsersListResponse>('/api/admin/users'),
     fetchFromApiResult<AdminUsersListResponse>('/api/admin/users/pending'),
@@ -89,7 +90,7 @@ const AdminUsersPage = async () => {
                                 : 'muted'
                           }
                         >
-                          {user.status}
+                          {tStatus(user.status)}
                         </Badge>
                       </td>
                       <td className="px-6 py-4 font-mono text-xs text-slate-500">{user.cognitoSub}</td>

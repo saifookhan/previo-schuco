@@ -11,8 +11,10 @@ Die Datenbank enthält Demo-Unternehmen und einen Benutzer pro Rolle. Auf der An
 ![Anmeldeseite mit dem Demo-Anmeldebereich](/img/screens/login.png)
 
 :::warning
-Die Demo-Anmeldung wird über `ALLOW_DEV_LOGIN` gesteuert (standardmäßig an). Sie muss auf `false`
-gesetzt werden, bevor echte Kunden den Server nutzen — dann verschwindet der Bereich und nur E-Mail + Passwort funktioniert.
+Die Demo-Anmeldung wird über `ALLOW_DEV_LOGIN` gesteuert. Lokal ist sie an
+(`NEXT_PUBLIC_ALLOW_DEV_LOGIN=true`); auf dem öffentlichen Web-Container ist sie **aus**,
+solange `ALLOW_DEV_LOGIN` nicht `true` ist. Ist das Flag aus, verschwindet der Abschnitt
+und `POST /api/auth/dev-login` antwortet mit 403 — es bleibt nur E-Mail + Passwort.
 :::
 
 ## Demo-Unternehmen

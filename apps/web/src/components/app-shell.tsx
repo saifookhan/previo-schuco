@@ -23,51 +23,25 @@ import { useEffect, useState } from 'react'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { NotificationBell } from '@/components/notifications'
 import { Toaster } from '@/components/toaster'
-import { hasMinimumRole, useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/hooks/use-auth'
+import { canAccess, PAGE_ACCESS, type GuardedPath } from '@/lib/auth/page-access'
 import { cn } from '@/lib/utils'
-import type { RoleId } from '@/types/settings'
-import type { Permission } from '@schuco/contracts'
 
 const mainNav = [
-  { href: '/app/dashboard', labelKey: 'dashboard', icon: LayoutDashboard, minRole: 'user' as RoleId },
-  {
-    href: '/app/product-families',
-    labelKey: 'productFamilies',
-    icon: Package,
-    minRole: 'user' as RoleId,
-    permission: 'catalog.view' as Permission,
-  },
-  {
-    href: '/app/quotes',
-    labelKey: 'quotes',
-    icon: FileSpreadsheet,
-    minRole: 'user' as RoleId,
-    permission: 'quote.view' as Permission,
-  },
-  {
-    href: '/app/partners',
-    labelKey: 'partners',
-    icon: Handshake,
-    minRole: 'company-admin' as RoleId,
-    permission: 'partners.manage' as Permission,
-  },
-]
+  { href: '/app/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
+  { href: '/app/product-families', labelKey: 'productFamilies', icon: Package },
+  { href: '/app/quotes', labelKey: 'quotes', icon: FileSpreadsheet },
+  { href: '/app/partners', labelKey: 'partners', icon: Handshake },
+] as const
 
 const settingsNav = [
-  { href: '/app/settings/users', labelKey: 'users', icon: Users, minRole: 'company-admin' as RoleId },
-  {
-    href: '/app/settings/access-rights',
-    labelKey: 'accessRights',
-    icon: Shield,
-    minRole: 'super-admin' as RoleId,
-  },
-  { href: '/app/settings/company', labelKey: 'company', icon: Building2, minRole: 'company-admin' as RoleId },
-  { href: '/app/settings/audit-log', labelKey: 'auditLog', icon: ScrollText, minRole: 'company-admin' as RoleId },
-]
+  { href: '/app/settings/users', labelKey: 'users', icon: Users },
+  { href: '/app/settings/access-rights', labelKey: 'accessRights', icon: Shield },
+  { href: '/app/settings/company', labelKey: 'company', icon: Building2 },
+  { href: '/app/settings/audit-log', labelKey: 'auditLog', icon: ScrollText },
+] as const
 
-const adminNav = [
-  { href: '/admin/dashboard', labelKey: 'adminPortal', icon: ShieldCheck, minRole: 'super-admin' as RoleId },
-]
+const adminNav = [{ href: '/admin/dashboard', labelKey: 'adminPortal', icon: ShieldCheck }] as const
 
 interface AppShellProps {
   children: React.ReactNode
@@ -78,7 +52,7 @@ interface AppShellProps {
  */
 export const AppShell = ({ children }: AppShellProps) => {
   const pathname = usePathname()
-  const { user, loading, signOut, can } = useAuth()
+  const { user, loading, signOut } = useAuth()
   const t = useTranslations('nav')
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -86,12 +60,8 @@ export const AppShell = ({ children }: AppShellProps) => {
     setMobileOpen(false)
   }, [pathname])
 
-  const filterNav = <T extends { minRole: RoleId; permission?: Permission }>(items: T[]): T[] => {
-    if (!user) {
-      return []
-    }
-    return items.filter((item) => (item.permission ? can(item.permission) : hasMinimumRole(user.role.id, item.minRole)))
-  }
+  const filterNav = <T extends { href: GuardedPath }>(items: readonly T[]): T[] =>
+    user ? items.filter((item) => canAccess(user, PAGE_ACCESS[item.href])) : []
 
   return (
     <div className="min-h-screen bg-slate-50">

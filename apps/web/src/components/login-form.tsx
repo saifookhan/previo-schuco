@@ -11,15 +11,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Link } from '@/i18n/navigation'
-import { isDevLoginUiEnabled } from '@/lib/auth/config'
 
 const DEV_USERS = ACTIVE_DEMO_USER_EMAILS
 
 /** Email+password login, with an optional dev-login shortcut for seeded demo users below it. */
-export const LoginForm = () => {
+export const LoginForm = ({ devLoginEnabled }: { devLoginEnabled: boolean }) => {
   const t = useTranslations('login')
   const router = useRouter()
-  const devMode = isDevLoginUiEnabled()
+  const devMode = devLoginEnabled
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

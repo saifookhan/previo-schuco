@@ -15,6 +15,9 @@ const AdminLayout = async ({ children }: { children: React.ReactNode }) => {
     redirect('/login?next=/admin/dashboard')
   }
 
+  // Browser navigations land on the caller's own dashboard. API clients
+  // (no HTML Accept, not a document navigation) are answered with 403 JSON
+  // in middleware, before this layout runs.
   if (me.user.role.id !== 'super-admin') {
     redirect('/app/dashboard')
   }

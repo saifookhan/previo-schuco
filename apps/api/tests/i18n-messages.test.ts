@@ -39,6 +39,20 @@ describe('web translation files', () => {
     }
   })
 
+  it('translates account statuses on the company user list', () => {
+    const statuses = ['active', 'inactive', 'pending_approval', 'invited', 'invite_failed'] as const
+    for (const locale of LOCALES) {
+      const values = (load(locale).settingsUsers as Messages).statusValue as Messages
+      for (const status of statuses) {
+        expect(typeof values[status]).toBe('string')
+        expect(values[status]).not.toBe(status)
+      }
+    }
+    const en = (load('en').settingsUsers as Messages).statusValue as Messages
+    expect(en.active).toBe('Active')
+    expect(en.inactive).toBe('Inactive')
+  })
+
   it.each(LOCALES)('%s labels every permission in the access-rights matrix', (locale) => {
     const access = load(locale).settingsAccessRights as Messages
     for (const permission of PERMISSIONS) {

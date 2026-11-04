@@ -17,6 +17,7 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 - **Notifiche**: una campanella accanto al tuo nome per richieste di connessione, risposte e rimozioni (accetta o rifiuta direttamente lì); una richiesta invia anche un'email.
 - **Finestra di condivisione**: casella di ricerca che elenca solo i partner connessi.
 - Nuovo permesso `partners.manage` (admin aziendali e manager).
+- **Correzioni dal giro di test del 28 ottobre**: l'accesso demo senza password è spento a meno che il server non lo attivi; le pagine per cui non hai i permessi (Utenti, Azienda, Registro attività, Diritti di accesso e le altre del menu) ora riportano alla Dashboard invece di mostrare errori di caricamento; la Dashboard propone solo le azioni rapide che puoi usare; un upload senza file o un indirizzo malformato danno un errore chiaro invece di un errore del server; gli stati degli utenti sono tradotti; l'uscita porta sempre alla pagina di accesso; la vecchia pagina demo **Invoice** è stata tolta (il suo indirizzo apre i Preventivi).
 
 ## Ottobre 2026
 

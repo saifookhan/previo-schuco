@@ -32,8 +32,8 @@ Deployed to **AWS ECS Fargate** in dev/prod; runs in **Docker** locally via `doc
 
 ## Auth
 
-- **Production:** `Authorization: Bearer <Cognito JWT>`
-- **Local dev:** `X-Dev-User-Sub: <cognito-sub>` when Cognito is not configured
+- `Authorization: Bearer <session JWT>`, signed by apps/web with `AUTH_SECRET`.
+- The password-less demo login is the same kind of JWT, marked `isDevLogin`; the API accepts it only while `ALLOW_DEV_LOGIN=true`.
 
 ## Scripts
 

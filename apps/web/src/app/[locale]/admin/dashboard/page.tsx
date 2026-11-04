@@ -10,6 +10,7 @@ import type { AdminUsersListResponse } from '@schuco/contracts'
  */
 const AdminDashboardPage = async () => {
   const t = await getTranslations('adminDashboard')
+  const tStatus = await getTranslations('settingsUsers.statusValue')
   const result = await fetchFromApiResult<AdminUsersListResponse>('/api/admin/users')
   const users = result.data?.users ?? []
   const loadFailed = result.status === 'error'
@@ -85,7 +86,7 @@ const AdminDashboardPage = async () => {
                   user.status === 'active' ? 'text-xs text-emerald-400' : 'text-xs text-slate-500'
                 }
               >
-                {user.status}
+                {tStatus(user.status)}
               </span>
             </div>
           ))}

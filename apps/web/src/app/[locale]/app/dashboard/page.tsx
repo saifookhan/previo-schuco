@@ -2,14 +2,15 @@ import { FileText, TrendingUp, Users, Wallet } from 'lucide-react'
 import { getLocale, getTranslations } from 'next-intl/server'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { canAccess, PAGE_ACCESS, type PageAccess } from '@/lib/auth/page-access'
+import { getMe } from '@/lib/auth/require-page-access'
 import { formatCurrency } from '@/types/quote'
 
 /**
  * Demo dashboard with summary stats and recent activity.
  */
 const DashboardPage = async () => {
-  const t = await getTranslations('dashboard')
-  const locale = await getLocale()
+  const [t, locale, me] = await Promise.all([getTranslations('dashboard'), getLocale(), getMe()])
 
   const stats = [
     { label: t('openQuotes'), value: '12', icon: FileText, change: t('thisWeek') },
@@ -23,11 +24,14 @@ const DashboardPage = async () => {
     { label: t('conversionRate'), value: '68%', icon: TrendingUp, change: t('vsLastMonth') },
   ]
 
-  const quickActions = [
-    { label: t('createNewQuote'), href: '/app/quotes' },
-    { label: t('manageUsers'), href: '/app/settings/users' },
-    { label: t('companySettings'), href: '/app/settings/company' },
-  ]
+  // Only the actions this user can actually take.
+  const quickActions = (
+    [
+      { label: t('createNewQuote'), href: '/app/quotes', access: { permission: 'quote.edit' } },
+      { label: t('manageUsers'), href: '/app/settings/users', access: PAGE_ACCESS['/app/settings/users'] },
+      { label: t('companySettings'), href: '/app/settings/company', access: PAGE_ACCESS['/app/settings/company'] },
+    ] satisfies Array<{ label: string; href: string; access: PageAccess }>
+  ).filter(({ access }) => me.status === 'ok' && canAccess(me.data.user, access))
 
   return (
     <div className="p-6 md:p-8">
@@ -82,22 +86,24 @@ const DashboardPage = async () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('quickActions')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {quickActions.map(({ label, href }) => (
-              <a
-                key={href}
-                href={href}
-                className="block rounded-lg border border-slate-100 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-brand/30 hover:bg-brand/5 hover:text-brand"
-              >
-                {label}
-              </a>
-            ))}
-          </CardContent>
-        </Card>
+        {quickActions.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('quickActions')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {quickActions.map(({ label, href }) => (
+                <a
+                  key={href}
+                  href={href}
+                  className="block rounded-lg border border-slate-100 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-brand/30 hover:bg-brand/5 hover:text-brand"
+                >
+                  {label}
+                </a>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </div>
   )

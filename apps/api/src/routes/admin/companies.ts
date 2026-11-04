@@ -10,6 +10,7 @@ import type { Context } from 'hono'
 import { Hono } from 'hono'
 
 import { toCompanyDto } from '../../lib/company-dto'
+import { rejectNonUuidParams } from '../../lib/uuid'
 import type { AuthVariables } from '../../middleware/auth'
 import { requireAuth, requireRoles } from '../../middleware/auth'
 import {
@@ -59,7 +60,7 @@ adminCompanies.post('/', requireAuth, requireRoles(['super-admin']), async (c) =
   return c.json(parsed.data, 201)
 })
 
-adminCompanies.patch('/:id', requireAuth, requireRoles(['super-admin']), async (c) => {
+adminCompanies.patch('/:id', rejectNonUuidParams, requireAuth, requireRoles(['super-admin']), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -85,7 +86,7 @@ adminCompanies.patch('/:id', requireAuth, requireRoles(['super-admin']), async (
   }
 })
 
-adminCompanies.patch('/:id/active', requireAuth, requireRoles(['super-admin']), async (c) => {
+adminCompanies.patch('/:id/active', rejectNonUuidParams, requireAuth, requireRoles(['super-admin']), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)

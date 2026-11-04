@@ -8,7 +8,7 @@ import {
   updateFamilySharesRequestSchema,
   type ProductFamilyImportFields,
 } from '@schuco/contracts'
-import type { Context } from 'hono'
+import type { Context, Next } from 'hono'
 import { Hono } from 'hono'
 
 import {
@@ -47,13 +47,30 @@ import {
   ProductFamilyValidationError,
   isProductFamilyEditable,
 } from '../lib/product-family-edit'
-import { isUuid } from '../lib/uuid'
+import { rejectNonUuidParams } from '../lib/uuid'
 import type { AuthVariables } from '../middleware/auth'
 import { hasPermission, requireAuth, requirePermission } from '../middleware/auth'
 import { respondWithRecordHistory } from './record-history'
 
 /** Product family catalog: import from Excel, list/detail, duplicate, publish toggle (Phase 2). */
 export const productFamilies = new Hono<{ Variables: AuthVariables }>()
+
+/** 400 when the body is not multipart. Registered ahead of auth so a missing file is not a 500. */
+const rejectUnlessMultipart = async (c: Context, next: Next): Promise<Response | void> => {
+  const contentType = c.req.header('content-type') ?? ''
+  if (!contentType.toLowerCase().includes('multipart/form-data')) {
+    return c.json({ error: 'Expected multipart form data with a "file" field' }, 400)
+  }
+  await next()
+}
+
+const parseMultipartBody = async (c: Context): Promise<Record<string, unknown> | Response> => {
+  try {
+    return await c.req.parseBody()
+  } catch {
+    return c.json({ error: 'Could not read multipart form data' }, 400)
+  }
+}
 
 const actorFrom = (c: Context<{ Variables: AuthVariables }>): ProductFamilyActor => ({
   actorUserId: c.get('actorUserId'),
@@ -78,8 +95,10 @@ const MISSING_FILE = { error: 'Missing "file" in multipart form data' }
  * Checks an uploaded workbook in memory and says what it holds, so the
  * upload dialog can show it before anything is saved. Writes nothing.
  */
-productFamilies.post('/import/preview', requireAuth, requirePermission('catalog.edit'), async (c) => {
-  const upload = await readWorkbookUpload(await c.req.parseBody())
+productFamilies.post('/import/preview', rejectUnlessMultipart, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const body = await parseMultipartBody(c)
+  if (body instanceof Response) return body
+  const upload = await readWorkbookUpload(body)
   if (!upload) {
     return c.json(MISSING_FILE, 400)
   }
@@ -100,7 +119,8 @@ productFamilies.post('/import/preview', requireAuth, requirePermission('catalog.
 const readImportRequest = async (
   c: Context<{ Variables: AuthVariables }>,
 ): Promise<{ upload: UploadedWorkbook; fields: ProductFamilyImportFields } | Response> => {
-  const body = await c.req.parseBody()
+  const body = await parseMultipartBody(c)
+  if (body instanceof Response) return body
   const upload = await readWorkbookUpload(body)
   if (!upload) {
     return c.json(MISSING_FILE, 400)
@@ -118,7 +138,7 @@ const readImportRequest = async (
  * Only a company-admin/super-user manages their own catalog; a client
  * company never imports into a supplier's.
  */
-productFamilies.post('/import', requireAuth, requirePermission('catalog.edit'), async (c) => {
+productFamilies.post('/import', rejectUnlessMultipart, requireAuth, requirePermission('catalog.edit'), async (c) => {
   const request = await readImportRequest(c)
   if (request instanceof Response) {
     return request
@@ -146,6 +166,8 @@ productFamilies.post('/import', requireAuth, requirePermission('catalog.edit'), 
  */
 productFamilies.post(
   '/:id/new-version',
+  rejectNonUuidParams,
+  rejectUnlessMultipart,
   requireAuth,
   requirePermission('catalog.edit'),
   async (c) => {
@@ -179,11 +201,8 @@ productFamilies.post(
 )
 
 /** Changes the days the family's prices can be used on new quote positions (owner or super-admin). */
-productFamilies.put('/:id/price-validity', requireAuth, requirePermission('catalog.edit'), async (c) => {
+productFamilies.put('/:id/price-validity', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id') ?? ''
-  if (!isUuid(id)) {
-    return c.json({ error: 'Not found' }, 404)
-  }
   const parsedBody = priceValidityRequestSchema.safeParse(await c.req.json().catch(() => null))
   if (!parsedBody.success) {
     return c.json({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request body', details: parsedBody.error.issues }, 400)
@@ -222,11 +241,8 @@ productFamilies.get('/', requireAuth, requirePermission('catalog.view'), async (
 })
 
 /** Full detail (lines, characteristics, matrices, relations, images) for one family. */
-productFamilies.get('/:id', requireAuth, requirePermission('catalog.view'), async (c) => {
-  const id = c.req.param('id')
-  if (!id) {
-    return c.json({ error: 'Missing id' }, 400)
-  }
+productFamilies.get('/:id', rejectNonUuidParams, requireAuth, requirePermission('catalog.view'), async (c) => {
+  const id = c.req.param('id') ?? ''
   const ctx = {
     effectiveCompanyId: c.get('effectiveCompanyId'),
     isSuperAdmin: c.get('isSuperAdmin'),
@@ -249,7 +265,7 @@ productFamilies.get('/:id', requireAuth, requirePermission('catalog.view'), asyn
 })
 
 /** The family's change history (import, publish, versions, price edits, sharing) — owning company and super-admin only. */
-productFamilies.get('/:id/history', requireAuth, requirePermission('catalog.view'), (c) =>
+productFamilies.get('/:id/history', rejectNonUuidParams, requireAuth, requirePermission('catalog.view'), (c) =>
   respondWithRecordHistory(
     c,
     (id, query) => getProductFamilyHistory({ effectiveCompanyId: c.get('effectiveCompanyId'), isSuperAdmin: c.get('isSuperAdmin') }, id, query),
@@ -258,7 +274,7 @@ productFamilies.get('/:id/history', requireAuth, requirePermission('catalog.view
 )
 
 /** The companies the caller's company shares this family with (plus the companies it could add). */
-productFamilies.get('/:id/shares', requireAuth, requirePermission('catalog.share'), async (c) => {
+productFamilies.get('/:id/shares', rejectNonUuidParams, requireAuth, requirePermission('catalog.share'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -278,7 +294,7 @@ productFamilies.get('/:id/shares', requireAuth, requirePermission('catalog.share
 })
 
 /** Replaces the set of companies the caller's company shares this family with, each at a default discount. */
-productFamilies.put('/:id/shares', requireAuth, requirePermission('catalog.share'), async (c) => {
+productFamilies.put('/:id/shares', rejectNonUuidParams, requireAuth, requirePermission('catalog.share'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -320,8 +336,8 @@ const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
 }
 
 /** Streams one embedded image — RLS-scoped the same way the rest of the family's detail is (via getProductFamilyDetail's own image list). */
-productFamilies.get('/:id/images/:imageId', requireAuth, requirePermission('catalog.view'), async (c) => {
-  const id = c.req.param('id')
+productFamilies.get('/:id/images/:imageId', rejectNonUuidParams, requireAuth, requirePermission('catalog.view'), async (c) => {
+  const id = c.req.param('id') ?? ''
   const imageId = c.req.param('imageId')
   if (!id || !imageId) {
     return c.json({ error: 'Missing id' }, 400)
@@ -350,11 +366,8 @@ productFamilies.get('/:id/images/:imageId', requireAuth, requirePermission('cata
 })
 
 /** Deep-copies a family ("Duplicate") under the name, price validity and publish choice from the copy dialog. */
-productFamilies.post('/:id/duplicate', requireAuth, requirePermission('catalog.edit'), async (c) => {
+productFamilies.post('/:id/duplicate', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id') ?? ''
-  if (!isUuid(id)) {
-    return c.json({ error: 'Not found' }, 404)
-  }
   const parsedBody = duplicateProductFamilyRequestSchema.safeParse(await c.req.json().catch(() => null))
   if (!parsedBody.success) {
     return c.json({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request body', details: parsedBody.error.issues }, 400)
@@ -375,7 +388,7 @@ productFamilies.post('/:id/duplicate', requireAuth, requirePermission('catalog.e
 })
 
 /** Toggles client visibility ("allowing a user to see/no-see"). */
-productFamilies.patch('/:id/publish', requireAuth, requirePermission('catalog.edit'), async (c) => {
+productFamilies.patch('/:id/publish', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -398,11 +411,8 @@ productFamilies.patch('/:id/publish', requireAuth, requirePermission('catalog.ed
 })
 
 /** Marks the family ready (or not) for invoicing: only ready families can be added to quotes. */
-productFamilies.patch('/:id/ready-for-invoicing', requireAuth, requirePermission('catalog.edit'), async (c) => {
+productFamilies.patch('/:id/ready-for-invoicing', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id') ?? ''
-  if (!isUuid(id)) {
-    return c.json({ error: 'Not found' }, 404)
-  }
   const body = await c.req.json().catch(() => null)
   if (typeof body?.readyForInvoicing !== 'boolean') {
     return c.json({ error: '"readyForInvoicing" (boolean) is required' }, 400)
@@ -424,11 +434,8 @@ productFamilies.patch('/:id/ready-for-invoicing', requireAuth, requirePermission
 })
 
 /** Sets whether the family has a price list ("Con listino") — information for the quote builder (owner or super-admin). */
-productFamilies.patch('/:id/has-price-list', requireAuth, requirePermission('catalog.edit'), async (c) => {
+productFamilies.patch('/:id/has-price-list', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id') ?? ''
-  if (!isUuid(id)) {
-    return c.json({ error: 'Not found' }, 404)
-  }
   const body = await c.req.json().catch(() => null)
   if (typeof body?.hasPriceList !== 'boolean') {
     return c.json({ error: '"hasPriceList" (boolean) is required' }, 400)
@@ -454,11 +461,8 @@ productFamilies.patch('/:id/has-price-list', requireAuth, requirePermission('cat
  * on the company's own families and on those shared with it; out of the library, the company's
  * quote builder no longer offers the family.
  */
-productFamilies.patch('/:id/library', requireAuth, requirePermission(LIBRARY_PERMISSION), async (c) => {
+productFamilies.patch('/:id/library', rejectNonUuidParams, requireAuth, requirePermission(LIBRARY_PERMISSION), async (c) => {
   const id = c.req.param('id') ?? ''
-  if (!isUuid(id)) {
-    return c.json({ error: 'Not found' }, 404)
-  }
   const body = await c.req.json().catch(() => null)
   if (typeof body?.inLibrary !== 'boolean') {
     return c.json({ error: '"inLibrary" (boolean) is required' }, 400)
@@ -480,7 +484,7 @@ productFamilies.patch('/:id/library', requireAuth, requirePermission(LIBRARY_PER
 })
 
 /** Permanently deletes a family and everything under it (lines, characteristics, matrices, images). */
-productFamilies.delete('/:id', requireAuth, requirePermission('catalog.edit'), async (c) => {
+productFamilies.delete('/:id', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -517,8 +521,8 @@ const editContext = (c: Context<{ Variables: AuthVariables }>) => ({
 })
 
 /** Replaces a pricing matrix's widths/heights/cells. */
-productFamilies.patch('/:id/matrices/:matrixId', requireAuth, requirePermission('catalog.edit'), async (c) => {
-  const id = c.req.param('id')
+productFamilies.patch('/:id/matrices/:matrixId', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const id = c.req.param('id') ?? ''
   const matrixId = c.req.param('matrixId')
   if (!id || !matrixId) {
     return c.json({ error: 'Missing id' }, 400)
@@ -533,8 +537,8 @@ productFamilies.patch('/:id/matrices/:matrixId', requireAuth, requirePermission(
 })
 
 /** Edits a product line's pricing fields (value, formula, discount, markup, installation hours). */
-productFamilies.patch('/:id/lines/:lineId', requireAuth, requirePermission('catalog.edit'), async (c) => {
-  const id = c.req.param('id')
+productFamilies.patch('/:id/lines/:lineId', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const id = c.req.param('id') ?? ''
   const lineId = c.req.param('lineId')
   if (!id || !lineId) {
     return c.json({ error: 'Missing id' }, 400)
@@ -549,8 +553,8 @@ productFamilies.patch('/:id/lines/:lineId', requireAuth, requirePermission('cata
 })
 
 /** Edits a sub-characteristic's price (value / formula). */
-productFamilies.patch('/:id/characteristics/:characteristicId', requireAuth, requirePermission('catalog.edit'), async (c) => {
-  const id = c.req.param('id')
+productFamilies.patch('/:id/characteristics/:characteristicId', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const id = c.req.param('id') ?? ''
   const characteristicId = c.req.param('characteristicId')
   if (!id || !characteristicId) {
     return c.json({ error: 'Missing id' }, 400)

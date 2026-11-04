@@ -2,6 +2,8 @@ import type { Context, Next } from 'hono'
 import { computePermissions, type Permission } from '@schuco/contracts'
 import { getCompanyById, getUserProfileByCognitoSub, getUserProfileById, withSystemTransaction, type UserProfile } from '@schuco/db'
 
+import { isDevLoginAllowed } from '@schuco/env/dev-login'
+
 import { getDb } from '../lib/db'
 import { isUuid } from '../lib/uuid'
 import type { RequestVariables } from './request-context'
@@ -16,28 +18,12 @@ export type AuthVariables = RequestVariables & {
   isActingAsTenant: boolean
 }
 
-const DEV_SUB_HEADER = 'x-dev-user-sub'
 const TENANT_OVERRIDE_HEADER = 'x-tenant-id'
-
-
-/**
- * Resolve dev-mode user sub (the seeded demo users — see demo-users.ts).
- * Gated the same way apps/web's own dev-login UI is: never in production
- * unless explicitly opted into (see docker-compose's `selfhost` profile).
- * @param c - Hono context
- */
-const resolveDevSub = (c: Context): string | null => {
-  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_LOGIN !== 'true') {
-    return null
-  }
-
-  return c.req.header(DEV_SUB_HEADER) ?? null
-}
 
 /**
  * Require authenticated user via our own session JWT (see
  * apps/web's lib/auth/session.ts — same `AUTH_SECRET`, verified here
- * with `verifySessionJwt`) or the dev header. Resolves identity and
+ * with `verifySessionJwt`), including demo-login sessions. Resolves identity and
  * tenant context onto the Hono context as plain data — `actorUserId`,
  * `effectiveCompanyId`, `isSuperAdmin`, `isActingAsTenant` — and holds NO
  * database transaction across `next()`. Route handlers open their own
@@ -56,27 +42,31 @@ export const requireAuth = async (c: Context, next: Next): Promise<Response | vo
   let profile: UserProfile | null = null
 
   const bearerToken = parseBearerToken(c.req.header('Authorization'))
-  if (bearerToken) {
-    const payload = await verifySessionJwt(bearerToken)
-    if (!payload) {
-      return c.json({ error: 'Invalid token' }, 401)
-    }
-    // Identity resolution (JWT sub -> profile) necessarily runs before we
-    // know the caller's company_id, so it can't be scoped by that
-    // company's RLS policy yet. This is a genuine system-level operation
-    // (see ADR 0007), not the caller's own tenant-scoped work — a short,
-    // self-contained transaction, not the request transaction (there
-    // isn't one anymore) and not the raw pooled `db` (which the
-    // restricted app DB role can't read from at all under RLS with no
-    // GUCs set).
-    profile = await withSystemTransaction(db, (tx) => getUserProfileById(tx, payload.sub))
-  } else {
-    const devSub = resolveDevSub(c)
-    if (!devSub) {
-      return c.json({ error: 'Unauthorized — set Authorization Bearer or X-Dev-User-Sub' }, 401)
-    }
-    profile = await withSystemTransaction(db, (tx) => getUserProfileByCognitoSub(tx, devSub))
+  if (!bearerToken) {
+    return c.json({ error: 'Unauthorized — set Authorization Bearer' }, 401)
   }
+  const payload = await verifySessionJwt(bearerToken)
+  if (!payload) {
+    return c.json({ error: 'Invalid token' }, 401)
+  }
+  // A demo-login session is still a JWT signed with AUTH_SECRET (only apps/web
+  // can mint one), and it stops working as soon as ALLOW_DEV_LOGIN is off.
+  // There is no unsigned header shortcut: anyone who could reach this port
+  // could have sent it.
+  if (payload.isDevLogin && !isDevLoginAllowed()) {
+    return c.json({ error: 'Invalid token' }, 401)
+  }
+  // Identity resolution (JWT sub -> profile) necessarily runs before we
+  // know the caller's company_id, so it can't be scoped by that
+  // company's RLS policy yet. This is a genuine system-level operation
+  // (see ADR 0007), not the caller's own tenant-scoped work — a short,
+  // self-contained transaction, not the request transaction (there
+  // isn't one anymore) and not the raw pooled `db` (which the
+  // restricted app DB role can't read from at all under RLS with no
+  // GUCs set).
+  profile = await withSystemTransaction(db, (tx) =>
+    payload.isDevLogin ? getUserProfileByCognitoSub(tx, payload.sub) : getUserProfileById(tx, payload.sub),
+  )
 
   if (!profile) {
     return c.json({ error: 'User not provisioned in PREVIO' }, 403)

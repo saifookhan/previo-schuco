@@ -6,9 +6,9 @@ import { isDevLoginAllowed } from '@/lib/auth/config'
 import { setSession } from '@/lib/auth/session'
 
 /**
- * Dev-only login for the seeded demo users — bypasses password auth
- * entirely, gated by `isDevLoginAllowed()` (never in production unless
- * explicitly opted into, e.g. the self-host Compose profile).
+ * Password-less login for the seeded demo users. Unavailable unless
+ * `ALLOW_DEV_LOGIN=true` (see `isDevLoginAllowed`) — hiding the form is
+ * not enough, this handler is the gate.
  */
 export const POST = async (request: Request): Promise<NextResponse> => {
   if (!isDevLoginAllowed()) {

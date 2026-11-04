@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 
@@ -52,21 +53,26 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
+  // Set for the whole sign-out so an in-flight session read cannot paint the user back in.
+  const signingOut = useRef(false)
 
   const refresh = useCallback(async () => {
+    if (signingOut.current) return
     setLoading(true)
     try {
-      const response = await fetch('/api/auth/session')
+      const response = await fetch('/api/auth/session', { cache: 'no-store' })
+      if (signingOut.current) return
       if (!response.ok) {
         setUser(null)
         return
       }
       const data = (await response.json()) as { user: AuthUser | null }
+      if (signingOut.current) return
       setUser(data.user)
     } catch {
-      setUser(null)
+      if (!signingOut.current) setUser(null)
     } finally {
-      setLoading(false)
+      if (!signingOut.current) setLoading(false)
     }
   }, [])
 
@@ -75,9 +81,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [refresh])
 
   const signOut = useCallback(async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    signingOut.current = true
     setUser(null)
-    window.location.href = '/login'
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' })
+      // The logout response's Set-Cookie is applied before this fetch resolves.
+      // A follow-up session read proves the jar no longer has the cookie, so the
+      // navigation to /login cannot race ahead of the clear and bounce back to
+      // /app/dashboard on a still-live session (middleware redirects /login → dashboard
+      // whenever the cookie is present).
+      const session = await fetch('/api/auth/session', { cache: 'no-store' })
+      // Gone only on a 401 without the `session` echo: a 401 with it (the API refused
+      // the user) or a 503 (API down) is answered while the cookie is still there.
+      const body = (await session.json().catch(() => ({}))) as { session?: unknown }
+      if (session.status === 401 && !body.session) {
+        window.location.replace('/login')
+        return
+      }
+    } catch {
+      // Fall through to the page-load sign-out below.
+    }
+    // Still signed in (or the request failed): sign out with a full page load
+    // instead, whose response clears the cookie and redirects to /login.
+    window.location.replace('/api/auth/logout')
   }, [])
 
   const hasRole = useCallback(
@@ -108,24 +134,3 @@ export const useAuth = (): AuthContextValue => {
   }
   return context
 }
-
-/**
- * Minimum role rank for hierarchical checks.
- */
-export const roleRank: Record<RoleId, number> = {
-  'super-admin': 4,
-  'company-admin': 3,
-  'super-user': 2,
-  user: 1,
-}
-
-/** Custom roles aren't in the ladder; they count as the lowest built-in level (permissions, not rank, decide what they may do). */
-const rankOf = (role: RoleId): number => roleRank[role] ?? 1
-
-/**
- * Check if user meets minimum role level.
- * @param userRole - Current user role
- * @param minimum - Minimum required role
- */
-export const hasMinimumRole = (userRole: RoleId, minimum: RoleId): boolean =>
-  rankOf(userRole) >= rankOf(minimum)

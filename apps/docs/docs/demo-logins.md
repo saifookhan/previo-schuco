@@ -11,8 +11,10 @@ The database is seeded with demo companies and one user per role. On the login p
 ![Login page with the demo login section](/img/screens/login.png)
 
 :::warning
-The demo login shortcut is controlled by `ALLOW_DEV_LOGIN` (on by default). It must be set to `false`
-before real customers use the server — then the section disappears and only email + password works.
+The demo login shortcut is controlled by `ALLOW_DEV_LOGIN`. It is on for local dev
+(`NEXT_PUBLIC_ALLOW_DEV_LOGIN=true` in `.env.local`) and **off** on the public web
+container unless you set `ALLOW_DEV_LOGIN=true`. With the flag off the login section
+is hidden and `POST /api/auth/dev-login` answers 403 — only email + password works.
 :::
 
 ## Demo companies

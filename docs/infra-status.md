@@ -38,7 +38,7 @@ Production is a single self-hosted server running Docker Compose. See [deploymen
 | Permissions | ✅ Editable role × permission matrix | Effective permissions = roles' permissions ∩ the company's capabilities (manufacturer / supplier / client / platform) |
 | Super-admin tenant override (`X-Tenant-Id`) | ✅ | [ADR 0008](./adr/0008-super-admin-tenant-override-header.md) |
 | Audit log | ✅ | Append-only, written in the same transaction as the change ([ADR 0010](./adr/0010-tenant-aware-audit-logging.md)) |
-| Demo-user login shortcut | ⚠️ On by default | `ALLOW_DEV_LOGIN` defaults to `true`; **set it to `false` before real customers use the server** |
+| Demo-user login shortcut | Off on the public web container unless `ALLOW_DEV_LOGIN=true` | The login form and `POST /api/auth/dev-login` both read that flag at request time. The API has no unsigned header shortcut: a demo session is a JWT only the web app can sign. The `api` container defaults the flag to `true` when unset (local `pnpm dev`); set `ALLOW_DEV_LOGIN=false` in the server `.env` to have it refuse old demo sessions too. Postgres, Redis and the API are published on 127.0.0.1 only. |
 
 ## Email
 

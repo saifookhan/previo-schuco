@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { authConfig } from '@/lib/auth/config'
+import { authConfig, isDevLoginAllowed } from '@/lib/auth/config'
 import { getSession, getSessionToken } from '@/lib/auth/session'
 
 /**
@@ -12,18 +12,16 @@ export const buildAuthHeaders = async (): Promise<Record<string, string> | null>
     return null
   }
 
-  const headers: Record<string, string> = {
+  // A dev-login cookie must not keep working after the shortcut is turned off
+  // (the API refuses it too).
+  if (session.isDevLogin && !isDevLoginAllowed()) {
+    return null
+  }
+
+  return {
     'Content-Type': 'application/json',
+    Authorization: `Bearer ${await getSessionToken()}`,
   }
-
-  if (session.isDevLogin) {
-    headers['X-Dev-User-Sub'] = session.sub
-  } else {
-    const token = await getSessionToken()
-    headers.Authorization = `Bearer ${token}`
-  }
-
-  return headers
 }
 
 /**
@@ -88,14 +86,31 @@ export const proxyGetToApi = async (request: Request, path: string): Promise<Nex
 }
 
 /**
- * Route-handler body for a multipart upload passthrough (Excel workbooks):
- * forwards the form data as-is and returns the API's JSON and status.
- * `buildAuthHeaders` can't be used — its `Content-Type: application/json`
- * would replace the multipart boundary `fetch` sets for the body.
+ * Route-handler body for a multipart upload passthrough (Excel workbooks).
+ * A request that is not multipart, or a multipart body with no `file`
+ * part, is 400 — calling `request.formData()` on anything else throws,
+ * and Next answers that with an empty 500. `Content-Type` is stripped
+ * from the auth headers so `fetch` can set the multipart boundary.
  * @param request - The incoming route-handler request carrying the form data
  * @param path - API path including leading slash
  */
 export const proxyFormDataToApi = async (request: Request, path: string): Promise<NextResponse> => {
+  const contentType = request.headers.get('content-type') ?? ''
+  if (!contentType.toLowerCase().includes('multipart/form-data')) {
+    return NextResponse.json({ error: 'Expected multipart form data with a "file" field' }, { status: 400 })
+  }
+
+  let form: FormData
+  try {
+    form = await request.formData()
+  } catch {
+    return NextResponse.json({ error: 'Could not read multipart form data' }, { status: 400 })
+  }
+  const file = form.get('file')
+  if (file === null || typeof file === 'string') {
+    return NextResponse.json({ error: 'Missing "file" in multipart form data' }, { status: 400 })
+  }
+
   const headers = await buildAuthHeaders()
   if (!headers) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -105,7 +120,7 @@ export const proxyFormDataToApi = async (request: Request, path: string): Promis
   const response = await fetch(`${authConfig.apiUrl}${path}`, {
     method: 'POST',
     headers,
-    body: await request.formData(),
+    body: form,
   })
   const data = await response.json().catch(() => ({ error: 'Invalid response from API' }))
   return NextResponse.json(data, { status: response.status })

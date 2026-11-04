@@ -11,6 +11,7 @@ import {
   rejectInvite,
   type ApprovalActor,
 } from '../../services/users-service'
+import { rejectNonUuidParams } from '../../lib/uuid'
 import type { AuthVariables } from '../../middleware/auth'
 import { requireAuth, requireRoles } from '../../middleware/auth'
 
@@ -59,7 +60,7 @@ adminUsers.get('/pending', requireAuth, requireRoles(['super-admin']), async (c)
 })
 
 /** Approves a pending invite request — sends the actual invite email. */
-adminUsers.post('/:id/approve', requireAuth, requireRoles(['super-admin']), async (c) => {
+adminUsers.post('/:id/approve', rejectNonUuidParams, requireAuth, requireRoles(['super-admin']), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)
@@ -81,7 +82,7 @@ adminUsers.post('/:id/approve', requireAuth, requireRoles(['super-admin']), asyn
 })
 
 /** Rejects a pending invite request — deletes it outright (nothing was ever activated). */
-adminUsers.post('/:id/reject', requireAuth, requireRoles(['super-admin']), async (c) => {
+adminUsers.post('/:id/reject', rejectNonUuidParams, requireAuth, requireRoles(['super-admin']), async (c) => {
   const id = c.req.param('id')
   if (!id) {
     return c.json({ error: 'Missing id' }, 400)

@@ -17,6 +17,7 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 - **Benachrichtigungen**: eine Glocke neben Ihrem Namen für Verbindungsanfragen, Antworten und Entfernungen (direkt dort annehmen oder ablehnen); eine Anfrage sendet auch eine E-Mail.
 - **Freigabe-Dialog**: Suchfeld, das nur verbundene Partner listet.
 - Neue Berechtigung `partners.manage` (Unternehmensadmins und Manager).
+- **Korrekturen aus der Testrunde vom 28. Oktober**: Die Demo-Anmeldung ohne Passwort ist aus, solange der Server sie nicht einschaltet; Seiten ohne Berechtigung (Benutzer, Unternehmen, Aktivitätsprotokoll, Zugriffsrechte und die anderen im Menü) führen jetzt zum Dashboard statt Ladefehler zu zeigen; das Dashboard bietet nur Schnellaktionen an, die man nutzen kann; ein Upload ohne Datei oder eine fehlerhafte Adresse liefern einen klaren Fehler statt eines Serverfehlers; Benutzerstatus sind übersetzt; Abmelden führt immer zur Anmeldeseite; die alte Demo-Seite **Invoice** ist entfernt (ihre Adresse öffnet die Angebote).
 
 ## Oktober 2026
 

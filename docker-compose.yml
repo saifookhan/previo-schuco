@@ -15,7 +15,9 @@ services:
     # silently drop or lose queued jobs (ADR 0009).
     command: redis-server --maxmemory-policy noeviction --appendonly yes
     ports:
-      - '6380:6379'
+      # 127.0.0.1 only: reachable from this machine (local `pnpm dev`,
+      # psql), never from outside — containers talk over the compose network.
+      - '127.0.0.1:6380:6379'
     volumes:
       - previo_redis_data:/data
     healthcheck:
@@ -63,7 +65,9 @@ services:
       POSTGRES_PASSWORD: previo
       POSTGRES_DB: previo
     ports:
-      - '5434:5432'
+      # 127.0.0.1 only: reachable from this machine (local `pnpm dev`,
+      # psql), never from outside — containers talk over the compose network.
+      - '127.0.0.1:5434:5432'
     volumes:
       - previo_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -93,7 +97,9 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     ports:
-      - '3001:3001'
+      # 127.0.0.1 only: reachable from this machine (local `pnpm dev`,
+      # psql), never from outside — containers talk over the compose network.
+      - '127.0.0.1:3001:3001'
     environment:
       PORT: 3001
       NODE_ENV: development
@@ -120,6 +126,11 @@ services:
       # rather point at some other local SMTP catcher.
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
+      # Whether the API accepts a demo-login session. Such a session is a
+      # JWT signed with AUTH_SECRET, so only the web app can mint one, and
+      # the public `web` service defaults this flag to false. Unset stays
+      # on here so local `pnpm dev` works without a Compose .env; set it
+      # explicitly to turn both on or both off.
       ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-true}
     volumes:
       - ./data/uploads:/app/data/uploads
@@ -187,10 +198,15 @@ services:
       # every request would look unauthenticated. Set to "true" once
       # this sits behind HTTPS.
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      # No real Cognito on a self-hosted demo box — enables the seeded
-      # demo-user login even though NODE_ENV=production.
-      ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-true}
-      NEXT_PUBLIC_ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-true}
+      # Password-less demo login. Off unless the operator sets
+      # ALLOW_DEV_LOGIN=true (same variable the api service reads). The
+      # api service defaults it to true when unset so local `pnpm dev`
+      # keeps working; this public container does the opposite, so a
+      # server that never set the variable does not leave POST
+      # /api/auth/dev-login open. NEXT_PUBLIC_* is inlined at image build
+      # and is not the gate — the route reads ALLOW_DEV_LOGIN at request time.
+      ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-false}
+      NEXT_PUBLIC_ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-false}
     depends_on:
       - api
 

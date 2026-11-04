@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server'
 
 import { authConfig } from '@/lib/auth/config'
-import { clearSession } from '@/lib/auth/session'
+import { attachClearedSession } from '@/lib/auth/session'
 
 /**
- * Clear session and redirect to login.
+ * Clear the session cookie on this response. The browser applies
+ * Set-Cookie before the fetch promise resolves, so the client can confirm
+ * the cookie is gone (GET /api/auth/session) before it navigates.
  */
 export const POST = async (): Promise<NextResponse> => {
-  await clearSession()
-  return NextResponse.json({ ok: true })
+  return attachClearedSession(NextResponse.json({ ok: true }))
 }
 
 export const GET = async (): Promise<NextResponse> => {
-  await clearSession()
-  return NextResponse.redirect(new URL('/login', authConfig.appUrl))
+  return attachClearedSession(NextResponse.redirect(new URL('/login', authConfig.appUrl)))
 }

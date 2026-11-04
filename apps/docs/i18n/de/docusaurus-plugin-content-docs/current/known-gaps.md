@@ -9,7 +9,6 @@ Dinge, die Tester **nicht** als Fehler melden sollen — sie sind bekannt und ge
 
 - **Die Dashboard-Zahlen sind Platzhalter** — die Karten und „Letzte Angebote“ im *Dashboard*
   zeigen Beispielwerte, nicht deine echten Daten.
-- Die Seite **Invoice** ist eine frühe Design-Nachbildung, nicht mit Angeboten verbunden.
 - Status-Ablauf für Angebote (Entwurf → gesendet → angenommen / abgelehnt) — jedes Angebot bleibt *Entwurf*.
 - Kopfdaten eines Angebots bearbeiten, ein ganzes Angebot löschen oder duplizieren.
 - Merkmal ↔ Linie-Zuordnungen ohne Excel-Import bearbeiten.

@@ -3,6 +3,12 @@ import { jwtVerify } from 'jose'
 export interface SessionJwtPayload {
   /** The user's own `users.id` — apps/web mints this JWT straight from a DB user, no external identity provider in between (unlike the old Cognito `sub`). */
   sub: string
+  /**
+   * Set by apps/web's password-less demo login: `sub` is then the seeded
+   * user's `cognito_sub`, not a `users.id`. Only honoured while
+   * `ALLOW_DEV_LOGIN` is on (see requireAuth).
+   */
+  isDevLogin: boolean
 }
 
 const getSecretKey = (): Uint8Array => {
@@ -35,7 +41,7 @@ export const verifySessionJwt = async (token: string): Promise<SessionJwtPayload
     if (typeof payload.sub !== 'string' || !payload.sub) {
       return null
     }
-    return { sub: payload.sub }
+    return { sub: payload.sub, isDevLogin: payload.isDevLogin === true }
   } catch {
     return null
   }
