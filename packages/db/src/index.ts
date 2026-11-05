@@ -127,6 +127,7 @@ export {
   updateProductLine,
   findLatestProductFamilyVersion,
   getProductFamilyDetail,
+  listProductFamilyVersions,
   insertCharacteristic,
   insertPricingMatrix,
   insertProductFamily,

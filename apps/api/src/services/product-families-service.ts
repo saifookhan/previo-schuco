@@ -13,6 +13,7 @@ import {
   insertProductFamilyImage,
   insertProductLine,
   insertProductLineCharacteristic,
+  listProductFamilyVersions,
   listVisibleProductFamilies,
   isFamilySharedWith,
   isProductFamilyInLibrary,
@@ -28,13 +29,17 @@ import {
   type ProductFamilySummary,
   type ProductLineRow,
 } from '@schuco/db'
-import type {
-  AuditLogListResponse,
-  DuplicateProductFamilyRequest,
-  PriceValidityRequest,
-  ProductFamilyImportPreview,
-  ProductFamilyImportWarning,
-  RecordHistoryQuery,
+import {
+  countFamilyChanges,
+  diffFamilyVersions,
+  type AuditLogListResponse,
+  type DuplicateProductFamilyRequest,
+  type FamilyVersionComparison,
+  type FamilyVersionsResponse,
+  type PriceValidityRequest,
+  type ProductFamilyImportPreview,
+  type ProductFamilyImportWarning,
+  type RecordHistoryQuery,
 } from '@schuco/contracts'
 
 import { isUuid } from '../lib/uuid'
@@ -396,6 +401,75 @@ export const getProductFamilyDetail = (
 ): Promise<ProductFamilyDetail | null> => {
   if (!isUuid(familyId)) return Promise.resolve(null)
   return withTenantDb(ctx, (tx) => getProductFamilyDetailQuery(tx, familyId))
+}
+
+/**
+ * Every version of the family's chain the caller can see, oldest first. With `withSteps`,
+ * also what changed between each version and the next one shown — that loads and compares
+ * every version, so the page asks for it separately. Null when the caller can't see `familyId`.
+ */
+export const getProductFamilyVersions = (
+  ctx: TenantContext,
+  familyId: string,
+  { withSteps = false }: { withSteps?: boolean } = {},
+): Promise<FamilyVersionsResponse | null> => {
+  if (!isUuid(familyId)) return Promise.resolve(null)
+  return withTenantDb(ctx, async (tx) => {
+    const versions = await listProductFamilyVersions(tx, familyId)
+    if (!versions.length) return null
+    const steps: FamilyVersionsResponse['steps'] = []
+    if (withSteps) {
+      // One at a time: they share the transaction's single connection anyway.
+      let older = await getProductFamilyDetailQuery(tx, versions[0].id)
+      for (const version of versions.slice(1)) {
+        const newer = await getProductFamilyDetailQuery(tx, version.id)
+        // Both rows were just listed under the same RLS, so neither detail can be missing.
+        steps.push({ fromId: older!.family.id, toId: version.id, counts: countFamilyChanges(diffFamilyVersions(older!, newer!)) })
+        older = newer
+      }
+    }
+    return {
+      versions: versions.map((v) => ({
+        id: v.id,
+        version: v.version,
+        isPublished: v.isPublished,
+        readyForInvoicing: v.readyForInvoicing,
+        priceValidFrom: v.priceValidFrom,
+        priceValidTo: v.priceValidTo,
+        createdAt: v.createdAt.toISOString(),
+      })),
+      steps,
+    }
+  })
+}
+
+/**
+ * What changed between two versions of the same family, older → newer whichever is passed
+ * first. Null when either isn't visible to the caller or they belong to different families.
+ */
+export const compareProductFamilyVersions = (
+  ctx: TenantContext,
+  familyId: string,
+  otherId: string,
+): Promise<FamilyVersionComparison | null> => {
+  if (!isUuid(familyId) || !isUuid(otherId) || familyId === otherId) return Promise.resolve(null)
+  return withTenantDb(ctx, async (tx) => {
+    const versions = await listProductFamilyVersions(tx, familyId)
+    const [older, newer] = versions.filter((v) => v.id === familyId || v.id === otherId)
+    if (!older || !newer) return null
+    const [olderDetail, newerDetail] = await Promise.all([
+      getProductFamilyDetailQuery(tx, older.id),
+      getProductFamilyDetailQuery(tx, newer.id),
+    ])
+    if (!olderDetail || !newerDetail) return null
+    const changes = diffFamilyVersions(olderDetail, newerDetail)
+    return {
+      from: { id: older.id, version: older.version },
+      to: { id: newer.id, version: newer.version },
+      changes,
+      counts: countFamilyChanges(changes),
+    }
+  })
 }
 
 /**

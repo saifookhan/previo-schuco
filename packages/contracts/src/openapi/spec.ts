@@ -506,6 +506,47 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           },
         },
       },
+      '/api/product-families/{id}/versions': {
+        get: {
+          tags: ['Products'],
+          summary: "The family's versions",
+          description:
+            'Every version of the chain the caller can see, oldest first (a company the family was shared with only gets the published ones). With `steps=true`, also `steps`: how many changes of each kind (added, removed, economic, description) lie between each version and the next — this compares every version, so it is slower. `{id}` can be any version.',
+          operationId: 'listProductFamilyVersions',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+            { name: 'steps', in: 'query', required: false, schema: { type: 'string', enum: ['true', 'false'], default: 'false' } },
+          ],
+          responses: {
+            '200': { description: 'Versions and the change counts between neighbours' },
+            '404': { description: 'No such family, or not visible to the caller', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
+      '/api/product-families/{id}/compare/{otherId}': {
+        get: {
+          tags: ['Products'],
+          summary: 'Compare two versions of a family',
+          description:
+            'What changed from the older of the two versions to the newer one, as a tree: section (details, product lines, options) → item → field. Each change is added, removed, economic (prices, formulas, discounts, markups, price tables, validity) or description (texts and settings). Lines and options are matched by name.',
+          operationId: 'compareProductFamilyVersions',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+            { name: 'otherId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          ],
+          responses: {
+            '200': { description: 'The changes, and how many there are of each kind' },
+            '404': {
+              description: 'Either version is not visible to the caller, or they are not versions of the same family',
+              content: { 'application/json': { schema: ref('ErrorResponse') } },
+            },
+            ...errorResponses(),
+          },
+        },
+      },
       '/api/product-families/{id}/shares': {
         get: {
           tags: ['Products'],

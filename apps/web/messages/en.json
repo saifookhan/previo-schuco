@@ -289,6 +289,84 @@
     "viewPreviousVersion": "View previous version",
     "viewLatestVersion": "View newer version"
   },
+  "productFamilyVersions": {
+    "title": "Versions and changes",
+    "subtitle": "Every version of this family. Pick a version on the timeline to see what changed between it and the one you are viewing.",
+    "viewing": "Viewing",
+    "open": "Open",
+    "compareWithVersion": "Compare with version {version}",
+    "status": {
+      "draft": "Draft",
+      "current": "Current",
+      "expired": "Expired",
+      "upcoming": "Upcoming"
+    },
+    "noChangesShort": "no changes",
+    "noChanges": "Version {from} and version {to} are the same.",
+    "allHidden": "Every kind of change is hidden. Turn one back on above.",
+    "loading": "Comparing versions…",
+    "error": "The versions could not be compared.",
+    "rootLabel": "v{from} → v{to}",
+    "kinds": {
+      "added": "Added",
+      "removed": "Removed",
+      "economic": "Economic",
+      "description": "Description"
+    },
+    "kindHelp": {
+      "added": "new line, option or size",
+      "removed": "line, option or size taken out",
+      "economic": "prices, formulas, discounts, markups, validity",
+      "description": "texts, units and settings"
+    },
+    "sections": {
+      "details": "Family details",
+      "lines": "Product lines",
+      "options": "Options"
+    },
+    "fields": {
+      "name": "Name",
+      "technicalName": "Technical name",
+      "category": "Category",
+      "brand": "Brand",
+      "description1": "Description 1",
+      "description2": "Description 2",
+      "hasPriceList": "Price list",
+      "priceValidFrom": "Valid from",
+      "priceValidTo": "Valid to",
+      "description": "Description",
+      "unitName": "Unit",
+      "unitSymbol": "Unit symbol",
+      "isApplicable": "Applicable",
+      "formula": "Formula",
+      "value": "Value",
+      "discountPct": "Discount",
+      "markupPct": "Markup",
+      "installationHoursPerUnit": "Installation hours per unit",
+      "priceSource": "Priced by",
+      "priceTable": "Price table"
+    },
+    "offersNow": "Now offers {name}",
+    "offersNoLonger": "No longer offers {name}",
+    "folded": "{count, plural, one {# change} other {# changes}}",
+    "hintFold": "Click to open or close",
+    "hintDetails": "Click for details",
+    "before": "Version {version}",
+    "after": "Version {version}",
+    "yes": "Yes",
+    "no": "No",
+    "empty": "—",
+    "priceTableValue": "price table",
+    "priceTableCells": "{count, plural, one {# price changed} other {# prices changed}}",
+    "view": {
+      "tree": "Tree",
+      "list": "List"
+    },
+    "heightByWidth": "H \\ W",
+    "cellAdded": "new size, {price}",
+    "cellRemoved": "size taken out, was {price}",
+    "heatmapLegend": "Only the changed sizes are filled in: orange = more expensive, blue = cheaper, green outline = new size, struck through = size taken out."
+  },
   "productFamilyEdit": {
     "edit": "Edit",
     "close": "Close",
@@ -432,6 +510,7 @@
     "summaryTitle": "Summary and closing",
     "fieldPaymentTerms": "Payment terms",
     "validityNote": "Quote valid for {days} days from issue date.",
+    "familyOption": "{name} (v{version})",
     "familyWithoutPriceList": "{name} (no price list)",
     "familyWithoutPriceListHint": "This family has no price list behind it — check the prices before sending the quote."
   },

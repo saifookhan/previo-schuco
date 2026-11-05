@@ -97,6 +97,26 @@ azienda decide per sé: togliere dalla libreria una famiglia condivisa non la ca
 
 Regole complete: [Come vengono calcolati i prezzi](../pricing.md).
 
+## Versioni e modifiche
+
+Quando una famiglia ha più di una versione, la sua pagina mostra **Versioni e modifiche**: una linea del tempo con tutte
+le versioni (bozza, in vigore, scaduta o futura) e quante modifiche ci sono tra una versione e la successiva. Clicca una
+versione per confrontarla con quella che stai guardando; **Apri** porta alla pagina di quella versione.
+
+Le modifiche sono disegnate come un albero — dati della famiglia, linee di prodotto, opzioni — e ognuna è di uno di
+quattro tipi:
+
+- **Aggiunte** — una nuova linea, opzione o misura della tabella prezzi; oppure una linea che ora offre un'opzione.
+- **Rimosse** — una linea, opzione o misura tolta; oppure una linea che non offre più un'opzione.
+- **Economiche** — prezzi, formule, sconti, ricarichi, ore di posa, validità dei prezzi, tabelle prezzi.
+- **Descrittive** — nomi, descrizioni, unità e impostazioni.
+
+Attiva o nascondi ogni tipo con i pulsanti sopra l'albero, clicca una linea o un'opzione per chiuderla, e clicca una
+modifica per vedere prima e dopo; una tabella prezzi cambiata si apre con le misure cambiate colorate (arancione più
+cara, blu più economica). **Elenco** mostra le stesse modifiche come elenco. Linee e opzioni sono abbinate per nome,
+quindi una linea rinominata appare come una rimossa e una aggiunta. Le aziende con cui la famiglia è condivisa vedono
+solo le versioni condivise con loro.
+
 ## Cronologia
 
 In fondo alla pagina della famiglia, **Cronologia** elenca importazione, pubblicazione, nuove versioni, modifiche

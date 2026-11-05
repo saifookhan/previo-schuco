@@ -21,11 +21,13 @@ import {
 import {
   ExcelImportError,
   ProductFamilyHistoryForbiddenError,
+  compareProductFamilyVersions,
   createNewVersionFromExcel,
   deleteProductFamily,
   duplicateProductFamily,
   getProductFamilyDetail,
   getProductFamilyDetailWithLibrary,
+  getProductFamilyVersions,
   canManageProductFamily,
   getProductFamilyHistory,
   importProductFamilyFromExcel,
@@ -262,6 +264,26 @@ productFamilies.get('/:id', rejectNonUuidParams, requireAuth, requirePermission(
     canViewHistory: ownsFamily,
     canManage: ownsFamily,
   })
+})
+
+/** Every version of the family's chain the caller can see, oldest first; `?steps=true` adds the change counts between neighbours. */
+productFamilies.get('/:id/versions', rejectNonUuidParams, requireAuth, requirePermission('catalog.view'), async (c) => {
+  const versions = await getProductFamilyVersions(
+    { effectiveCompanyId: c.get('effectiveCompanyId'), isSuperAdmin: c.get('isSuperAdmin') },
+    c.req.param('id') ?? '',
+    { withSteps: c.req.query('steps') === 'true' },
+  )
+  return versions ? c.json(versions) : c.json({ error: 'Not found' }, 404)
+})
+
+/** What changed between two versions of the same family (older → newer), as a tree of added / removed / economic / description changes. */
+productFamilies.get('/:id/compare/:otherId', rejectNonUuidParams, requireAuth, requirePermission('catalog.view'), async (c) => {
+  const comparison = await compareProductFamilyVersions(
+    { effectiveCompanyId: c.get('effectiveCompanyId'), isSuperAdmin: c.get('isSuperAdmin') },
+    c.req.param('id') ?? '',
+    c.req.param('otherId') ?? '',
+  )
+  return comparison ? c.json(comparison) : c.json({ error: 'Not found' }, 404)
 })
 
 /** The family's change history (import, publish, versions, price edits, sharing) — owning company and super-admin only. */

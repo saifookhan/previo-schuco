@@ -14,9 +14,10 @@ import { ProductFamilyPricingEditor } from '@/components/product-family-pricing-
 import { ProductFamilyRowActions } from '@/components/product-family-row-actions'
 import { ProductFamilyShareButton } from '@/components/product-family-share-button'
 import { ProductFamilyUploadButton } from '@/components/product-family-upload-button'
+import { ProductFamilyVersions } from '@/components/product-family-versions'
 import { RecordHistory } from '@/components/record-history'
 import type { ProductFamilyDetail } from '@/types/product-family'
-import { priceValidityToday } from '@schuco/contracts'
+import { priceValidityToday, type FamilyVersionsResponse } from '@schuco/contracts'
 
 interface ProductFamilyDetailPageProps {
   params: Promise<{ id: string }>
@@ -30,7 +31,10 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
   const tVersion = await getTranslations('productFamilyVersion')
   const tEdit = await getTranslations('productFamilyEdit')
   const tFlags = await getTranslations('productFamilyFlags')
-  const result = await fetchFromApiResult<ProductFamilyDetail>(`/api/product-families/${id}`)
+  const [result, versionsResult] = await Promise.all([
+    fetchFromApiResult<ProductFamilyDetail>(`/api/product-families/${id}`),
+    fetchFromApiResult<FamilyVersionsResponse>(`/api/product-families/${id}/versions`),
+  ])
 
   if (result.status !== 'ok') {
     if (result.status === 'not_found') {
@@ -264,6 +268,14 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
           ))}
         </CardContent>
       </Card>
+
+      {/* Only once there is something to compare; a version the caller can't see is not listed. */}
+      {versionsResult.status === 'ok' && versionsResult.data.versions.length > 1 ? (
+        <div className="mt-6">
+          {/* Keyed so moving to another version starts a fresh comparison instead of keeping the old pair. */}
+          <ProductFamilyVersions key={family.id} familyId={family.id} versions={versionsResult.data.versions} today={priceValidityToday()} />
+        </div>
+      ) : null}
 
       {/* Owning company / super-admin only (same rule as the API) — no empty panel on a shared family. */}
       {canViewHistory ? (

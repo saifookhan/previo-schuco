@@ -603,15 +603,21 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                       onChange={(e) => void onFamilyChange(e.target.value)}
                     >
                       <option value="">{t('selectFamily')}</option>
-                      {families.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {/* "Con listino: No" is information for whoever quotes; the family can still be used. */}
-                          {f.hasPriceList ? f.name : t('familyWithoutPriceList', { name: f.name })}
-                        </option>
-                      ))}
+                      {families.map((f) => {
+                        // Several versions of one family can be offered at once, so the version tells them apart.
+                        const name = t('familyOption', { name: f.name, version: f.version })
+                        return (
+                          <option key={f.id} value={f.id}>
+                            {/* "Con listino: No" is information for whoever quotes; the family can still be used. */}
+                            {f.hasPriceList ? name : t('familyWithoutPriceList', { name })}
+                          </option>
+                        )
+                      })}
                       {/* An edited position's family may no longer be offered (expired or unpublished); keep it selectable. */}
                       {familyId && family && !families.some((f) => f.id === familyId) ? (
-                        <option value={familyId}>{family.family.name}</option>
+                        <option value={familyId}>
+                          {t('familyOption', { name: family.family.name, version: family.family.version })}
+                        </option>
                       ) : null}
                     </select>
                     {family && !family.family.hasPriceList ? (

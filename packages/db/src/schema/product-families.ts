@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   date,
+  index,
   integer,
   jsonb,
   numeric,
@@ -98,6 +99,8 @@ export const productFamilies = pgTable('product_families', {
     'product_families_price_validity_check',
     sql`${table.priceValidTo} IS NULL OR ${table.priceValidFrom} IS NULL OR ${table.priceValidTo} >= ${table.priceValidFrom}`,
   ),
+  // Walking a version chain forward ("which version supersedes this one?").
+  index('product_families_supersedes_id_idx').on(table.supersedesId),
 ])
 
 /** A product line (option) under a family — one row per "Product lines" sheet entry. */
@@ -126,7 +129,10 @@ export const productLines = pgTable('product_lines', {
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-})
+}, (table) => [
+  // Loading a family's detail (every version, for the version comparison) reads its rows by family.
+  index('product_lines_product_family_id_idx').on(table.productFamilyId),
+])
 
 /**
  * Hierarchical characteristic, owned at the FAMILY level — not a single
@@ -163,7 +169,10 @@ export const characteristics = pgTable('characteristics', {
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-})
+}, (table) => [
+  // Loading a family's detail (every version, for the version comparison) reads its rows by family.
+  index('characteristics_product_family_id_idx').on(table.productFamilyId),
+])
 
 /**
  * A width×height price lookup table (the Excel "matrix sheet" a product
@@ -181,7 +190,10 @@ export const pricingMatrices = pgTable('pricing_matrices', {
   heights: jsonb('heights').notNull().$type<number[]>(),
   matrix: jsonb('matrix').notNull().$type<(number | null)[][]>(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-})
+}, (table) => [
+  // Loading a family's detail (every version, for the version comparison) reads its rows by family.
+  index('pricing_matrices_product_family_id_idx').on(table.productFamilyId),
+])
 
 /**
  * Which characteristics apply to which product line (the Excel "Relations"
@@ -221,4 +233,7 @@ export const productFamilyImages = pgTable('product_family_images', {
   localPath: text('local_path').notNull(),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-})
+}, (table) => [
+  // Loading a family's detail (every version, for the version comparison) reads its rows by family.
+  index('product_family_images_product_family_id_idx').on(table.productFamilyId),
+])

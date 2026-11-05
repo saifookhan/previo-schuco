@@ -101,6 +101,26 @@ für niemand anderen.
 
 Alle Regeln: [Wie Preise berechnet werden](../pricing.md).
 
+## Versionen und Änderungen
+
+Hat eine Familie mehr als eine Version, zeigt ihre Seite **Versionen und Änderungen**: eine Zeitleiste aller Versionen
+(Entwurf, gültig, abgelaufen oder künftig) mit der Zahl der Änderungen zwischen einer Version und der nächsten. Klicke
+eine Version, um sie mit der angezeigten zu vergleichen; **Öffnen** führt zur Seite dieser Version.
+
+Die Änderungen werden als Baum gezeigt — Familiendaten, Produktlinien, Optionen — und jede gehört zu einer von vier
+Arten:
+
+- **Hinzugefügt** — eine neue Linie, Option oder Preistabellen-Größe; oder eine Linie bietet jetzt eine Option an.
+- **Entfernt** — eine entfernte Linie, Option oder Größe; oder eine Linie bietet eine Option nicht mehr an.
+- **Wirtschaftlich** — Preise, Formeln, Rabatte, Aufschläge, Montagestunden, Preisgültigkeit, Preistabellen.
+- **Beschreibung** — Namen, Beschreibungen, Einheiten und Einstellungen.
+
+Blende jede Art mit den Schaltflächen über dem Baum ein oder aus, klicke eine Linie oder Option, um sie zuzuklappen,
+und klicke eine Änderung für vorher und nachher; eine geänderte Preistabelle öffnet sich mit farbigen geänderten Größen
+(Orange teurer, Blau günstiger). **Liste** zeigt dieselben Änderungen als Liste. Linien und Optionen werden über den
+Namen zugeordnet, eine umbenannte Linie erscheint also als entfernt und hinzugefügt. Unternehmen, mit denen die Familie
+geteilt ist, sehen nur die mit ihnen geteilten Versionen.
+
 ## Verlauf
 
 Unten auf der Familienseite listet **Verlauf** Import, Veröffentlichung, neue Versionen, Änderungen an Freigaben und

@@ -97,6 +97,24 @@ each company decides for itself: taking a shared family out of your library does
 
 Full rules: [How prices are calculated](../pricing.md).
 
+## Versions and changes
+
+When a family has more than one version, its page shows **Versions and changes**: a timeline of every version
+(draft, current, expired or upcoming) with how many changes lie between each version and the next. Click a version
+to compare it with the one you are viewing; **Open** goes to that version's page.
+
+The changes are drawn as a tree — family details, product lines, options — and each one is one of four kinds:
+
+- **Added** — a new line, option or price-table size; or a line now offers an option.
+- **Removed** — a line, option or size taken out; or a line no longer offers an option.
+- **Economic** — prices, formulas, discounts, markups, installation hours, price validity, price tables.
+- **Description** — names, descriptions, units and settings.
+
+Turn each kind on or off with the chips above the tree, click a line or option to fold it, and click a change for the
+before and after; a changed price table opens with the changed sizes coloured (orange more expensive, blue cheaper).
+**List** shows the same changes as a list. Lines and options are matched by name, so a renamed line shows as one
+removed and one added. Companies a family was shared with only see the versions shared with them.
+
 ## History
 
 At the bottom of a family's page, **History** lists its import, publishing, new versions, sharing changes and every

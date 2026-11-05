@@ -289,6 +289,84 @@
     "viewPreviousVersion": "Vorherige Version ansehen",
     "viewLatestVersion": "Neuere Version ansehen"
   },
+  "productFamilyVersions": {
+    "title": "Versionen und Änderungen",
+    "subtitle": "Alle Versionen dieser Familie. Wähle eine Version auf der Zeitleiste, um zu sehen, was sich gegenüber der angezeigten geändert hat.",
+    "viewing": "Angezeigt",
+    "open": "Öffnen",
+    "compareWithVersion": "Mit Version {version} vergleichen",
+    "status": {
+      "draft": "Entwurf",
+      "current": "Gültig",
+      "expired": "Abgelaufen",
+      "upcoming": "Künftig"
+    },
+    "noChangesShort": "keine Änderungen",
+    "noChanges": "Version {from} und Version {to} sind gleich.",
+    "allHidden": "Alle Änderungsarten sind ausgeblendet. Blende oben wieder eine ein.",
+    "loading": "Versionen werden verglichen…",
+    "error": "Die Versionen konnten nicht verglichen werden.",
+    "rootLabel": "v{from} → v{to}",
+    "kinds": {
+      "added": "Hinzugefügt",
+      "removed": "Entfernt",
+      "economic": "Wirtschaftlich",
+      "description": "Beschreibung"
+    },
+    "kindHelp": {
+      "added": "neue Linie, Option oder Größe",
+      "removed": "entfernte Linie, Option oder Größe",
+      "economic": "Preise, Formeln, Rabatte, Aufschläge, Gültigkeit",
+      "description": "Texte, Einheiten und Einstellungen"
+    },
+    "sections": {
+      "details": "Familiendaten",
+      "lines": "Produktlinien",
+      "options": "Optionen"
+    },
+    "fields": {
+      "name": "Name",
+      "technicalName": "Technischer Name",
+      "category": "Kategorie",
+      "brand": "Marke",
+      "description1": "Beschreibung 1",
+      "description2": "Beschreibung 2",
+      "hasPriceList": "Mit Preisliste",
+      "priceValidFrom": "Gültig ab",
+      "priceValidTo": "Gültig bis",
+      "description": "Beschreibung",
+      "unitName": "Einheit",
+      "unitSymbol": "Einheitenzeichen",
+      "isApplicable": "Anwendbar",
+      "formula": "Formel",
+      "value": "Wert",
+      "discountPct": "Rabatt",
+      "markupPct": "Aufschlag",
+      "installationHoursPerUnit": "Montagestunden pro Einheit",
+      "priceSource": "Preis aus",
+      "priceTable": "Preistabelle"
+    },
+    "offersNow": "Bietet jetzt {name}",
+    "offersNoLonger": "Bietet {name} nicht mehr",
+    "folded": "{count, plural, one {# Änderung} other {# Änderungen}}",
+    "hintFold": "Zum Öffnen oder Schließen klicken",
+    "hintDetails": "Für Details klicken",
+    "before": "Version {version}",
+    "after": "Version {version}",
+    "yes": "Ja",
+    "no": "Nein",
+    "empty": "—",
+    "priceTableValue": "Preistabelle",
+    "priceTableCells": "{count, plural, one {# Preis geändert} other {# Preise geändert}}",
+    "view": {
+      "tree": "Baum",
+      "list": "Liste"
+    },
+    "heightByWidth": "H \\ B",
+    "cellAdded": "neue Größe, {price}",
+    "cellRemoved": "Größe entfernt, war {price}",
+    "heatmapLegend": "Nur geänderte Größen sind ausgefüllt: Orange = teurer, Blau = günstiger, grüner Rand = neue Größe, durchgestrichen = Größe entfernt."
+  },
   "productFamilyEdit": {
     "edit": "Bearbeiten",
     "close": "Schließen",
@@ -432,6 +510,7 @@
     "summaryTitle": "Zusammenfassung und Abschluss",
     "fieldPaymentTerms": "Zahlungsbedingungen",
     "validityNote": "Angebot gültig für {days} Tage ab Ausstellungsdatum.",
+    "familyOption": "{name} (v{version})",
     "familyWithoutPriceList": "{name} (ohne Preisliste)",
     "familyWithoutPriceListHint": "Diese Familie hat keine Preisliste — prüfen Sie die Preise, bevor Sie das Angebot senden."
   },

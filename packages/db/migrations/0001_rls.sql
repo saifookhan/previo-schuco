@@ -98,6 +98,36 @@ CREATE OR REPLACE FUNCTION app_family_reaches_company(p_family_id uuid, p_compan
   SELECT EXISTS (SELECT 1 FROM reach WHERE company_id = p_company_id);
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
+-- Every version id in p_family_id's version chain (supersedes_id links, both
+-- directions). SECURITY DEFINER on purpose — a recipient may not see a draft
+-- version in the middle (v2 published, v3 draft, v4 published), and walking
+-- under its RLS would stop at the gap. Empty unless the caller can see
+-- p_family_id itself (the product_families_select rule), and it only returns
+-- ids: callers select the rows under their own RLS, so hidden versions stay hidden.
+CREATE OR REPLACE FUNCTION app_family_version_chain(p_family_id uuid) RETURNS SETOF uuid AS $$
+  WITH RECURSIVE
+    start AS (
+      SELECT id, supersedes_id FROM product_families
+      WHERE id = p_family_id
+        AND (
+          app_is_super_admin()
+          OR supplier_company_id = app_current_company_id()
+          OR (is_published AND app_family_reaches_company(id, app_current_company_id()))
+        )
+    ),
+    older(id, supersedes_id) AS (
+      SELECT id, supersedes_id FROM start
+      UNION
+      SELECT pf.id, pf.supersedes_id FROM product_families pf JOIN older o ON pf.id = o.supersedes_id
+    ),
+    newer(id) AS (
+      SELECT id FROM start
+      UNION
+      SELECT pf.id FROM product_families pf JOIN newer n ON pf.supersedes_id = n.id
+    )
+  SELECT id FROM older UNION SELECT id FROM newer;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+
 -- Product families (Phase 2, project-context.md) and everything under
 -- them. Two helper functions capture the shared rule so it's written
 -- once, not five times:

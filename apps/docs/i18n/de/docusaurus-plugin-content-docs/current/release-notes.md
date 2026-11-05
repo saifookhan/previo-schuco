@@ -17,6 +17,8 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 - **Benachrichtigungen**: eine Glocke neben Ihrem Namen für Verbindungsanfragen, Antworten und Entfernungen (direkt dort annehmen oder ablehnen); eine Anfrage sendet auch eine E-Mail.
 - **Freigabe-Dialog**: Suchfeld, das nur verbundene Partner listet.
 - Neue Berechtigung `partners.manage` (Unternehmensadmins und Manager).
+- **Versionen und Änderungen** auf der Seite einer Familie: eine Zeitleiste aller Versionen und ein Baum, was sich zwischen zwei beliebigen Versionen geändert hat — hinzugefügte, entfernte, wirtschaftliche und beschreibende Änderungen, jede Art ausblendbar; eine geänderte Preistabelle zeigt, welche Größen teurer oder günstiger wurden.
+- **Angebotserstellung**: Jede Familie in der Liste zeigt ihre Version, z. B. „Finestra (v2)“, da zwei Versionen gleichzeitig angeboten werden können.
 - **Korrekturen aus der Testrunde vom 28. Oktober**: Die Demo-Anmeldung ohne Passwort ist aus, solange der Server sie nicht einschaltet; Seiten ohne Berechtigung (Benutzer, Unternehmen, Aktivitätsprotokoll, Zugriffsrechte und die anderen im Menü) führen jetzt zum Dashboard statt Ladefehler zu zeigen; das Dashboard bietet nur Schnellaktionen an, die man nutzen kann; ein Upload ohne Datei oder eine fehlerhafte Adresse liefern einen klaren Fehler statt eines Serverfehlers; Benutzerstatus sind übersetzt; Abmelden führt immer zur Anmeldeseite; die alte Demo-Seite **Invoice** ist entfernt (ihre Adresse öffnet die Angebote).
 
 ## Oktober 2026

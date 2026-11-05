@@ -1,4 +1,4 @@
-import { and, desc, eq, getTableColumns, inArray, isNotNull, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, getTableColumns, inArray, isNotNull, or, sql } from 'drizzle-orm'
 
 import type { DbLike } from '../client'
 import {
@@ -267,6 +267,21 @@ export const findLatestProductFamilyVersion = async (
   }
   return latest
 }
+
+/**
+ * Every version in `familyId`'s chain that the caller can see, oldest first. The chain
+ * comes from `app_family_version_chain` (it sees past versions the caller can't, and is
+ * empty when the caller can't see `familyId` itself); the rows are read under the
+ * caller's RLS, so a recipient only gets the published ones.
+ * @param db - RLS-scoped transaction
+ * @param familyId - Any version in the chain
+ */
+export const listProductFamilyVersions = (db: DbLike, familyId: string): Promise<ProductFamilySummary[]> =>
+  db
+    .select()
+    .from(productFamilies)
+    .where(sql`${productFamilies.id} IN (SELECT app_family_version_chain(${familyId}::uuid))`)
+    .orderBy(asc(productFamilies.version), asc(productFamilies.createdAt))
 
 /**
  * Publishes/unpublishes a family. Returns the updated row's id and
