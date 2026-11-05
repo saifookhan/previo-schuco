@@ -28,6 +28,15 @@ richiede `quote.edit`, che hanno solo le aziende **supplier** (nei dati demo: Su
 
 Le posizioni da una famiglia condivisa partono con lo sconto impostato sulla condivisione. Come viene calcolato ogni numero: [Come vengono calcolati i prezzi](../pricing.md).
 
+## Versioni della famiglia nel preventivo
+
+- L'elenco delle famiglie mostra la versione di ciascuna, ad es. “Finestra (v2)”, e sotto cosa ha cambiato quella
+  versione rispetto alla precedente (aggiunte, rimosse, economiche, descrittive) con **Vedi modifiche**, che apre il
+  confronto nella pagina della famiglia.
+- Una posizione calcolata da una versione più vecchia mostra la versione sotto il nome della linea e, quando si può
+  preventivare una versione più recente, il badge **v3 disponibile**: cliccalo per vedere cosa è cambiato e il link al
+  confronto. La posizione mantiene il suo prezzo; modificala per passare alla nuova versione.
+
 ## Cronologia
 
 Apri **Cronologia** in fondo al preventivo per vedere chi l’ha creato e chi ha aggiunto, modificato, duplicato,

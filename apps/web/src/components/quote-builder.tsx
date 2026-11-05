@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { QuotePositionCard } from '@/components/quote-position-card'
+import { FamilyVersionChanges } from '@/components/family-version-changes'
+import { QuotePositionCard, type PositionFamilyVersion } from '@/components/quote-position-card'
 import { cn } from '@/lib/utils'
 import type { ProductFamilyDetail, ProductFamilySummary } from '@/types/product-family'
 import type { AddQuotePositionInput, PricingMode, QuoteDetail, QuotePositionPreview } from '@/types/sales-quote'
@@ -81,6 +82,8 @@ const PricingModeToggle = ({
 interface QuoteBuilderProps {
   initialDetail: QuoteDetail
   families: ProductFamilySummary[]
+  /** By family id: the version of the families the positions were priced from, and a newer one that can be quoted now. */
+  familyVersions: Record<string, PositionFamilyVersion>
 }
 
 /** Trailing zeros from Postgres numerics ("12.5000") are noise in a display or an edit box. */
@@ -94,9 +97,14 @@ const tidy = (v: string): string => String(Number(v))
  * The position list is presented as sortable cards (reorder, duplicate,
  * expand for detail) matching the reference preventivo layout.
  */
-export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => {
+export const QuoteBuilder = ({ initialDetail, families, familyVersions }: QuoteBuilderProps) => {
   const t = useTranslations('quotes')
   const [detail, setDetail] = useState(initialDetail)
+  // Positions added in this session aren't in the server's map; the offered families give at least their version.
+  const familyVersionOf = (familyId: string): PositionFamilyVersion | undefined => {
+    const offered = families.find((f) => f.id === familyId)
+    return familyVersions[familyId] ?? (offered ? { version: offered.version } : undefined)
+  }
   const [familyCache, setFamilyCache] = useState<Record<string, ProductFamilyDetail>>({})
   const [familyLoading, setFamilyLoading] = useState(false)
 
@@ -570,6 +578,7 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
               <QuotePositionCard
                 key={position.id}
                 position={position}
+                familyVersion={familyVersionOf(position.productFamilyId)}
                 isFirst={index === 0}
                 isLast={index === detail.positions.length - 1}
                 busy={busyPositionId === position.id}
@@ -623,6 +632,8 @@ export const QuoteBuilder = ({ initialDetail, families }: QuoteBuilderProps) => 
                     {family && !family.family.hasPriceList ? (
                       <p className="text-xs text-amber-700">{t('familyWithoutPriceListHint')}</p>
                     ) : null}
+                    {/* What this version changed compared with the previous one. */}
+                    {familyId ? <FamilyVersionChanges key={familyId} familyId={familyId} /> : null}
                   </div>
 
                   <div className="space-y-1.5">

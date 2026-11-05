@@ -6,31 +6,21 @@ import { GitCompareArrows, ListTree, Loader2, Network } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 
+import { ChangeCountChips, KIND_COLOR, KIND_GLYPH, KindGlyph, totalChanges as total } from '@/components/family-change-kinds'
+import { FamilyVersionGraph } from '@/components/family-version-graph'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Link } from '@/i18n/navigation'
 import { cn } from '@/lib/utils'
 import {
   FAMILY_CHANGE_KINDS,
   countFamilyChanges,
   pctChange,
-  priceValidityStatus,
   type FamilyChangeCounts,
   type FamilyChangeKind,
   type FamilyChangeNode,
   type FamilyVersionComparison,
-  type FamilyVersionSummary,
   type FamilyVersionsResponse,
   type PriceTableDiff,
 } from '@schuco/contracts'
-
-/** One hue per change kind (validated as a set: lightness, chroma, colour-blind separation). Every mark also carries a glyph and a label, so colour is never the only cue. */
-const KIND_COLOR: Record<FamilyChangeKind, string> = {
-  added: '#1baf7a',
-  removed: '#e34948',
-  economic: '#eda100',
-  description: '#2a78d6',
-}
-const KIND_GLYPH: Record<FamilyChangeKind, string> = { added: '+', removed: '−', economic: '€', description: 'T' }
 
 const ROW_HEIGHT = 30
 const COLUMN_WIDTH = 210
@@ -54,32 +44,58 @@ type Datum = {
 }
 
 const truncate = (value: string, max: number) => (value.length > max ? `${value.slice(0, max - 1)}…` : value)
-const total = (counts: FamilyChangeCounts) => FAMILY_CHANGE_KINDS.reduce((sum, kind) => sum + counts[kind], 0)
 
-const KindGlyph = ({ kind, className }: { kind: FamilyChangeKind; className?: string }) => (
-  <span
-    aria-hidden
-    className={cn('inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold leading-none text-white', className)}
-    style={{ backgroundColor: KIND_COLOR[kind] }}
-  >
-    {KIND_GLYPH[kind]}
-  </span>
-)
+/** Which lane of the graph a family is in: its own chain, the original it was copied from, or a copy. */
+const laneOf = (graph: Omit<FamilyVersionsResponse, 'steps'>, id: string) =>
+  graph.versions.some((v) => v.id === id)
+    ? 'main'
+    : graph.origin?.id === id
+      ? 'origin'
+      : `branch-${graph.branches.findIndex((b) => b.versions.some((v) => v.id === id))}`
+
+/** "v2" for each side of two versions of one family; "Name v2" when comparing a copy with its original. */
+const sideLabels = (graph: Omit<FamilyVersionsResponse, 'steps'>, { from, to }: FamilyVersionComparison) =>
+  laneOf(graph, from.id) === laneOf(graph, to.id)
+    ? { from: `v${from.version}`, to: `v${to.version}` }
+    : { from: `${truncate(from.name, 18)} v${from.version}`, to: `${truncate(to.name, 18)} v${to.version}` }
+
+/** Width of the root pill for a label. */
+const rootWidth = (label: string) => Math.max(64, label.length * 7.5 + 16)
+
+/** Ids of everything in the graph the base can be compared with. */
+const graphIds = (graph: Omit<FamilyVersionsResponse, 'steps'>) => [
+  ...graph.versions.map((v) => v.id),
+  ...graph.branches.flatMap((b) => b.versions.map((v) => v.id)),
+  ...(graph.origin ? [graph.origin.id] : []),
+]
 
 /**
- * The family's versions on a timeline, and what changed between the version being viewed
- * (the base) and any other one, as a tree: what changed → section → line / option → field.
- * Every change is added, removed, economic or description, and each kind can be hidden.
+ * The family's version graph (its versions, the copies made from it, the family it was copied
+ * from), and what changed between the version being viewed (the base) and any other one, as a
+ * tree: what changed → section → line / option → field. Every change is added, removed, economic
+ * or description, and each kind can be hidden.
  */
 export const ProductFamilyVersions = ({
   familyId,
-  versions,
+  graph,
+  initialCompareId,
   today,
-}: Pick<FamilyVersionsResponse, 'versions'> & { familyId: string; today: string }) => {
+}: {
+  familyId: string
+  graph: Omit<FamilyVersionsResponse, 'steps'>
+  /** From the page address (`?compare=`), e.g. the quote builder's "See changes" link. */
+  initialCompareId?: string
+  today: string
+}) => {
   const t = useTranslations('productFamilyVersions')
   const format = useFormatter()
-  const baseIndex = versions.findIndex((v) => v.id === familyId)
-  const [compareId, setCompareId] = useState<string>(() => (versions[baseIndex - 1] ?? versions[baseIndex + 1])?.id ?? '')
+  const [compareId, setCompareId] = useState<string>(() => {
+    if (initialCompareId && initialCompareId !== familyId && graphIds(graph).includes(initialCompareId)) return initialCompareId
+    // Otherwise the version before the base, else the one after it, else where it was copied from, else a copy.
+    const { versions } = graph
+    const baseIndex = versions.findIndex((v) => v.id === familyId)
+    return (versions[baseIndex - 1] ?? versions[baseIndex + 1] ?? graph.origin ?? graph.branches[0]?.versions[0])?.id ?? ''
+  })
   const [comparison, setComparison] = useState<FamilyVersionComparison | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
@@ -91,7 +107,7 @@ export const ProductFamilyVersions = ({
   const [steps, setSteps] = useState<FamilyVersionsResponse['steps']>([])
   const latestRequest = useRef(0)
 
-  // The timeline's change counts compare every version, so they come after the page.
+  // The graph's change counts compare every version, so they come after the page.
   useEffect(() => {
     let current = true
     fetch(`/api/product-families/${familyId}/versions?steps=true`, { cache: 'no-store' })
@@ -209,24 +225,27 @@ export const ProductFamilyVersions = ({
     if (!children.length) return null
     return {
       key: 'root',
-      label: t('rootLabel', { from: comparison.from.version, to: comparison.to.version }),
+      label: t('rootLabel', sideLabels(graph, comparison)),
       root: true,
       children,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- t / format only change with the locale, which reloads the page.
-  }, [comparison, shownKinds, folded])
+  }, [comparison, shownKinds, folded, graph])
 
   const layout = useMemo(() => {
     if (!data) return null
     const root = tree<Datum>().nodeSize([ROW_HEIGHT, COLUMN_WIDTH])(hierarchy(data))
     const nodes = root.descendants()
+    // A long root label (a copy compared with its original) pushes the tree right instead of covering it.
+    const shift = Math.max(0, rootWidth(data.label) + 40 - COLUMN_WIDTH)
+    for (const node of nodes) if (node.depth > 0) node.y += shift
     const minX = Math.min(...nodes.map((n) => n.x))
     const maxX = Math.max(...nodes.map((n) => n.x))
     const maxDepth = Math.max(...nodes.map((n) => n.depth))
     return {
       nodes,
       links: root.links(),
-      width: maxDepth * COLUMN_WIDTH + LEAF_LABEL_SPACE + PADDING * 2,
+      width: maxDepth * COLUMN_WIDTH + shift + LEAF_LABEL_SPACE + PADDING * 2,
       height: maxX - minX + PADDING * 2 + ROW_HEIGHT,
       offsetY: PADDING + ROW_HEIGHT / 2 - minX,
     }
@@ -279,22 +298,6 @@ export const ProductFamilyVersions = ({
   }
   const selected = comparison && selectedKey ? findChange(comparison.changes, selectedKey) : null
 
-  const statusOf = (v: FamilyVersionSummary) => (v.isPublished ? priceValidityStatus(v, today) : 'draft')
-
-  const countChips = (counts: FamilyChangeCounts) =>
-    total(counts) === 0 ? (
-      <span className="text-[11px] text-slate-400">{t('noChangesShort')}</span>
-    ) : (
-      <span className="flex flex-wrap items-center justify-center gap-1">
-        {FAMILY_CHANGE_KINDS.filter((kind) => counts[kind] > 0).map((kind) => (
-          <span key={kind} className="inline-flex items-center gap-0.5 text-[11px] font-medium text-slate-600" title={t(`kinds.${kind}`)}>
-            <KindGlyph kind={kind} className="h-3.5 w-3.5 text-[9px]" />
-            {counts[kind]}
-          </span>
-        ))}
-      </span>
-    )
-
   const renderList = (datum: Datum) => (
     <ul className="space-y-1 border-l border-slate-200 pl-4">
       {datum.children?.map((child) => (
@@ -330,53 +333,8 @@ export const ProductFamilyVersions = ({
         <p className="text-sm text-slate-500">{t('subtitle')}</p>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Timeline: every version, the change counts between neighbours; pick the version to compare with. */}
-        <div className="overflow-x-auto pb-1">
-          <ol className="flex min-w-max items-start">
-            {versions.map((v, i) => {
-              const isBase = v.id === familyId
-              const isTarget = v.id === compareId
-              const status = statusOf(v)
-              return (
-                <li key={v.id} className="flex items-start">
-                  {i > 0 ? (
-                    <div className="flex w-36 flex-col items-center gap-1 pt-3">
-                      <div className="h-px w-full bg-slate-200" />
-                      {/* Nothing until the counts arrive (or if they don't). */}
-                      {steps[i - 1]?.toId === v.id ? countChips(steps[i - 1].counts) : null}
-                    </div>
-                  ) : null}
-                  <div className="flex w-28 flex-col items-center gap-1 text-center">
-                    <button
-                      type="button"
-                      disabled={isBase}
-                      onClick={() => setCompareId(v.id)}
-                      aria-pressed={isTarget}
-                      className={cn(
-                        'flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-bold transition',
-                        isBase && 'bg-brand text-white ring-4 ring-brand/15',
-                        !isBase && isTarget && 'border-2 border-dashed border-brand bg-white text-brand',
-                        !isBase && !isTarget && 'border border-slate-300 bg-white text-slate-600 hover:border-brand hover:text-brand',
-                      )}
-                      title={isBase ? t('viewing') : t('compareWithVersion', { version: v.version })}
-                    >
-                      v{v.version}
-                    </button>
-                    <span className="text-[11px] font-medium text-slate-600">{t(`status.${status}`)}</span>
-                    <span className="text-[11px] text-slate-400">{format.dateTime(new Date(v.createdAt), { dateStyle: 'medium' })}</span>
-                    {isBase ? (
-                      <span className="text-[11px] font-semibold text-brand">{t('viewing')}</span>
-                    ) : (
-                      <Link href={`/app/product-families/${v.id}`} className="text-[11px] text-slate-400 underline-offset-2 hover:text-brand hover:underline">
-                        {t('open')}
-                      </Link>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ol>
-        </div>
+        {/* Git graph: every version and copy, the change counts along each edge; pick what to compare with. */}
+        <FamilyVersionGraph graph={graph} steps={steps} baseId={familyId} compareId={compareId} today={today} onPick={setCompareId} />
 
         {/* Filters: one chip per change kind, with its count; plus tree / list. */}
         <div className="flex flex-wrap items-center gap-2">
@@ -429,7 +387,7 @@ export const ProductFamilyVersions = ({
           <p className="py-6 text-sm text-red-600">{t('error')}</p>
         ) : !comparison ? null : !data || !layout ? (
           <p className="py-6 text-sm text-slate-500">
-            {total(comparison.counts) === 0 ? t('noChanges', { from: comparison.from.version, to: comparison.to.version }) : t('allHidden')}
+            {total(comparison.counts) === 0 ? t('noChanges', sideLabels(graph, comparison)) : t('allHidden')}
           </p>
         ) : view === 'list' ? (
           <div className="-ml-4">{renderList(data)}</div>
@@ -472,7 +430,7 @@ export const ProductFamilyVersions = ({
                     >
                       {datum.root ? (
                         <>
-                          <rect x={-8} y={-13} width={Math.max(64, datum.label.length * 7.5 + 16)} height={26} rx={13} fill="var(--color-brand)" />
+                          <rect x={-8} y={-13} width={rootWidth(datum.label)} height={26} rx={13} fill="var(--color-brand)" />
                           <text x={0} dy="0.35em" className="fill-white text-[12px] font-semibold">
                             {datum.label}
                           </text>
@@ -522,7 +480,9 @@ export const ProductFamilyVersions = ({
                 </div>
                 {hovered.datum.detail ? <div className="mt-1 text-slate-500">{hovered.datum.detail}</div> : null}
                 {hovered.datum.counts ? (
-                  <div className="mt-1">{countChips(hovered.datum.counts)}</div>
+                  <div className="mt-1">
+                    <ChangeCountChips counts={hovered.datum.counts} />
+                  </div>
                 ) : null}
                 <div className="mt-1 text-[11px] text-slate-400">{hovered.datum.counts ? t('hintFold') : t('hintDetails')}</div>
               </div>
@@ -543,11 +503,11 @@ export const ProductFamilyVersions = ({
             ) : (
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
                 <div className="rounded-md bg-slate-50 p-3">
-                  <dt className="text-xs text-slate-500">{t('before', { version: comparison!.from.version })}</dt>
+                  <dt className="text-xs text-slate-500">{sideLabels(graph, comparison!).from}</dt>
                   <dd className="mt-1 whitespace-pre-wrap break-words text-slate-800">{fieldValue(selected, selected.before)}</dd>
                 </div>
                 <div className="rounded-md bg-slate-50 p-3">
-                  <dt className="text-xs text-slate-500">{t('after', { version: comparison!.to.version })}</dt>
+                  <dt className="text-xs text-slate-500">{sideLabels(graph, comparison!).to}</dt>
                   <dd className="mt-1 whitespace-pre-wrap break-words text-slate-800">{fieldValue(selected, selected.after)}</dd>
                 </div>
               </dl>

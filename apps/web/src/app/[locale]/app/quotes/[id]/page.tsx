@@ -4,9 +4,10 @@ import { notFound } from 'next/navigation'
 
 import { fetchFromApiResult } from '@/lib/api/server-client'
 import { QuoteBuilder } from '@/components/quote-builder'
+import type { PositionFamilyVersion } from '@/components/quote-position-card'
 import type { ProductFamilySummary } from '@/types/product-family'
 import type { QuoteDetail } from '@/types/sales-quote'
-import { priceValidityStatus, priceValidityToday } from '@schuco/contracts'
+import { priceValidityStatus, priceValidityToday, type FamilyVersionsResponse } from '@schuco/contracts'
 
 interface QuoteDetailPageProps {
   params: Promise<{ id: string }>
@@ -42,7 +43,23 @@ const QuoteDetailPage = async ({ params }: QuoteDetailPageProps) => {
     (f) => f.isPublished && f.inLibrary !== false && f.readyForInvoicing && priceValidityStatus(f, today) === 'current',
   )
 
-  return <QuoteBuilder initialDetail={quoteResult.data} families={families} />
+  // For each family the positions were priced from: its version, and the newest version of it
+  // that can be quoted now (the positions keep their price; the builder offers to look at the changes).
+  const usableIds = new Set(families.map((f) => f.id))
+  const usedFamilyIds = [...new Set(quoteResult.data.positions.map((p) => p.productFamilyId))]
+  const versionResults = await Promise.all(
+    usedFamilyIds.map((familyId) => fetchFromApiResult<FamilyVersionsResponse>(`/api/product-families/${familyId}/versions?graph=false`)),
+  )
+  const familyVersions: Record<string, PositionFamilyVersion> = {}
+  usedFamilyIds.forEach((familyId, i) => {
+    const result = versionResults[i]
+    const own = result.status === 'ok' ? result.data.versions.find((v) => v.id === familyId) : undefined
+    if (result.status !== 'ok' || !own) return
+    const newer = result.data.versions.filter((v) => v.version > own.version && usableIds.has(v.id)).at(-1)
+    familyVersions[familyId] = { version: own.version, newer: newer ? { id: newer.id, version: newer.version } : undefined }
+  })
+
+  return <QuoteBuilder initialDetail={quoteResult.data} families={families} familyVersions={familyVersions} />
 }
 
 export default QuoteDetailPage

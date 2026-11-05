@@ -101,6 +101,8 @@ export const productFamilies = pgTable('product_families', {
   ),
   // Walking a version chain forward ("which version supersedes this one?").
   index('product_families_supersedes_id_idx').on(table.supersedesId),
+  // The copies made from a family (the branches of its version graph).
+  index('product_families_duplicated_from_id_idx').on(table.duplicatedFromId),
 ])
 
 /** A product line (option) under a family — one row per "Product lines" sheet entry. */

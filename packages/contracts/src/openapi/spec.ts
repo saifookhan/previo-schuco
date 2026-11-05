@@ -509,14 +509,21 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
       '/api/product-families/{id}/versions': {
         get: {
           tags: ['Products'],
-          summary: "The family's versions",
+          summary: "The family's version graph",
           description:
-            'Every version of the chain the caller can see, oldest first (a company the family was shared with only gets the published ones). With `steps=true`, also `steps`: how many changes of each kind (added, removed, economic, description) lie between each version and the next — this compares every version, so it is slower. `{id}` can be any version.',
+            "Like a git graph: the chain of versions `{id}` belongs to (oldest first), the copies made from any of them with Duplicate (`branches`, each with its own versions), the family the chain's first version was copied from (`origin`) and the `edges` between them. Only what the caller can see — a company the family was shared with only gets the published ones. With `steps=true`, also `steps`: how many changes of each kind (added, removed, economic, description) lie along every edge; this compares every version, so it is slower.",
           operationId: 'listProductFamilyVersions',
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
             { name: 'steps', in: 'query', required: false, schema: { type: 'string', enum: ['true', 'false'], default: 'false' } },
+            {
+              name: 'graph',
+              in: 'query',
+              required: false,
+              description: '`false` leaves out the copies (`branches` empty) when only the chain and the original are needed.',
+              schema: { type: 'string', enum: ['true', 'false'], default: 'true' },
+            },
           ],
           responses: {
             '200': { description: 'Versions and the change counts between neighbours' },
@@ -530,7 +537,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           tags: ['Products'],
           summary: 'Compare two versions of a family',
           description:
-            'What changed from the older of the two versions to the newer one, as a tree: section (details, product lines, options) → item → field. Each change is added, removed, economic (prices, formulas, discounts, markups, price tables, validity) or description (texts and settings). Lines and options are matched by name.',
+            'Two versions of a family, or a copy and its original (anything in the version graph). What changed from the older of the two to the newer one, as a tree: section (details, product lines, options) → item → field. Each change is added, removed, economic (prices, formulas, discounts, markups, price tables, validity) or description (texts and settings). Lines and options are matched by name.',
           operationId: 'compareProductFamilyVersions',
           security: [{ bearerAuth: [] }],
           parameters: [
@@ -540,7 +547,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           responses: {
             '200': { description: 'The changes, and how many there are of each kind' },
             '404': {
-              description: 'Either version is not visible to the caller, or they are not versions of the same family',
+              description: 'Either family is not visible to the caller, or they are not in the same version graph',
               content: { 'application/json': { schema: ref('ErrorResponse') } },
             },
             ...errorResponses(),

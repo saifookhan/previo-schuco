@@ -103,9 +103,12 @@ Alle Regeln: [Wie Preise berechnet werden](../pricing.md).
 
 ## Versionen und Änderungen
 
-Hat eine Familie mehr als eine Version, zeigt ihre Seite **Versionen und Änderungen**: eine Zeitleiste aller Versionen
-(Entwurf, gültig, abgelaufen oder künftig) mit der Zahl der Änderungen zwischen einer Version und der nächsten. Klicke
-eine Version, um sie mit der angezeigten zu vergleichen; **Öffnen** führt zur Seite dieser Version.
+Hat eine Familie mehr als eine Version oder wurde sie kopiert, zeigt ihre Seite **Versionen und Änderungen**: einen
+Graphen wie einen Git-Graphen. Eine Spur enthält die Versionen dieser Familie (Entwurf, gültig, abgelaufen oder
+künftig), je eine Spur pro mit **Duplizieren** erstellter Kopie zweigt von der Version ab, aus der sie kopiert wurde,
+und ist die Familie selbst eine Kopie, zeigt eine graue Spur die Ursprungsfamilie. Jede Verbindung zeigt, wie viele
+Änderungen dazwischen liegen. Klicke eine Version — oder eine Kopie oder das Original —, um sie mit der angezeigten zu
+vergleichen; **Öffnen** führt zu ihrer Seite.
 
 Die Änderungen werden als Baum gezeigt — Familiendaten, Produktlinien, Optionen — und jede gehört zu einer von vier
 Arten:

@@ -291,7 +291,7 @@
   },
   "productFamilyVersions": {
     "title": "Versioni e modifiche",
-    "subtitle": "Tutte le versioni di questa famiglia. Scegli una versione sulla linea del tempo per vedere cosa è cambiato rispetto a quella che stai guardando.",
+    "subtitle": "Tutte le versioni di questa famiglia, le copie fatte da essa e da dove è stata copiata. Clicca una versione per vedere cosa è cambiato rispetto a quella che stai guardando.",
     "viewing": "In visione",
     "open": "Apri",
     "compareWithVersion": "Confronta con la versione {version}",
@@ -302,11 +302,11 @@
       "upcoming": "Futura"
     },
     "noChangesShort": "nessuna modifica",
-    "noChanges": "La versione {from} e la versione {to} sono uguali.",
+    "noChanges": "{from} e {to} sono uguali.",
     "allHidden": "Tutti i tipi di modifica sono nascosti. Riattivane uno qui sopra.",
     "loading": "Confronto delle versioni…",
     "error": "Non è stato possibile confrontare le versioni.",
-    "rootLabel": "v{from} → v{to}",
+    "rootLabel": "{from} → {to}",
     "kinds": {
       "added": "Aggiunte",
       "removed": "Rimosse",
@@ -351,8 +351,6 @@
     "folded": "{count, plural, one {# modifica} other {# modifiche}}",
     "hintFold": "Clicca per aprire o chiudere",
     "hintDetails": "Clicca per i dettagli",
-    "before": "Versione {version}",
-    "after": "Versione {version}",
     "yes": "Sì",
     "no": "No",
     "empty": "—",
@@ -365,7 +363,16 @@
     "heightByWidth": "H \\ L",
     "cellAdded": "nuova misura, {price}",
     "cellRemoved": "misura tolta, era {price}",
-    "heatmapLegend": "Sono compilate solo le misure cambiate: arancione = più cara, blu = più economica, bordo verde = nuova misura, barrata = misura tolta."
+    "heatmapLegend": "Sono compilate solo le misure cambiate: arancione = più cara, blu = più economica, bordo verde = nuova misura, barrata = misura tolta.",
+    "graphLabel": "Grafico delle versioni",
+    "copyOf": "copia della v{version}",
+    "originLane": "copiata da qui",
+    "firstVersion": "Prima versione di questa famiglia.",
+    "changesBetween": "Modifiche v{from} → v{to}:",
+    "changesFromOriginal": "Modifiche rispetto a {name} v{from} (copiata da questa):",
+    "seeChanges": "Vedi modifiche",
+    "newerAvailable": "v{version} disponibile",
+    "newerAvailableHint": "Si può preventivare una versione più recente di questa famiglia. Questa posizione mantiene il suo prezzo; modificala per passare alla nuova."
   },
   "productFamilyEdit": {
     "edit": "Modifica",

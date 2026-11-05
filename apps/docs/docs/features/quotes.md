@@ -28,6 +28,15 @@ which only **supplier** companies have (in the demo data: Suppli).
 
 Positions from a shared family start with the discount set on the share. How every number is computed: [How prices are calculated](../pricing.md).
 
+## Family versions in a quote
+
+- The family list shows each family's version, e.g. “Finestra (v2)”, and under it what that version changed compared
+  with the previous one (added, removed, economic, description) with **See changes**, which opens the comparison on the
+  family's page.
+- A position priced from an older version shows the version under its line name and, when a newer version can be
+  quoted, a **v3 available** badge: click it for what changed and the link to the comparison. The position keeps its
+  price; edit it to switch to the new version.
+
 ## History
 
 Open **History** at the bottom of a quote to see who created it and who added, edited, duplicated, reordered or

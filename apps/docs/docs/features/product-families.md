@@ -99,9 +99,11 @@ Full rules: [How prices are calculated](../pricing.md).
 
 ## Versions and changes
 
-When a family has more than one version, its page shows **Versions and changes**: a timeline of every version
-(draft, current, expired or upcoming) with how many changes lie between each version and the next. Click a version
-to compare it with the one you are viewing; **Open** goes to that version's page.
+When a family has more than one version, or has been copied, its page shows **Versions and changes**: a graph like a
+git graph. One lane holds this family's versions (draft, current, expired or upcoming), one lane per copy made with
+**Duplicate** branches off the version it was copied from, and if the family is itself a copy, a grey lane shows the
+family it came from. Every edge shows how many changes lie along it. Click a version — or a copy, or the original — to
+compare it with the one you are viewing; **Open** goes to its page.
 
 The changes are drawn as a tree — family details, product lines, options — and each one is one of four kinds:
 

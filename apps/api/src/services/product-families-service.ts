@@ -13,7 +13,9 @@ import {
   insertProductFamilyImage,
   insertProductLine,
   insertProductLineCharacteristic,
+  listProductFamilyCopies,
   listProductFamilyVersions,
+  listProductFamilyVersionsOfChains,
   listVisibleProductFamilies,
   isFamilySharedWith,
   isProductFamilyInLibrary,
@@ -35,6 +37,7 @@ import {
   type AuditLogListResponse,
   type DuplicateProductFamilyRequest,
   type FamilyVersionComparison,
+  type FamilyVersionSummary,
   type FamilyVersionsResponse,
   type PriceValidityRequest,
   type ProductFamilyImportPreview,
@@ -403,49 +406,136 @@ export const getProductFamilyDetail = (
   return withTenantDb(ctx, (tx) => getProductFamilyDetailQuery(tx, familyId))
 }
 
+const toVersionSummary = (v: ProductFamilySummary): FamilyVersionSummary => ({
+  id: v.id,
+  name: v.name,
+  version: v.version,
+  duplicatedFromId: v.duplicatedFromId,
+  isPublished: v.isPublished,
+  readyForInvoicing: v.readyForInvoicing,
+  priceValidFrom: v.priceValidFrom,
+  priceValidTo: v.priceValidTo,
+  createdAt: v.createdAt.toISOString(),
+})
+
+type VersionGraph = {
+  versions: ProductFamilySummary[]
+  branches: { forkFromId: string; versions: ProductFamilySummary[] }[]
+  origin: ProductFamilySummary | null
+}
+
+/** Splits versions of several chains into chains (by their `supersedesId` links), each oldest first. */
+const groupIntoChains = (rows: ProductFamilySummary[]): ProductFamilySummary[][] => {
+  const byId = new Map(rows.map((row) => [row.id, row]))
+  const next = new Map(rows.filter((row) => row.supersedesId).map((row) => [row.supersedesId!, row]))
+  const seen = new Set<string>()
+  const chains: ProductFamilySummary[][] = []
+  for (const row of rows) {
+    if (seen.has(row.id)) continue
+    let first = row
+    while (first.supersedesId && byId.has(first.supersedesId) && !seen.has(first.supersedesId)) first = byId.get(first.supersedesId)!
+    const chain: ProductFamilySummary[] = []
+    for (let v: ProductFamilySummary | undefined = first; v && !seen.has(v.id); v = next.get(v.id)) {
+      seen.add(v.id)
+      chain.push(v)
+    }
+    chains.push(chain)
+  }
+  return chains
+}
+
 /**
- * Every version of the family's chain the caller can see, oldest first. With `withSteps`,
- * also what changed between each version and the next one shown — that loads and compares
- * every version, so the page asks for it separately. Null when the caller can't see `familyId`.
+ * The family's chain, the family its first version was copied from and — unless `branches` is
+ * false (callers that only need the chain) — the copies made from any of its versions, each with
+ * its own chain. One level each way, all under the caller's RLS. Null when the caller can't see
+ * `familyId`.
+ */
+const loadVersionGraph = async (
+  tx: Parameters<typeof listProductFamilyVersions>[0],
+  familyId: string,
+  { branches: withBranches = true }: { branches?: boolean } = {},
+): Promise<VersionGraph | null> => {
+  const versions = await listProductFamilyVersions(tx, familyId)
+  if (!versions.length) return null
+  const inGraph = new Set(versions.map((v) => v.id))
+  const branches: VersionGraph['branches'] = []
+  if (withBranches) {
+    const copies = (await listProductFamilyCopies(tx, [...inGraph])).filter((copy) => !inGraph.has(copy.id))
+    // Every copy's chain in one query, then one branch per chain (two copies in one chain are one branch).
+    for (const chain of groupIntoChains(await listProductFamilyVersionsOfChains(tx, copies.map((copy) => copy.id)))) {
+      const fork = chain.find((v) => v.duplicatedFromId && inGraph.has(v.duplicatedFromId))
+      if (fork) branches.push({ forkFromId: fork.duplicatedFromId!, versions: chain })
+    }
+    branches.sort((x, y) => x.versions[0].createdAt.getTime() - y.versions[0].createdAt.getTime())
+    branches.forEach((branch) => branch.versions.forEach((v) => inGraph.add(v.id)))
+  }
+  const originId = versions.find((v) => v.duplicatedFromId && !inGraph.has(v.duplicatedFromId))?.duplicatedFromId
+  const origin = originId ? await getProductFamilyById(tx, originId) : null
+  return { versions, branches, origin }
+}
+
+const graphFamilies = (graph: VersionGraph) => [
+  ...graph.versions,
+  ...graph.branches.flatMap((branch) => branch.versions),
+  ...(graph.origin ? [graph.origin] : []),
+]
+
+/** Every edge of the graph: each version → the next one, and original → copy. */
+const graphEdges = ({ versions, branches, origin }: VersionGraph): [string, string][] => {
+  const chainEdges = (chain: ProductFamilySummary[]) => chain.slice(1).map((v, i): [string, string] => [chain[i].id, v.id])
+  const forkEdges = (chain: ProductFamilySummary[], fromIds: Set<string>) =>
+    chain.filter((v) => v.duplicatedFromId && fromIds.has(v.duplicatedFromId)).map((v): [string, string] => [v.duplicatedFromId!, v.id])
+  return [
+    ...(origin ? forkEdges(versions, new Set([origin.id])) : []),
+    ...chainEdges(versions),
+    ...branches.flatMap((branch) => [...forkEdges(branch.versions, new Set([branch.forkFromId])), ...chainEdges(branch.versions)]),
+  ]
+}
+
+/**
+ * The family's version graph (see `FamilyVersionsResponse`). With `withSteps`, also the
+ * change counts along every edge — that loads and compares every version, so the page
+ * asks for it separately; `withBranches: false` leaves out the copies (callers that only
+ * need the chain and the original). Null when the caller can't see `familyId`.
  */
 export const getProductFamilyVersions = (
   ctx: TenantContext,
   familyId: string,
-  { withSteps = false }: { withSteps?: boolean } = {},
+  { withSteps = false, withBranches = true }: { withSteps?: boolean; withBranches?: boolean } = {},
 ): Promise<FamilyVersionsResponse | null> => {
   if (!isUuid(familyId)) return Promise.resolve(null)
   return withTenantDb(ctx, async (tx) => {
-    const versions = await listProductFamilyVersions(tx, familyId)
-    if (!versions.length) return null
+    const graph = await loadVersionGraph(tx, familyId, { branches: withBranches })
+    if (!graph) return null
     const steps: FamilyVersionsResponse['steps'] = []
     if (withSteps) {
-      // One at a time: they share the transaction's single connection anyway.
-      let older = await getProductFamilyDetailQuery(tx, versions[0].id)
-      for (const version of versions.slice(1)) {
-        const newer = await getProductFamilyDetailQuery(tx, version.id)
-        // Both rows were just listed under the same RLS, so neither detail can be missing.
-        steps.push({ fromId: older!.family.id, toId: version.id, counts: countFamilyChanges(diffFamilyVersions(older!, newer!)) })
-        older = newer
+      // One at a time (they share the transaction's single connection), each version loaded once.
+      const details = new Map<string, ProductFamilyDetail | null>()
+      const detail = async (id: string) => {
+        if (!details.has(id)) details.set(id, await getProductFamilyDetailQuery(tx, id))
+        return details.get(id)!
+      }
+      for (const [fromId, toId] of graphEdges(graph)) {
+        const older = await detail(fromId)
+        const newer = await detail(toId)
+        // Every id was just listed under the same RLS, so neither detail can be missing.
+        if (older && newer) steps.push({ fromId, toId, counts: countFamilyChanges(diffFamilyVersions(older, newer)) })
       }
     }
     return {
-      versions: versions.map((v) => ({
-        id: v.id,
-        version: v.version,
-        isPublished: v.isPublished,
-        readyForInvoicing: v.readyForInvoicing,
-        priceValidFrom: v.priceValidFrom,
-        priceValidTo: v.priceValidTo,
-        createdAt: v.createdAt.toISOString(),
-      })),
+      versions: graph.versions.map(toVersionSummary),
+      branches: graph.branches.map((branch) => ({ forkFromId: branch.forkFromId, versions: branch.versions.map(toVersionSummary) })),
+      origin: graph.origin ? toVersionSummary(graph.origin) : null,
+      edges: graphEdges(graph).map(([fromId, toId]) => ({ fromId, toId })),
       steps,
     }
   })
 }
 
 /**
- * What changed between two versions of the same family, older → newer whichever is passed
- * first. Null when either isn't visible to the caller or they belong to different families.
+ * What changed between two families of the same version graph — two versions, or a copy and
+ * its original — older → newer by creation, whichever is passed first. Null when either isn't
+ * visible to the caller or they aren't in the graph of either one.
  */
 export const compareProductFamilyVersions = (
   ctx: TenantContext,
@@ -454,18 +544,21 @@ export const compareProductFamilyVersions = (
 ): Promise<FamilyVersionComparison | null> => {
   if (!isUuid(familyId) || !isUuid(otherId) || familyId === otherId) return Promise.resolve(null)
   return withTenantDb(ctx, async (tx) => {
-    const versions = await listProductFamilyVersions(tx, familyId)
-    const [older, newer] = versions.filter((v) => v.id === familyId || v.id === otherId)
+    const pairIn = (graph: VersionGraph | null) =>
+      graph ? graphFamilies(graph).filter((v) => v.id === familyId || v.id === otherId) : []
+    // Cheapest first: the chain and its original; then the copies; then the other side's graph (a copy seen from its original's original).
+    let pair = pairIn(await loadVersionGraph(tx, familyId, { branches: false }))
+    if (pair.length < 2) pair = pairIn(await loadVersionGraph(tx, familyId))
+    if (pair.length < 2) pair = pairIn(await loadVersionGraph(tx, otherId))
+    const [older, newer] = pair.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
     if (!older || !newer) return null
-    const [olderDetail, newerDetail] = await Promise.all([
-      getProductFamilyDetailQuery(tx, older.id),
-      getProductFamilyDetailQuery(tx, newer.id),
-    ])
+    const olderDetail = await getProductFamilyDetailQuery(tx, older.id)
+    const newerDetail = await getProductFamilyDetailQuery(tx, newer.id)
     if (!olderDetail || !newerDetail) return null
     const changes = diffFamilyVersions(olderDetail, newerDetail)
     return {
-      from: { id: older.id, version: older.version },
-      to: { id: newer.id, version: newer.version },
+      from: { id: older.id, name: older.name, version: older.version },
+      to: { id: newer.id, name: newer.name, version: newer.version },
       changes,
       counts: countFamilyChanges(changes),
     }

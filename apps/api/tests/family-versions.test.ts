@@ -13,6 +13,7 @@ import { getDb } from '../src/lib/db'
 import {
   compareProductFamilyVersions,
   createNewVersionFromExcel,
+  duplicateProductFamily,
   getProductFamilyDetail,
   getProductFamilyVersions,
   importProductFamilyFromExcel,
@@ -31,7 +32,7 @@ const actor = { actorUserId: '', actorCompanyId: '', requestId: 'test-request' }
 let supplierId = ''
 let clientId = ''
 let actorUserId = ''
-const ids = { v1: '', v2: '', v3: '', other: '' }
+const ids = { v1: '', v2: '', v3: '', other: '', copy: '', copyV2: '' }
 
 const supplierCtx = () => ({ effectiveCompanyId: supplierId, isSuperAdmin: false })
 const clientCtx = () => ({ effectiveCompanyId: clientId, isSuperAdmin: false })
@@ -62,7 +63,10 @@ beforeAll(async () => {
   const v2 = await createNewVersionFromExcel(supplierCtx(), actor, v1.id, fixture)
   const v3 = await createNewVersionFromExcel(supplierCtx(), actor, v1.id, fixture)
   const other = await importProductFamilyFromExcel(supplierCtx(), actor, supplierId, fixture)
-  Object.assign(ids, { v1: v1.id, v2: v2.id, v3: v3.id, other: other.id })
+  // A copy of v2 with its own second version: a branch of the graph.
+  const copy = await duplicateProductFamily(supplierCtx(), actor, v2.id, { name: 'Copy of v2', priceValidFrom: '2026-01-01', priceValidTo: null, publish: false, readyForInvoicing: false })
+  const copyV2 = await createNewVersionFromExcel(supplierCtx(), actor, copy.id, fixture)
+  Object.assign(ids, { v1: v1.id, v2: v2.id, v3: v3.id, other: other.id, copy: copy.id, copyV2: copyV2.id })
 
   const v3Lines = (await getProductFamilyDetail(supplierCtx(), v3.id))!.lines.sort((a, b) => a.sortOrder - b.sortOrder)
   await withSystemTransaction(getDb(), async (tx) => {
@@ -94,6 +98,27 @@ describe('getProductFamilyVersions', () => {
     const result = await getProductFamilyVersions(supplierCtx(), ids.v2)
     expect(result!.versions.map((v) => v.version)).toEqual([1, 2, 3])
     expect(result!.steps).toEqual([])
+    expect(result!.origin).toBeNull()
+    expect(result!.branches).toEqual([{ forkFromId: ids.v2, versions: [expect.objectContaining({ id: ids.copy }), expect.objectContaining({ id: ids.copyV2 })] }])
+    expect(result!.edges).toEqual([
+      { fromId: ids.v1, toId: ids.v2 },
+      { fromId: ids.v2, toId: ids.v3 },
+      { fromId: ids.v2, toId: ids.copy },
+      { fromId: ids.copy, toId: ids.copyV2 },
+    ])
+  })
+
+  it('leaves the copies out when asked for the chain only', async () => {
+    const result = await getProductFamilyVersions(supplierCtx(), ids.v2, { withBranches: false })
+    expect(result!.versions.map((v) => v.version)).toEqual([1, 2, 3])
+    expect(result!.branches).toEqual([])
+  })
+
+  it('shows a copy with the version it was copied from as its origin', async () => {
+    const result = await getProductFamilyVersions(supplierCtx(), ids.copyV2)
+    expect(result!.versions.map((v) => v.id)).toEqual([ids.copy, ids.copyV2])
+    expect(result!.origin).toMatchObject({ id: ids.v2, version: 2 })
+    expect(result!.branches).toEqual([])
   })
 
   it('adds the changes between neighbours when asked', async () => {
@@ -101,12 +126,17 @@ describe('getProductFamilyVersions', () => {
     expect(result!.steps).toEqual([
       { fromId: ids.v1, toId: ids.v2, counts: { added: 0, removed: 0, economic: 0, description: 0 } },
       { fromId: ids.v2, toId: ids.v3, counts: V3_CHANGES },
+      // The copy got a new name and validity; its own v2 is a fresh import of the workbook again.
+      { fromId: ids.v2, toId: ids.copy, counts: expect.objectContaining({ added: 0, removed: 0 }) },
+      { fromId: ids.copy, toId: ids.copyV2, counts: expect.objectContaining({ added: 0, removed: 0 }) },
     ])
   })
 
   it('shows a client only the versions shared with it, stepping over the draft in between', async () => {
     const result = await getProductFamilyVersions(clientCtx(), ids.v3, { withSteps: true })
     expect(result!.versions.map((v) => v.version)).toEqual([1, 3])
+    // The unpublished copy isn't shared with the client either.
+    expect(result!.branches).toEqual([])
     expect(result!.steps).toEqual([{ fromId: ids.v1, toId: ids.v3, counts: V3_CHANGES }])
   })
 
@@ -127,6 +157,21 @@ describe('compareProductFamilyVersions', () => {
       'changed',
       'removed',
     ])
+  })
+
+  it('compares a copy with a version of its original from either side', async () => {
+    // v1 is in v2's chain but not the copy's own graph (that only reaches v2): found from v1's side.
+    const fromCopy = await compareProductFamilyVersions(supplierCtx(), ids.copyV2, ids.v1)
+    const fromOriginal = await compareProductFamilyVersions(supplierCtx(), ids.v1, ids.copyV2)
+    expect(fromCopy).toEqual(fromOriginal)
+    expect(fromCopy!.from.id).toBe(ids.v1)
+  })
+
+  it('compares a copy with its original', async () => {
+    const result = await compareProductFamilyVersions(supplierCtx(), ids.copy, ids.v2)
+    expect(result!.from).toMatchObject({ id: ids.v2, version: 2 })
+    expect(result!.to).toMatchObject({ id: ids.copy, name: 'Copy of v2' })
+    expect(result!.counts.description).toBeGreaterThan(0) // the new name
   })
 
   it('refuses a version the caller cannot see and a version of another family', async () => {

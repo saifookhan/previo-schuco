@@ -99,9 +99,11 @@ Regole complete: [Come vengono calcolati i prezzi](../pricing.md).
 
 ## Versioni e modifiche
 
-Quando una famiglia ha più di una versione, la sua pagina mostra **Versioni e modifiche**: una linea del tempo con tutte
-le versioni (bozza, in vigore, scaduta o futura) e quante modifiche ci sono tra una versione e la successiva. Clicca una
-versione per confrontarla con quella che stai guardando; **Apri** porta alla pagina di quella versione.
+Quando una famiglia ha più di una versione, o è stata copiata, la sua pagina mostra **Versioni e modifiche**: un
+grafico come un git graph. Una corsia contiene le versioni di questa famiglia (bozza, in vigore, scaduta o futura), una
+corsia per ogni copia fatta con **Duplica** parte dalla versione da cui è stata copiata e, se la famiglia è a sua volta
+una copia, una corsia grigia mostra la famiglia di origine. Ogni collegamento mostra quante modifiche ci sono. Clicca una
+versione — o una copia, o l'originale — per confrontarla con quella che stai guardando; **Apri** porta alla sua pagina.
 
 Le modifiche sono disegnate come un albero — dati della famiglia, linee di prodotto, opzioni — e ognuna è di uno di
 quattro tipi:

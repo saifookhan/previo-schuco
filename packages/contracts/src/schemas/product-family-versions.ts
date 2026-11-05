@@ -361,10 +361,13 @@ export const countFamilyChanges = (nodes: FamilyChangeNode[]): FamilyChangeCount
   return counts
 }
 
-/** One version in a family's chain, as the version timeline shows it. */
+/** One version in a family's graph, as the version graph shows it. */
 export interface FamilyVersionSummary {
   id: string
+  name: string
   version: number
+  /** The family this one was copied from with "Duplicate"; null for an import or a new version. */
+  duplicatedFromId: string | null
   isPublished: boolean
   readyForInvoicing: boolean
   priceValidFrom: string | null
@@ -372,17 +375,28 @@ export interface FamilyVersionSummary {
   createdAt: string
 }
 
-/** `GET /api/product-families/:id/versions`: the chain oldest first, with the change counts between neighbours. */
+/**
+ * `GET /api/product-families/:id/versions`: the family's version graph, like a git graph —
+ * its own chain of versions, the copies made from any of them (each a branch with its own
+ * versions), and the family its first version was copied from. Only what the caller can see.
+ */
 export interface FamilyVersionsResponse {
+  /** The chain `:id` belongs to, oldest first. */
   versions: FamilyVersionSummary[]
-  /** `steps[i]` is versions[i] → versions[i + 1]; empty unless asked for with `?steps=true`. */
+  /** Copies made from a version of the chain ("Duplicate"), oldest first, each with its own versions. */
+  branches: { forkFromId: string; versions: FamilyVersionSummary[] }[]
+  /** The family the chain's first version was copied from, if any. */
+  origin: FamilyVersionSummary | null
+  /** Every edge of the graph: each version → the next one, and original → copy. */
+  edges: { fromId: string; toId: string }[]
+  /** The change counts along every edge of the graph (version → next version, original → copy); empty unless asked for with `?steps=true`. */
   steps: { fromId: string; toId: string; counts: FamilyChangeCounts }[]
 }
 
-/** `GET /api/product-families/:id/compare/:otherId`: always older → newer, whichever id is which. */
+/** `GET /api/product-families/:id/compare/:otherId`: always older → newer (by creation), whichever id is which. */
 export interface FamilyVersionComparison {
-  from: { id: string; version: number }
-  to: { id: string; version: number }
+  from: { id: string; name: string; version: number }
+  to: { id: string; name: string; version: number }
   changes: FamilyChangeNode[]
   counts: FamilyChangeCounts
 }

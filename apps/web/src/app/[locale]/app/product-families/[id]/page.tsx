@@ -21,11 +21,14 @@ import { priceValidityToday, type FamilyVersionsResponse } from '@schuco/contrac
 
 interface ProductFamilyDetailPageProps {
   params: Promise<{ id: string }>
+  /** `compare`: open the version graph compared with this version (the quote builder's "See changes"). */
+  searchParams: Promise<{ compare?: string }>
 }
 
 /** Full detail view for one product family: header, images, product lines, and characteristics. */
-const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps) => {
+const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDetailPageProps) => {
   const { id } = await params
+  const { compare } = await searchParams
   const t = await getTranslations('productFamilyDetail')
   const tList = await getTranslations('productFamilies')
   const tVersion = await getTranslations('productFamilyVersion')
@@ -269,11 +272,18 @@ const ProductFamilyDetailPage = async ({ params }: ProductFamilyDetailPageProps)
         </CardContent>
       </Card>
 
-      {/* Only once there is something to compare; a version the caller can't see is not listed. */}
-      {versionsResult.status === 'ok' && versionsResult.data.versions.length > 1 ? (
+      {/* Only once there is something to compare (another version, a copy, or an original); what the caller can't see is not listed. */}
+      {versionsResult.status === 'ok' &&
+      (versionsResult.data.versions.length > 1 || versionsResult.data.branches.length > 0 || versionsResult.data.origin) ? (
         <div className="mt-6">
           {/* Keyed so moving to another version starts a fresh comparison instead of keeping the old pair. */}
-          <ProductFamilyVersions key={family.id} familyId={family.id} versions={versionsResult.data.versions} today={priceValidityToday()} />
+          <ProductFamilyVersions
+            key={family.id}
+            familyId={family.id}
+            graph={versionsResult.data}
+            initialCompareId={typeof compare === 'string' ? compare : undefined}
+            today={priceValidityToday()}
+          />
         </div>
       ) : null}
 

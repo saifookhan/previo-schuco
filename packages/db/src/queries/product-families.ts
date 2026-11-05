@@ -120,6 +120,8 @@ export interface ProductFamilySummary {
   brand: string | null
   version: number
   supersedesId: string | null
+  /** The family this one was copied from with "Duplicate" (pure lineage); null for an import or new version. */
+  duplicatedFromId: string | null
   isPublished: boolean
   /** Only families ready for invoicing are offered for new quote positions. */
   readyForInvoicing: boolean
@@ -282,6 +284,41 @@ export const listProductFamilyVersions = (db: DbLike, familyId: string): Promise
     .from(productFamilies)
     .where(sql`${productFamilies.id} IN (SELECT app_family_version_chain(${familyId}::uuid))`)
     .orderBy(asc(productFamilies.version), asc(productFamilies.createdAt))
+
+/**
+ * Every version of the chains of all of `familyIds` the caller can see, in one query (same
+ * rules as `listProductFamilyVersions`); the caller groups them by their `supersedesId` links.
+ * @param db - RLS-scoped transaction
+ * @param familyIds - One version of each chain
+ */
+export const listProductFamilyVersionsOfChains = (db: DbLike, familyIds: string[]): Promise<ProductFamilySummary[]> =>
+  familyIds.length
+    ? db
+        .select()
+        .from(productFamilies)
+        .where(
+          sql`${productFamilies.id} IN (SELECT app_family_version_chain(f) FROM unnest(ARRAY[${sql.join(
+            familyIds.map((id) => sql`${id}::uuid`),
+            sql`, `,
+          )}]) AS f)`,
+        )
+        .orderBy(asc(productFamilies.version), asc(productFamilies.createdAt))
+    : Promise.resolve([])
+
+/**
+ * Families copied ("Duplicate") from any of `sourceIds` that the caller can see, oldest first —
+ * the branches of the version graph.
+ * @param db - RLS-scoped transaction
+ * @param sourceIds - Family ids the copies were made from
+ */
+export const listProductFamilyCopies = (db: DbLike, sourceIds: string[]): Promise<ProductFamilySummary[]> =>
+  sourceIds.length
+    ? db
+        .select()
+        .from(productFamilies)
+        .where(inArray(productFamilies.duplicatedFromId, sourceIds))
+        .orderBy(asc(productFamilies.createdAt))
+    : Promise.resolve([])
 
 /**
  * Publishes/unpublishes a family. Returns the updated row's id and

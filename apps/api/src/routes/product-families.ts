@@ -266,17 +266,17 @@ productFamilies.get('/:id', rejectNonUuidParams, requireAuth, requirePermission(
   })
 })
 
-/** Every version of the family's chain the caller can see, oldest first; `?steps=true` adds the change counts between neighbours. */
+/** The family's version graph (its versions, the copies made from them, the family it was copied from) as far as the caller can see it; `?steps=true` adds the change counts along each edge, `?graph=false` leaves out the copies. */
 productFamilies.get('/:id/versions', rejectNonUuidParams, requireAuth, requirePermission('catalog.view'), async (c) => {
   const versions = await getProductFamilyVersions(
     { effectiveCompanyId: c.get('effectiveCompanyId'), isSuperAdmin: c.get('isSuperAdmin') },
     c.req.param('id') ?? '',
-    { withSteps: c.req.query('steps') === 'true' },
+    { withSteps: c.req.query('steps') === 'true', withBranches: c.req.query('graph') !== 'false' },
   )
   return versions ? c.json(versions) : c.json({ error: 'Not found' }, 404)
 })
 
-/** What changed between two versions of the same family (older → newer), as a tree of added / removed / economic / description changes. */
+/** What changed between two families of one version graph — two versions, or a copy and its original — older → newer, as a tree of added / removed / economic / description changes. */
 productFamilies.get('/:id/compare/:otherId', rejectNonUuidParams, requireAuth, requirePermission('catalog.view'), async (c) => {
   const comparison = await compareProductFamilyVersions(
     { effectiveCompanyId: c.get('effectiveCompanyId'), isSuperAdmin: c.get('isSuperAdmin') },

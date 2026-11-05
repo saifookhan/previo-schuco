@@ -28,6 +28,15 @@ title: Angebote
 
 Positionen aus einer geteilten Familie starten mit dem Rabatt der Freigabe. Wie jede Zahl berechnet wird: [Wie Preise berechnet werden](../pricing.md).
 
+## Familienversionen im Angebot
+
+- Die Familienliste zeigt die Version jeder Familie, z. B. „Finestra (v2)“, und darunter, was diese Version gegenüber
+  der vorherigen geändert hat (hinzugefügt, entfernt, wirtschaftlich, Beschreibung), mit **Änderungen ansehen**, das den
+  Vergleich auf der Seite der Familie öffnet.
+- Eine Position aus einer älteren Version zeigt die Version unter dem Namen der Linie und, wenn eine neuere Version
+  angeboten werden kann, das Abzeichen **v3 verfügbar**: anklicken für die Änderungen und den Link zum Vergleich. Die
+  Position behält ihren Preis; bearbeite sie, um zur neuen Version zu wechseln.
+
 ## Verlauf
 
 Unten im Angebot **Verlauf** öffnen, um zu sehen, wer es erstellt hat und wer welche Position hinzugefügt,

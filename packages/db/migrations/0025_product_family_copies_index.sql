@@ -1,0 +1,1 @@
+CREATE INDEX "product_families_duplicated_from_id_idx" ON "product_families" USING btree ("duplicated_from_id");

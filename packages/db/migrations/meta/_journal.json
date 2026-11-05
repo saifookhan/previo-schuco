@@ -169,6 +169,13 @@
       "when": 1793887452285,
       "tag": "0024_product_family_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793889935711,
+      "tag": "0025_product_family_copies_index",
+      "breakpoints": true
     }
   ]
 }

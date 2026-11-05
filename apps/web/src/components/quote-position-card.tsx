@@ -1,16 +1,24 @@
 'use client'
 
-import { ChevronDown, ChevronUp, Copy, Loader2, Pencil, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Copy, GitBranch, Loader2, Pencil, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
+import { FamilyVersionChanges } from '@/components/family-version-changes'
 import { cn } from '@/lib/utils'
 import type { QuotePosition } from '@/types/sales-quote'
 
 const EUR = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' })
 
+/** The version of the family a position was priced from, and a newer version that can be quoted now, if any. */
+export interface PositionFamilyVersion {
+  version: number
+  newer?: { id: string; version: number }
+}
+
 interface QuotePositionCardProps {
   position: QuotePosition
+  familyVersion?: PositionFamilyVersion
   isFirst: boolean
   isLast: boolean
   busy: boolean
@@ -28,6 +36,7 @@ interface QuotePositionCardProps {
  */
 export const QuotePositionCard = ({
   position,
+  familyVersion,
   isFirst,
   isLast,
   busy,
@@ -38,7 +47,10 @@ export const QuotePositionCard = ({
   onDelete,
 }: QuotePositionCardProps) => {
   const t = useTranslations('quotes')
+  const tVersions = useTranslations('productFamilyVersions')
   const [expanded, setExpanded] = useState(false)
+  const [showNewer, setShowNewer] = useState(false)
+  const newer = familyVersion?.newer
 
   return (
     <div className="overflow-hidden rounded-xl border-l-4 border-l-brand bg-white shadow-sm transition-all duration-200 hover:shadow-md">
@@ -77,8 +89,23 @@ export const QuotePositionCard = ({
 
           <div className="min-w-0 flex-1">
             <p className="truncate text-[15px] font-semibold text-slate-900">{position.productLineName}</p>
-            <p className="truncate text-xs text-slate-400">{position.productFamilyName}</p>
+            <p className="truncate text-xs text-slate-400">
+              {familyVersion ? t('familyOption', { name: position.productFamilyName, version: familyVersion.version }) : position.productFamilyName}
+            </p>
           </div>
+
+          {newer ? (
+            <button
+              type="button"
+              onClick={() => setShowNewer((open) => !open)}
+              aria-expanded={showNewer}
+              title={tVersions('newerAvailableHint')}
+              className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-200"
+            >
+              <GitBranch className="h-3 w-3" />
+              {tVersions('newerAvailable', { version: newer.version })}
+            </button>
+          ) : null}
 
           <span
             title={position.isValid ? t('validHint') : t('invalidHint')}
@@ -138,6 +165,13 @@ export const QuotePositionCard = ({
           </button>
         </div>
       </div>
+
+      {newer && showNewer ? (
+        <div className="space-y-1 border-b border-amber-100 bg-amber-50/60 px-4 py-2">
+          <p className="text-xs text-amber-800">{tVersions('newerAvailableHint')}</p>
+          <FamilyVersionChanges familyId={newer.id} fromId={position.productFamilyId} />
+        </div>
+      ) : null}
 
       {expanded ? (
         <div className="space-y-2 px-4 py-3 text-sm text-slate-600">

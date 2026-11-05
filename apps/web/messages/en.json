@@ -291,7 +291,7 @@
   },
   "productFamilyVersions": {
     "title": "Versions and changes",
-    "subtitle": "Every version of this family. Pick a version on the timeline to see what changed between it and the one you are viewing.",
+    "subtitle": "Every version of this family, the copies made from it and where it was copied from. Click a version to see what changed between it and the one you are viewing.",
     "viewing": "Viewing",
     "open": "Open",
     "compareWithVersion": "Compare with version {version}",
@@ -302,11 +302,11 @@
       "upcoming": "Upcoming"
     },
     "noChangesShort": "no changes",
-    "noChanges": "Version {from} and version {to} are the same.",
+    "noChanges": "{from} and {to} are the same.",
     "allHidden": "Every kind of change is hidden. Turn one back on above.",
     "loading": "Comparing versions…",
     "error": "The versions could not be compared.",
-    "rootLabel": "v{from} → v{to}",
+    "rootLabel": "{from} → {to}",
     "kinds": {
       "added": "Added",
       "removed": "Removed",
@@ -351,8 +351,6 @@
     "folded": "{count, plural, one {# change} other {# changes}}",
     "hintFold": "Click to open or close",
     "hintDetails": "Click for details",
-    "before": "Version {version}",
-    "after": "Version {version}",
     "yes": "Yes",
     "no": "No",
     "empty": "—",
@@ -365,7 +363,16 @@
     "heightByWidth": "H \\ W",
     "cellAdded": "new size, {price}",
     "cellRemoved": "size taken out, was {price}",
-    "heatmapLegend": "Only the changed sizes are filled in: orange = more expensive, blue = cheaper, green outline = new size, struck through = size taken out."
+    "heatmapLegend": "Only the changed sizes are filled in: orange = more expensive, blue = cheaper, green outline = new size, struck through = size taken out.",
+    "graphLabel": "Version graph",
+    "copyOf": "copy of v{version}",
+    "originLane": "copied from here",
+    "firstVersion": "First version of this family.",
+    "changesBetween": "Changes v{from} → v{to}:",
+    "changesFromOriginal": "Changes from {name} v{from} (copied from it):",
+    "seeChanges": "See changes",
+    "newerAvailable": "v{version} available",
+    "newerAvailableHint": "A newer version of this family can be quoted. This position keeps its price; edit it to switch."
   },
   "productFamilyEdit": {
     "edit": "Edit",
