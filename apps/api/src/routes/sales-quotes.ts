@@ -15,6 +15,8 @@ import {
   updateQuotePosition,
   type QuoteActor,
 } from '../services/quotes-service'
+import { getFamilyVersionNotes } from '../services/product-families-service'
+import { logger } from '../lib/logger'
 import { renderQuotePdf } from '../lib/quote-pdf'
 import { isUuid, rejectNonUuidParams } from '../lib/uuid'
 import type { AuthVariables } from '../middleware/auth'
@@ -190,7 +192,7 @@ salesQuotes.post('/:id/positions/:positionId/duplicate', rejectNonUuidParams, re
   }
 })
 
-/** Streams the quote as a PDF document. */
+/** Streams the quote as a PDF document, with each family's version and what changed since the version before. */
 salesQuotes.get('/:id/pdf', rejectNonUuidParams, requireAuth, requirePermission('quote.view'), async (c) => {
   const id = c.req.param('id')
   if (!id) {
@@ -206,7 +208,15 @@ salesQuotes.get('/:id/pdf', rejectNonUuidParams, requireAuth, requirePermission(
   // than trust it verbatim in a Content-Disposition value.
   const safeFilename = detail.quote.reference.replace(/[^a-zA-Z0-9 ._-]/g, '_') || 'quote'
 
-  const pdfBuffer = await renderQuotePdf(detail)
+  // The version notes are an extra: if they can't be loaded, the PDF still goes out without them.
+  const versionNotes = await getFamilyVersionNotes(
+    ctxFrom(c),
+    detail.positions.map((position) => position.productFamilyId),
+  ).catch((error: unknown) => {
+    logger.warn({ err: error, requestId: c.get('requestId'), quoteId: id }, 'quote PDF without family version notes')
+    return undefined
+  })
+  const pdfBuffer = await renderQuotePdf(detail, versionNotes)
   return c.body(new Uint8Array(pdfBuffer), 200, {
     'Content-Type': 'application/pdf',
     'Content-Disposition': `inline; filename="${safeFilename}.pdf"`,

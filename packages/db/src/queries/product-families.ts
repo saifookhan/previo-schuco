@@ -286,24 +286,35 @@ export const listProductFamilyVersions = (db: DbLike, familyId: string): Promise
     .orderBy(asc(productFamilies.version), asc(productFamilies.createdAt))
 
 /**
- * Every version of the chains of all of `familyIds` the caller can see, in one query (same
- * rules as `listProductFamilyVersions`); the caller groups them by their `supersedesId` links.
+ * The chains of all of `familyIds` in one query, keyed by the id each was asked for: every version
+ * the caller can see, oldest first (same rules as `listProductFamilyVersions`). Keyed rather than
+ * left to the caller to link up by `supersedesId`, since a version the caller can't see would
+ * split a chain in two.
  * @param db - RLS-scoped transaction
  * @param familyIds - One version of each chain
  */
-export const listProductFamilyVersionsOfChains = (db: DbLike, familyIds: string[]): Promise<ProductFamilySummary[]> =>
-  familyIds.length
-    ? db
-        .select()
-        .from(productFamilies)
-        .where(
-          sql`${productFamilies.id} IN (SELECT app_family_version_chain(f) FROM unnest(ARRAY[${sql.join(
-            familyIds.map((id) => sql`${id}::uuid`),
-            sql`, `,
-          )}]) AS f)`,
-        )
-        .orderBy(asc(productFamilies.version), asc(productFamilies.createdAt))
-    : Promise.resolve([])
+export const listProductFamilyVersionsOfChains = async (
+  db: DbLike,
+  familyIds: string[],
+): Promise<Map<string, ProductFamilySummary[]>> => {
+  const chains = new Map<string, ProductFamilySummary[]>()
+  if (!familyIds.length) return chains
+  const rows = await db
+    .select({ chainOf: sql<string>`c.f`, ...getTableColumns(productFamilies) })
+    .from(productFamilies)
+    .innerJoin(
+      sql`(SELECT f, app_family_version_chain(f) AS chain_id FROM unnest(ARRAY[${sql.join(
+        familyIds.map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )}]) AS f) AS c`,
+      sql`c.chain_id = ${productFamilies.id}`,
+    )
+    .orderBy(asc(productFamilies.version), asc(productFamilies.createdAt))
+  for (const { chainOf, ...family } of rows) {
+    chains.set(chainOf, [...(chains.get(chainOf) ?? []), family])
+  }
+  return chains
+}
 
 /**
  * Families copied ("Duplicate") from any of `sourceIds` that the caller can see, oldest first —

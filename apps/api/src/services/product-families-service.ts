@@ -45,6 +45,7 @@ import {
   type RecordHistoryQuery,
 } from '@schuco/contracts'
 
+import type { FamilyVersionNote } from '../lib/quote-pdf'
 import { isUuid } from '../lib/uuid'
 import { extractEmbeddedImages } from '../lib/excel-import/extract-embedded-images'
 import { parseProductFamilyWorkbook, type ParsedWorkbook } from '../lib/excel-import'
@@ -424,26 +425,6 @@ type VersionGraph = {
   origin: ProductFamilySummary | null
 }
 
-/** Splits versions of several chains into chains (by their `supersedesId` links), each oldest first. */
-const groupIntoChains = (rows: ProductFamilySummary[]): ProductFamilySummary[][] => {
-  const byId = new Map(rows.map((row) => [row.id, row]))
-  const next = new Map(rows.filter((row) => row.supersedesId).map((row) => [row.supersedesId!, row]))
-  const seen = new Set<string>()
-  const chains: ProductFamilySummary[][] = []
-  for (const row of rows) {
-    if (seen.has(row.id)) continue
-    let first = row
-    while (first.supersedesId && byId.has(first.supersedesId) && !seen.has(first.supersedesId)) first = byId.get(first.supersedesId)!
-    const chain: ProductFamilySummary[] = []
-    for (let v: ProductFamilySummary | undefined = first; v && !seen.has(v.id); v = next.get(v.id)) {
-      seen.add(v.id)
-      chain.push(v)
-    }
-    chains.push(chain)
-  }
-  return chains
-}
-
 /**
  * The family's chain, the family its first version was copied from and — unless `branches` is
  * false (callers that only need the chain) — the copies made from any of its versions, each with
@@ -462,7 +443,10 @@ const loadVersionGraph = async (
   if (withBranches) {
     const copies = (await listProductFamilyCopies(tx, [...inGraph])).filter((copy) => !inGraph.has(copy.id))
     // Every copy's chain in one query, then one branch per chain (two copies in one chain are one branch).
-    for (const chain of groupIntoChains(await listProductFamilyVersionsOfChains(tx, copies.map((copy) => copy.id)))) {
+    const branchStarts = new Set<string>()
+    for (const chain of (await listProductFamilyVersionsOfChains(tx, copies.map((copy) => copy.id))).values()) {
+      if (!chain.length || branchStarts.has(chain[0].id)) continue
+      branchStarts.add(chain[0].id)
       const fork = chain.find((v) => v.duplicatedFromId && inGraph.has(v.duplicatedFromId))
       if (fork) branches.push({ forkFromId: fork.duplicatedFromId!, versions: chain })
     }
@@ -532,6 +516,13 @@ export const getProductFamilyVersions = (
   })
 }
 
+/** What changed from one family to another, both read under the caller's RLS; null when either is missing. */
+const diffVersionPair = async (tx: Parameters<typeof listProductFamilyVersions>[0], olderId: string, newerId: string) => {
+  const olderDetail = await getProductFamilyDetailQuery(tx, olderId)
+  const newerDetail = olderDetail ? await getProductFamilyDetailQuery(tx, newerId) : null
+  return olderDetail && newerDetail ? diffFamilyVersions(olderDetail, newerDetail) : null
+}
+
 /**
  * What changed between two families of the same version graph — two versions, or a copy and
  * its original — older → newer by creation, whichever is passed first. Null when either isn't
@@ -552,16 +543,42 @@ export const compareProductFamilyVersions = (
     if (pair.length < 2) pair = pairIn(await loadVersionGraph(tx, otherId))
     const [older, newer] = pair.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
     if (!older || !newer) return null
-    const olderDetail = await getProductFamilyDetailQuery(tx, older.id)
-    const newerDetail = await getProductFamilyDetailQuery(tx, newer.id)
-    if (!olderDetail || !newerDetail) return null
-    const changes = diffFamilyVersions(olderDetail, newerDetail)
+    const changes = await diffVersionPair(tx, older.id, newer.id)
+    if (!changes) return null
     return {
       from: { id: older.id, name: older.name, version: older.version },
       to: { id: newer.id, name: newer.name, version: newer.version },
       changes,
       counts: countFamilyChanges(changes),
     }
+  })
+}
+
+/**
+ * For the quote PDF: each family's version and the changes since the version before it in its
+ * chain, as the caller sees the chain (a client stepping over a draft compares with the version
+ * before that). Families the caller can't see are left out.
+ */
+export const getFamilyVersionNotes = (ctx: TenantContext, familyIds: string[]): Promise<Map<string, FamilyVersionNote>> => {
+  const ids = [...new Set(familyIds.filter(isUuid))]
+  if (!ids.length) return Promise.resolve(new Map())
+  return withTenantDb(ctx, async (tx) => {
+    const notes = new Map<string, FamilyVersionNote>()
+    // Every family's chain in one query.
+    const chains = await listProductFamilyVersionsOfChains(tx, ids)
+    for (const familyId of ids) {
+      const chain = chains.get(familyId) ?? []
+      const index = chain.findIndex((v) => v.id === familyId)
+      if (index < 0) continue
+      const previous = chain[index - 1]
+      const changes = previous ? await diffVersionPair(tx, previous.id, familyId) : null
+      notes.set(familyId, {
+        version: chain[index].version,
+        previousVersion: changes ? previous.version : null,
+        changes: changes ?? [],
+      })
+    }
+    return notes
   })
 }
 

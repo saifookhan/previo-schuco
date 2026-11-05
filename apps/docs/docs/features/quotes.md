@@ -36,6 +36,9 @@ Positions from a shared family start with the discount set on the share. How eve
 - A position priced from an older version shows the version under its line name and, when a newer version can be
   quoted, a **v3 available** badge: click it for what changed and the link to the comparison. The position keeps its
   price; edit it to switch to the new version.
+- In the PDF, each family's heading shows its version, and under it what changed since the previous version: what was
+  added or removed, and which items have price changes (price tables with their % range) or text changes. A copy's
+  first version is not compared with the family it was copied from.
 
 ## History
 

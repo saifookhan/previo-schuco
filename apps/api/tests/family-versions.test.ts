@@ -10,10 +10,12 @@ import { eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { getDb } from '../src/lib/db'
+import { familyChangeLines } from '../src/lib/quote-pdf'
 import {
   compareProductFamilyVersions,
   createNewVersionFromExcel,
   duplicateProductFamily,
+  getFamilyVersionNotes,
   getProductFamilyDetail,
   getProductFamilyVersions,
   importProductFamilyFromExcel,
@@ -177,5 +179,84 @@ describe('compareProductFamilyVersions', () => {
   it('refuses a version the caller cannot see and a version of another family', async () => {
     expect(await compareProductFamilyVersions(clientCtx(), ids.v1, ids.v2)).toBeNull()
     expect(await compareProductFamilyVersions(supplierCtx(), ids.v1, ids.other)).toBeNull()
+  })
+})
+
+describe('getFamilyVersionNotes', () => {
+  it('gives each family its version and the changes since the version before, for the quote PDF', async () => {
+    const notes = await getFamilyVersionNotes(supplierCtx(), [ids.v3, ids.v1, ids.copy, ids.v3, 'not-a-uuid'])
+    expect([...notes.keys()].sort()).toEqual([ids.v3, ids.v1, ids.copy].sort())
+    expect(notes.get(ids.v3)).toMatchObject({ version: 3, previousVersion: 2 })
+    expect(notes.get(ids.v1)).toEqual({ version: 1, previousVersion: null, changes: [] })
+    // A copy is never compared with its original in the PDF.
+    expect(notes.get(ids.copy)).toEqual({ version: 1, previousVersion: null, changes: [] })
+
+    const lines = familyChangeLines(notes.get(ids.v3)!.changes)
+    expect(lines.map((line) => line.kind)).toEqual(['removed', 'economic', 'description'])
+    expect(lines.every((line) => line.text.length > 0)).toBe(true)
+  })
+
+  it('compares with the version before that the caller can see, and leaves out what it cannot see', async () => {
+    const notes = await getFamilyVersionNotes(clientCtx(), [ids.v3, ids.v2])
+    expect([...notes.keys()]).toEqual([ids.v3])
+    expect(notes.get(ids.v3)).toMatchObject({ version: 3, previousVersion: 1 })
+  })
+})
+
+describe('familyChangeLines', () => {
+  it('lists each name once per kind, with sub-options under their option and the price table range', () => {
+    const lines = familyChangeLines([
+      { type: 'section', id: 'details', children: [{ type: 'field', id: 'f', field: 'brand', kind: 'description', before: 'A', after: 'B' }] },
+      {
+        type: 'section',
+        id: 'lines',
+        children: [
+          { type: 'item', id: 'l1', name: 'Frame', kind: 'added', children: [] },
+          {
+            type: 'item',
+            id: 'l2',
+            name: 'Sash',
+            children: [
+              { type: 'field', id: 'm', field: 'markupPct', kind: 'economic', before: '1', after: '2' },
+              { type: 'field', id: 't', field: 'priceTable', kind: 'economic', before: null, after: null, priceTable: { widths: [], heights: [], cells: [], pricedCells: 1, minPct: -2, maxPct: 4.25 } },
+              { type: 'link', id: 'k', name: 'Glass', kind: 'removed' },
+            ],
+          },
+        ],
+      },
+      {
+        type: 'section',
+        id: 'options',
+        children: [{ type: 'item', id: 'o', name: 'Colour', children: [{ type: 'item', id: 's', name: 'Red', kind: 'added', children: [] }] }],
+      },
+    ])
+    expect(lines).toEqual([
+      { kind: 'added', text: 'Frame, Colour › Red' },
+      { kind: 'removed', text: 'Sash: Glass' },
+      { kind: 'economic', text: 'Sash (-2.0% to +4.3%)' },
+      { kind: 'description', text: 'Family details' },
+    ])
+  })
+
+  it('shows a price table range that rounds to one value once', () => {
+    const priceTable = { widths: [], heights: [], cells: [], pricedCells: 1, minPct: -4.81, maxPct: -4.79 }
+    const changes = [{ type: 'item' as const, id: 'l', name: 'Sash', children: [{ type: 'field' as const, id: 't', field: 'priceTable' as const, kind: 'economic' as const, before: null, after: null, priceTable }] }]
+    expect(familyChangeLines([{ type: 'section', id: 'lines', children: changes }])).toEqual([{ kind: 'economic', text: 'Sash (-4.8%)' }])
+  })
+
+  it('merges the ranges of an item\'s price tables and never shows a signed zero', () => {
+    const table = (minPct: number, maxPct: number) => ({ widths: [], heights: [], cells: [], pricedCells: 1, minPct, maxPct })
+    const field = (id: string, priceTable?: ReturnType<typeof table>) => ({ type: 'field' as const, id, field: 'priceTable' as const, kind: 'economic' as const, before: null, after: null, priceTable })
+    const item = (name: string, children: ReturnType<typeof field>[]) => ({ type: 'item' as const, id: name, name, children })
+    expect(
+      familyChangeLines([
+        { type: 'section', id: 'lines', children: [item('Sash', [field('a'), field('b', table(1, 2)), field('c', table(-3, 1.5))]), item('Frame', [field('d', table(-0.03, 0.04))])] },
+      ]),
+    ).toEqual([{ kind: 'economic', text: 'Sash (-3.0% to +2.0%), Frame (0.0%)' }])
+  })
+
+  it('cuts a long list short', () => {
+    const items = Array.from({ length: 8 }, (_, i) => ({ type: 'item' as const, id: `i${i}`, name: `L${i}`, kind: 'added' as const, children: [] }))
+    expect(familyChangeLines([{ type: 'section', id: 'lines', children: items }])).toEqual([{ kind: 'added', text: 'L0, L1, L2, L3, L4, L5 and 2 more' }])
   })
 })

@@ -36,6 +36,9 @@ Positionen aus einer geteilten Familie starten mit dem Rabatt der Freigabe. Wie 
 - Eine Position aus einer älteren Version zeigt die Version unter dem Namen der Linie und, wenn eine neuere Version
   angeboten werden kann, das Abzeichen **v3 verfügbar**: anklicken für die Änderungen und den Link zum Vergleich. Die
   Position behält ihren Preis; bearbeite sie, um zur neuen Version zu wechseln.
+- Im PDF zeigt die Überschrift jeder Familie ihre Version und darunter, was sich seit der vorherigen Version geändert
+  hat: was hinzugefügt oder entfernt wurde und welche Einträge Preisänderungen (Preistabellen mit ihrer %-Spanne) oder
+  Textänderungen haben. Die erste Version einer Kopie wird nicht mit der Familie verglichen, aus der sie kopiert wurde.
 
 ## Verlauf
 

@@ -36,6 +36,9 @@ Le posizioni da una famiglia condivisa partono con lo sconto impostato sulla con
 - Una posizione calcolata da una versione più vecchia mostra la versione sotto il nome della linea e, quando si può
   preventivare una versione più recente, il badge **v3 disponibile**: cliccalo per vedere cosa è cambiato e il link al
   confronto. La posizione mantiene il suo prezzo; modificala per passare alla nuova versione.
+- Nel PDF il titolo di ogni famiglia mostra la sua versione e, sotto, cosa è cambiato rispetto alla versione precedente:
+  cosa è stato aggiunto o rimosso e quali voci hanno modifiche di prezzo (le tabelle prezzi con il loro intervallo in %)
+  o di testo. La prima versione di una copia non viene confrontata con la famiglia da cui è stata copiata.
 
 ## Cronologia
 
