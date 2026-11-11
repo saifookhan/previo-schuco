@@ -176,6 +176,13 @@
       "when": 1793889935711,
       "tag": "0025_product_family_copies_index",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794399910162,
+      "tag": "0026_excel_v2_fields",
+      "breakpoints": true
     }
   ]
 }

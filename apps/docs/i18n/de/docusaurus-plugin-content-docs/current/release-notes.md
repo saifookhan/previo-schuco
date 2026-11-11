@@ -9,6 +9,13 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 
 ## November 2026
 
+**Woche vom 9. November**
+- **Excel-Vorlage Version 2**: **Distributore** (Händler) und **Note** der Familie, ein **Mindesteinkaufspreis** (`MinValue`) für Linien und Optionen sowie pro Option ein eigener **Rabatt**, **Aufschlag** und eigene **Montagestunden**. Dateien der Version 1 lassen sich weiterhin importieren. Siehe [Excel-Importformat](./excel-format.md).
+- **Preise**: Eine Linie oder Option kostet nie weniger als ihr Minimum; jede Option wird mit ihrem eigenen Rabatt und Aufschlag berechnet (die Linie mit denen der Position; bei einer geteilten Familie gilt der Rabatt der Position auch für die Optionen), angezeigt neben der Option in der Position; die Montagestunden der Optionen werden für „Ore di posa“-Optionen zu denen der Linie addiert. Siehe [Wie Preise berechnet werden](./pricing.md).
+- **Import-Korrekturen**: `NO` im Blatt Relations zählt nicht mehr als „gilt“; ein fehlendes Preistabellen-Blatt stoppt den Import mit seinem Namen, statt eine Option ohne Preise anzulegen; Linien mit leerem Preis werden mit 0 importiert; neuer Typ `Altezza x [€/m]`, und in Dateien der Version 2 ist `2xAltezza x [€/m]` die doppelte **Höhe** (Dateien der Version 1 behalten die Formel ihrer Vorlage).
+- **Versionen und Änderungen**: Eine an ihrer Stelle umbenannte Linie oder Option erscheint als eine Beschreibungsänderung, nicht als entfernt + hinzugefügt; eine ganz hinzugefügte oder entfernte Option ist eine Änderung, nicht zusätzlich eine pro Linie, die sie anbietet; die neuen Felder werden ebenfalls verglichen.
+- Die Seite der Familie zeigt Händler, Hinweis, Mindestpreise der Linien und die eigenen Konditionen der Optionen; die herunterladbare Beispiel-Arbeitsmappe ist jetzt Version 2.
+
 **Woche vom 2. November**
 - **Produktfamilien-Liste, neue Spalten** (aus dem Mock-up des Kunden): **Mit Preisliste** (Ja / Nein), **Gültig ab** und **Gültig bis** als Datumsfelder, **Bereit zur Fakturierung** und **In Bibliothek** (Ja / Nein) — alle direkt in der Zeile änderbar.
 - **In Bibliothek**: jedes Unternehmen wählt, welche Familien (eigene oder geteilte) sein Angebot anbietet; für andere Benutzer verschwinden Familien außerhalb der Bibliothek aus dem Katalog.

@@ -214,6 +214,14 @@ export const QuotePositionCard = ({
               {position.characteristics.map((c) => (
                 <span key={c.id} className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-600">
                   {c.characteristicName}: {c.subCharacteristicName}
+                  {/* Priced at its own discount/markup, not the position's shown above. */}
+                  {c.discountPct != null &&
+                  c.markupPct != null &&
+                  (Number(c.discountPct) !== Number(position.discountPct) || Number(c.markupPct) !== Number(position.extraMarkupPct)) ? (
+                    <span className="ml-1 text-slate-400" title={t('optionOwnTermsHint')}>
+                      · {Number(c.discountPct)}% / {Number(c.markupPct)}%
+                    </span>
+                  ) : null}
                   {c.pricingMode === 'manual' ? (
                     <span className="ml-1 font-semibold text-amber-600" title={t('pricingModeManualLabel')}>
                       ({t('pricingModeManual')})

@@ -40,6 +40,10 @@ export const productFamilies = pgTable('product_families', {
   description1: text('description_1'),
   /** Excel "Descrizione_2". */
   description2: text('description_2'),
+  /** Excel "Note" (v2 template): a free-text note, often a link to technical documentation. */
+  note: text('note'),
+  /** Excel "Distributore" (v2 template): who the family is bought through, next to its brand. */
+  distributor: text('distributor'),
   version: integer('version').notNull().default(1),
   /**
    * Previous version this one replaces, if any — null for the first
@@ -121,6 +125,8 @@ export const productLines = pgTable('product_lines', {
   pricingMatrixId: uuid('pricing_matrix_id').references((): AnyPgColumn => pricingMatrices.id, {
     onDelete: 'set null',
   }),
+  /** Excel "MinValue" (v2 template): the lowest purchase price per unit — a smaller computed price is raised to it. Null = no minimum. */
+  minValue: numeric('min_value', { precision: 14, scale: 4 }),
   unitName: text('unit_name').notNull(),
   unitSymbol: text('unit_symbol').notNull(),
   discountPct: numeric('discount_pct', { precision: 8, scale: 4 }).notNull().default('0'),
@@ -168,6 +174,16 @@ export const characteristics = pgTable('characteristics', {
   pricingMatrixId: uuid('pricing_matrix_id').references((): AnyPgColumn => pricingMatrices.id, {
     onDelete: 'set null',
   }),
+  /**
+   * v2 template only, so null on options imported from a v1 workbook (and on main
+   * characteristics): the option's own minimum purchase price, discount and markup (both
+   * "out of 100", like a line's), and the installation hours it adds to the line's.
+   * A null discount/markup means the position's own applies, as before v2.
+   */
+  minValue: numeric('min_value', { precision: 14, scale: 4 }),
+  discountPct: numeric('discount_pct', { precision: 8, scale: 4 }),
+  markupPct: numeric('markup_pct', { precision: 8, scale: 4 }),
+  installationHoursPerUnit: numeric('installation_hours_per_unit', { precision: 14, scale: 4 }),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

@@ -103,6 +103,16 @@ describe('computeLinePrice', () => {
     expect(result.finalPrice).toBeCloseTo(expectedBase * (1 - 43 / 100) * (150 / 100), 6)
   })
 
+  it('raises a price below the minimum purchase price (MinValue) to it, before discount and markup', () => {
+    // v2 example "Avvolgibile Aria-Luce": 80 €/m2 with a MinValue of 120.
+    const line = { value: 80, formula: '((B*H)/1000000) * valore', minValue: 120, installationHoursPerUnit: 0, discountPct: 10, markupPct: 150 }
+    const small = computeLinePrice(line, 1000, 1000)
+    expect(small.basePrice).toBe(120)
+    expect(small.finalPrice).toBeCloseTo(120 * 0.9 * 1.5, 6)
+    expect(computeLinePrice(line, 2000, 1000).basePrice).toBe(160)
+    expect(computeCharacteristicPrice({ ...line, minValue: null }, 1000, 1000, 0).basePrice).toBe(80)
+  })
+
   it('throws when a matrix lookup falls outside the table, rather than returning a wrong price', () => {
     expect(() =>
       computeLinePrice(

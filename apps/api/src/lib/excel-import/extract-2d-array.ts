@@ -1,3 +1,5 @@
+import * as XLSX from 'xlsx'
+
 import type { RawPricingMatrix } from './types'
 
 /**
@@ -40,4 +42,59 @@ export const extract2DArray = (rows: unknown[][]): RawPricingMatrix => {
     .map((row) => row.filter((_, i) => keepWidth[i] !== false))
 
   return { widths, heights, matrix }
+}
+
+/**
+ * The BxH price table on sheet `sheetName` (see `extract2DArray`).
+ * @param workbook - Parsed workbook (`extractWorkbook`)
+ * @param sheetName - The price list column's value, naming the sheet
+ * @param usedBy - What names it, for the error ("Product line \"X\"")
+ * @throws if the workbook has no such sheet — the price would otherwise be silently empty
+ */
+export const extractPriceSheet = (workbook: XLSX.WorkBook, sheetName: unknown, usedBy: string): RawPricingMatrix => {
+  const name = String(sheetName ?? '').trim()
+  if (!name || !workbook.SheetNames.includes(name)) {
+    throw new Error(`${usedBy} uses the price table "${name}", but the workbook has no sheet with that name`)
+  }
+  return extract2DArray(XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[name], { header: 1 }))
+}
+
+/** A number cell, or null when blank (or not a number). */
+export const optionalNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined || (typeof value === 'string' && !value.trim())) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+/** The price list sheet names the template fills in by default: "LP<n>" for lines, "C<n>_<row>" for options. */
+const TEMPLATE_SHEET_NAME = /^(LP\d+|C\d+_\d+)$/
+
+/**
+ * A line's or option's purchase price. A "Tabella BxH" type reads the price table its price
+ * list column names. Otherwise a blank cell, or the template's untouched default sheet name,
+ * is 0 (a "for itself" family can price everything through its options); another sheet name
+ * is a price table too (v1 lines relied on that); anything else must be a number.
+ * @throws if a price table sheet is missing, or the value is neither a number nor a sheet
+ */
+export const resolvePurchasePrice = (
+  workbook: XLSX.WorkBook,
+  priceListType: string | null,
+  listino: unknown,
+  usedBy: string,
+): number | RawPricingMatrix => {
+  if (priceListType?.includes('Tabella BxH')) {
+    return extractPriceSheet(workbook, listino, usedBy)
+  }
+  const text = typeof listino === 'string' ? listino.trim() : null
+  if (listino == null || text === '' || (text && TEMPLATE_SHEET_NAME.test(text))) {
+    return 0
+  }
+  if (text && workbook.SheetNames.includes(text)) {
+    return extractPriceSheet(workbook, text, usedBy)
+  }
+  const price = optionalNumber(listino)
+  if (price === null) {
+    throw new Error(`${usedBy} has the price "${String(listino)}", which is neither a number nor a sheet of the workbook`)
+  }
+  return price
 }

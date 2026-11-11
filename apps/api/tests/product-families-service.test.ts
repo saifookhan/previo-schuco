@@ -124,6 +124,7 @@ describe('importProductFamilyFromExcel', () => {
     expect(matrixLine.pricingMatrixId).not.toBeNull()
 
     const formulaLine = detail!.lines.find((l) => l.name.startsWith('Guida aggintiva'))!
+    // A v1 workbook keeps its template's "2xAltezza" formula.
     expect(formulaLine.formula).toBe('(B*2/1000) * valore')
     expect(formulaLine.pricingMatrixId).toBeNull()
   })

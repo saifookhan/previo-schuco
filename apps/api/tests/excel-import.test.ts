@@ -21,12 +21,15 @@ const fixturePath = join(__dirname, 'fixtures/product-family-sample.xlsx')
 const fixtureBuffer = readFileSync(fixturePath)
 
 describe('resolvePriceListType', () => {
-  it('resolves every known Tipo_Listino to its formula (verified against the fixture\'s own "Elenchi" sheet)', () => {
+  it('resolves every known Tipo_Listino to its formula (verified against the v2 template\'s "Elenchi" sheet)', () => {
     expect(resolvePriceListType('Valore_Fisso [€/Pz]')).toEqual({ kind: 'formula', formula: 'valore' })
+    // Twice the height — the v1 template's "(B*2/1000)" was a mistake the v2 one fixed.
     expect(resolvePriceListType('2xAltezza x [€/m]')).toEqual({
       kind: 'formula',
-      formula: '(B*2/1000) * valore',
+      formula: '(H*2/1000) * valore',
     })
+    expect(resolvePriceListType('2xAltezza x [€/m]', 1)).toEqual({ kind: 'formula', formula: '(B*2/1000) * valore' })
+    expect(resolvePriceListType('Altezza x [€/m]')).toEqual({ kind: 'formula', formula: '(H/1000) * valore' })
     expect(resolvePriceListType('Tabella BxH [€/Pz]')).toEqual({ kind: 'matrix' })
   })
 
@@ -174,8 +177,14 @@ describe('sample workbook (scripts/sample-workbook.ts)', () => {
       ['Vetro', 3],
       ['Colore', 3],
       ['Maniglia', 3],
+      ['Posa', 2],
     ])
-    expect(parsed.relations).toHaveLength(7)
+    // Every cell is SI or NO (v2); only the SI ones are relations.
+    expect(parsed.relations).toHaveLength(10)
+    expect(parsed.family).toMatchObject({ brand: 'PREVIO Demo', distributor: 'Demo Distribution' })
+    expect(parsed.productLines[2].minValue).toBe(40)
+    const vetro = parsed.characteristics.find((main) => main.name === 'Vetro')!
+    expect(vetro.subCharacters[2]).toMatchObject({ minValue: 30, discountPct: 0.05, markupPct: 1.2, installationHoursPerUnit: 0.5 })
     // "% sul valore base" options are Excel percentages: 0.08 in the sheet is read as 8 (%),
     // which the docs' worked example (Antracite = 8% of the line price) depends on.
     const colore = parsed.characteristics.find((main) => main.name === 'Colore')!

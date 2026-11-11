@@ -9,6 +9,13 @@ What changed, newest first. Use it to see what's new to test.
 
 ## November 2026
 
+**Week of 9 November**
+- **Excel template version 2**: the family's **Distributore** and **Note**, a **minimum purchase price** (`MinValue`) on lines and options, and per option its own **discount**, **markup** and **installation hours**. Version 1 workbooks still import. See [Excel import format](./excel-format.md).
+- **Pricing**: a line or option never costs less than its minimum; each option is priced at its own discount and markup (the line at the position's; on a shared family the position's discount applies to options too), shown next to the option on the position; options' installation hours add up with the line's for "Ore di posa" options. See [How prices are calculated](./pricing.md).
+- **Import fixes**: `NO` in the Relations sheet no longer counts as "applies"; a price table sheet that doesn't exist stops the import with its name, instead of an option without prices; lines with a blank price import at 0; new type `Altezza x [€/m]`, and in version 2 workbooks `2xAltezza x [€/m]` is twice the **height** (version 1 workbooks keep their template's formula).
+- **Versions and changes**: a line or option renamed in place shows as one description change, not removed + added; an option added or removed as a whole is one change, not also one per line offering it; the new fields are compared too.
+- The family's page shows the distributor, the note, line minimums and options' own terms; the downloadable sample workbook is now version 2.
+
 **Week of 2 November**
 - **Product families list, new columns** (from the client's mock-up): **With price list** (Yes / No), **Valid from** and **Valid to** as date fields, **Ready for invoicing** and **In library** (Yes / No) — all changed right in the row.
 - **In library**: each company chooses which families (its own or shared with it) its quote builder offers; for other users, families out of the library disappear from the catalog.

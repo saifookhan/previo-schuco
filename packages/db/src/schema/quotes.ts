@@ -149,6 +149,9 @@ export const quotePositionCharacteristics = pgTable(
     pricingMode: pricingModeEnum('pricing_mode').notNull().default('auto'),
     /** Only meaningful when pricingMode = 'manual' — this characteristic's own €/unit value the user typed in place of the computed one (pre-quantity, same basis as the formula path — see quotes-service.ts). */
     manualUnitPrice: numeric('manual_unit_price', { precision: 14, scale: 4 }),
+    /** The option's own discount and markup at save time (v2 options); null = the position's discount/markup applied to it. */
+    discountPct: numeric('discount_pct', { precision: 8, scale: 4 }),
+    markupPct: numeric('markup_pct', { precision: 8, scale: 4 }),
   },
   (table) => ({
     // getQuoteDetail fetches this table once per position on every quote read.

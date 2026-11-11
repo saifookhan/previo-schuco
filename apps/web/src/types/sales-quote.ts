@@ -31,6 +31,9 @@ export interface QuotePositionCharacteristic {
   price: string
   pricingMode: PricingMode
   manualUnitPrice: string | null
+  /** The option's own discount/markup (v2 families); null = the position's applied to it. */
+  discountPct: string | null
+  markupPct: string | null
 }
 
 export interface QuotePosition {

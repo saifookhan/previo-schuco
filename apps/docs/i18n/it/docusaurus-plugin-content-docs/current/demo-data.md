@@ -20,15 +20,16 @@ Un piccolo catalogo di finestre inventato. Tutti i prezzi sono fittizi.
 |---|---|---|
 | Finestra 1 anta | Tabella larghezza × altezza (vedi sotto), al pezzo | 10% / 130% |
 | Finestra 2 ante | €280 al m² | 10% / 130% |
-| Zanzariera | €18 al metro di perimetro | 0% / 140% |
+| Zanzariera | €18 al metro di perimetro, almeno €40 | 0% / 140% |
 
 | Caratteristica | Opzioni |
 |---|---|
-| Vetro | Doppio vetro €0/m² · Triplo vetro €45/m² · Vetro acustico €60/m² |
+| Vetro | Doppio vetro €0/m² · Triplo vetro €45/m² · Vetro acustico €60/m² (propri 5% / 120%) — triplo e acustico: almeno €30, +0,5 h di posa |
 | Colore | Bianco €0 · Antracite +8% del prezzo del prodotto · Effetto legno +15% |
-| Maniglia | Standard €0 · Con chiave €35 · Design inox €55 |
+| Maniglia | Standard €0 · Con chiave €35 · Design inox €55 (ricarico proprio 150%) |
+| Posa | Esclusa €0 · Inclusa (a ore) €45 per ora di posa, almeno €60 |
 
-La *Zanzariera* offre solo *Colore*; le finestre offrono tutte e tre.
+La *Zanzariera* offre solo *Colore* e *Posa*; le finestre offrono tutte e quattro.
 
 **Tabella prezzi di "Finestra 1 anta"** (€ al pezzo; larghezza in orizzontale, altezza in verticale, in mm):
 

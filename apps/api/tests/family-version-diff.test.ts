@@ -69,7 +69,7 @@ describe('diffFamilyVersions', () => {
     }
     const changes = diffFamilyVersions(base, newer)
     expect(countFamilyChanges(changes)).toEqual({
-      added: 3, // line Scorrevole, option Vetro, Battente now offers Vetro
+      added: 2, // line Scorrevole, option Vetro (a whole new option is one change, not also one per line offering it)
       removed: 2, // line Fisso, Battente no longer offers Colore
       economic: 3, // valid to, Battente markup, RAL 9010 value
       description: 2, // description 1, Battente unit name
@@ -79,6 +79,20 @@ describe('diffFamilyVersions', () => {
     expect(details).toContainEqual(
       expect.objectContaining({ field: 'priceValidTo', kind: 'economic', before: null, after: '2026-12-31' }),
     )
+  })
+
+  it('pairs a removed and an added item at the same place as a rename (a description change)', () => {
+    const newer: FamilyVersionSnapshot = {
+      ...base,
+      lines: [line('n1', 'Battente nuovo'), line('n2', 'Fisso', { sortOrder: 1 })],
+      relations: [{ productLineId: 'n1', characteristicId: 'c1' }],
+    }
+    const changes = diffFamilyVersions(base, newer)
+    expect(countFamilyChanges(changes)).toEqual({ added: 0, removed: 0, economic: 0, description: 1 })
+    expect(changes[0]).toMatchObject({
+      id: 'lines',
+      children: [{ type: 'item', name: 'Battente nuovo', children: [{ field: 'name', before: 'Battente', after: 'Battente nuovo' }] }],
+    })
   })
 
   it('reports switching between a fixed price and a price table as one economic change', () => {

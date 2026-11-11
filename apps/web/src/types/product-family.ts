@@ -42,6 +42,8 @@ export interface ProductLine {
   formula: string
   value: string
   pricingMatrixId: string | null
+  /** Lowest purchase price per unit (v2 template); null = none. */
+  minValue: string | null
   unitName: string
   unitSymbol: string
   discountPct: string
@@ -59,6 +61,11 @@ export interface Characteristic {
   formula: string | null
   value: string | null
   pricingMatrixId: string | null
+  /** v2 options: own minimum purchase price, discount and markup (out of 100), and the installation hours they add. Null = not set (the position's discount/markup apply). */
+  minValue: string | null
+  discountPct: string | null
+  markupPct: string | null
+  installationHoursPerUnit: string | null
   sortOrder: number
 }
 
@@ -75,6 +82,9 @@ export interface ProductFamilyDetail {
   family: ProductFamilySummary & {
     description1: string | null
     description2: string | null
+    /** v2 template: free-text note (often a link to technical documentation) and the distributor. */
+    note: string | null
+    distributor: string | null
     sourceExcelPath: string | null
     supersedesId: string | null
     duplicatedFromId: string | null

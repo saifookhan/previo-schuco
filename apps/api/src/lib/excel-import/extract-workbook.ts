@@ -14,3 +14,14 @@ export const extractWorkbook = (buffer: Buffer): XLSX.WorkBook => {
     throw new Error('Failed to read the uploaded file as an Excel workbook')
   }
 }
+
+/**
+ * Which version of the Excel template the workbook follows: 2 when "Product lines" has the
+ * "MinValue" column version 2 added, otherwise 1.
+ * @param workbook - Parsed workbook (`extractWorkbook`)
+ */
+export const detectTemplateVersion = (workbook: XLSX.WorkBook): 1 | 2 => {
+  const sheet = workbook.Sheets['Product lines']
+  const [header = []] = sheet ? XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 }) : []
+  return header.some((cell) => String(cell ?? '').trim() === 'MinValue') ? 2 : 1
+}

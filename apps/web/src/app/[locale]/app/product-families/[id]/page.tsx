@@ -1,5 +1,5 @@
 import { AlertTriangle, History } from 'lucide-react'
-import { getTranslations } from 'next-intl/server'
+import { getFormatter, getTranslations } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 
 import { Badge } from '@/components/ui/badge'
@@ -34,6 +34,20 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
   const tVersion = await getTranslations('productFamilyVersion')
   const tEdit = await getTranslations('productFamilyEdit')
   const tFlags = await getTranslations('productFamilyFlags')
+  const format = await getFormatter()
+  const euro = (value: string) => format.number(Number(value), { style: 'currency', currency: 'EUR' })
+  // A v2 option's own minimum, discount/markup and added installation hours, when set.
+  const optionTerms = (option: ProductFamilyDetail['characteristics'][number]) =>
+    [
+      option.minValue != null ? t('optionMin', { value: euro(option.minValue) }) : null,
+      // Not the no-op 0% / 100% most options carry.
+      option.discountPct != null && option.markupPct != null && (Number(option.discountPct) !== 0 || Number(option.markupPct) !== 100)
+        ? t('optionTerms', { discount: Number(option.discountPct), markup: Number(option.markupPct) })
+        : null,
+      Number(option.installationHoursPerUnit ?? 0) > 0 ? t('optionHours', { hours: Number(option.installationHoursPerUnit) }) : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
   const [result, versionsResult] = await Promise.all([
     fetchFromApiResult<ProductFamilyDetail>(`/api/product-families/${id}`),
     fetchFromApiResult<FamilyVersionsResponse>(`/api/product-families/${id}/versions`),
@@ -104,7 +118,14 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
             {!editable ? <Badge variant="warning">{tEdit('lockedBadge')}</Badge> : null}
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            {[family.technicalName, family.category, family.brand].filter(Boolean).join(' · ') || '—'}
+            {[
+              family.technicalName,
+              family.category,
+              family.brand,
+              family.distributor ? t('distributor', { name: family.distributor }) : null,
+            ]
+              .filter(Boolean)
+              .join(' · ') || '—'}
           </p>
           <ProductFamilyPriceValidity familyId={family.id} validity={family} canEdit={canManage} today={priceValidityToday()} />
           <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600">
@@ -150,11 +171,17 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
         </div>
       </div>
 
-      {(family.description1 || family.description2) && (
+      {(family.description1 || family.description2 || family.note) && (
         <Card className="mb-6">
           <CardContent className="space-y-1 pt-6 text-sm text-slate-600">
             {family.description1 ? <p>{family.description1}</p> : null}
             {family.description2 ? <p>{family.description2}</p> : null}
+            {family.note ? (
+              <p className="whitespace-pre-line pt-1 text-slate-500">
+                <span className="font-medium text-slate-700">{t('note')}: </span>
+                {family.note}
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       )}
@@ -198,6 +225,9 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
                         {line.formula} <span className="text-slate-400">(valore = {line.value})</span>
                       </span>
                     )}
+                    {line.minValue != null ? (
+                      <p className="mt-0.5 text-xs text-slate-400">{t('minValue', { value: euro(line.minValue) })}</p>
+                    ) : null}
                     <ProductFamilyPricingEditor
                       kind="line"
                       familyId={family.id}
@@ -240,32 +270,36 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
             <div key={main.id} className="px-6 py-4">
               <p className="font-medium text-slate-900">{main.name}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                {(subCharacteristicsByParent.get(main.id) ?? []).map((sub) => (
-                  <span
-                    key={sub.id}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600"
-                    title={sub.pricingMatrixId ? undefined : `${sub.formula} (valore = ${sub.value})`}
-                  >
-                    {sub.name}
-                    {sub.pricingMatrixId && matrixById.has(sub.pricingMatrixId) ? (
-                      <ProductFamilyMatrixPreview
-                        familyId={family.id}
-                        matrix={matrixById.get(sub.pricingMatrixId)!}
-                        label={t('pricingMatrix')}
-                        editable={editable}
-                      />
-                    ) : (
-                      <ProductFamilyPricingEditor
-                        kind="characteristic"
-                        familyId={family.id}
-                        itemId={sub.id}
-                        itemName={sub.name}
-                        editable={editable}
-                        initial={{ value: sub.value, formula: sub.formula }}
-                      />
-                    )}
-                  </span>
-                ))}
+                {(subCharacteristicsByParent.get(main.id) ?? []).map((sub) => {
+                  const terms = optionTerms(sub)
+                  return (
+                    <span
+                      key={sub.id}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600"
+                      title={sub.pricingMatrixId ? undefined : `${sub.formula} (valore = ${sub.value})`}
+                    >
+                      {sub.name}
+                      {sub.pricingMatrixId && matrixById.has(sub.pricingMatrixId) ? (
+                        <ProductFamilyMatrixPreview
+                          familyId={family.id}
+                          matrix={matrixById.get(sub.pricingMatrixId)!}
+                          label={t('pricingMatrix')}
+                          editable={editable}
+                        />
+                      ) : (
+                        <ProductFamilyPricingEditor
+                          kind="characteristic"
+                          familyId={family.id}
+                          itemId={sub.id}
+                          itemName={sub.name}
+                          editable={editable}
+                          initial={{ value: sub.value, formula: sub.formula }}
+                        />
+                      )}
+                      {terms ? <span className="text-slate-400">· {terms}</span> : null}
+                    </span>
+                  )
+                })}
               </div>
             </div>
           ))}

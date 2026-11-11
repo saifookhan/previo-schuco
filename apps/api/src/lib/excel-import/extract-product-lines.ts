@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 
-import { extract2DArray } from './extract-2d-array'
+import { optionalNumber, resolvePurchasePrice } from './extract-2d-array'
 import type { RawProductLine } from './types'
 
 /**
@@ -18,12 +18,12 @@ const trimKeys = (row: Record<string, unknown>): Record<string, unknown> =>
  * Extracts product lines from the "Product lines" sheet. `Listino_acquisto`
  * is either a plain number, or the name of another sheet in the same
  * workbook holding a BxH pricing matrix — resolved here, not left for the
- * caller to figure out. Rows missing a name/unit/price are template
- * placeholder rows (confirmed in a real workbook — dozens of rows with
- * only an Index and a `Listino_acquisto` sheet name), not data; filtered
- * out, not imported as broken product lines.
+ * caller to figure out (see `resolvePurchasePrice`). Rows missing a name or
+ * unit are template placeholder rows (confirmed in a real workbook — dozens
+ * of rows with only an Index and a `Listino_acquisto` sheet name), not data;
+ * filtered out, not imported as broken product lines. A blank price is 0.
  * @param workbook - Parsed workbook (`extractWorkbook`)
- * @throws if the "Product lines" sheet is missing
+ * @throws if the "Product lines" sheet is missing, or a line's price can't be read
  */
 export const extractProductLines = (workbook: XLSX.WorkBook): RawProductLine[] => {
   if (!workbook.SheetNames.includes('Product lines')) {
@@ -35,27 +35,22 @@ export const extractProductLines = (workbook: XLSX.WorkBook): RawProductLine[] =
     .sheet_to_json<Record<string, unknown>>(sheet)
     .map(trimKeys)
 
-  const filtered = rows.filter(
-    (row) => row.Nome_linea_prodotto && row.Nome_UM && row.Simbolo_UM && row.Listino_acquisto != null,
-  )
+  const filtered = rows.filter((row) => row.Nome_linea_prodotto && row.Nome_UM && row.Simbolo_UM)
 
   return filtered.map((row) => {
-    const listino = row.Listino_acquisto as string | number
-    const resolvedListino =
-      typeof listino === 'string' && workbook.SheetNames.includes(listino)
-        ? extract2DArray(XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[listino], { header: 1 }))
-        : Number(listino)
-
+    const name = String(row.Nome_linea_prodotto)
+    const priceListType = row.Tipo_Listino != null ? String(row.Tipo_Listino) : null
     return {
-      name: row.Nome_linea_prodotto as string,
+      name,
       description: (row.Descrizione_opzionale as string) ?? null,
-      priceListType: (row.Tipo_Listino as string) ?? null,
-      listinoAcquisto: resolvedListino,
+      priceListType,
+      listinoAcquisto: resolvePurchasePrice(workbook, priceListType, row.Listino_acquisto, `Product line "${name}"`),
+      minValue: optionalNumber(row.MinValue),
       unitName: row.Nome_UM as string,
       unitSymbol: row.Simbolo_UM as string,
-      discountPct: (row['Sconto %'] as number) ?? null,
-      markupPct: (row['MarkUp %'] as number) ?? null,
-      installationHoursPerUnit: (row['Ore di posa x UM'] as number) ?? 0,
+      discountPct: optionalNumber(row['Sconto %']),
+      markupPct: optionalNumber(row['MarkUp %']),
+      installationHoursPerUnit: optionalNumber(row['Ore di posa x UM']) ?? 0,
     }
   })
 }

@@ -78,13 +78,15 @@ export interface CostableLine {
   formula: string
   /** Present when this line's price comes from a width/height lookup table instead of `value`/`formula`. */
   pricingMatrix?: PricingMatrix | null
+  /** The lowest purchase price: a smaller matrix/formula result is raised to it. Null/absent = no minimum. */
+  minValue?: number | null
   installationHoursPerUnit: number
   discountPct: number
   markupPct: number
 }
 
 export interface CostResult {
-  /** Price before discount/markup. */
+  /** Price before discount/markup (at least `minValue`). */
   basePrice: number
   /** Price after discount and markup are applied. */
   finalPrice: number
@@ -132,6 +134,16 @@ export const computeCharacteristicPrice = (
 }
 
 const computeRawPrice = (
+  line: CostableLine,
+  width: number,
+  height: number,
+  valoreBaseInVendita: number,
+): number => {
+  const price = computeUnfloored(line, width, height, valoreBaseInVendita)
+  return line.minValue != null && price < line.minValue ? line.minValue : price
+}
+
+const computeUnfloored = (
   line: CostableLine,
   width: number,
   height: number,

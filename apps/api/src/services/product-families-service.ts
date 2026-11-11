@@ -115,13 +115,13 @@ const readWorkbook = (buffer: Buffer): ParsedWorkbook => {
   try {
     for (const line of parsed.productLines) {
       if (line.priceListType && !isMatrix(line.listinoAcquisto)) {
-        resolvePriceListType(line.priceListType)
+        resolvePriceListType(line.priceListType, parsed.templateVersion)
       }
     }
     for (const main of parsed.characteristics) {
       for (const sub of main.subCharacters) {
         if (sub.priceListType && !isMatrix(sub.listinoAcquisto)) {
-          resolvePriceListType(sub.priceListType)
+          resolvePriceListType(sub.priceListType, parsed.templateVersion)
         }
       }
     }
@@ -253,6 +253,8 @@ export const importProductFamilyFromExcel = async (
       brand: parsed.family.brand ?? null,
       description1: (parsed.family.description_1 as string | undefined) ?? null,
       description2: (parsed.family.description_2 as string | undefined) ?? null,
+      note: parsed.family.note ?? null,
+      distributor: parsed.family.distributor ?? null,
       sourceExcelPath: excelPath,
       version: versionOptions?.version,
       supersedesId: versionOptions?.supersedesId,
@@ -288,7 +290,7 @@ export const importProductFamilyFromExcel = async (
         })
       } else {
         value = String(line.listinoAcquisto)
-        const resolved = resolvePriceListType(line.priceListType ?? '')
+        const resolved = resolvePriceListType(line.priceListType ?? '', parsed.templateVersion)
         if (resolved.kind === 'formula') {
           formula = resolved.formula
         }
@@ -301,6 +303,7 @@ export const importProductFamilyFromExcel = async (
         formula,
         value,
         pricingMatrixId,
+        minValue: line.minValue == null ? null : String(line.minValue),
         unitName: line.unitName,
         unitSymbol: line.unitSymbol,
         discountPct: toStoredPct(line.discountPct) ?? '0',
@@ -336,7 +339,7 @@ export const importProductFamilyFromExcel = async (
           })
         } else {
           value = String(sub.listinoAcquisto)
-          const resolved = resolvePriceListType(sub.priceListType ?? '')
+          const resolved = resolvePriceListType(sub.priceListType ?? '', parsed.templateVersion)
           if (resolved.kind === 'formula') {
             formula = resolved.formula
           }
@@ -349,6 +352,10 @@ export const importProductFamilyFromExcel = async (
           formula,
           value,
           pricingMatrixId,
+          minValue: sub.minValue == null ? null : String(sub.minValue),
+          discountPct: toStoredPct(sub.discountPct) ?? null,
+          markupPct: toStoredPct(sub.markupPct) ?? null,
+          installationHoursPerUnit: sub.installationHoursPerUnit == null ? null : String(sub.installationHoursPerUnit),
           sortOrder: subIndex,
         })
       }
@@ -656,6 +663,8 @@ export const duplicateProductFamily = async (
       brand: source.family.brand,
       description1: source.family.description1,
       description2: source.family.description2,
+      note: source.family.note,
+      distributor: source.family.distributor,
       priceValidFrom,
       priceValidTo,
       isPublished: published,
@@ -693,6 +702,7 @@ export const duplicateProductFamily = async (
         formula: line.formula,
         value: line.value,
         pricingMatrixId: line.pricingMatrixId ? matrixIdMap.get(line.pricingMatrixId) : null,
+        minValue: line.minValue,
         unitName: line.unitName,
         unitSymbol: line.unitSymbol,
         discountPct: line.discountPct,
@@ -728,6 +738,10 @@ export const duplicateProductFamily = async (
         formula: sub.formula,
         value: sub.value,
         pricingMatrixId: sub.pricingMatrixId ? matrixIdMap.get(sub.pricingMatrixId) : null,
+        minValue: sub.minValue,
+        discountPct: sub.discountPct,
+        markupPct: sub.markupPct,
+        installationHoursPerUnit: sub.installationHoursPerUnit,
         sortOrder: sub.sortOrder,
       })
       characteristicIdMap.set(sub.id, newId)

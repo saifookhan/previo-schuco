@@ -2,7 +2,7 @@ import { extractCharacteristics } from './extract-characteristics'
 import { extractProductFamily } from './extract-product-family'
 import { extractProductLines } from './extract-product-lines'
 import { extractRelations } from './extract-relations'
-import { extractWorkbook } from './extract-workbook'
+import { detectTemplateVersion, extractWorkbook } from './extract-workbook'
 import type { ParsedWorkbook } from './types'
 
 export * from './extract-2d-array'
@@ -24,6 +24,7 @@ export const parseProductFamilyWorkbook = (buffer: Buffer): ParsedWorkbook => {
   const workbook = extractWorkbook(buffer)
 
   return {
+    templateVersion: detectTemplateVersion(workbook),
     family: extractProductFamily(workbook),
     productLines: extractProductLines(workbook),
     characteristics: extractCharacteristics(workbook),

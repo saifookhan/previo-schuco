@@ -237,6 +237,9 @@ interface PricedPosition {
     price: number
     pricingMode: 'auto' | 'manual'
     manualUnitPrice: number | null
+    /** The option's own discount/markup (v2); null = the position's applied. */
+    discountPct: number | null
+    markupPct: number | null
   }[]
 }
 
@@ -327,6 +330,25 @@ export const priceQuotePosition = async (
 
   const matrixById = new Map(family.matrices.map((m) => [m.id, m]))
 
+  const selections = input.characteristicSelections.map((selection) => {
+    const main = family.characteristics.find((c) => c.id === selection.characteristicId && !c.parentId)
+    const sub = family.characteristics.find(
+      (c) => c.id === selection.subCharacteristicId && c.parentId === selection.characteristicId,
+    )
+    if (!main || !sub) {
+      throw new QuoteValidationError(
+        `Characteristic selection ${selection.characteristicId}/${selection.subCharacteristicId} not found in this family`,
+      )
+    }
+    return { selection, main, sub }
+  })
+  // The position's installation hours: the line's, plus what each chosen option adds (v2 options
+  // have their own "Ore di posa"). An "Ore di posa x [€/h]" option is priced on these hours; the
+  // line's own formula keeps the line's hours, so labour isn't charged on both.
+  const installationHours =
+    Number(line.installationHoursPerUnit) +
+    selections.reduce((sum, { sub }) => sum + Number(sub.installationHoursPerUnit ?? 0), 0)
+
   const linePricingMode = input.pricingMode === 'manual' ? 'manual' : 'auto'
   let lineBasePrice: number
   if (linePricingMode === 'manual') {
@@ -348,6 +370,7 @@ export const priceQuotePosition = async (
           value: Number(line.value),
           formula: line.formula,
           pricingMatrix: lineMatrix ? asMatrix(lineMatrix.widths, lineMatrix.heights, lineMatrix.matrix) : null,
+          minValue: line.minValue == null ? null : Number(line.minValue),
           installationHoursPerUnit: Number(line.installationHoursPerUnit),
           discountPct: 0,
           markupPct: 100,
@@ -362,8 +385,23 @@ export const priceQuotePosition = async (
     }
   }
 
+  // A family shared with this company at a non-zero discount starts positions at that discount;
+  // otherwise (own family, or shared at 0%) the line's own catalog discount applies. Always overridable via input.
+  const shareDiscount =
+    family.family.supplierCompanyId === ctx.effectiveCompanyId
+      ? 0
+      : ((await getIncomingShareDiscounts(tx, ctx.effectiveCompanyId, [family.family.id])).get(family.family.id) ?? 0)
+  const discountPct = input.discountPct ?? (shareDiscount > 0 ? shareDiscount : Number(line.discountPct))
+  const extraMarkupPct = input.extraMarkupPct ?? Number(line.markupPct)
+  if (discountPct < 0 || discountPct > 100) {
+    throw new QuoteValidationError('discountPct must be between 0 and 100')
+  }
+  if (extraMarkupPct < 0 || extraMarkupPct > 10000) {
+    throw new QuoteValidationError('extraMarkupPct must be between 0 and 10000')
+  }
   const descriptionParts = [line.name]
   let characteristicsBasePrice = 0
+  let characteristicsFinalPrice = 0
   const characteristicRows: {
     characteristicId: string
     subCharacteristicId: string
@@ -372,19 +410,11 @@ export const priceQuotePosition = async (
     price: number
     pricingMode: 'auto' | 'manual'
     manualUnitPrice: number | null
+    discountPct: number | null
+    markupPct: number | null
   }[] = []
 
-  for (const selection of input.characteristicSelections) {
-    const main = family.characteristics.find((c) => c.id === selection.characteristicId && !c.parentId)
-    const sub = family.characteristics.find(
-      (c) => c.id === selection.subCharacteristicId && c.parentId === selection.characteristicId,
-    )
-    if (!main || !sub) {
-      throw new QuoteValidationError(
-        `Characteristic selection ${selection.characteristicId}/${selection.subCharacteristicId} not found in this family`,
-      )
-    }
-
+  for (const { selection, main, sub } of selections) {
     const subPricingMode = selection.pricingMode === 'manual' ? 'manual' : 'auto'
     let subPrice: number
     if (subPricingMode === 'manual') {
@@ -411,7 +441,8 @@ export const priceQuotePosition = async (
               value: sub.value == null ? 0 : Number(sub.value),
               formula: sub.formula ?? 'valore',
               pricingMatrix: subMatrix ? asMatrix(subMatrix.widths, subMatrix.heights, subMatrix.matrix) : null,
-              installationHoursPerUnit: Number(line.installationHoursPerUnit),
+              minValue: sub.minValue == null ? null : Number(sub.minValue),
+              installationHoursPerUnit: installationHours,
               discountPct: 0,
               markupPct: 100,
             },
@@ -426,7 +457,12 @@ export const priceQuotePosition = async (
       }
     }
 
+    // A v2 option has its own discount and markup; on a shared family the position's discount (the
+    // share's, or what the user typed over it) replaces the option's own.
+    const ownDiscountPct = sub.discountPct == null ? null : shareDiscount > 0 ? discountPct : Number(sub.discountPct)
+    const ownMarkupPct = sub.markupPct == null ? null : Number(sub.markupPct)
     characteristicsBasePrice += subPrice
+    characteristicsFinalPrice += subPrice * (1 - (ownDiscountPct ?? discountPct) / 100) * ((ownMarkupPct ?? extraMarkupPct) / 100)
     characteristicRows.push({
       characteristicId: main.id,
       subCharacteristicId: sub.id,
@@ -435,6 +471,8 @@ export const priceQuotePosition = async (
       price: subPrice,
       pricingMode: subPricingMode,
       manualUnitPrice: subPricingMode === 'manual' ? (selection.manualUnitPrice as number) : null,
+      discountPct: ownDiscountPct,
+      markupPct: ownMarkupPct,
     })
     descriptionParts.push(`${main.name}: ${sub.name}`)
   }
@@ -442,22 +480,9 @@ export const priceQuotePosition = async (
   const totalM2 = (input.widthMm * input.heightMm * input.quantity) / 1_000_000
   const basePricePerUnit = lineBasePrice + characteristicsBasePrice
   const basePrice = basePricePerUnit * input.quantity
-
-  // A family shared with this company at a non-zero discount starts positions at that discount;
-  // otherwise (own family, or shared at 0%) the line's own catalog discount applies. Always overridable via input.
-  const shareDiscount =
-    family.family.supplierCompanyId === ctx.effectiveCompanyId
-      ? 0
-      : ((await getIncomingShareDiscounts(tx, ctx.effectiveCompanyId, [family.family.id])).get(family.family.id) ?? 0)
-  const discountPct = input.discountPct ?? (shareDiscount > 0 ? shareDiscount : Number(line.discountPct))
-  const extraMarkupPct = input.extraMarkupPct ?? Number(line.markupPct)
-  if (discountPct < 0 || discountPct > 100) {
-    throw new QuoteValidationError('discountPct must be between 0 and 100')
-  }
-  if (extraMarkupPct < 0 || extraMarkupPct > 10000) {
-    throw new QuoteValidationError('extraMarkupPct must be between 0 and 10000')
-  }
-  const finalPrice = basePrice * (1 - discountPct / 100) * (extraMarkupPct / 100)
+  // The line at the position's discount/markup, each option at its own (or the position's).
+  const finalPrice =
+    (lineBasePrice * (1 - discountPct / 100) * (extraMarkupPct / 100) + characteristicsFinalPrice) * input.quantity
 
   return {
     family,
@@ -583,6 +608,8 @@ export const addQuotePosition = async (
         price: (row.price * input.quantity).toFixed(2),
         pricingMode: row.pricingMode,
         manualUnitPrice: row.manualUnitPrice == null ? null : String(row.manualUnitPrice),
+        discountPct: row.discountPct == null ? null : String(row.discountPct),
+        markupPct: row.markupPct == null ? null : String(row.markupPct),
       })
     }
 
@@ -686,6 +713,8 @@ export const updateQuotePosition = async (
         price: (row.price * input.quantity).toFixed(2),
         pricingMode: row.pricingMode,
         manualUnitPrice: row.manualUnitPrice == null ? null : String(row.manualUnitPrice),
+        discountPct: row.discountPct == null ? null : String(row.discountPct),
+        markupPct: row.markupPct == null ? null : String(row.markupPct),
       })
     }
 
@@ -866,6 +895,8 @@ export const duplicatePosition = async (
         price: characteristic.price,
         pricingMode: characteristic.pricingMode,
         manualUnitPrice: characteristic.manualUnitPrice,
+        discountPct: characteristic.discountPct,
+        markupPct: characteristic.markupPct,
       })
     }
 

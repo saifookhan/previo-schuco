@@ -9,6 +9,13 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 
 ## Novembre 2026
 
+**Settimana del 9 novembre**
+- **Template Excel versione 2**: **Distributore** e **Note** della famiglia, un **prezzo d'acquisto minimo** (`MinValue`) su linee e opzioni, e per ogni opzione il suo **sconto**, **ricarico** e le sue **ore di posa**. I file della versione 1 si importano ancora. Vedi [Formato di importazione Excel](./excel-format.md).
+- **Prezzi**: una linea o un'opzione non costa mai meno del suo minimo; ogni opzione è calcolata con il proprio sconto e ricarico (la linea con quelli della posizione; su una famiglia condivisa lo sconto della posizione vale anche per le opzioni), indicati accanto all'opzione nella posizione; le ore di posa delle opzioni si sommano a quelle della linea per le opzioni "Ore di posa". Vedi [Come vengono calcolati i prezzi](./pricing.md).
+- **Correzioni all'importazione**: `NO` nel foglio Relations non vale più come "si applica"; un foglio tabella prezzi inesistente blocca l'importazione indicandone il nome, invece di un'opzione senza prezzi; le linee con prezzo vuoto si importano a 0; nuovo tipo `Altezza x [€/m]`, e nei file della versione 2 `2xAltezza x [€/m]` vale due volte l'**altezza** (i file della versione 1 mantengono la formula del loro modello).
+- **Versioni e modifiche**: una linea o un'opzione rinominata al suo posto appare come una modifica descrittiva, non come rimossa + aggiunta; un'opzione aggiunta o rimossa per intero è una sola modifica, non anche una per ogni linea che la offre; si confrontano anche i nuovi campi.
+- La pagina della famiglia mostra il distributore, la nota, i minimi delle linee e le condizioni proprie delle opzioni; il file Excel di esempio scaricabile ora è nella versione 2.
+
 **Settimana del 2 novembre**
 - **Elenco famiglie di prodotto, nuove colonne** (dal mock-up del cliente): **Con listino** (Sì / No), **Data inizio** e **Data fine validità** come campi data, **Pronta per la fatturazione** e **In libreria** (Sì / No) — tutte modificabili direttamente nella riga.
 - **In libreria**: ogni azienda sceglie quali famiglie (proprie o condivise) propone il suo preventivo; per gli altri utenti le famiglie fuori dalla libreria spariscono dal catalogo.

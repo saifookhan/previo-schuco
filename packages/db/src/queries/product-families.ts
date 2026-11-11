@@ -20,6 +20,8 @@ export interface InsertProductFamilyInput {
   brand?: string | null
   description1?: string | null
   description2?: string | null
+  note?: string | null
+  distributor?: string | null
   sourceExcelPath?: string | null
   supersedesId?: string | null
   duplicatedFromId?: string | null
@@ -56,6 +58,7 @@ export interface InsertProductLineInput {
   formula: string
   value: string
   pricingMatrixId?: string | null
+  minValue?: string | null
   unitName: string
   unitSymbol: string
   discountPct: string
@@ -77,6 +80,10 @@ export interface InsertCharacteristicInput {
   formula?: string | null
   value?: string | null
   pricingMatrixId?: string | null
+  minValue?: string | null
+  discountPct?: string | null
+  markupPct?: string | null
+  installationHoursPerUnit?: string | null
   sortOrder: number
 }
 
@@ -186,6 +193,8 @@ export interface ProductFamilyDetail {
   family: ProductFamilySummary & {
     description1: string | null
     description2: string | null
+    note: string | null
+    distributor: string | null
     sourceExcelPath: string | null
     supersedesId: string | null
     duplicatedFromId: string | null

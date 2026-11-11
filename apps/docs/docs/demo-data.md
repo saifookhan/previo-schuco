@@ -20,15 +20,16 @@ A small, made-up window catalog. All prices are fictional.
 |---|---|---|
 | Finestra 1 anta | Width × height table (see below), per piece | 10% / 130% |
 | Finestra 2 ante | €280 per m² | 10% / 130% |
-| Zanzariera (insect screen) | €18 per metre of perimeter | 0% / 140% |
+| Zanzariera (insect screen) | €18 per metre of perimeter, at least €40 | 0% / 140% |
 
 | Characteristic | Options |
 |---|---|
-| Vetro (glass) | Doppio vetro €0/m² · Triplo vetro €45/m² · Vetro acustico €60/m² |
+| Vetro (glass) | Doppio vetro €0/m² · Triplo vetro €45/m² · Vetro acustico €60/m² (own 5% / 120%) — triple and acoustic: at least €30, +0.5 h installation |
 | Colore (colour) | Bianco €0 · Antracite +8% of the product price · Effetto legno +15% |
-| Maniglia (handle) | Standard €0 · Con chiave €35 · Design inox €55 |
+| Maniglia (handle) | Standard €0 · Con chiave €35 · Design inox €55 (own markup 150%) |
+| Posa (installation) | Esclusa €0 · Inclusa (a ore) €45 per installation hour, at least €60 |
 
-*Zanzariera* only offers *Colore*; the windows offer all three.
+*Zanzariera* only offers *Colore* and *Posa*; the windows offer all four.
 
 **Price table for "Finestra 1 anta"** (€ per piece; width across, height down, in mm):
 

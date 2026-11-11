@@ -16,13 +16,24 @@ Either looked up in a **price table**, or computed with the formula of its prici
 | Fixed per piece | `valore` |
 | Per metre of perimeter | `((B+H)*2/1000) * valore` |
 | Per metre of width | `(B/1000) * valore` |
+| Per metre of height | `(H/1000) * valore` |
 | Per m² | `((B*H)/1000000) * valore` |
-| 2 × width | `(B*2/1000) * valore` |
+| 2 × height | `(H*2/1000) * valore` |
 | Width + 2 × height | `((H*2+B)/1000) * valore` |
-| Installation hours | `ore_di_posa * valore` |
+| Installation hours | `ore_di_posa * valore` — `ore_di_posa` is the line's hours plus those of the chosen options |
 | Price table | first width ≥ B, first height ≥ H — no price if the size is bigger than the table |
 
-`valore` is the line's value from the catalog. A catalog owner can also write their own formula
+`valore` is the line's value from the catalog.
+
+A workbook made with version 1 of the Excel template keeps that version's "2 × height" formula,
+`(B*2/1000) * valore` (a mistake version 2 fixed), so re-importing it doesn't change any price.
+
+### Minimum price
+
+A line or option with a **minimum purchase price** (`MinValue` in the Excel) never costs less: when
+the computed price is lower, the minimum is used instead — before discount and markup.
+
+A catalog owner can also write their own formula
 using `valore`, `B`, `H`, `valore_base_in_vendita`, `ore_di_posa` and `min`, `max`, `round`, `ceil`,
 `floor`, `abs`, `sqrt`, `pow`.
 
@@ -31,15 +42,22 @@ using `valore`, `B`, `H`, `valore_base_in_vendita`, `ore_di_posa` and `min`, `ma
 Same rules, with one addition: **"% of the product price"** options use
 `valore_base_in_vendita * valore / 100`, where `valore_base_in_vendita` is the line's price from step 1.
 
+An option imported from a version 2 Excel has its **own discount and markup**, used for its price
+instead of the position's. Options without them (version 1) take the position's.
+
 ## 3. The position total
 
 ```
-unit price      = line price + sum of chosen option prices
-position total  = unit price × quantity × (1 − discount% / 100) × (markup% / 100)
+each part       = price × (1 − discount% / 100) × (markup% / 100)
+position total  = (line part + sum of option parts) × quantity
 ```
 
+- The line uses the position's **discount** and **markup**; each option its own, or the position's
+  when it has none. With no option discounts or markups this is the same as
+  `(line + options) × quantity × (1 − discount%) × markup%`.
 - **Discount** starts at the share's discount (if the family was shared with you at more than 0%),
-  otherwise the line's catalog discount. It can be changed per position.
+  otherwise the line's catalog discount. It can be changed per position. On a shared family the
+  position's discount also replaces the options' own discounts.
 - **Markup** starts at the line's catalog markup. `100` means no markup.
 - **Manual (M)** pricing replaces the computed line or option price with the value you type.
 

@@ -60,6 +60,8 @@ export interface InsertQuotePositionCharacteristicInput {
   price: string
   pricingMode?: 'auto' | 'manual'
   manualUnitPrice?: string | null
+  discountPct?: string | null
+  markupPct?: string | null
 }
 
 export const insertQuotePositionCharacteristic = async (

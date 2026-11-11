@@ -20,15 +20,16 @@ Ein kleiner, ausgedachter Fensterkatalog. Alle Preise sind fiktiv.
 |---|---|---|
 | Finestra 1 anta (einflügeliges Fenster) | Tabelle Breite × Höhe (siehe unten), pro Stück | 10 % / 130 % |
 | Finestra 2 ante (zweiflügeliges Fenster) | 280 € pro m² | 10 % / 130 % |
-| Zanzariera (Insektenschutz) | 18 € pro Meter Umfang | 0 % / 140 % |
+| Zanzariera (Insektenschutz) | 18 € pro Meter Umfang, mindestens 40 € | 0 % / 140 % |
 
 | Merkmal | Optionen |
 |---|---|
-| Vetro (Glas) | Doppio vetro 0 €/m² · Triplo vetro 45 €/m² · Vetro acustico 60 €/m² |
+| Vetro (Glas) | Doppio vetro 0 €/m² · Triplo vetro 45 €/m² · Vetro acustico 60 €/m² (eigene 5 % / 120 %) — Triplo und acustico: mindestens 30 €, +0,5 h Montage |
 | Colore (Farbe) | Bianco 0 € · Antracite +8 % des Produktpreises · Effetto legno +15 % |
-| Maniglia (Griff) | Standard 0 € · Con chiave 35 € · Design inox 55 € |
+| Maniglia (Griff) | Standard 0 € · Con chiave 35 € · Design inox 55 € (eigener Aufschlag 150 %) |
+| Posa (Montage) | Esclusa 0 € · Inclusa (a ore) 45 € pro Montagestunde, mindestens 60 € |
 
-*Zanzariera* bietet nur *Colore*; die Fenster bieten alle drei.
+*Zanzariera* bietet nur *Colore* und *Posa*; die Fenster bieten alle vier.
 
 **Preistabelle für „Finestra 1 anta“** (€ pro Stück; Breite waagerecht, Höhe senkrecht, in mm):
 

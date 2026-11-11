@@ -44,8 +44,11 @@ export const extractProductFamily = (workbook: XLSX.WorkBook): RawProductFamilyR
     family_name: familyName,
     technical_name: asString('Nome_tecnico_famiglia'),
     category: asString('Categoria prodotti'),
-    brand: asString('Brand/Fornitore'),
+    // v1 "Brand/Fornitore", v2 "Brand" (with the distributor in its own row).
+    brand: asString('Brand') ?? asString('Brand/Fornitore'),
     description_1: asString('Descrizione_1'),
     description_2: asString('Descrizione_2'),
+    note: asString('Note'),
+    distributor: asString('Distributore'),
   }
 }

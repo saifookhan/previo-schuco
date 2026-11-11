@@ -9,6 +9,9 @@ A product family is imported from one Excel workbook (`.xlsx`). Sheet names and 
 match **exactly** (spaces around header names are ignored). Download
 [the sample workbook](pathname:///samples/previo-sample-family.xlsx) to see a working example.
 
+This page describes **version 2** of the template. Workbooks made with version 1 still import: the
+version is recognised from the headers, and the columns version 2 added are simply empty.
+
 | Sheet | Required | Contains |
 |---|---|---|
 | `Product Family` | yes | Family name and details |
@@ -28,14 +31,17 @@ Two columns, `Label` and `Value`, one row per field:
 | `Nome_famiglia` | yes | Demo Window W70 |
 | `Nome_tecnico_famiglia` | no | W70-DEMO |
 | `Categoria prodotti` | no | Finestre |
-| `Brand/Fornitore` | no | PREVIO Demo |
+| `Brand` | no | PREVIO Demo (version 1: `Brand/Fornitore`) |
+| `Distributore` | no | Who the family is bought through |
+| `Note` | no | Free text, e.g. a link to the technical documentation |
 | `Descrizione_1`, `Descrizione_2` | no | Free text |
 
 Images placed on this sheet are imported as the family's pictures.
 
 ## `Product lines`
 
-One row per line. Rows without a name, unit name, unit symbol or price are skipped.
+One row per line. Rows without a name, unit name or unit symbol are skipped. A blank price is 0 — a
+family can be priced entirely through its options.
 
 | Column | Meaning | Example |
 |---|---|---|
@@ -43,6 +49,7 @@ One row per line. Rows without a name, unit name, unit symbol or price are skipp
 | `Descrizione_opzionale` | Description (optional) | |
 | `Tipo_Listino` | Pricing type — see [Pricing types](#pricing-types) | `Superficie x [€/m2]` |
 | `Listino_acquisto` | The price value, **or the name of a price-table sheet** | `280` or `Matrice_1anta` |
+| `MinValue` | Lowest purchase price per piece (optional) — see [Minimum price](./pricing.md#minimum-price) | `120` |
 | `Nome_UM` / `Simbolo_UM` | Unit name / symbol | Metro quadro / m² |
 | `Sconto %` | Discount, as an Excel percentage (`0.1` = 10%) | `0.1` |
 | `MarkUp %` | Markup multiplier (`1.3` = 130%; `1` = no markup) | `1.3` |
@@ -55,32 +62,40 @@ Typing `10` means 1000%.
 
 ## `Caracteristics`
 
-A grid, three columns per characteristic:
+A grid, seven columns per characteristic:
 
-- **Row 2**: the characteristic names, each starting a block of three columns (A, D, G, …).
+- **Row 2**: the characteristic names, each starting a block of seven columns (B, I, P, …).
 - **A header row** containing `Nome valore` in each block.
-- **Every row below it**: one option per block — `[option name, pricing type, value]`.
+- **Every row below it**: one option per block — `[Nome valore, Tipo_Listino, Listino_acquisto,
+  MinValue, Sconto %, MarkUp %, Ore di posa x UM]`.
 
-|   | A | B | C | D | E | F |
-|---|---|---|---|---|---|---|
-| 1 | Caratteristiche | | | | | |
-| 2 | **Vetro** | | | **Colore** | | |
-| 3 | Nome valore | Tipo listino | Valore | Nome valore | Tipo listino | Valore |
-| 4 | Doppio vetro | Superficie x [€/m2] | 0 | Bianco | Valore_Fisso [€/Pz] | 0 |
-| 5 | Triplo vetro | Superficie x [€/m2] | 45 | Antracite | % sul valore base del prodotto | 0.08 |
+|   | B | C | D | E | F | G | H |
+|---|---|---|---|---|---|---|---|
+| 2 | **Vetro** | | | | | | |
+| 4 | Nome valore | Tipo_Listino | Listino_acquisto | MinValue | Sconto % | MarkUp % | Ore di posa x UM |
+| 5 | Doppio vetro | Superficie x [€/m2] | 0 | | 0 | 1 | 0 |
+| 6 | Vetro acustico | Superficie x [€/m2] | 60 | 30 | 0.05 | 1.2 | 0.5 |
 
-For `% sul valore base del prodotto`, the value is an Excel percentage too (`0.08` = 8%).
-For `Tabella BxH [€/Pz]`, the value is the name of a price-table sheet.
+- `MinValue`, `Sconto %` and `MarkUp %` work like a line's, for **this option's price** — see
+  [How prices are calculated](./pricing.md#2-each-chosen-option).
+- `Ore di posa x UM` is the installation time the option **adds** to the line's (e.g. a heavier glass).
+  An `Ore di posa x [€/h]` option is priced on the total.
+- For `% sul valore base del prodotto`, the value is an Excel percentage too (`0.08` = 8%).
+- For `Tabella BxH [€/Pz]`, the value is the name of a price-table sheet — the import stops if the
+  workbook has no such sheet.
+
+A version 1 workbook has three columns per characteristic (`[option name, pricing type, value]`);
+its options use the position's discount and markup and add no installation time.
 
 ## `Relations` (optional)
 
 First column `Product line / Caracteristics` holds the line names; one column per characteristic
-name. Any non-empty cell means "this characteristic applies to this line".
+name. `SI` means "this characteristic applies to this line"; `NO` or an empty cell means it doesn't.
 
 | Product line / Caracteristics | Vetro | Colore | Maniglia |
 |---|---|---|---|
-| Finestra 1 anta | x | x | x |
-| Zanzariera | | x | |
+| Finestra 1 anta | SI | SI | SI |
+| Zanzariera | NO | SI | NO |
 
 ## Price-table sheets
 
@@ -102,10 +117,11 @@ Widths and heights must be in ascending order. Non-numeric header cells are igno
 | `Valore_Fisso [€/Pz]` | value (fixed per piece) |
 | `Perimetro x [€/m]` | perimeter in m × value |
 | `Base x [€/m]` | width in m × value |
+| `Altezza x [€/m]` | height in m × value |
 | `Superficie x [€/m2]` | area in m² × value |
-| `2xAltezza x [€/m]` | 2 × width in m × value |
+| `2xAltezza x [€/m]` | 2 × height in m × value |
 | `Base+2xAltezza x [€/m]` | (width + 2 × height) in m × value |
-| `Ore di posa x [€/h]` | installation hours × value |
+| `Ore di posa x [€/h]` | installation hours (the line's plus its options') × value |
 | `% sul valore base del prodotto` | value % of the product line's price (options only) |
 | `Tabella BxH [€/Pz]` | looked up in a price-table sheet |
 
@@ -118,4 +134,6 @@ The exact formulas are on [How prices are calculated](./pricing.md).
 | The workbook does not have a sheet named "…" | Add / rename the sheet — names are case- and spelling-sensitive |
 | The "Product Family" sheet must have a "Nome_famiglia" row | Add a `Nome_famiglia` row with a value |
 | Unknown Tipo_Listino "…" | Use one of the labels above exactly (including spaces and brackets) |
+| … uses the price table "…", but the workbook has no sheet with that name | Add the price-table sheet, or fix the name in `Listino_acquisto` |
+| … has the price "…", which is neither a number nor a sheet of the workbook | Type a number, or the name of a price-table sheet |
 | Failed to read the uploaded file as an Excel workbook | Save as `.xlsx` |

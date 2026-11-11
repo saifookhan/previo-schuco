@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 
-import { extract2DArray } from './extract-2d-array'
+import { optionalNumber, resolvePurchasePrice } from './extract-2d-array'
 import type { RawCharacteristic } from './types'
 
 /**
@@ -9,12 +9,12 @@ import type { RawCharacteristic } from './types'
  * a guess): row index 1 holds the main characteristic names, one per
  * column, with the column's own index (`colIndex`) tracked. Every row
  * from the one containing "Nome valore" onward holds sub-characteristics,
- * three columns wide per main characteristic starting at its `colIndex`:
- * [name, price-list type, price]. A sub-characteristic whose type
- * includes "Tabella BxH" has its price column naming another sheet (a
- * matrix) instead of holding a number directly.
+ * starting at the main characteristic's `colIndex`: [name, price-list
+ * type, price] in a v1 workbook; in a v2 one followed by [MinValue,
+ * Sconto %, MarkUp %, Ore di posa x UM] (told by the "MinValue" header
+ * after the price). A price naming a sheet is a BxH table.
  * @param workbook - Parsed workbook (`extractWorkbook`)
- * @throws if the "Caracteristics" sheet is missing
+ * @throws if the "Caracteristics" sheet is missing, or an option's price can't be read
  */
 export const extractCharacteristics = (workbook: XLSX.WorkBook): RawCharacteristic[] => {
   if (!workbook.SheetNames.includes('Caracteristics')) {
@@ -31,31 +31,34 @@ export const extractCharacteristics = (workbook: XLSX.WorkBook): RawCharacterist
     }
   })
 
-  const subCharacterStartIndex = rows.findIndex((row) => row.includes('Nome valore')) + 1
-  const subCharacterRows = rows.slice(subCharacterStartIndex)
+  const headerIndex = rows.findIndex((row) => row.includes('Nome valore'))
+  const header = rows[headerIndex] ?? []
+  const subCharacterRows = rows.slice(headerIndex + 1)
 
   for (const main of mainCharacteristics) {
+    const isV2 = String(header[main.colIndex + 3] ?? '').trim() === 'MinValue'
     for (const row of subCharacterRows) {
-      const [name, priceListType, priceCell] = row.slice(main.colIndex, main.colIndex + 3)
+      const [name, priceListType, priceCell, minValue, discountPct, markupPct, hours] = row.slice(
+        main.colIndex,
+        main.colIndex + (isV2 ? 7 : 3),
+      )
       if (!name) {
         continue
       }
 
       const priceListTypeStr = priceListType != null ? String(priceListType) : null
-      const isMatrix = priceListTypeStr?.includes('Tabella BxH') ?? false
-
-      const listinoAcquisto = isMatrix
-        ? extract2DArray(
-            XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[String(priceCell)], { header: 1 }),
-          )
-        : priceListTypeStr?.includes('%')
-          ? Number(priceCell) * 100
-          : Number(priceCell) || 0
+      const price = resolvePurchasePrice(workbook, priceListTypeStr, priceCell, `Option "${main.name}: ${String(name)}"`)
+      // A "%" type's price is a fraction in the sheet (0.1 = 10%).
+      const listinoAcquisto = typeof price === 'number' && priceListTypeStr?.includes('%') ? price * 100 : price
 
       main.subCharacters.push({
         name: String(name),
         priceListType: priceListTypeStr,
         listinoAcquisto,
+        minValue: isV2 ? optionalNumber(minValue) : null,
+        discountPct: isV2 ? optionalNumber(discountPct) : null,
+        markupPct: isV2 ? optionalNumber(markupPct) : null,
+        installationHoursPerUnit: isV2 ? optionalNumber(hours) : null,
       })
     }
   }

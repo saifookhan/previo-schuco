@@ -22,6 +22,8 @@ export type FamilyChangeField =
   | 'brand'
   | 'description1'
   | 'description2'
+  | 'note'
+  | 'distributor'
   | 'hasPriceList'
   | 'priceValidFrom'
   | 'priceValidTo'
@@ -31,6 +33,7 @@ export type FamilyChangeField =
   | 'isApplicable'
   | 'formula'
   | 'value'
+  | 'minValue'
   | 'discountPct'
   | 'markupPct'
   | 'installationHoursPerUnit'
@@ -80,6 +83,9 @@ export interface FamilyVersionSnapshot {
     brand: string | null
     description1: string | null
     description2: string | null
+    /** v2 template fields; absent or null on older families. */
+    note?: string | null
+    distributor?: string | null
     hasPriceList: boolean
     priceValidFrom: string | null
     priceValidTo: string | null
@@ -91,6 +97,7 @@ export interface FamilyVersionSnapshot {
     formula: string
     value: Numeric
     pricingMatrixId: string | null
+    minValue?: Numeric | null
     unitName: string
     unitSymbol: string
     discountPct: Numeric
@@ -106,6 +113,11 @@ export interface FamilyVersionSnapshot {
     formula: string | null
     value: Numeric | null
     pricingMatrixId: string | null
+    /** v2 options only. */
+    minValue?: Numeric | null
+    discountPct?: Numeric | null
+    markupPct?: Numeric | null
+    installationHoursPerUnit?: Numeric | null
     sortOrder: number
   }[]
   matrices: { id: string; widths: number[]; heights: number[]; matrix: (number | null)[][] }[]
@@ -132,7 +144,9 @@ const matchKey = (name: string) => name.trim().toLowerCase()
 
 /**
  * Pairs items by name, in their sort order. Two items with the same name in one version are
- * paired with the same-named items of the other version in order.
+ * paired with the same-named items of the other version in order. Then an item only in the
+ * older version and one only in the newer at the same place (`sortOrder`: the Excel row or
+ * column) are paired too — the item was renamed.
  */
 const pairByName = <T extends { name: string; sortOrder: number }>(older: T[], newer: T[]) => {
   const keyed = (items: T[]) => {
@@ -156,7 +170,16 @@ const pairByName = <T extends { name: string; sortOrder: number }>(older: T[], n
   for (const [key, item] of olderByKey) {
     pairs.push({ key, older: item })
   }
-  return pairs
+  // A removed and an added item at the same place (Excel row or column) is one item renamed.
+  const addedAt = new Map(pairs.filter((p) => !p.older).map((p) => [p.newer!.sortOrder, p]))
+  return pairs.filter((pair) => {
+    if (pair.newer) return true
+    const renamed = addedAt.get(pair.older!.sortOrder)
+    if (!renamed) return true
+    addedAt.delete(pair.older!.sortOrder)
+    renamed.older = pair.older
+    return false
+  })
 }
 
 /** % change from `before` to `after` (callers skip a zero `before`). */
@@ -241,6 +264,10 @@ const pricingChanges = (
   return changes
 }
 
+/** A rename (items paired by place); the same name in another case or spacing is no change. */
+const renamed = (id: string, older: { name: string }, newer: { name: string }): FamilyChangeNode[] =>
+  matchKey(older.name) === matchKey(newer.name) ? [] : field(id, 'name', 'description', text(older.name), text(newer.name))
+
 const itemNode = (
   key: string,
   name: string,
@@ -263,6 +290,8 @@ export const diffFamilyVersions = (older: FamilyVersionSnapshot, newer: FamilyVe
     ...field('family', 'technicalName', 'description', text(of.technicalName), text(nf.technicalName)),
     ...field('family', 'category', 'description', text(of.category), text(nf.category)),
     ...field('family', 'brand', 'description', text(of.brand), text(nf.brand)),
+    ...field('family', 'distributor', 'description', text(of.distributor), text(nf.distributor)),
+    ...field('family', 'note', 'description', text(of.note), text(nf.note)),
     ...field('family', 'description1', 'description', text(of.description1), text(nf.description1)),
     ...field('family', 'description2', 'description', text(of.description2), text(nf.description2)),
     ...field('family', 'hasPriceList', 'economic', String(of.hasPriceList), String(nf.hasPriceList)),
@@ -270,30 +299,37 @@ export const diffFamilyVersions = (older: FamilyVersionSnapshot, newer: FamilyVe
     ...field('family', 'priceValidTo', 'economic', of.priceValidTo, nf.priceValidTo),
   ]
 
-  // Options keyed by "main" or "main › sub", so the lines' offered options can be matched by name too.
-  const optionKeys = (snapshot: FamilyVersionSnapshot) => {
-    const byId = new Map(snapshot.characteristics.map((c) => [c.id, c]))
-    return (c: Characteristic) => {
-      const parent = c.parentId ? byId.get(c.parentId) : undefined
-      return parent ? `${matchKey(parent.name)}›${matchKey(c.name)}` : matchKey(c.name)
-    }
-  }
-  const olderOptionKey = optionKeys(older)
-  const newerOptionKey = optionKeys(newer)
-  const offeredOptions = (snapshot: FamilyVersionSnapshot, keyOf: (c: Characteristic) => string) => {
+  // Options (and sub-options per option) paired by name, then by place for a rename.
+  const subOptions = (snapshot: FamilyVersionSnapshot, parentId: string | undefined) =>
+    parentId ? snapshot.characteristics.filter((c) => c.parentId === parentId) : []
+  const optionPairs = pairByName<Characteristic>(
+    older.characteristics.filter((c) => !c.parentId),
+    newer.characteristics.filter((c) => !c.parentId),
+  ).map((pair) => ({
+    ...pair,
+    subs: pair.older && pair.newer ? pairByName<Characteristic>(subOptions(older, pair.older.id), subOptions(newer, pair.newer.id)) : [],
+  }))
+
+  // The options each line offers (the "Relations" sheet), keyed by the newer name, so a renamed option is no change here.
+  // Only options in both versions: one added or removed as a whole is already that one change.
+  const newerNameOf = new Map<string, string>()
+  for (const { older: o, newer: n } of optionPairs) if (o && n) newerNameOf.set(o.id, n.name)
+  const inBoth = new Set([...newerNameOf.values()].map(matchKey))
+  const offeredOptions = (snapshot: FamilyVersionSnapshot, nameOf: (c: Characteristic) => string) => {
     const byId = new Map(snapshot.characteristics.map((c) => [c.id, c]))
     const byLine = new Map<string, Map<string, string>>()
     for (const relation of snapshot.relations) {
       const option = byId.get(relation.characteristicId)
       if (!option) continue
       const offered = byLine.get(relation.productLineId) ?? new Map<string, string>()
-      offered.set(keyOf(option), option.name)
+      const name = nameOf(option)
+      offered.set(matchKey(name), name)
       byLine.set(relation.productLineId, offered)
     }
     return byLine
   }
-  const olderOffered = offeredOptions(older, olderOptionKey)
-  const newerOffered = offeredOptions(newer, newerOptionKey)
+  const olderOffered = offeredOptions(older, (c) => newerNameOf.get(c.id) ?? c.name)
+  const newerOffered = offeredOptions(newer, (c) => c.name)
 
   const lines = pairByName<Line>(older.lines, newer.lines).flatMap(({ key, older: o, newer: n }) => {
     const id = `line:${key}`
@@ -301,14 +337,16 @@ export const diffFamilyVersions = (older: FamilyVersionSnapshot, newer: FamilyVe
     const before = olderOffered.get(o.id) ?? new Map<string, string>()
     const after = newerOffered.get(n.id) ?? new Map<string, string>()
     const links: FamilyChangeNode[] = [
-      ...[...after].filter(([k]) => !before.has(k)).map(([k, name]): FamilyChangeNode => ({ type: 'link', id: `${id}:offers:${k}`, name, kind: 'added' })),
-      ...[...before].filter(([k]) => !after.has(k)).map(([k, name]): FamilyChangeNode => ({ type: 'link', id: `${id}:offers:${k}`, name, kind: 'removed' })),
+      ...[...after].filter(([k]) => inBoth.has(k) && !before.has(k)).map(([k, name]): FamilyChangeNode => ({ type: 'link', id: `${id}:offers:${k}`, name, kind: 'added' })),
+      ...[...before].filter(([k]) => inBoth.has(k) && !after.has(k)).map(([k, name]): FamilyChangeNode => ({ type: 'link', id: `${id}:offers:${k}`, name, kind: 'removed' })),
     ]
     return itemNode(id, n.name, undefined, [
+      ...renamed(id, o, n),
       ...field(id, 'description', 'description', text(o.description), text(n.description)),
       ...field(id, 'unitName', 'description', text(o.unitName), text(n.unitName)),
       ...field(id, 'unitSymbol', 'description', text(o.unitSymbol), text(n.unitSymbol)),
       ...pricingChanges(id, o, n, olderMatrices, newerMatrices),
+      ...field(id, 'minValue', 'economic', number(o.minValue), number(n.minValue)),
       ...field(id, 'discountPct', 'economic', number(o.discountPct), number(n.discountPct)),
       ...field(id, 'markupPct', 'economic', number(o.markupPct), number(n.markupPct)),
       ...field(id, 'installationHoursPerUnit', 'economic', number(o.installationHoursPerUnit), number(n.installationHoursPerUnit)),
@@ -317,25 +355,23 @@ export const diffFamilyVersions = (older: FamilyVersionSnapshot, newer: FamilyVe
   })
 
   const optionChanges = (id: string, o: Characteristic, n: Characteristic) => [
+    ...renamed(id, o, n),
     ...field(id, 'isApplicable', 'description', String(o.isApplicable), String(n.isApplicable)),
     ...pricingChanges(id, o, n, olderMatrices, newerMatrices),
+    ...field(id, 'minValue', 'economic', number(o.minValue), number(n.minValue)),
+    ...field(id, 'discountPct', 'economic', number(o.discountPct), number(n.discountPct)),
+    ...field(id, 'markupPct', 'economic', number(o.markupPct), number(n.markupPct)),
+    ...field(id, 'installationHoursPerUnit', 'economic', number(o.installationHoursPerUnit), number(n.installationHoursPerUnit)),
   ]
-  const subOptions = (snapshot: FamilyVersionSnapshot, parentId: string | undefined) =>
-    parentId ? snapshot.characteristics.filter((c) => c.parentId === parentId) : []
-  const options = pairByName<Characteristic>(
-    older.characteristics.filter((c) => !c.parentId),
-    newer.characteristics.filter((c) => !c.parentId),
-  ).flatMap(({ key, older: o, newer: n }) => {
+  const options = optionPairs.flatMap(({ key, older: o, newer: n, subs }) => {
     const id = `option:${key}`
     if (!o || !n) return itemNode(id, (o ?? n)!.name, o ? 'removed' : 'added', [])
-    const subs = pairByName<Characteristic>(subOptions(older, o.id), subOptions(newer, n.id)).flatMap(
-      ({ key: subKey, older: so, newer: sn }) => {
-        const subId = `${id}›${subKey}`
-        if (!so || !sn) return itemNode(subId, (so ?? sn)!.name, so ? 'removed' : 'added', [])
-        return itemNode(subId, sn.name, undefined, optionChanges(subId, so, sn))
-      },
-    )
-    return itemNode(id, n.name, undefined, [...optionChanges(id, o, n), ...subs])
+    const subChanges = subs.flatMap(({ key: subKey, older: so, newer: sn }) => {
+      const subId = `${id}›${subKey}`
+      if (!so || !sn) return itemNode(subId, (so ?? sn)!.name, so ? 'removed' : 'added', [])
+      return itemNode(subId, sn.name, undefined, optionChanges(subId, so, sn))
+    })
+    return itemNode(id, n.name, undefined, [...optionChanges(id, o, n), ...subChanges])
   })
 
   const sections: FamilyChangeNode[] = []
