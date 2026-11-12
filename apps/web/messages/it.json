@@ -379,7 +379,9 @@
     "firstVersion": "Prima versione di questa famiglia.",
     "changesBetween": "Modifiche v{from} → v{to}:",
     "changesFromOriginal": "Modifiche rispetto a {name} v{from} (copiata da questa):",
-    "seeChanges": "Vedi modifiche",
+    "familyPage": "Pagina della famiglia",
+    "showChanges": "Mostra modifiche",
+    "hideChanges": "Nascondi modifiche",
     "newerAvailable": "v{version} disponibile",
     "newerAvailableHint": "Si può preventivare una versione più recente di questa famiglia. Questa posizione mantiene il suo prezzo; modificala per passare alla nuova."
   },

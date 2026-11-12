@@ -632,8 +632,6 @@ export const QuoteBuilder = ({ initialDetail, families, familyVersions }: QuoteB
                     {family && !family.family.hasPriceList ? (
                       <p className="text-xs text-amber-700">{t('familyWithoutPriceListHint')}</p>
                     ) : null}
-                    {/* What this version changed compared with the previous one. */}
-                    {familyId ? <FamilyVersionChanges key={familyId} familyId={familyId} /> : null}
                   </div>
 
                   <div className="space-y-1.5">
@@ -654,6 +652,8 @@ export const QuoteBuilder = ({ initialDetail, families, familyVersions }: QuoteB
                     </select>
                   </div>
                 </div>
+                {/* What this version changed compared with the previous one, as a tree, full width. */}
+                {familyId ? <FamilyVersionChanges key={familyId} familyId={familyId} defaultOpen className="mt-3" /> : null}
               </FormSection>
 
               {line ? (

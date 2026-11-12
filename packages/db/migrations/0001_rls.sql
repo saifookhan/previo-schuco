@@ -171,6 +171,7 @@ ALTER TABLE characteristics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pricing_matrices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE product_line_characteristics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE product_family_images ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_family_changes ENABLE ROW LEVEL SECURITY;
 
 -- product_families: split SELECT (broader — includes a linked client
 -- reading a published family) from write (supplier-only, always) —
@@ -279,6 +280,21 @@ CREATE POLICY product_family_images_insert ON product_family_images
   FOR INSERT WITH CHECK (app_owns_product_family(product_family_id));
 DROP POLICY IF EXISTS product_family_images_delete ON product_family_images;
 CREATE POLICY product_family_images_delete ON product_family_images
+  FOR DELETE USING (app_owns_product_family(product_family_id));
+
+-- product_family_changes: a stored change list is readable by whoever can see both families it
+-- compares, and written only by the newer family's owner (it is computed from that family).
+DROP POLICY IF EXISTS product_family_changes_select ON product_family_changes;
+CREATE POLICY product_family_changes_select ON product_family_changes
+  FOR SELECT USING (app_can_view_product_family(product_family_id) AND app_can_view_product_family(from_family_id));
+DROP POLICY IF EXISTS product_family_changes_insert ON product_family_changes;
+CREATE POLICY product_family_changes_insert ON product_family_changes
+  FOR INSERT WITH CHECK (app_owns_product_family(product_family_id));
+DROP POLICY IF EXISTS product_family_changes_update ON product_family_changes;
+CREATE POLICY product_family_changes_update ON product_family_changes
+  FOR UPDATE USING (app_owns_product_family(product_family_id)) WITH CHECK (app_owns_product_family(product_family_id));
+DROP POLICY IF EXISTS product_family_changes_delete ON product_family_changes;
+CREATE POLICY product_family_changes_delete ON product_family_changes
   FOR DELETE USING (app_owns_product_family(product_family_id));
 
 -- Application role: this is what the API connects as at runtime. It must

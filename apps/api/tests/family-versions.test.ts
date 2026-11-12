@@ -5,7 +5,7 @@ process.env.DATABASE_URL =
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { auditLog, companies, createDb, productFamilyShares, productLines, roles, users, withSystemTransaction } from '@schuco/db'
+import { auditLog, companies, createDb, productFamilyChanges, productFamilyShares, productLines, roles, users, withSystemTransaction } from '@schuco/db'
 import { eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -74,6 +74,8 @@ beforeAll(async () => {
   await withSystemTransaction(getDb(), async (tx) => {
     await tx.update(productLines).set({ markupPct: '123', description: 'Changed in v3' }).where(eq(productLines.id, v3Lines[0].id))
     await tx.delete(productLines).where(eq(productLines.id, v3Lines[1].id))
+    // Edited behind the services' back, so the change list stored at import no longer fits.
+    await tx.delete(productFamilyChanges).where(eq(productFamilyChanges.productFamilyId, v3.id))
     await tx.insert(productFamilyShares).values([
       { productFamilyId: v1.id, fromCompanyId: supplierId, toCompanyId: clientId },
       { productFamilyId: v3.id, fromCompanyId: supplierId, toCompanyId: clientId },

@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import type { Db } from '../src/client'
-import { companies, productFamilies, productFamilyShares } from '../src/schema'
+import { companies, productFamilies, productFamilyChanges, productFamilyShares } from '../src/schema'
 import { withRlsTransaction, withSystemTransaction } from '../src/queries/users'
 import { getTestDb } from './helpers'
 
@@ -255,5 +255,27 @@ describe('product_families RLS', () => {
       tx.select().from(productFamilies).where(eq(productFamilies.supplierCompanyId, supplierB)),
     )
     expect(rows.every((r) => r.supplierCompanyId === supplierB)).toBe(true)
+  })
+
+  it('10. stored change lists: the owner writes them; a company both families are shared with reads them but cannot write; others see nothing', async () => {
+    const shared = { published: true, owner: supplierA, from: supplierA, to: clientLinkedToA }
+    const olderId = await createSharedFamily('Changes Older', shared)
+    const newerId = await createSharedFamily('Changes Newer', shared)
+    const row = { productFamilyId: newerId, fromFamilyId: olderId, diffVersion: 1 }
+    const as = (companyId: string) => ({ companyId, isSuperAdmin: false })
+
+    await withRlsTransaction(db, as(supplierA), (tx) => tx.insert(productFamilyChanges).values({ ...row, changes: [] }))
+    const read = (companyId: string) =>
+      withRlsTransaction(db, as(companyId), (tx) => tx.select().from(productFamilyChanges).where(eq(productFamilyChanges.productFamilyId, newerId)))
+    expect(await read(clientLinkedToA)).toHaveLength(1)
+    expect(await read(supplierB)).toHaveLength(0)
+
+    await expect(
+      withRlsTransaction(db, as(clientLinkedToA), (tx) => tx.insert(productFamilyChanges).values({ ...row, fromFamilyId: newerId, productFamilyId: olderId, changes: [] })),
+    ).rejects.toThrow()
+    const updated = await withRlsTransaction(db, as(clientLinkedToA), (tx) =>
+      tx.update(productFamilyChanges).set({ changes: ['forged'] }).where(eq(productFamilyChanges.productFamilyId, newerId)).returning(),
+    )
+    expect(updated).toHaveLength(0)
   })
 })

@@ -5,19 +5,22 @@ process.env.DATABASE_URL =
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { auditLog, companies, createDb, roles, users, withSystemTransaction } from '@schuco/db'
+import { auditLog, companies, createDb, productFamilyChanges, roles, users, withSystemTransaction } from '@schuco/db'
 import { countFamilyChanges, type FamilyChangeNode } from '@schuco/contracts'
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { parseProductFamilyWorkbook } from '../src/lib/excel-import'
 import { getDb } from '../src/lib/db'
 import {
   ExcelImportError,
+  backfillFamilyChanges,
   compareProductFamilyVersions,
   createNewVersionFromExcel,
   getProductFamilyDetail,
   importProductFamilyFromExcel,
+  setProductFamilyPublishedStatus,
+  updateProductLine,
 } from '../src/services/product-families-service'
 import { previewQuotePosition } from '../src/services/quotes-service'
 
@@ -186,6 +189,59 @@ describe('importing v2 workbooks and comparing their versions', () => {
       ]),
     )
     expect(countFamilyChanges(changes).description).toBe(0)
+  })
+})
+
+describe('storing the changes detected between versions', () => {
+  const storedRow = (familyId: string, fromId: string) =>
+    withSystemTransaction(getDb(), async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(productFamilyChanges)
+        .where(and(eq(productFamilyChanges.productFamilyId, familyId), eq(productFamilyChanges.fromFamilyId, fromId)))
+      return row
+    })
+
+  it('detects and stores them when a new version is imported, from the content and not the file name', async () => {
+    const v1 = await importProductFamilyFromExcel(ctx(), actor, supplierId, file('mybox-v01.xlsx'))
+    // An "Add" name on the economics file: only what is in it counts.
+    const v2 = await createNewVersionFromExcel(ctx(), actor, v1.id, { buffer: fixture('mybox-v02-economics.xlsx'), originalName: 'MyBox V02 - Add.xlsx' })
+    const row = await storedRow(v2.id, v1.id)
+    expect(row).toBeDefined()
+    expect(countFamilyChanges(row.changes as FamilyChangeNode[])).toEqual({ added: 2, removed: 1, economic: 14, description: 0 })
+    expect((await compareProductFamilyVersions(ctx(), v1.id, v2.id))!.changes).toEqual(row.changes)
+  })
+
+  it('shows the stored list (also after publishing), and detects again once either version is edited', async () => {
+    const v1 = await importProductFamilyFromExcel(ctx(), actor, supplierId, file('mybox-v01.xlsx'))
+    const v2 = await createNewVersionFromExcel(ctx(), actor, v1.id, file('mybox-v02-cancel.xlsx'))
+    // Stand-in content, to see that the stored list is what is shown.
+    await withSystemTransaction(getDb(), (tx) =>
+      tx.update(productFamilyChanges).set({ changes: [] }).where(eq(productFamilyChanges.productFamilyId, v2.id)),
+    )
+    await setProductFamilyPublishedStatus(ctx(), actor, v2.id, true)
+    expect((await compareProductFamilyVersions(ctx(), v1.id, v2.id))!.changes).toEqual([])
+    await setProductFamilyPublishedStatus(ctx(), actor, v2.id, false)
+
+    const line = (await getProductFamilyDetail(ctx(), v2.id))!.lines[0]
+    await updateProductLine(ctx(), actor, v2.id, line.id, { discountPct: 7 })
+    const { counts } = (await compareProductFamilyVersions(ctx(), v1.id, v2.id))!
+    expect(counts).toEqual({ added: 0, removed: 6, economic: 1, description: 0 })
+    expect(countFamilyChanges((await storedRow(v2.id, v1.id)).changes as FamilyChangeNode[])).toEqual(counts)
+  })
+
+  it('the backfill stores the lists that are missing, and leaves current ones alone', async () => {
+    const v1 = await importProductFamilyFromExcel(ctx(), actor, supplierId, file('mybox-v01.xlsx'))
+    const v2 = await createNewVersionFromExcel(ctx(), actor, v1.id, file('mybox-v02-descriptions.xlsx'))
+    await withSystemTransaction(getDb(), (tx) => tx.delete(productFamilyChanges).where(eq(productFamilyChanges.productFamilyId, v2.id)))
+    expect(await storedRow(v2.id, v1.id)).toBeUndefined()
+
+    expect(await withSystemTransaction(getDb(), (tx) => backfillFamilyChanges(tx))).toBeGreaterThanOrEqual(1)
+    const stored = await storedRow(v2.id, v1.id)
+    expect(countFamilyChanges(stored.changes as FamilyChangeNode[]).description).toBeGreaterThan(0)
+    // Other test files' families may still be filled in, but this current list isn't redone.
+    await withSystemTransaction(getDb(), (tx) => backfillFamilyChanges(tx))
+    expect((await storedRow(v2.id, v1.id)).computedAt).toEqual(stored.computedAt)
   })
 })
 

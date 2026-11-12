@@ -30,9 +30,12 @@ Positions from a shared family start with the discount set on the share. How eve
 
 ## Family versions in a quote
 
-- The family list shows each family's version, e.g. “Finestra (v2)”, and under it what that version changed compared
-  with the previous one (added, removed, economic, description) with **See changes**, which opens the comparison on the
-  family's page.
+- The family list shows each family's version, e.g. “Finestra (v2)”. As soon as a family is picked, what that version
+  changed compared with the previous one (added, removed, economic, description) opens below it as a tree, the same as
+  on the family's page: hide kinds of change, switch to a list, click a change for its before and after (or the price
+  table cell by cell). **Hide changes** folds it; **Family page** opens the comparison there.
+- The changes are detected from the content of the two versions when the new one is uploaded, not from the file's name
+  or highlighted cells, and stored with the version.
 - A position priced from an older version shows the version under its line name and, when a newer version can be
   quoted, a **v3 available** badge: click it for what changed and the link to the comparison. The position keeps its
   price; edit it to switch to the new version.

@@ -14,6 +14,7 @@ What changed, newest first. Use it to see what's new to test.
 - **Pricing**: a line or option never costs less than its minimum; each option is priced at its own discount and markup (the line at the position's; on a shared family the position's discount applies to options too), shown next to the option on the position; options' installation hours add up with the line's for "Ore di posa" options. See [How prices are calculated](./pricing.md).
 - **Import fixes**: `NO` in the Relations sheet no longer counts as "applies"; a price table sheet that doesn't exist stops the import with its name, instead of an option without prices; lines with a blank price import at 0; new type `Altezza x [€/m]`, and in version 2 workbooks `2xAltezza x [€/m]` is twice the **height** (version 1 workbooks keep their template's formula).
 - **Versions and changes**: a line or option renamed in place shows as one description change, not removed + added; an option added or removed as a whole is one change, not also one per line offering it; the new fields are compared too.
+- **Quote builder**: picking a family opens the full tree of what its version changed right there, below the family list (hide it with **Hide changes**). The changes are detected from the content of the two versions when the new one is uploaded — never from the file name — and stored with it.
 - The family's page shows the distributor, the note, line minimums and options' own terms; the downloadable sample workbook is now version 2.
 
 **Week of 2 November**

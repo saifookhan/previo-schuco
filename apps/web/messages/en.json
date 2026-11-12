@@ -379,7 +379,9 @@
     "firstVersion": "First version of this family.",
     "changesBetween": "Changes v{from} → v{to}:",
     "changesFromOriginal": "Changes from {name} v{from} (copied from it):",
-    "seeChanges": "See changes",
+    "familyPage": "Family page",
+    "showChanges": "Show changes",
+    "hideChanges": "Hide changes",
     "newerAvailable": "v{version} available",
     "newerAvailableHint": "A newer version of this family can be quoted. This position keeps its price; edit it to switch."
   },

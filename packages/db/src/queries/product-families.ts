@@ -6,6 +6,7 @@ import {
   companyDirectory,
   pricingMatrices,
   productFamilies,
+  productFamilyChanges,
   productFamilyImages,
   productFamilyLibraryHidden,
   productLineCharacteristics,
@@ -486,6 +487,44 @@ export const getProductFamiliesPublishStatus = async (
     .from(productFamilies)
     .where(inArray(productFamilies.id, familyIds))
   return new Map(rows.map((row) => [row.id, row.isPublished]))
+}
+
+export type StoredFamilyChanges = typeof productFamilyChanges.$inferSelect
+
+/** The stored change lists of these families (as the newer side), from any older family. RLS-scoped. */
+export const listStoredFamilyChanges = async (db: DbLike, familyIds: string[]): Promise<StoredFamilyChanges[]> => {
+  if (familyIds.length === 0) {
+    return []
+  }
+  return db.select().from(productFamilyChanges).where(inArray(productFamilyChanges.productFamilyId, familyIds))
+}
+
+/** The stored change lists a family is either side of — what its edits make out of date. RLS-scoped. */
+export const listFamilyChangesInvolving = async (db: DbLike, familyId: string): Promise<StoredFamilyChanges[]> =>
+  db
+    .select()
+    .from(productFamilyChanges)
+    .where(or(eq(productFamilyChanges.productFamilyId, familyId), eq(productFamilyChanges.fromFamilyId, familyId)))
+
+/** Every family that is a later version or a copy, with the family it replaces or was copied from. RLS-scoped. */
+export const listFamilyPredecessors = (db: DbLike) =>
+  db
+    .select({ id: productFamilies.id, supersedesId: productFamilies.supersedesId, duplicatedFromId: productFamilies.duplicatedFromId })
+    .from(productFamilies)
+    .where(or(isNotNull(productFamilies.supersedesId), isNotNull(productFamilies.duplicatedFromId)))
+
+/** Stores (or replaces) the change list from `fromFamilyId` to `productFamilyId`. */
+export const saveFamilyChanges = async (
+  db: DbLike,
+  input: Pick<StoredFamilyChanges, 'productFamilyId' | 'fromFamilyId' | 'diffVersion' | 'changes'>,
+): Promise<void> => {
+  await db
+    .insert(productFamilyChanges)
+    .values(input)
+    .onConflictDoUpdate({
+      target: [productFamilyChanges.productFamilyId, productFamilyChanges.fromFamilyId],
+      set: { diffVersion: input.diffVersion, changes: input.changes, computedAt: new Date() },
+    })
 }
 
 /** Bumps a family's `updatedAt` — call after editing any of its children. */

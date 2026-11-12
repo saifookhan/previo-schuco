@@ -30,9 +30,13 @@ Positionen aus einer geteilten Familie starten mit dem Rabatt der Freigabe. Wie 
 
 ## Familienversionen im Angebot
 
-- Die Familienliste zeigt die Version jeder Familie, z. B. „Finestra (v2)“, und darunter, was diese Version gegenüber
-  der vorherigen geändert hat (hinzugefügt, entfernt, wirtschaftlich, Beschreibung), mit **Änderungen ansehen**, das den
-  Vergleich auf der Seite der Familie öffnet.
+- Die Familienliste zeigt die Version jeder Familie, z. B. „Finestra (v2)“. Sobald eine Familie gewählt ist, öffnet
+  sich darunter als Baum, was diese Version gegenüber der vorherigen geändert hat (hinzugefügt, entfernt,
+  wirtschaftlich, Beschreibung), wie auf der Seite der Familie: Änderungsarten ausblenden, zur Liste wechseln, eine
+  Änderung anklicken für vorher und nachher (oder die Preistabelle Zelle für Zelle). **Änderungen ausblenden** klappt
+  ihn zu; **Familienseite** öffnet dort den Vergleich.
+- Die Änderungen werden beim Hochladen der neuen Version aus dem Inhalt der beiden Versionen erkannt, nicht aus dem
+  Dateinamen oder markierten Zellen, und mit der Version gespeichert.
 - Eine Position aus einer älteren Version zeigt die Version unter dem Namen der Linie und, wenn eine neuere Version
   angeboten werden kann, das Abzeichen **v3 verfügbar**: anklicken für die Änderungen und den Link zum Vergleich. Die
   Position behält ihren Preis; bearbeite sie, um zur neuen Version zu wechseln.

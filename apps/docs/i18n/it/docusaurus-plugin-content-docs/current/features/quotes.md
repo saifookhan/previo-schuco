@@ -30,9 +30,13 @@ Le posizioni da una famiglia condivisa partono con lo sconto impostato sulla con
 
 ## Versioni della famiglia nel preventivo
 
-- L'elenco delle famiglie mostra la versione di ciascuna, ad es. “Finestra (v2)”, e sotto cosa ha cambiato quella
-  versione rispetto alla precedente (aggiunte, rimosse, economiche, descrittive) con **Vedi modifiche**, che apre il
-  confronto nella pagina della famiglia.
+- L'elenco delle famiglie mostra la versione di ciascuna, ad es. “Finestra (v2)”. Appena scelta una famiglia, sotto si
+  apre come albero cosa ha cambiato quella versione rispetto alla precedente (aggiunte, rimosse, economiche,
+  descrittive), come nella pagina della famiglia: nascondi tipi di modifica, passa all'elenco, clicca una modifica per
+  il prima e dopo (o la tabella prezzi cella per cella). **Nascondi modifiche** lo chiude; **Pagina della famiglia**
+  apre lì il confronto.
+- Le modifiche vengono rilevate dal contenuto delle due versioni al caricamento della nuova, non dal nome del file né
+  dalle celle evidenziate, e salvate con la versione.
 - Una posizione calcolata da una versione più vecchia mostra la versione sotto il nome della linea e, quando si può
   preventivare una versione più recente, il badge **v3 disponibile**: cliccalo per vedere cosa è cambiato e il link al
   confronto. La posizione mantiene il suo prezzo; modificala per passare alla nuova versione.

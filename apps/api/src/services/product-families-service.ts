@@ -2,6 +2,11 @@ import {
   deleteProductFamily as deleteProductFamilyQuery,
   getProductFamilyById,
   touchProductFamily,
+  listStoredFamilyChanges,
+  listFamilyChangesInvolving,
+  listFamilyPredecessors,
+  saveFamilyChanges,
+  type StoredFamilyChanges,
   updateCharacteristic as updateCharacteristicQuery,
   updatePricingMatrix as updatePricingMatrixQuery,
   updateProductLine as updateProductLineQuery,
@@ -32,8 +37,10 @@ import {
   type ProductLineRow,
 } from '@schuco/db'
 import {
+  FAMILY_DIFF_VERSION,
   countFamilyChanges,
   diffFamilyVersions,
+  type FamilyChangeNode,
   type AuditLogListResponse,
   type DuplicateProductFamilyRequest,
   type FamilyVersionComparison,
@@ -207,7 +214,7 @@ export interface ProductFamilyImportOptions {
   /** "Con listino"; a new family has one unless told otherwise. */
   hasPriceList?: boolean
   /** Makes this import a new *version* of an existing family (see `createNewVersionFromExcel`). */
-  version?: { version: number; supersedesId: string }
+  version?: { version: number; supersedesId: string; previous: ProductFamilyDetail }
 }
 
 /**
@@ -388,6 +395,8 @@ export const importProductFamilyFromExcel = async (
     })
 
     const detail = await getProductFamilyDetailQuery(tx, familyId)
+    // Detected from the two versions' content now, so viewing them later doesn't recompute it.
+    if (versionOptions) await storeFamilyChanges(tx, versionOptions.previous, detail!)
     return detail!.family
   })
 
@@ -500,17 +509,13 @@ export const getProductFamilyVersions = (
     if (!graph) return null
     const steps: FamilyVersionsResponse['steps'] = []
     if (withSteps) {
-      // One at a time (they share the transaction's single connection), each version loaded once.
-      const details = new Map<string, ProductFamilyDetail | null>()
-      const detail = async (id: string) => {
-        if (!details.has(id)) details.set(id, await getProductFamilyDetailQuery(tx, id))
-        return details.get(id)!
-      }
+      const stored = await listStoredFamilyChanges(tx, graphFamilies(graph).map((family) => family.id))
+      // One at a time (they share the transaction's single connection), each version loaded at most once.
+      const loaded: ProductFamilyDetail[] = []
       for (const [fromId, toId] of graphEdges(graph)) {
-        const older = await detail(fromId)
-        const newer = await detail(toId)
-        // Every id was just listed under the same RLS, so neither detail can be missing.
-        if (older && newer) steps.push({ fromId, toId, counts: countFamilyChanges(diffFamilyVersions(older, newer)) })
+        // Every id was just listed under the same RLS, so neither family can be missing.
+        const changes = await familyChanges(tx, fromId, toId, { stored, loaded })
+        if (changes) steps.push({ fromId, toId, counts: countFamilyChanges(changes) })
       }
     }
     return {
@@ -523,11 +528,87 @@ export const getProductFamilyVersions = (
   })
 }
 
-/** What changed from one family to another, both read under the caller's RLS; null when either is missing. */
-const diffVersionPair = async (tx: Parameters<typeof listProductFamilyVersions>[0], olderId: string, newerId: string) => {
-  const olderDetail = await getProductFamilyDetailQuery(tx, olderId)
-  const newerDetail = olderDetail ? await getProductFamilyDetailQuery(tx, newerId) : null
-  return olderDetail && newerDetail ? diffFamilyVersions(olderDetail, newerDetail) : null
+/** Loads family details under the caller's RLS, each at most once: from `loaded`, else the DB (then kept in `loaded`). */
+const detailLoader = (tx: Parameters<typeof listProductFamilyVersions>[0], loaded: ProductFamilyDetail[]) => async (id: string) => {
+  const known = loaded.find((detail) => detail.family.id === id)
+  if (known) return known
+  const detail = await getProductFamilyDetailQuery(tx, id)
+  if (detail) loaded.push(detail)
+  return detail
+}
+
+/**
+ * What changed from `olderId` to `newerId`, both read under the caller's RLS; null when either is
+ * missing. The stored change list when there is a current one, otherwise compared now — reading
+ * never stores (see `storeFamilyChanges` / `refreshFamilyChanges`). `stored` is the caller's
+ * already-loaded stored lists (else they're looked up), and `loaded` the details it already has;
+ * details loaded here are added to it, so a caller comparing many pairs loads each family once.
+ */
+const familyChanges = async (
+  tx: Parameters<typeof listProductFamilyVersions>[0],
+  olderId: string,
+  newerId: string,
+  { stored, loaded = [] }: { stored?: StoredFamilyChanges[]; loaded?: ProductFamilyDetail[] } = {},
+): Promise<FamilyChangeNode[] | null> => {
+  const row = (stored ?? (await listStoredFamilyChanges(tx, [newerId]))).find(
+    (r) => r.productFamilyId === newerId && r.fromFamilyId === olderId && r.diffVersion === FAMILY_DIFF_VERSION,
+  )
+  if (row) return row.changes as FamilyChangeNode[]
+  const load = detailLoader(tx, loaded)
+  const older = await load(olderId)
+  const newer = older ? await load(newerId) : null
+  return older && newer ? diffFamilyVersions(older, newer) : null
+}
+
+/** Detects what changed from `older` to `newer` and stores it — when the newer one is created. */
+const storeFamilyChanges = (tx: Parameters<typeof listProductFamilyVersions>[0], older: ProductFamilyDetail, newer: ProductFamilyDetail) =>
+  saveFamilyChanges(tx, {
+    productFamilyId: newer.family.id,
+    fromFamilyId: older.family.id,
+    diffVersion: FAMILY_DIFF_VERSION,
+    changes: diffFamilyVersions(older, newer),
+  })
+
+/**
+ * After an edit of a family's content: detects again every stored change list it is either side
+ * of. Lists whose newer family the caller doesn't own are left (copies and versions are always
+ * the same owner's, so there are none in practice).
+ */
+const refreshFamilyChanges = async (tx: Parameters<typeof listProductFamilyVersions>[0], ctx: TenantContext, familyId: string) => {
+  const rows = await listFamilyChangesInvolving(tx, familyId)
+  const load = detailLoader(tx, [])
+  for (const row of rows) {
+    const older = await load(row.fromFamilyId)
+    const newer = await load(row.productFamilyId)
+    if (older && newer && canManageProductFamily(ctx, newer.family)) await storeFamilyChanges(tx, older, newer)
+  }
+}
+
+/**
+ * Stores the change list of every version and copy that has no current one: families created
+ * before change lists were stored, or stored by an older `FAMILY_DIFF_VERSION`. Pass a system
+ * (RLS-bypassing) transaction. Returns how many lists it stored.
+ */
+export const backfillFamilyChanges = async (tx: Parameters<typeof listProductFamilyVersions>[0]): Promise<number> => {
+  const families = await listFamilyPredecessors(tx)
+  const current = new Set(
+    (await listStoredFamilyChanges(tx, families.map((family) => family.id)))
+      .filter((row) => row.diffVersion === FAMILY_DIFF_VERSION)
+      .map((row) => `${row.fromFamilyId}>${row.productFamilyId}`),
+  )
+  const load = detailLoader(tx, [])
+  let count = 0
+  for (const family of families) {
+    for (const fromId of [family.supersedesId, family.duplicatedFromId]) {
+      if (!fromId || current.has(`${fromId}>${family.id}`)) continue
+      const older = await load(fromId)
+      const newer = await load(family.id)
+      if (!older || !newer) continue
+      await storeFamilyChanges(tx, older, newer)
+      count++
+    }
+  }
+  return count
 }
 
 /**
@@ -550,7 +631,7 @@ export const compareProductFamilyVersions = (
     if (pair.length < 2) pair = pairIn(await loadVersionGraph(tx, otherId))
     const [older, newer] = pair.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
     if (!older || !newer) return null
-    const changes = await diffVersionPair(tx, older.id, newer.id)
+    const changes = await familyChanges(tx, older.id, newer.id)
     if (!changes) return null
     return {
       from: { id: older.id, name: older.name, version: older.version },
@@ -571,14 +652,16 @@ export const getFamilyVersionNotes = (ctx: TenantContext, familyIds: string[]): 
   if (!ids.length) return Promise.resolve(new Map())
   return withTenantDb(ctx, async (tx) => {
     const notes = new Map<string, FamilyVersionNote>()
-    // Every family's chain in one query.
+    // Every family's chain and stored change lists in one query each; each family loaded at most once.
     const chains = await listProductFamilyVersionsOfChains(tx, ids)
+    const stored = await listStoredFamilyChanges(tx, ids)
+    const loaded: ProductFamilyDetail[] = []
     for (const familyId of ids) {
       const chain = chains.get(familyId) ?? []
       const index = chain.findIndex((v) => v.id === familyId)
       if (index < 0) continue
       const previous = chain[index - 1]
-      const changes = previous ? await diffVersionPair(tx, previous.id, familyId) : null
+      const changes = previous ? await familyChanges(tx, previous.id, familyId, { stored, loaded }) : null
       notes.set(familyId, {
         version: chain[index].version,
         previousVersion: changes ? previous.version : null,
@@ -619,12 +702,17 @@ export const createNewVersionFromExcel = async (
   }
 
   const latest = await withTenantDb(ctx, (tx) => findLatestProductFamilyVersion(tx, existingFamilyId))
+  // The version this one replaces, to detect what changed; usually the one the upload started from.
+  const previous = latest.id === existing.family.id ? existing : await getProductFamilyDetail(ctx, latest.id)
+  if (!previous) {
+    throw new Error('Product family not found')
+  }
 
   return importProductFamilyFromExcel(ctx, actor, existing.family.supplierCompanyId, file, {
     // Set by hand, not from the file, so the new version keeps the one it replaces has.
     hasPriceList: latest.hasPriceList,
     ...options,
-    version: { version: latest.version + 1, supersedesId: latest.id },
+    version: { version: latest.version + 1, supersedesId: latest.id, previous },
   })
 }
 
@@ -768,6 +856,7 @@ export const duplicateProductFamily = async (
     )
 
     const detail = await getProductFamilyDetailQuery(tx, newFamilyId)
+    await storeFamilyChanges(tx, source, detail!)
     return detail!.family
   })
 
@@ -841,6 +930,7 @@ export const setProductFamilyHasPriceListStatus = async (
     if (!updated) {
       throw new ProductFamilyNotFoundError()
     }
+    await refreshFamilyChanges(tx, ctx, familyId)
     await recordAuditEvent(tx, auditActor(actor), updated.supplierCompanyId, {
       action: hasPriceList ? 'product_family.price_list_set' : 'product_family.price_list_unset',
       resourceType: 'product_family',
@@ -919,6 +1009,7 @@ export const setProductFamilyPriceValidityDates = async (
     if (!before || !updated) {
       throw new ProductFamilyNotFoundError()
     }
+    await refreshFamilyChanges(tx, ctx, familyId)
     await recordAuditEvent(tx, auditActor(actor), updated.supplierCompanyId, {
       action: 'product_family.price_validity_update',
       resourceType: 'product_family',
@@ -992,6 +1083,7 @@ const editFamilyPricing = <T>(
     }
 
     await touchProductFamily(tx, familyId)
+    await refreshFamilyChanges(tx, ctx, familyId)
     await recordAuditEvent(tx, auditActor(actor), family.supplierCompanyId, {
       action: audit.action,
       // Filed under the family (its history panel finds it by resourceId); the edited item is in the metadata.

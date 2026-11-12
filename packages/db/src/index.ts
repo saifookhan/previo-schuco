@@ -122,6 +122,10 @@ export {
   getProductFamiliesPublishStatus,
   getProductFamilyById,
   touchProductFamily,
+  listStoredFamilyChanges,
+  listFamilyChangesInvolving,
+  listFamilyPredecessors,
+  saveFamilyChanges,
   updateCharacteristic,
   updatePricingMatrix,
   updateProductLine,
@@ -157,6 +161,7 @@ export {
   type UpdatePricingMatrixInput,
   type UpdateProductLineInput,
   type ProductFamilySummary,
+  type StoredFamilyChanges,
 } from './queries/product-families'
 export {
   deleteQuotePosition,

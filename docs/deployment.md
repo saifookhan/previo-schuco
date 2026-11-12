@@ -74,6 +74,7 @@ Full step-by-step (Docker install, read-only deploy key, `.env`, first `up`, HTT
 Migrations run automatically: the `migrate` service executes on every `docker compose up`. It applies the Drizzle migrations in `packages/db/migrations/`, then re-applies `0001_rls.sql` (idempotent RLS policies, helper functions, grants), sets the `previo_app` password from `APP_DB_PASSWORD`, and runs the idempotent seed (4 roles, the demo companies and demo users if absent).
 
 - Migrations are **forward-only**. Rolling the code back does not undo a migration.
+- After `up`, `deploy.yml` also runs `pnpm backfill:family-changes`: it stores the detected changes of product family versions and copies that have none yet (made before they were stored, or after `FAMILY_DIFF_VERSION` was bumped). Idempotent; if it fails, those changes are just computed on every view.
 - Migrations that drop or rewrite data (for example `0013` replaced the company `type` column, `0016` replaced company links with per-family shares) deserve a **backup first** — see below.
 - When adding a migration with `pnpm --filter @schuco/db db:generate`, check that the generated file number does not collide with an existing one and that the snapshot chain (`migrations/meta/`) stays intact.
 

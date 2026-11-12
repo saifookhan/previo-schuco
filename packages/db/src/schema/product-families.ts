@@ -255,3 +255,30 @@ export const productFamilyImages = pgTable('product_family_images', {
   // Loading a family's detail (every version, for the version comparison) reads its rows by family.
   index('product_family_images_product_family_id_idx').on(table.productFamilyId),
 ])
+
+/**
+ * What changed from one family to another (a version and the one before it, or a copy and its
+ * original), detected from their content when the newer one is created, recomputed when either
+ * one's content is edited, and kept so it isn't recomputed on every view. `changes` is the
+ * contracts' `FamilyChangeNode[]`. A row made by an older `diffVersion` of the diff code is
+ * ignored (and recomputed by the backfill script).
+ */
+export const productFamilyChanges = pgTable(
+  'product_family_changes',
+  {
+    productFamilyId: uuid('product_family_id')
+      .notNull()
+      .references(() => productFamilies.id, { onDelete: 'cascade' }),
+    fromFamilyId: uuid('from_family_id')
+      .notNull()
+      .references(() => productFamilies.id, { onDelete: 'cascade' }),
+    diffVersion: integer('diff_version').notNull(),
+    changes: jsonb('changes').notNull().$type<unknown[]>(),
+    computedAt: timestamp('computed_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.productFamilyId, table.fromFamilyId] }),
+    // Edits refresh the rows a family is the older side of; deleting it cascades by this column.
+    index('product_family_changes_from_family_id_idx').on(table.fromFamilyId),
+  ],
+)

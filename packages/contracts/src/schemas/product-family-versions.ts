@@ -276,6 +276,12 @@ const itemNode = (
 ): FamilyChangeNode[] => (kind || children.length ? [{ type: 'item', id: key, name, kind, children }] : [])
 
 /**
+ * Bump whenever `diffFamilyVersions` changes what it reports: stored change lists made by an
+ * older version of the code are then computed again instead of being shown.
+ */
+export const FAMILY_DIFF_VERSION = 1
+
+/**
  * Compares two versions of a family, older first. Returns only the sections that changed,
  * so an empty array means the two versions are the same.
  */

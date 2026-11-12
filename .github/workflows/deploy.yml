@@ -34,4 +34,8 @@ jobs:
             # does. A failure must not fail the deploy, but is flagged.
             docker compose --profile selfhost run --rm -T api pnpm seed:demo-family \
               || echo "::warning::seed:demo-family failed — demo family may be missing"
+            # Stores the change lists of family versions made before they were stored (and after
+            # the diff code changes). Idempotent; without it those are just computed on view.
+            docker compose --profile selfhost run --rm -T api pnpm backfill:family-changes \
+              || echo "::warning::backfill:family-changes failed — older versions' changes are computed on view"
             docker image prune -f
