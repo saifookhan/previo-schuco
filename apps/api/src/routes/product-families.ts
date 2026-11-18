@@ -14,7 +14,7 @@ import { Hono } from 'hono'
 import {
   FamilyShareNotFoundError,
   FamilyShareValidationError,
-  getFamilyShareDiscount,
+  getFamilyShareItems,
   getFamilyShares,
   updateFamilyShares,
 } from '../services/family-shares-service'
@@ -255,12 +255,12 @@ productFamilies.get('/:id', rejectNonUuidParams, requireAuth, requirePermission(
   if (!detail) {
     return c.json({ error: 'Not found' }, 404)
   }
-  const shareDiscountPct = await getFamilyShareDiscount(ctx, id)
+  const shareItems = await getFamilyShareItems(ctx, id)
   const ownsFamily = canManageProductFamily(ctx, detail.family)
   return c.json({
     ...detail,
     editable: isProductFamilyEditable(detail.family),
-    shareDiscountPct,
+    shareItems,
     canViewHistory: ownsFamily,
     canManage: ownsFamily,
   })
@@ -315,7 +315,7 @@ productFamilies.get('/:id/shares', rejectNonUuidParams, requireAuth, requirePerm
   }
 })
 
-/** Replaces the set of companies the caller's company shares this family with, each at a default discount. */
+/** Replaces the set of companies the caller's company shares this family with, each with its discount, markup and installation hours per line and option. */
 productFamilies.put('/:id/shares', rejectNonUuidParams, requireAuth, requirePermission('catalog.share'), async (c) => {
   const id = c.req.param('id')
   if (!id) {

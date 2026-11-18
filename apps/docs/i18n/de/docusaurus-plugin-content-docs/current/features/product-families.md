@@ -133,7 +133,7 @@ sehen ihn — nicht die Unternehmen, mit denen die Familie geteilt wurde.
 ## Reiter
 
 - **Meine Familien** — Familien deines Unternehmens.
-- **Mit mir geteilt** — Familien, die andere Unternehmen mit dir geteilt haben, mit Besitzer und **deinem Rabatt**.
+- **Mit mir geteilt** — Familien, die andere Unternehmen mit dir geteilt haben, mit Besitzer und **Ihrem max. Rabatt** (dem höchsten, den die Freigabe auf einer Linie oder Option gibt).
 
 ## Filter
 

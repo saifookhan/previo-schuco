@@ -2,7 +2,18 @@ import { eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import type { Db } from '../src/client'
-import { businessUnits, companies, companyDirectory, productFamilies, productFamilyShares, roles, userBusinessUnits, users } from '../src/schema'
+import {
+  businessUnits,
+  companies,
+  companyDirectory,
+  productFamilies,
+  productFamilyShareItems,
+  productFamilyShares,
+  productLines,
+  roles,
+  userBusinessUnits,
+  users,
+} from '../src/schema'
 import { withRlsTransaction, withSystemTransaction } from '../src/queries/users'
 import { getTestDb } from './helpers'
 
@@ -262,6 +273,7 @@ describe('product_family_shares RLS', () => {
   // so it's a genuine cross-tenant negative case.
   let companyC: string
   let familyId: string
+  let lineId: string
 
   beforeAll(async () => {
     await withSystemTransaction(db, async (tx) => {
@@ -275,9 +287,21 @@ describe('product_family_shares RLS', () => {
         .values({ supplierCompanyId: companyA, name: 'RLS Share Family', isPublished: true })
         .returning({ id: productFamilies.id })
       familyId = family.id
-      await tx.insert(productFamilyShares).values([
-        { productFamilyId: familyId, fromCompanyId: companyA, toCompanyId: companyB },
-        { productFamilyId: familyId, fromCompanyId: companyB, toCompanyId: companyC },
+      const [line] = await tx
+        .insert(productLines)
+        .values({ productFamilyId: familyId, name: 'RLS Share Line', unitName: 'Pezzo', unitSymbol: 'PZ' })
+        .returning({ id: productLines.id })
+      lineId = line.id
+      const shares = await tx
+        .insert(productFamilyShares)
+        .values([
+          { productFamilyId: familyId, fromCompanyId: companyA, toCompanyId: companyB },
+          { productFamilyId: familyId, fromCompanyId: companyB, toCompanyId: companyC },
+        ])
+        .returning({ id: productFamilyShares.id })
+      await tx.insert(productFamilyShareItems).values([
+        { shareId: shares[0].id, productLineId: lineId, discountPct: '10' },
+        { shareId: shares[1].id, productLineId: lineId, discountPct: '20' },
       ])
     })
   })
@@ -334,5 +358,25 @@ describe('product_family_shares RLS', () => {
       tx.select({ id: companies.id }).from(companies),
     )
     expect(rows.map((r) => r.id)).toEqual([companyA])
+  })
+
+  it("7. a share's per-line values are seen by its two parties only, and written by the sharer only", async () => {
+    const itemsSeenBy = (companyId: string, isSuperAdmin = false) =>
+      withRlsTransaction(db, { companyId, isSuperAdmin }, (tx) =>
+        tx.select({ discountPct: productFamilyShareItems.discountPct }).from(productFamilyShareItems).where(eq(productFamilyShareItems.productLineId, lineId)),
+      )
+    const discounts = async (companyId: string, isSuperAdmin = false) =>
+      (await itemsSeenBy(companyId, isSuperAdmin)).map((r) => Number(r.discountPct)).sort((a, b) => a - b)
+    expect(await discounts(companyA)).toEqual([10]) // not what B gives C
+    expect(await discounts(companyB)).toEqual([10, 20])
+    expect(await discounts(companyC)).toEqual([20])
+    expect(await discounts(companyA, true)).toEqual([10, 20])
+
+    // The recipient can't change what it was given: the update matches no row it may write.
+    const changed = await withRlsTransaction(db, { companyId: companyC, isSuperAdmin: false }, (tx) =>
+      tx.update(productFamilyShareItems).set({ discountPct: '90' }).where(eq(productFamilyShareItems.productLineId, lineId)).returning(),
+    )
+    expect(changed).toEqual([])
+    expect(await discounts(companyC)).toEqual([20])
   })
 })

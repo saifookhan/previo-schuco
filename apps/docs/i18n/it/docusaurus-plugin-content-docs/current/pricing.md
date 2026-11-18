@@ -43,7 +43,8 @@ Stesse regole, con un'aggiunta: le opzioni **"% del prezzo del prodotto"** usano
 `valore_base_in_vendita * valore / 100`, dove `valore_base_in_vendita` è il prezzo della linea del punto 1.
 
 Un'opzione importata da un Excel della versione 2 ha **sconto e ricarico propri**, usati per il suo prezzo
-al posto di quelli della posizione. Le opzioni senza (versione 1) prendono quelli della posizione.
+al posto di quelli della posizione. Le opzioni senza (versione 1) prendono quelli della posizione. Su una famiglia
+**condivisa con te** ogni opzione ha i propri: quelli impostati sulla condivisione.
 
 ## 3. Il totale della posizione
 
@@ -55,10 +56,11 @@ totale posizione  = (parte linea + somma delle parti delle opzioni) × quantità
 - La linea usa **sconto** e **markup** della posizione; ogni opzione i propri, o quelli della posizione
   se non ne ha. Senza sconti o markup delle opzioni equivale a
   `(linea + opzioni) × quantità × (1 − sconto%) × markup%`.
-- Lo **sconto** parte dallo sconto della condivisione (se la famiglia è condivisa con te a più dello 0%),
-  altrimenti dallo sconto a catalogo della linea. Si può cambiare per ogni posizione. Su una famiglia
-  condivisa lo sconto della posizione sostituisce anche gli sconti propri delle opzioni.
-- Il **markup** parte dal markup a catalogo della linea. `100` significa nessun ricarico.
+- **Sconto** e **markup** partono dai valori a catalogo della linea o, su una famiglia condivisa con te, dai
+  valori che la condivisione imposta per quella linea. Si possono cambiare per ogni posizione. Un markup di `100`
+  significa nessun ricarico.
+- **Ore di posa** (per le opzioni "Ore di posa"): quelle della linea più quelle di ogni opzione scelta — su una
+  famiglia condivisa, quelle della condivisione.
 - Il prezzo **manuale (M)** sostituisce il prezzo calcolato della linea o dell'opzione con quello inserito.
 
 Il totale del preventivo è la somma delle posizioni, **IVA esclusa**.

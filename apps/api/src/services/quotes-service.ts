@@ -9,7 +9,7 @@ import {
   insertQuote,
   insertQuotePosition,
   insertQuotePositionCharacteristic,
-  getIncomingShareDiscounts,
+  getIncomingShareItems,
   isFamilySharedWith,
   isProductFamilyInLibrary,
   listQuotes,
@@ -153,7 +153,7 @@ export interface AddQuotePositionInput {
     pricingMode?: 'auto' | 'manual'
     manualUnitPrice?: number
   }[]
-  /** Overrides the line's own catalog discount/markup as the position's starting point (still independently editable afterward). Omit to use the line's own values. */
+  /** Overrides the line's own catalog discount/markup as the position's starting point (still independently editable afterward). Omit to use the line's own values, or on a shared family the share's. */
   discountPct?: number
   extraMarkupPct?: number
   /** Overrides the auto-built description (line name + selected characteristic names). */
@@ -342,12 +342,24 @@ export const priceQuotePosition = async (
     }
     return { selection, main, sub }
   })
+  // On a family shared with this company, each line and option starts at what the share gives it
+  // (discount, markup, installation hours) instead of the family's own values; one the share has
+  // no values for keeps the family's.
+  const shareItems =
+    family.family.supplierCompanyId === ctx.effectiveCompanyId
+      ? null
+      : await getIncomingShareItems(tx, ctx.effectiveCompanyId, family.family.id)
+  const lineShare = shareItems?.get(line.id)
+  const lineHours = lineShare?.installationHours ?? Number(line.installationHoursPerUnit)
   // The position's installation hours: the line's, plus what each chosen option adds (v2 options
   // have their own "Ore di posa"). An "Ore di posa x [€/h]" option is priced on these hours; the
   // line's own formula keeps the line's hours, so labour isn't charged on both.
   const installationHours =
-    Number(line.installationHoursPerUnit) +
-    selections.reduce((sum, { sub }) => sum + Number(sub.installationHoursPerUnit ?? 0), 0)
+    lineHours +
+    selections.reduce(
+      (sum, { sub }) => sum + (shareItems?.get(sub.id)?.installationHours ?? Number(sub.installationHoursPerUnit ?? 0)),
+      0,
+    )
 
   const linePricingMode = input.pricingMode === 'manual' ? 'manual' : 'auto'
   let lineBasePrice: number
@@ -371,7 +383,7 @@ export const priceQuotePosition = async (
           formula: line.formula,
           pricingMatrix: lineMatrix ? asMatrix(lineMatrix.widths, lineMatrix.heights, lineMatrix.matrix) : null,
           minValue: line.minValue == null ? null : Number(line.minValue),
-          installationHoursPerUnit: Number(line.installationHoursPerUnit),
+          installationHoursPerUnit: lineHours,
           discountPct: 0,
           markupPct: 100,
         },
@@ -385,14 +397,9 @@ export const priceQuotePosition = async (
     }
   }
 
-  // A family shared with this company at a non-zero discount starts positions at that discount;
-  // otherwise (own family, or shared at 0%) the line's own catalog discount applies. Always overridable via input.
-  const shareDiscount =
-    family.family.supplierCompanyId === ctx.effectiveCompanyId
-      ? 0
-      : ((await getIncomingShareDiscounts(tx, ctx.effectiveCompanyId, [family.family.id])).get(family.family.id) ?? 0)
-  const discountPct = input.discountPct ?? (shareDiscount > 0 ? shareDiscount : Number(line.discountPct))
-  const extraMarkupPct = input.extraMarkupPct ?? Number(line.markupPct)
+  // Only defaults: always overridable via input.
+  const discountPct = input.discountPct ?? lineShare?.discountPct ?? Number(line.discountPct)
+  const extraMarkupPct = input.extraMarkupPct ?? lineShare?.markupPct ?? Number(line.markupPct)
   if (discountPct < 0 || discountPct > 100) {
     throw new QuoteValidationError('discountPct must be between 0 and 100')
   }
@@ -457,10 +464,11 @@ export const priceQuotePosition = async (
       }
     }
 
-    // A v2 option has its own discount and markup; on a shared family the position's discount (the
-    // share's, or what the user typed over it) replaces the option's own.
-    const ownDiscountPct = sub.discountPct == null ? null : shareDiscount > 0 ? discountPct : Number(sub.discountPct)
-    const ownMarkupPct = sub.markupPct == null ? null : Number(sub.markupPct)
+    // An option has its own discount and markup when the share gives it some, or (v2) the family
+    // does; otherwise the position's apply to it.
+    const optionShare = shareItems?.get(sub.id)
+    const ownDiscountPct = optionShare?.discountPct ?? (sub.discountPct == null ? null : Number(sub.discountPct))
+    const ownMarkupPct = optionShare?.markupPct ?? (sub.markupPct == null ? null : Number(sub.markupPct))
     characteristicsBasePrice += subPrice
     characteristicsFinalPrice += subPrice * (1 - (ownDiscountPct ?? discountPct) / 100) * ((ownMarkupPct ?? extraMarkupPct) / 100)
     characteristicRows.push({

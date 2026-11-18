@@ -163,7 +163,7 @@ describe('partners page', () => {
         .values({ supplierCompanyId: manufacturer, name: 'Partner Test Family', isPublished: true })
         .returning({ id: productFamilies.id }),
     )
-    await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), family.id, [{ companyId: client, discountPct: 5 }])
+    await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), family.id, [{ companyId: client, items: [] }])
 
     expect(await removeConnection(ctxOf(client), actorOf(client), manufacturer)).toBe('none')
     expect(await statusSeenBy(manufacturer, client)).toBe('none')
@@ -173,7 +173,7 @@ describe('partners page', () => {
     expect(left).toEqual([])
     expect((await notificationsOf(admins[manufacturer])).map((n) => n.type)).toContain('partner.connection_removed')
     await expect(
-      updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), family.id, [{ companyId: client, discountPct: 5 }]),
+      updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), family.id, [{ companyId: client, items: [] }]),
     ).rejects.toThrow(FamilyShareValidationError)
     expect(await removeConnection(ctxOf(client), actorOf(client), manufacturer)).toBe('none') // nothing left to remove
   })

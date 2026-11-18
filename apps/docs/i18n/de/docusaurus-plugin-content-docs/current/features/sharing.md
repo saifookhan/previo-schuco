@@ -5,7 +5,8 @@ title: Familien teilen
 
 # Familien teilen
 
-Ein Unternehmen entscheidet, wer jede seiner Produktfamilien nutzen darf und mit welchem Standardrabatt.
+Ein Unternehmen entscheidet, wer jede seiner Produktfamilien nutzen darf und was jedes Unternehmen für jede
+Produktlinie und Option erhält: einen Rabatt, einen Aufschlag und Montagestunden.
 
 **Wo:** Familienliste oder Familienseite → **Teilen** · benötigt `catalog.share`. Teilen ist nur mit Unternehmen
 möglich, mit denen Sie auf der Seite [Partner](./partners.md) verbunden sind; die Suche im Dialog listet nur diese.
@@ -15,9 +16,16 @@ möglich, mit denen Sie auf der Seite [Partner](./partners.md) verbunden sind; d
 ## Regeln
 
 - Eine Familie muss **veröffentlicht** sein, bevor sie geteilt werden kann.
-- Jede Freigabe lautet *„Unternehmen A teilt Familie F mit Unternehmen B zu Rabatt d“*. Der Rabatt ist der
-  Startwert für die Angebotspositionen von B — er kann pro Position trotzdem geändert werden.
-  `0 %` heißt kein eigener Rabatt: es gilt der Katalograbatt der Linie.
+- Jede Freigabe lautet *„Unternehmen A teilt Familie F mit Unternehmen B“*, mit **Rabatt %**, **Aufschlag %**
+  und **Montagestunden** pro Einheit für jede Produktlinie und jede Option. Mit diesen Werten starten die
+  Angebotspositionen von B — B kann Rabatt und Aufschlag der Position trotzdem ändern.
+- Wenn Sie ein Unternehmen hinzufügen, starten die Werte mit denen der Familie (aus der hochgeladenen Excel). Wo die
+  Excel keine hat (eine Option aus Version 1), starten sie mit 0 % Rabatt, 100 % Aufschlag und 0 Stunden. Ein
+  Aufschlag von `100 %` heißt kein Aufschlag; `130 %` schlägt 30 % auf.
+- **Neue Version:** Freigaben gehören zu einer Version. Wenn Sie ein Unternehmen zu einer neuen Version hinzufügen,
+  mit dem Sie eine frühere Version geteilt haben, werden seine damaligen Werte übernommen, nach Namen der Linie und
+  Option zugeordnet („Werte aus einer anderen Version“). Eine in dieser Version neue Linie oder Option startet mit
+  den Werten der Excel.
 - Nur der **Besitzer** oder ein Unternehmen, mit dem die Familie selbst geteilt wurde, darf sie weiterteilen.
   So entsteht eine Kette, z. B. Hersteller → Händler → Kunde.
 - Das **Zurückziehen** der Veröffentlichung oder das Entfernen einer Freigabe weiter oben verbirgt die
@@ -25,13 +33,17 @@ möglich, mit denen Sie auf der Seite [Partner](./partners.md) verbunden sind; d
 
 ## So testen
 
-Die Demo-Familie *Demo Window W70* ist bereits mit Technometal zu 10 % geteilt.
+Die Demo-Familie *Demo Window W70* ist bereits mit Technometal zu 10 % auf jede Linie und Option geteilt.
 
-1. Als `admin@technometal-demo.it`: *Produktfamilien → Mit mir geteilt* zeigt sie mit „Dein Rabatt 10 %“.
+1. Als `admin@technometal-demo.it`: *Produktfamilien → Mit mir geteilt* zeigt sie mit „Ihr max. Rabatt 10 %“
+   (der höchste Rabatt auf einer Linie oder Option).
 
    ![Reiter Mit mir geteilt](/img/screens/product-families-shared.png)
 
-2. Als `admin@suppli-demo.it`: sie zusätzlich mit **Fabbrikka** zu 5 % teilen (falls Fabbrikka nicht erscheint,
-   zuerst unter *Partner* verbinden).
-3. Als `admin@fabbrikka-demo.it`: sie erscheint nun mit 5 %. Freigabe wieder entfernen → sie ist weg.
+2. Als `admin@suppli-demo.it`: sie zusätzlich mit **Fabbrikka** teilen (falls Fabbrikka nicht erscheint,
+   zuerst unter *Partner* verbinden). Ihre Linien und Optionen öffnen sich mit den Werten der Excel; *Finestra 1 anta*
+   auf 5 % setzen und speichern. Einen Wert leeren und speichern → das Unternehmen öffnet sich wieder mit einer
+   Meldung, nichts wird gespeichert.
+3. Als `admin@fabbrikka-demo.it`: sie erscheint nun mit 10 % (die 10 % der Excel auf *Finestra 2 ante* sind der
+   höchste Wert). Freigabe wieder entfernen → sie ist weg.
 4. Wieder als Suppli: Veröffentlichung zurückziehen → sie verschwindet für Technometal.

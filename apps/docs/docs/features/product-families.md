@@ -126,7 +126,7 @@ the family was shared with.
 ## Tabs
 
 - **Own** — families your company owns.
-- **Shared with me** — families other companies shared with you, with the owner and **your discount**.
+- **Shared with me** — families other companies shared with you, with the owner and **your max discount** (the highest the share gives on any line or option).
 
 ## Filters
 

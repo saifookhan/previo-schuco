@@ -81,13 +81,17 @@ export {
 } from './queries/role-permissions'
 export {
   deleteSharesBetween,
-  getIncomingShareDiscounts,
+  getIncomingShareItems,
   isFamilySharedWith,
   listFamilyShareTargets,
   listOutgoingFamilyShares,
+  listPreviousVersionShareItems,
   replaceOutgoingFamilyShares,
+  type FamilyShareItem,
+  type FamilyShareItemValues,
   type FamilyShareRow,
   type FamilyShareTarget,
+  type NamedFamilyShareItem,
 } from './queries/product-family-shares'
 export { filterBusinessUnitIdsByCompany } from './queries/business-units'
 export {

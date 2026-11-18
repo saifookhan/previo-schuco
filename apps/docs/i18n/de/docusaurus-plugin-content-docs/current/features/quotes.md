@@ -26,7 +26,7 @@ title: Angebote
 
 ![Formular zum Hinzufügen einer Position](/img/screens/add-position.png)
 
-Positionen aus einer geteilten Familie starten mit dem Rabatt der Freigabe. Wie jede Zahl berechnet wird: [Wie Preise berechnet werden](../pricing.md).
+Positionen aus einer geteilten Familie starten mit Rabatt, Aufschlag und Montagestunden, die die Freigabe für diese Linie und ihre Optionen festlegt. Wie jede Zahl berechnet wird: [Wie Preise berechnet werden](../pricing.md).
 
 ## Familienversionen im Angebot
 

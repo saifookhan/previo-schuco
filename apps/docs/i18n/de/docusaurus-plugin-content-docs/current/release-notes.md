@@ -9,6 +9,11 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 
 ## November 2026
 
+**Woche vom 16. November**
+- **Teilen pro Linie und Option**: Der Teilen-Dialog listet jede Produktlinie und Option der Familie, jeweils mit eigenem **Rabatt**, **Aufschlag** und **Montagestunden** für dieses Unternehmen, ausgehend von den Werten der Excel (0 % / 100 % / 0, wo sie keine hat). Eine neue Version startet mit dem, was das Unternehmen in der früheren hatte, nach Namen zugeordnet. Der einzelne Rabatt pro Unternehmen entfällt. Siehe [Familien teilen](./features/sharing.md).
+- **Angebote aus einer geteilten Familie**: Jede Position startet mit den Werten der Freigabe für ihre Linie, und jede Option wird mit den Werten der Freigabe für diese Option berechnet.
+- *Mit mir geteilt* zeigt **Ihren max. Rabatt**: den höchsten auf einer Linie oder Option.
+
 **Woche vom 9. November**
 - **Excel-Vorlage Version 2**: **Distributore** (Händler) und **Note** der Familie, ein **Mindesteinkaufspreis** (`MinValue`) für Linien und Optionen sowie pro Option ein eigener **Rabatt**, **Aufschlag** und eigene **Montagestunden**. Dateien der Version 1 lassen sich weiterhin importieren. Siehe [Excel-Importformat](./excel-format.md).
 - **Preise**: Eine Linie oder Option kostet nie weniger als ihr Minimum; jede Option wird mit ihrem eigenen Rabatt und Aufschlag berechnet (die Linie mit denen der Position; bei einer geteilten Familie gilt der Rabatt der Position auch für die Optionen), angezeigt neben der Option in der Position; die Montagestunden der Optionen werden für „Ore di posa“-Optionen zu denen der Linie addiert. Siehe [Wie Preise berechnet werden](./pricing.md).

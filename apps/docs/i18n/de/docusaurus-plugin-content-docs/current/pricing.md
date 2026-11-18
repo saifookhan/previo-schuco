@@ -43,7 +43,8 @@ Gleiche Regeln, mit einer Ergänzung: Optionen **„% des Produktpreises“** ve
 `valore_base_in_vendita * valore / 100`, wobei `valore_base_in_vendita` der Linienpreis aus Schritt 1 ist.
 
 Eine aus einer Excel-Datei der Version 2 importierte Option hat **eigenen Rabatt und Aufschlag**, die für
-ihren Preis statt denen der Position gelten. Optionen ohne (Version 1) übernehmen die der Position.
+ihren Preis statt denen der Position gelten. Optionen ohne (Version 1) übernehmen die der Position. Bei einer
+**mit dir geteilten** Familie hat jede Option eigene: die in der Freigabe festgelegten.
 
 ## 3. Die Positionssumme
 
@@ -55,10 +56,11 @@ Positionssumme   = (Linienteil + Summe der Optionsteile) × Menge
 - Die Linie verwendet **Rabatt** und **Aufschlag** der Position; jede Option ihre eigenen oder, wenn sie
   keine hat, die der Position. Ohne Rabatte oder Aufschläge der Optionen entspricht das
   `(Linie + Optionen) × Menge × (1 − Rabatt%) × Aufschlag%`.
-- Der **Rabatt** startet mit dem Rabatt der Freigabe (wenn die Familie mit mehr als 0 % mit dir geteilt wurde),
-  sonst mit dem Katalograbatt der Linie. Er kann pro Position geändert werden. Bei einer geteilten
-  Familie ersetzt der Rabatt der Position auch die eigenen Rabatte der Optionen.
-- Der **Aufschlag** startet mit dem Katalogaufschlag der Linie. `100` bedeutet kein Aufschlag.
+- **Rabatt** und **Aufschlag** starten mit den Katalogwerten der Linie oder, bei einer mit dir geteilten Familie,
+  mit den Werten, die die Freigabe für diese Linie festlegt. Beide können pro Position geändert werden. `100`
+  Aufschlag bedeutet kein Aufschlag.
+- **Montagestunden** (für „Ore di posa“-Optionen): die der Linie plus die jeder gewählten Option — bei einer
+  geteilten Familie die der Freigabe.
 - **Manueller (M)** Preis ersetzt den berechneten Linien- oder Optionspreis durch den eingegebenen Wert.
 
 Die Angebotssumme ist die Summe der Positionen, **ohne MwSt.**

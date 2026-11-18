@@ -146,7 +146,7 @@ export interface ProductFamilySummary {
 export interface ProductFamilyListItem extends ProductFamilySummary {
   /** Name of the company that owns the family; null if the caller cannot read that company. */
   ownerCompanyName: string | null
-  /** Default discount the family was shared with the caller at (highest if several companies shared it); null for the caller's own families. */
+  /** The highest discount the share of the family with the caller gives on any line or option; null for the caller's own families. */
   shareDiscountPct: number | null
   /** Whether the family is in the listing company's library ("In libreria"). */
   inLibrary: boolean
@@ -168,9 +168,15 @@ export const listVisibleProductFamilies = (db: DbLike, companyId: string): Promi
       ...getTableColumns(productFamilies),
       ownerCompanyName: companyDirectory.name,
       shareDiscountPct: sql<number | null>`(
-        SELECT max(s.discount_pct)::float FROM product_family_shares s
-        WHERE s.product_family_id = ${productFamilies.id} AND s.to_company_id = ${companyId}::uuid
-          AND app_family_reaches_company(s.product_family_id, s.from_company_id)
+        SELECT max(i.discount_pct)::float FROM product_family_share_items i
+        WHERE i.share_id = (
+          -- The share that applies, as getIncomingShareItems picks it: the owner's, else the first one made.
+          SELECT s.id FROM product_family_shares s
+          WHERE s.product_family_id = ${productFamilies.id} AND s.to_company_id = ${companyId}::uuid
+            AND app_family_reaches_company(s.product_family_id, s.from_company_id)
+          ORDER BY s.from_company_id = ${productFamilies.supplierCompanyId} DESC, s.created_at, s.id
+          LIMIT 1
+        )
       )`,
       inLibrary: sql<boolean>`NOT EXISTS (
         SELECT 1 FROM product_family_library_hidden h

@@ -128,7 +128,7 @@ alle condivisioni e ogni modifica di prezzo (quale linea o opzione, quali campi)
 ## Schede
 
 - **Le mie famiglie** — le famiglie della tua azienda.
-- **Condivise con me** — famiglie che altre aziende hanno condiviso con te, con proprietario e **il tuo sconto**.
+- **Condivise con me** — famiglie che altre aziende hanno condiviso con te, con proprietario e **il tuo sconto max** (il più alto che la condivisione dà su una linea o opzione).
 
 ## Filtri
 

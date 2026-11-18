@@ -1,3 +1,5 @@
+import type { FamilyShareValues } from '@schuco/contracts'
+
 export interface ProductFamilySummary {
   id: string
   supplierCompanyId: string
@@ -20,7 +22,7 @@ export interface ProductFamilySummary {
   updatedAt: string
   /** List endpoint only: the owning company's name, when the caller may read it. */
   ownerCompanyName?: string | null
-  /** List endpoint only: default discount this family was shared with the caller at; null for the caller's own. */
+  /** List endpoint only: the highest discount a share of this family with the caller gives on any line or option; null for the caller's own. */
   shareDiscountPct?: number | null
   /** List endpoint only: whether the family is in the caller's company library ("In libreria"). */
   inLibrary?: boolean
@@ -100,8 +102,8 @@ export interface ProductFamilyDetail {
   canViewHistory: boolean
   /** Owning company or super-admin: may upload a new version and change the price validity. */
   canManage: boolean
-  /** Default discount this family was shared with the caller's company at (null if own or shared at 0%). */
-  shareDiscountPct?: number | null
+  /** What the share of this family with the caller's company gives it, by product line or option id (null for its own families). */
+  shareItems?: Record<string, FamilyShareValues> | null
   /** Whether the family is in the caller's company library ("In libreria"). */
   inLibrary: boolean
 }

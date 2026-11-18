@@ -1,6 +1,6 @@
 'use client'
 
-import { Loader2, Search, Share2, Trash2, X } from 'lucide-react'
+import { ChevronDown, Loader2, Search, Share2, Trash2, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
@@ -10,16 +10,40 @@ import { useLoadingTransition } from '@/components/ui/loading-region'
 import { useAuth } from '@/hooks/use-auth'
 import { Link, useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
-import type { FamilySharesResponse } from '@schuco/contracts'
+import { cn } from '@/lib/utils'
+import type { FamilyShareItemDto, FamilyShareableItem, FamilySharesResponse } from '@schuco/contracts'
+
+const FIELDS = ['discountPct', 'markupPct', 'installationHours'] as const
+type Field = (typeof FIELDS)[number]
+/** One line's or option's values, kept as text while typing so "12." and "" don't fight the input. */
+type Values = Record<Field, string>
 
 interface Row {
   companyId: string
   companyName: string
-  /** Kept as text while typing so "12." and "" don't fight the input. */
-  discount: string
+  open: boolean
+  /** Started from what the company got on another version of the family. */
+  fromPrevious: boolean
+  values: Record<string, Values>
 }
 
-/** "Share" button + dialog: choose which connected partners get this family, each with a default discount. */
+const asText = (items: Array<Pick<FamilyShareItemDto, 'id' | Field>>): Record<string, Values> =>
+  Object.fromEntries(
+    items.map((item) => [
+      item.id,
+      { discountPct: String(item.discountPct), markupPct: String(item.markupPct), installationHours: String(item.installationHours) },
+    ]),
+  )
+
+/** The valid range of each value: discount 0–100 %, markup 0–10000 % (100 = none), hours ≥ 0. */
+const inRange = (field: Field, value: number) =>
+  Number.isFinite(value) && value >= 0 && (field === 'discountPct' ? value <= 100 : field === 'markupPct' ? value <= 10000 : true)
+
+/**
+ * "Share" button + dialog: choose which connected partners get this family and, for each, the
+ * discount, markup and installation hours it gets on every product line and option — starting
+ * from what it got on another version of the family, else from the family's own (Excel) values.
+ */
 export const ProductFamilyShareButton = ({
   familyId,
   familyName,
@@ -42,6 +66,8 @@ export const ProductFamilyShareButton = ({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rows, setRows] = useState<Row[]>([])
+  const [items, setItems] = useState<FamilyShareableItem[]>([])
+  const [previous, setPrevious] = useState<FamilySharesResponse['previous']>([])
   const [targets, setTargets] = useState<Array<{ id: string; name: string }>>([])
   const [query, setQuery] = useState('')
   const [listOpen, setListOpen] = useState(false)
@@ -64,11 +90,15 @@ export const ProductFamilyShareButton = ({
         return
       }
       setTargets(data.targets)
+      setItems(data.items ?? [])
+      setPrevious(data.previous ?? [])
       setRows(
         data.shares.map((share) => ({
           companyId: share.companyId,
           companyName: share.companyName,
-          discount: String(share.discountPct),
+          open: false,
+          fromPrevious: false,
+          values: { ...asText(data.items ?? []), ...asText(share.items) },
         })),
       )
     } catch {
@@ -79,16 +109,48 @@ export const ProductFamilyShareButton = ({
   }
 
   const add = (target: { id: string; name: string }) => {
-    setRows((prev) => [...prev, { companyId: target.id, companyName: target.name, discount: '0' }])
+    const before = previous.find((p) => p.companyId === target.id)
+    setRows((prev) => [
+      ...prev.map((row) => ({ ...row, open: false })),
+      {
+        companyId: target.id,
+        companyName: target.name,
+        open: true,
+        fromPrevious: Boolean(before?.items.length),
+        values: { ...asText(items), ...asText(before?.items ?? []) },
+      },
+    ])
     setQuery('')
   }
 
+  const setValue = (companyId: string, itemId: string, field: Field, value: string) =>
+    setRows((prev) =>
+      prev.map((row) =>
+        row.companyId === companyId ? { ...row, values: { ...row.values, [itemId]: { ...row.values[itemId], [field]: value } } } : row,
+      ),
+    )
+
   const save = async () => {
-    const shares = rows.map((row) => ({ companyId: row.companyId, discountPct: Number(row.discount) }))
-    if (shares.some((s) => !Number.isFinite(s.discountPct) || s.discountPct < 0 || s.discountPct > 100)) {
-      setError(t('discountInvalid'))
+    // A blank or invalid value: open that company and say so, rather than saving a default in its place.
+    const valueOf = (row: Row, itemId: string, field: Field) => row.values[itemId]?.[field]?.trim() ?? ''
+    const invalid = rows.find((row) =>
+      items.some((item) => FIELDS.some((f) => valueOf(row, item.id, f) === '' || !inRange(f, Number(valueOf(row, item.id, f))))),
+    )
+    if (invalid) {
+      setRows((prev) => prev.map((row) => (row.companyId === invalid.companyId ? { ...row, open: true } : row)))
+      setError(t('valuesInvalid', { name: invalid.companyName }))
       return
     }
+    const shares = rows.map((row) => ({
+      companyId: row.companyId,
+      items: items.map((item) => ({
+        kind: item.kind,
+        id: item.id,
+        discountPct: Number(valueOf(row, item.id, 'discountPct')),
+        markupPct: Number(valueOf(row, item.id, 'markupPct')),
+        installationHours: Number(valueOf(row, item.id, 'installationHours')),
+      })),
+    }))
     setSaving(true)
     setError(null)
     try {
@@ -137,7 +199,7 @@ export const ProductFamilyShareButton = ({
           onClick={() => !saving && setOpen(false)}
         >
           <div
-            className="max-h-full w-full max-w-lg overflow-auto rounded-xl bg-white p-5 shadow-xl"
+            className="max-h-full w-full max-w-3xl overflow-auto rounded-xl bg-white p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-3">
@@ -228,38 +290,22 @@ export const ProductFamilyShareButton = ({
                   {rows.length === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-slate-400">{t('empty')}</p>
                   ) : (
-                    <>
-                      <div className="grid grid-cols-[1fr_7rem_2rem] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-500">
-                        <span>{t('company')}</span>
-                        <span>{t('discount')}</span>
-                        <span />
-                      </div>
-                      {rows.map((row) => (
-                        <div
-                          key={row.companyId}
-                          className="grid grid-cols-[1fr_7rem_2rem] items-center gap-3 border-b border-slate-50 px-4 py-2 last:border-b-0"
-                        >
-                          <span className="truncate text-sm font-medium text-slate-900">{row.companyName}</span>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              inputMode="decimal"
-                              min={0}
-                              max={100}
-                              step="0.5"
-                              className="h-8 pr-7 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                              value={row.discount}
-                              aria-label={t('discountFor', { name: row.companyName })}
-                              onChange={(e) =>
-                                setRows((prev) =>
-                                  prev.map((r) => (r.companyId === row.companyId ? { ...r, discount: e.target.value } : r)),
-                                )
-                              }
-                            />
-                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-400">
-                              %
-                            </span>
-                          </div>
+                    rows.map((row) => (
+                      <div key={row.companyId} className="border-b border-slate-100 last:border-b-0">
+                        <div className="flex items-center gap-2 px-4 py-2">
+                          <button
+                            type="button"
+                            aria-expanded={row.open}
+                            aria-controls={`share-items-${row.companyId}`}
+                            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                            onClick={() =>
+                              setRows((prev) => prev.map((r) => (r.companyId === row.companyId ? { ...r, open: !r.open } : r)))
+                            }
+                          >
+                            <ChevronDown className={cn('h-4 w-4 shrink-0 text-slate-400 transition-transform', !row.open && '-rotate-90')} />
+                            <span className="truncate text-sm font-medium text-slate-900">{row.companyName}</span>
+                            {row.fromPrevious ? <span className="shrink-0 text-xs text-slate-500">{t('fromPrevious')}</span> : null}
+                          </button>
                           <button
                             type="button"
                             className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-red-600"
@@ -270,11 +316,20 @@ export const ProductFamilyShareButton = ({
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-                      ))}
-                    </>
+                        {row.open ? (
+                          <ShareItemsTable
+                            id={`share-items-${row.companyId}`}
+                            companyName={row.companyName}
+                            items={items}
+                            values={row.values}
+                            onChange={(itemId, field, value) => setValue(row.companyId, itemId, field, value)}
+                          />
+                        ) : null}
+                      </div>
+                    ))
                   )}
                 </div>
-                <p className="mt-2 text-xs text-slate-500">{t('discountHint')}</p>
+                <p className="mt-2 text-xs text-slate-500">{t('valuesHint')}</p>
               </>
             )}
 
@@ -292,5 +347,95 @@ export const ProductFamilyShareButton = ({
         </div>
       ) : null}
     </>
+  )
+}
+
+const numberInput =
+  'h-8 pr-7 text-right tabular-nums [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+
+/** One company's discount, markup and installation hours for every line, then every option under its characteristic. */
+const ShareItemsTable = ({
+  id,
+  companyName,
+  items,
+  values,
+  onChange,
+}: {
+  id: string
+  companyName: string
+  items: FamilyShareableItem[]
+  values: Record<string, Values>
+  onChange: (itemId: string, field: Field, value: string) => void
+}) => {
+  const t = useTranslations('productFamilyShare')
+  if (items.length === 0) {
+    return (
+      <p id={id} className="px-4 pb-3 text-sm text-slate-400">
+        {t('noItems')}
+      </p>
+    )
+  }
+  const unit: Record<Field, string> = { discountPct: '%', markupPct: '%', installationHours: 'h' }
+  const lines = items.filter((item) => item.kind === 'line')
+  const groups = new Map<string, FamilyShareableItem[]>()
+  for (const option of items.filter((item) => item.kind === 'option')) {
+    groups.set(option.characteristicName ?? '', [...(groups.get(option.characteristicName ?? '') ?? []), option])
+  }
+  const sections = [
+    ...(lines.length ? [{ title: t('lines'), items: lines }] : []),
+    ...[...groups].map(([name, options]) => ({ title: t('optionsOf', { name }), items: options })),
+  ]
+  return (
+    <div id={id} className="overflow-x-auto px-4 pb-3">
+      <table className="w-full min-w-[34rem] text-sm">
+        <thead>
+          <tr className="text-xs text-slate-500">
+            <th className="py-1.5 pr-3 text-left font-medium">
+              <span className="sr-only">{t('item')}</span>
+            </th>
+            <th className="w-28 px-1 py-1.5 text-right font-medium">{t('discountPct')}</th>
+            <th className="w-28 px-1 py-1.5 text-right font-medium">{t('markupPct')}</th>
+            <th className="w-28 py-1.5 pl-1 text-right font-medium">{t('installationHours')}</th>
+          </tr>
+        </thead>
+        {sections.map((section) => (
+          <tbody key={section.title}>
+            <tr>
+              <th colSpan={4} scope="colgroup" className="pb-1 pt-3 text-left text-xs font-semibold text-slate-700">
+                {section.title}
+              </th>
+            </tr>
+            {section.items.map((item) => (
+              <tr key={item.id} className="border-t border-slate-50">
+                <th scope="row" className="max-w-0 py-1 pr-3 text-left font-normal text-slate-700">
+                  <span className="block truncate" title={item.name}>
+                    {item.name}
+                  </span>
+                </th>
+                {FIELDS.map((field) => (
+                  <td key={field} className="px-1 py-1 last:pr-0">
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
+                        className={numberInput}
+                        value={values[item.id]?.[field] ?? ''}
+                        aria-label={t(`${field}For`, { item: item.name, name: companyName })}
+                        onChange={(e) => onChange(item.id, field, e.target.value)}
+                      />
+                      <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-slate-400">
+                        {unit[field]}
+                      </span>
+                    </div>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        ))}
+      </table>
+    </div>
   )
 }

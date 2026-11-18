@@ -43,7 +43,8 @@ Same rules, with one addition: **"% of the product price"** options use
 `valore_base_in_vendita * valore / 100`, where `valore_base_in_vendita` is the line's price from step 1.
 
 An option imported from a version 2 Excel has its **own discount and markup**, used for its price
-instead of the position's. Options without them (version 1) take the position's.
+instead of the position's. Options without them (version 1) take the position's. On a family **shared with
+you**, every option has its own: the ones set on the share.
 
 ## 3. The position total
 
@@ -55,10 +56,10 @@ position total  = (line part + sum of option parts) × quantity
 - The line uses the position's **discount** and **markup**; each option its own, or the position's
   when it has none. With no option discounts or markups this is the same as
   `(line + options) × quantity × (1 − discount%) × markup%`.
-- **Discount** starts at the share's discount (if the family was shared with you at more than 0%),
-  otherwise the line's catalog discount. It can be changed per position. On a shared family the
-  position's discount also replaces the options' own discounts.
-- **Markup** starts at the line's catalog markup. `100` means no markup.
+- **Discount** and **markup** start at the line's catalog values, or on a family shared with you at the
+  values the share sets for that line. Both can be changed per position. `100` markup means no markup.
+- **Installation hours** (for "Ore di posa" options): the line's plus each chosen option's — on a shared
+  family, the share's.
 - **Manual (M)** pricing replaces the computed line or option price with the value you type.
 
 The quote total is the sum of its positions, **excluding VAT**.

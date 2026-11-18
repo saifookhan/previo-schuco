@@ -26,7 +26,7 @@ which only **supplier** companies have (in the demo data: Suppli).
 
 ![Add a position form](/img/screens/add-position.png)
 
-Positions from a shared family start with the discount set on the share. How every number is computed: [How prices are calculated](../pricing.md).
+Positions from a shared family start with the discount, markup and installation hours set on the share for that line and its options. How every number is computed: [How prices are calculated](../pricing.md).
 
 ## Family versions in a quote
 

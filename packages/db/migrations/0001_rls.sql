@@ -333,6 +333,33 @@ CREATE POLICY product_family_shares_write ON product_family_shares
   USING (app_is_super_admin() OR from_company_id = app_current_company_id())
   WITH CHECK (app_is_super_admin() OR from_company_id = app_current_company_id());
 
+-- product_family_share_items: a share's per-line/option values, read and
+-- written like the share they belong to.
+ALTER TABLE product_family_share_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS product_family_share_items_select ON product_family_share_items;
+CREATE POLICY product_family_share_items_select ON product_family_share_items
+  FOR SELECT
+  USING (
+    app_is_super_admin() OR EXISTS (
+      SELECT 1 FROM product_family_shares s
+      WHERE s.id = share_id
+        AND (s.from_company_id = app_current_company_id() OR s.to_company_id = app_current_company_id())
+    )
+  );
+DROP POLICY IF EXISTS product_family_share_items_write ON product_family_share_items;
+CREATE POLICY product_family_share_items_write ON product_family_share_items
+  FOR ALL
+  USING (
+    app_is_super_admin() OR EXISTS (
+      SELECT 1 FROM product_family_shares s WHERE s.id = share_id AND s.from_company_id = app_current_company_id()
+    )
+  )
+  WITH CHECK (
+    app_is_super_admin() OR EXISTS (
+      SELECT 1 FROM product_family_shares s WHERE s.id = share_id AND s.from_company_id = app_current_company_id()
+    )
+  );
+
 -- product_family_library_hidden: each company's own "In libreria: No" choices.
 -- Only that company reads or writes them, and only for families it can see.
 ALTER TABLE product_family_library_hidden ENABLE ROW LEVEL SECURITY;

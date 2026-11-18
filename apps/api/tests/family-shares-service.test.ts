@@ -2,14 +2,17 @@ process.env.DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
   `postgresql://previo_app:${process.env.APP_DB_PASSWORD ?? 'previo_app'}@localhost:5434/previo_test`
 
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   auditLog,
+  characteristics,
   companies,
   companyConnections,
   createDb,
   productFamilies,
+  productFamilyShareItems,
+  productLines,
   roles,
   users,
   withSystemTransaction,
@@ -26,12 +29,12 @@ import {
 import {
   FamilyShareNotFoundError,
   FamilyShareValidationError,
-  getFamilyShareDiscount,
+  getFamilyShareItems,
   getFamilyShares,
   updateFamilyShares,
 } from '../src/services/family-shares-service'
 
-/** Service-layer test: sharing a product family (and onward sharing) with per-company default discounts. */
+/** Service-layer test: sharing a product family (and onward sharing) with per-company, per-line and per-option values. */
 
 let db: Db
 let manufacturer: string
@@ -40,6 +43,10 @@ let client: string
 let outsider: string
 let platformOnly: string
 let familyId: string
+let lineId: string
+let plainLineId: string
+let optionId: string
+let v1OptionId: string
 let actorUserId: string
 const createdCompanyIds: string[] = []
 const ctxOf = (companyId: string) => ({ effectiveCompanyId: companyId, isSuperAdmin: false })
@@ -85,6 +92,28 @@ beforeAll(async () => {
       .values({ supplierCompanyId: manufacturer, name: 'Share Test Family', isPublished: true })
       .returning({ id: productFamilies.id })
     familyId = family.id
+    const [line, plainLine] = await tx
+      .insert(productLines)
+      .values([
+        { productFamilyId: familyId, name: 'Line A', unitName: 'Pezzo', unitSymbol: 'PZ', discountPct: '10', markupPct: '130', installationHoursPerUnit: '1.5', sortOrder: 0 },
+        { productFamilyId: familyId, name: 'Line B', unitName: 'Pezzo', unitSymbol: 'PZ', sortOrder: 1 },
+      ])
+      .returning({ id: productLines.id })
+    lineId = line.id
+    plainLineId = plainLine.id
+    const [colour] = await tx
+      .insert(characteristics)
+      .values({ productFamilyId: familyId, name: 'Colore' })
+      .returning({ id: characteristics.id })
+    const [option, v1Option] = await tx
+      .insert(characteristics)
+      .values([
+        { productFamilyId: familyId, parentId: colour.id, name: 'RAL 9010', discountPct: '5', markupPct: '120', installationHoursPerUnit: '0.25', sortOrder: 0 },
+        { productFamilyId: familyId, parentId: colour.id, name: 'Bianco', sortOrder: 1 },
+      ])
+      .returning({ id: characteristics.id })
+    optionId = option.id
+    v1OptionId = v1Option.id
   })
 })
 
@@ -109,13 +138,13 @@ describe('family shares', () => {
         .returning({ id: productFamilies.id }),
     )
     try {
-      await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), fam.id, [{ companyId: client, discountPct: 7 }])
+      await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), fam.id, [{ companyId: client, items: [] }])
       const seenByClient = async () => (await listProductFamilies(ctxOf(client))).filter((f) => f.id === fam.id)
 
       const visible = await seenByClient()
       expect(visible).toHaveLength(1)
       expect(visible[0].ownerCompanyName).toBe('Share Test Manufacturer')
-      expect(visible[0].shareDiscountPct).toBe(7)
+      expect(visible[0].shareDiscountPct).toBeNull() // no lines or options, so no discount on any
 
       const setPublished = (isPublished: boolean) =>
         withSystemTransaction(db, (tx) => tx.update(productFamilies).set({ isPublished }).where(eq(productFamilies.id, fam.id)))
@@ -141,7 +170,7 @@ describe('family shares', () => {
     )
     try {
       await expect(
-        updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), draft.id, [{ companyId: client, discountPct: 1 }]),
+        updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), draft.id, [{ companyId: client, items: [] }]),
       ).rejects.toThrow(FamilyShareValidationError)
 
       // publish, share, then unpublish again: removing is still allowed, adding is not
@@ -149,20 +178,20 @@ describe('family shares', () => {
         tx.update(productFamilies).set({ isPublished: true }).where(eq(productFamilies.id, draft.id)),
       )
       await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), draft.id, [
-        { companyId: client, discountPct: 1 },
-        { companyId: supplier, discountPct: 2 },
+        { companyId: client, items: [] },
+        { companyId: supplier, items: [] },
       ])
       await withSystemTransaction(db, (tx) =>
         tx.update(productFamilies).set({ isPublished: false }).where(eq(productFamilies.id, draft.id)),
       )
       const trimmed = await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), draft.id, [
-        { companyId: client, discountPct: 1 },
+        { companyId: client, items: [] },
       ])
       expect(trimmed.shares.map((s) => s.companyId)).toEqual([client])
       await expect(
         updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), draft.id, [
-          { companyId: client, discountPct: 1 },
-          { companyId: outsider, discountPct: 1 },
+          { companyId: client, items: [] },
+          { companyId: outsider, items: [] },
         ]),
       ).rejects.toThrow(FamilyShareValidationError)
     } finally {
@@ -180,33 +209,143 @@ describe('family shares', () => {
     expect(ids).not.toContain(platformOnly) // connected, but platform-only companies cannot receive shares
   })
 
-  it('shares with chosen companies at their own discounts and reads them back with names', async () => {
-    const saved = await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), familyId, [
-      { companyId: supplier, discountPct: 20 },
-      { companyId: client, discountPct: 5.5 },
+  it("lists the family's lines and options with their own values as the default (0, ×1 and 0 where the Excel has none)", async () => {
+    const { items } = await getFamilyShares(ctxOf(manufacturer), familyId)
+    expect(items).toEqual([
+      { kind: 'line', id: lineId, name: 'Line A', characteristicName: null, discountPct: 10, markupPct: 130, installationHours: 1.5 },
+      { kind: 'line', id: plainLineId, name: 'Line B', characteristicName: null, discountPct: 0, markupPct: 100, installationHours: 0 },
+      { kind: 'option', id: optionId, name: 'RAL 9010', characteristicName: 'Colore', discountPct: 5, markupPct: 120, installationHours: 0.25 },
+      { kind: 'option', id: v1OptionId, name: 'Bianco', characteristicName: 'Colore', discountPct: 0, markupPct: 100, installationHours: 0 },
     ])
-    expect(saved.shares.map((s) => [s.companyName, s.discountPct])).toEqual([
-      ['Share Test Client', 5.5],
-      ['Share Test Supplier', 20],
-    ])
-    expect(await getFamilyShareDiscount(ctxOf(supplier), familyId)).toBe(20)
-    expect(await getFamilyShareDiscount(ctxOf(manufacturer), familyId)).toBeNull() // the owner has no share discount
   })
 
-  it('replaces the set: a company left out loses its share, a changed discount is updated', async () => {
+  it('shares with chosen companies at their own values per line and option, filling in the defaults for the rest', async () => {
     const saved = await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), familyId, [
-      { companyId: supplier, discountPct: 30 },
+      { companyId: supplier, items: [{ kind: 'line', id: lineId, discountPct: 20, markupPct: 150, installationHours: 2 }] },
+      { companyId: client, items: [{ kind: 'option', id: v1OptionId, discountPct: 5.5, markupPct: 110, installationHours: 0.5 }] },
     ])
-    expect(saved.shares.map((s) => [s.companyId, s.discountPct])).toEqual([[supplier, 30]])
-    expect(await getFamilyShareDiscount(ctxOf(client), familyId)).toBeNull()
+    expect(saved.shares.map((s) => s.companyName)).toEqual(['Share Test Client', 'Share Test Supplier'])
+    expect(saved.shares[1].items).toEqual([
+      { kind: 'line', id: lineId, discountPct: 20, markupPct: 150, installationHours: 2 },
+      { kind: 'line', id: plainLineId, discountPct: 0, markupPct: 100, installationHours: 0 },
+      { kind: 'option', id: optionId, discountPct: 5, markupPct: 120, installationHours: 0.25 },
+      { kind: 'option', id: v1OptionId, discountPct: 0, markupPct: 100, installationHours: 0 },
+    ])
+    // Every line and option is stored, so the recipient's values don't move if the family's own change later.
+    const stored = await withSystemTransaction(db, (tx) => tx.select().from(productFamilyShareItems))
+    expect(stored.filter((row) => [lineId, plainLineId, optionId, v1OptionId].includes((row.productLineId ?? row.characteristicId)!))).toHaveLength(8)
+
+    expect(await getFamilyShareItems(ctxOf(supplier), familyId)).toMatchObject({
+      [lineId]: { discountPct: 20, markupPct: 150, installationHours: 2 },
+    })
+    expect((await getFamilyShareItems(ctxOf(client), familyId))?.[v1OptionId]).toEqual({ discountPct: 5.5, markupPct: 110, installationHours: 0.5 })
+    expect(await getFamilyShareItems(ctxOf(manufacturer), familyId)).toBeNull() // the owner's own family
+    // The families list shows the highest discount the share gives.
+    expect((await listProductFamilies(ctxOf(supplier))).find((f) => f.id === familyId)?.shareDiscountPct).toBe(20)
+  })
+
+  it('refuses a line or option that is not part of the family', async () => {
+    const save = (item: { kind: 'line' | 'option'; id: string }) =>
+      updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), familyId, [
+        { companyId: supplier, items: [{ ...item, discountPct: 1, markupPct: 100, installationHours: 0 }] },
+      ])
+    await expect(save({ kind: 'option', id: lineId })).rejects.toThrow(FamilyShareValidationError) // a line sent as an option
+    await expect(save({ kind: 'line', id: '00000000-0000-0000-0000-000000000000' })).rejects.toThrow(FamilyShareValidationError)
+  })
+
+  it('replaces the set: a company left out loses its share, changed values are updated', async () => {
+    const saved = await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), familyId, [
+      { companyId: supplier, items: [{ kind: 'line', id: lineId, discountPct: 30, markupPct: 100, installationHours: 0 }] },
+    ])
+    expect(saved.shares.map((s) => [s.companyId, s.items[0].discountPct])).toEqual([[supplier, 30]])
+    expect(await getFamilyShareItems(ctxOf(client), familyId)).toBeNull()
+  })
+
+  it('starts a company added to a new version from what it got on the previous one, matched by name', async () => {
+    const versionIds: string[] = []
+    try {
+      const make = async (supersedesId: string | null, lineNames: string[]) =>
+        withSystemTransaction(db, async (tx) => {
+          const [family] = await tx
+            .insert(productFamilies)
+            .values({ supplierCompanyId: manufacturer, name: 'Share Test Versions', isPublished: true, supersedesId })
+            .returning({ id: productFamilies.id })
+          versionIds.push(family.id)
+          const lines = await tx
+            .insert(productLines)
+            .values(lineNames.map((name) => ({ productFamilyId: family.id, name, unitName: 'Pezzo', unitSymbol: 'PZ' })))
+            .returning({ id: productLines.id, name: productLines.name })
+          const [colour] = await tx.insert(characteristics).values({ productFamilyId: family.id, name: 'Colore' }).returning({ id: characteristics.id })
+          const [ral] = await tx
+            .insert(characteristics)
+            .values({ productFamilyId: family.id, parentId: colour.id, name: 'RAL 9010' })
+            .returning({ id: characteristics.id })
+          return { id: family.id, line: (name: string) => lines.find((l) => l.name === name)!.id, ral: ral.id }
+        })
+      const v1 = await make(null, ['Line A', 'Old line'])
+      const v2 = await make(v1.id, ['Line A', 'New line'])
+      await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), v1.id, [
+        {
+          companyId: client,
+          items: [
+            { kind: 'line', id: v1.line('Line A'), discountPct: 12, markupPct: 140, installationHours: 3 },
+            { kind: 'line', id: v1.line('Old line'), discountPct: 50, markupPct: 100, installationHours: 0 },
+            { kind: 'option', id: v1.ral, discountPct: 7, markupPct: 115, installationHours: 1 },
+          ],
+        },
+      ])
+
+      const { previous } = await getFamilyShares(ctxOf(manufacturer), v2.id)
+      expect(previous).toHaveLength(1)
+      expect(previous[0].companyId).toBe(client)
+      // The removed line has nothing to carry over to; the new one starts from its default in the dialog.
+      expect(previous[0].items).toHaveLength(2)
+      expect(previous[0].items).toEqual(
+        expect.arrayContaining([
+          { kind: 'line', id: v2.line('Line A'), discountPct: 12, markupPct: 140, installationHours: 3 },
+          { kind: 'option', id: v2.ral, discountPct: 7, markupPct: 115, installationHours: 1 },
+        ]),
+      )
+
+      // Once the company has a share of this version too, its own values are what count.
+      await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), v2.id, [{ companyId: client, items: [] }])
+      expect((await getFamilyShares(ctxOf(manufacturer), v2.id)).previous).toEqual([])
+    } finally {
+      await withSystemTransaction(db, (tx) => tx.delete(productFamilies).where(inArray(productFamilies.id, versionIds.reverse())))
+    }
+  })
+
+  it("when several companies share the family with one, the owner's share applies, whoever saved last", async () => {
+    await withSystemTransaction(db, (tx) =>
+      tx.insert(companyConnections).values({ requesterCompanyId: supplier, addresseeCompanyId: client, status: 'accepted' }),
+    )
+    try {
+      const line = (discountPct: number) => [{ kind: 'line' as const, id: lineId, discountPct, markupPct: 100, installationHours: 0 }]
+      await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), familyId, [
+        { companyId: supplier, items: [] },
+        { companyId: client, items: line(40) },
+      ])
+      await updateFamilyShares(ctxOf(supplier), actorOf(supplier), familyId, [{ companyId: client, items: line(5) }])
+      expect((await getFamilyShareItems(ctxOf(client), familyId))?.[lineId].discountPct).toBe(40)
+      // Saving the owner's dialog again (or the supplier's) doesn't change which one applies.
+      await updateFamilyShares(ctxOf(supplier), actorOf(supplier), familyId, [{ companyId: client, items: line(6) }])
+      expect((await getFamilyShareItems(ctxOf(client), familyId))?.[lineId].discountPct).toBe(40)
+      expect((await listProductFamilies(ctxOf(client))).find((f) => f.id === familyId)?.shareDiscountPct).toBe(40)
+    } finally {
+      await updateFamilyShares(ctxOf(supplier), actorOf(supplier), familyId, [])
+      await withSystemTransaction(db, (tx) =>
+        tx.delete(companyConnections).where(and(eq(companyConnections.requesterCompanyId, supplier), eq(companyConnections.addresseeCompanyId, client))),
+      )
+    }
   })
 
   it('lets a company that received the family share it onward, and cuts that off when the first share is revoked', async () => {
     const viaSupplier = await updateFamilyShares(ctxOf(supplier), actorOf(supplier), familyId, [
-      { companyId: outsider, discountPct: 8 },
+      { companyId: outsider, items: [] },
     ])
     expect(viaSupplier.shares.map((s) => s.companyId)).toEqual([outsider])
-    expect(await getFamilyShareDiscount(ctxOf(outsider), familyId)).toBe(8)
+    // An onward share starts from the family's own values, not from what the sharer got.
+    expect((await getFamilyShareItems(ctxOf(outsider), familyId))?.[lineId]).toEqual({ discountPct: 10, markupPct: 130, installationHours: 1.5 })
 
     await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), familyId, [])
     await expect(getFamilyShares(ctxOf(supplier), familyId)).rejects.toThrow(FamilyShareNotFoundError)
@@ -215,11 +354,11 @@ describe('family shares', () => {
   it('refuses a company that cannot reach the family, and recipients that are not allowed', async () => {
     await expect(getFamilyShares(ctxOf(outsider), familyId)).rejects.toThrow(FamilyShareNotFoundError)
     await expect(
-      updateFamilyShares(ctxOf(outsider), actorOf(outsider), familyId, [{ companyId: client, discountPct: 1 }]),
+      updateFamilyShares(ctxOf(outsider), actorOf(outsider), familyId, [{ companyId: client, items: [] }]),
     ).rejects.toThrow(FamilyShareNotFoundError)
 
     const bad = (companyId: string) =>
-      updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), familyId, [{ companyId, discountPct: 1 }])
+      updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), familyId, [{ companyId, items: [] }])
     await expect(bad(manufacturer)).rejects.toThrow(FamilyShareValidationError) // itself
     await expect(bad(platformOnly)).rejects.toThrow(FamilyShareValidationError) // not a supplier or client
     await expect(bad(outsider)).rejects.toThrow(FamilyShareValidationError) // not connected
@@ -235,7 +374,7 @@ describe('company library ("In libreria")', () => {
         .values({ supplierCompanyId: manufacturer, name: 'Library Test Family', isPublished: true })
         .returning({ id: productFamilies.id }),
     )
-    await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), family.id, [{ companyId: supplier, discountPct: 0 }])
+    await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), family.id, [{ companyId: supplier, items: [] }])
     const inLibraryOf = async (companyId: string) =>
       (await listProductFamilies(ctxOf(companyId))).find((f) => f.id === family.id)?.inLibrary
 

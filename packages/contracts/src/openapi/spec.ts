@@ -632,19 +632,57 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
         },
       },
       schemas: {
+        FamilyShareItem: {
+          type: 'object',
+          description: 'What a share gives the recipient for one product line or option (a sub-characteristic).',
+          required: ['kind', 'id', 'discountPct', 'markupPct', 'installationHours'],
+          properties: {
+            kind: { type: 'string', enum: ['line', 'option'] },
+            id: { type: 'string', format: 'uuid' },
+            discountPct: { type: 'number', minimum: 0, maximum: 100 },
+            markupPct: { type: 'number', minimum: 0, maximum: 10000, description: '"Out of 100": 100 = no markup, 130 = ×1.3' },
+            installationHours: { type: 'number', minimum: 0, description: 'Installation hours per unit' },
+          },
+        },
         FamilySharesResponse: {
           type: 'object',
-          required: ['shares', 'targets'],
+          required: ['items', 'shares', 'previous', 'targets'],
           properties: {
+            items: {
+              type: 'array',
+              description: "Every line and option of this version, with the family's own values as the default",
+              items: {
+                allOf: [
+                  ref('FamilyShareItem'),
+                  {
+                    type: 'object',
+                    required: ['name', 'characteristicName'],
+                    properties: { name: { type: 'string' }, characteristicName: { type: 'string', nullable: true } },
+                  },
+                ],
+              },
+            },
             shares: {
               type: 'array',
               items: {
                 type: 'object',
-                required: ['companyId', 'companyName', 'discountPct'],
+                required: ['companyId', 'companyName', 'items'],
                 properties: {
                   companyId: { type: 'string', format: 'uuid' },
                   companyName: { type: 'string' },
-                  discountPct: { type: 'number' },
+                  items: { type: 'array', items: ref('FamilyShareItem') },
+                },
+              },
+            },
+            previous: {
+              type: 'array',
+              description: 'Values given to a company on another version of the family, matched to this version by name',
+              items: {
+                type: 'object',
+                required: ['companyId', 'items'],
+                properties: {
+                  companyId: { type: 'string', format: 'uuid' },
+                  items: { type: 'array', items: ref('FamilyShareItem') },
                 },
               },
             },
@@ -669,10 +707,10 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
               type: 'array',
               items: {
                 type: 'object',
-                required: ['companyId', 'discountPct'],
+                required: ['companyId', 'items'],
                 properties: {
                   companyId: { type: 'string', format: 'uuid' },
-                  discountPct: { type: 'number', minimum: 0, maximum: 100 },
+                  items: { type: 'array', items: ref('FamilyShareItem'), description: 'A line or option left out gets its default' },
                 },
               },
             },

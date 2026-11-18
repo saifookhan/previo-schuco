@@ -1,15 +1,18 @@
 import {
-  getIncomingShareDiscounts,
+  getIncomingShareItems,
   getProductFamilyDetail,
   isFamilySharedWith,
   listFamilyShareTargets,
   listOutgoingFamilyShares,
+  listPreviousVersionShareItems,
   lockConnectedCompanyIds,
   replaceOutgoingFamilyShares,
   withSystemTransaction,
-  type FamilyShareRow,
-  type FamilyShareTarget,
+  type FamilyShareItem,
+  type FamilyShareItemValues,
+  type ProductFamilyDetail,
 } from '@schuco/db'
+import type { FamilyShareItemDto, FamilyShareableItem, FamilySharesResponse } from '@schuco/contracts'
 
 import { getDb } from '../lib/db'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
@@ -27,46 +30,118 @@ export interface FamilyShareActor {
   requestId?: string | null
 }
 
-export interface FamilyShares {
-  shares: FamilyShareRow[]
-  targets: FamilyShareTarget[]
+const optional = (value: string | null): number | null => (value == null ? null : Number(value))
+
+/**
+ * Every line and option (sub-characteristic) of the family, with the family's own values — the
+ * Excel's — as the default a share starts from; an option without its own gets no discount, no
+ * markup and no hours.
+ */
+const shareableItems = (detail: ProductFamilyDetail): FamilyShareableItem[] => {
+  const nameOf = new Map(detail.characteristics.map((c) => [c.id, c.name]))
+  return [
+    ...[...detail.lines]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((line) => ({
+        kind: 'line' as const,
+        id: line.id,
+        name: line.name,
+        characteristicName: null,
+        discountPct: Number(line.discountPct),
+        markupPct: Number(line.markupPct),
+        installationHours: Number(line.installationHoursPerUnit),
+      })),
+    ...detail.characteristics
+      .filter((option) => option.parentId)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((option) => ({
+        kind: 'option' as const,
+        id: option.id,
+        name: option.name,
+        characteristicName: nameOf.get(option.parentId!) ?? '',
+        discountPct: optional(option.discountPct) ?? 0,
+        markupPct: optional(option.markupPct) ?? 100,
+        installationHours: optional(option.installationHoursPerUnit) ?? 0,
+      })),
+  ]
 }
 
-/** Companies that may receive a share of `ownerCompanyId`'s family from `sharerCompanyId`: its connected partners. Listed across tenants, so system-scoped — returns names only. */
-const shareTargetsFor = async (ownerCompanyId: string, sharerCompanyId: string): Promise<FamilyShareTarget[]> => {
-  const all = await withSystemTransaction(getDb(), (tx) => listFamilyShareTargets(tx, sharerCompanyId))
-  return all.filter((company) => company.id !== ownerCompanyId)
-}
+const valuesOf = ({ discountPct, markupPct, installationHours }: FamilyShareItemValues): FamilyShareItemValues => ({
+  discountPct,
+  markupPct,
+  installationHours,
+})
 
-/** The default discount this family was shared with the caller's company at, or null when it is the company's own or was shared at 0%. */
-export const getFamilyShareDiscount = (ctx: TenantContext, familyId: string): Promise<number | null> =>
+/** The share's value for every item of the family: what was saved, or the item's default. */
+const completeItems = (items: FamilyShareableItem[], saved: Map<string, FamilyShareItemValues>): FamilyShareItemDto[] =>
+  items.map((item) => ({ kind: item.kind, id: item.id, ...valuesOf(saved.get(item.id) ?? item) }))
+
+const byItemId = (items: FamilyShareItem[]): Map<string, FamilyShareItemValues> =>
+  new Map(items.map((item) => [(item.productLineId ?? item.characteristicId)!, valuesOf(item)]))
+
+export type FamilyShares = FamilySharesResponse
+
+/**
+ * What the share of this family with the caller's company gives it, by product line or option id;
+ * null when the family is the company's own or wasn't shared with it.
+ */
+export const getFamilyShareItems = (
+  ctx: TenantContext,
+  familyId: string,
+): Promise<Record<string, FamilyShareItemValues> | null> =>
   withTenantDb(ctx, async (tx) => {
-    const discounts = await getIncomingShareDiscounts(tx, ctx.effectiveCompanyId, [familyId])
-    const discount = discounts.get(familyId)
-    return discount && discount > 0 ? discount : null
+    const items = await getIncomingShareItems(tx, ctx.effectiveCompanyId, familyId)
+    return items && Object.fromEntries(items)
   })
 
 /**
- * The shares the caller's company made of this family, plus the companies it could add.
+ * The shares the caller's company made of this family (with every line's and option's values),
+ * the family's lines and options with their defaults, what companies got on other versions of the
+ * family, and the companies it could add.
  * @throws {FamilyShareNotFoundError} unknown family, or one the caller's company cannot reach
  */
 export const getFamilyShares = async (ctx: TenantContext, familyId: string): Promise<FamilyShares> => {
-  const { ownerCompanyId, shares } = await withTenantDb(ctx, async (tx) => {
+  const { ownerCompanyId, ...shares } = await withTenantDb(ctx, async (tx) => {
     const detail = await getProductFamilyDetail(tx, familyId)
     if (!detail || !(await isFamilySharedWith(tx, familyId, ctx.effectiveCompanyId))) {
       throw new FamilyShareNotFoundError('Product family not found')
     }
+    const items = shareableItems(detail)
+    const shares = await listOutgoingFamilyShares(tx, familyId, ctx.effectiveCompanyId)
+    const shared = new Set(shares.map((share) => share.companyId))
+    // A line matches by name; an option by its characteristic's name and its own.
+    const keyOf = (characteristicName: string | null, name: string) =>
+      characteristicName == null ? `line:${name}` : `option:${characteristicName}\u0000${name}`
+    const byKey = new Map(items.map((item) => [keyOf(item.characteristicName, item.name), item]))
+    const previous = [...(await listPreviousVersionShareItems(tx, familyId, ctx.effectiveCompanyId))]
+      .filter(([companyId]) => !shared.has(companyId))
+      .map(([companyId, named]) => ({
+        companyId,
+        items: named.flatMap((old) => {
+          const match = byKey.get(old.lineName != null ? keyOf(null, old.lineName) : keyOf(old.characteristicName, old.optionName!))
+          return match ? [{ kind: match.kind, id: match.id, ...valuesOf(old) }] : []
+        }),
+      }))
     return {
       ownerCompanyId: detail.family.supplierCompanyId,
-      shares: await listOutgoingFamilyShares(tx, familyId, ctx.effectiveCompanyId),
+      items,
+      shares: shares.map((share) => ({
+        companyId: share.companyId,
+        companyName: share.companyName,
+        items: completeItems(items, byItemId(share.items)),
+      })),
+      previous,
     }
   })
-  return { shares, targets: await shareTargetsFor(ownerCompanyId, ctx.effectiveCompanyId) }
+  // Listed across tenants, so system-scoped — names only.
+  const targets = await withSystemTransaction(getDb(), (tx) => listFamilyShareTargets(tx, ctx.effectiveCompanyId))
+  return { ...shares, targets: targets.filter((company) => company.id !== ownerCompanyId) }
 }
 
 /**
- * Replaces the set of companies the caller's company shares this family with
- * (each with a default discount). Only published families can be shared with new
+ * Replaces the set of companies the caller's company shares this family with, each with
+ * the discount, markup and installation hours it gets per line and option (a line or option
+ * left out gets its default). Only published families can be shared with new
  * companies. The sharer is the owner or any company that was itself shared the
  * family (onward sharing). Recipients must be connected with the sharer (Partners page).
  * @throws {FamilyShareNotFoundError} unknown family, or one the caller's company cannot reach
@@ -76,7 +151,7 @@ export const updateFamilyShares = async (
   ctx: TenantContext,
   actor: FamilyShareActor,
   familyId: string,
-  requested: Array<{ companyId: string; discountPct: number }>,
+  requested: Array<{ companyId: string; items: FamilyShareItemDto[] }>,
 ): Promise<FamilyShares> => {
   // Cross-tenant list, read first: the reach check, validation and write below must share ONE
   // tenant transaction, so a share revoked mid-request can't be written to afterwards.
@@ -110,7 +185,31 @@ export const updateFamilyShares = async (
         throw new FamilyShareValidationError('Publish the family before sharing it with new companies')
       }
     }
-    await replaceOutgoingFamilyShares(tx, familyId, ctx.effectiveCompanyId, requested)
+    const items = shareableItems(detail)
+    const kindOf = new Map(items.map((item) => [item.id, item.kind]))
+    for (const share of requested) {
+      const unknown = share.items.find((item) => kindOf.get(item.id) !== item.kind)
+      if (unknown) {
+        throw new FamilyShareValidationError(`'${unknown.id}' is not a ${unknown.kind === 'line' ? 'product line' : 'option'} of this family`)
+      }
+    }
+    const shares = requested.map((share) => ({
+      companyId: share.companyId,
+      items: completeItems(items, new Map(share.items.map((item) => [item.id, valuesOf(item)]))),
+    }))
+    await replaceOutgoingFamilyShares(
+      tx,
+      familyId,
+      ctx.effectiveCompanyId,
+      shares.map((share) => ({
+        companyId: share.companyId,
+        items: share.items.map(({ kind, id, ...values }) => ({
+          productLineId: kind === 'line' ? id : null,
+          characteristicId: kind === 'option' ? id : null,
+          ...values,
+        })),
+      })),
+    )
     await recordAuditEvent(
       tx,
       {
@@ -124,7 +223,7 @@ export const updateFamilyShares = async (
         action: 'product_family.share.update',
         resourceType: 'product_family',
         resourceId: familyId,
-        metadata: { shares: requested },
+        metadata: { shares },
       },
     )
   })

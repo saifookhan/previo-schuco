@@ -26,7 +26,7 @@ richiede `quote.edit`, che hanno solo le aziende **supplier** (nei dati demo: Su
 
 ![Modulo per aggiungere una posizione](/img/screens/add-position.png)
 
-Le posizioni da una famiglia condivisa partono con lo sconto impostato sulla condivisione. Come viene calcolato ogni numero: [Come vengono calcolati i prezzi](../pricing.md).
+Le posizioni da una famiglia condivisa partono con sconto, ricarico e ore di posa impostati sulla condivisione per quella linea e le sue opzioni. Come viene calcolato ogni numero: [Come vengono calcolati i prezzi](../pricing.md).
 
 ## Versioni della famiglia nel preventivo
 

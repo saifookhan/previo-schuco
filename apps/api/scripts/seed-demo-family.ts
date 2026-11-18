@@ -7,7 +7,7 @@ bootstrapApiEnv()
 const { companies, companyConnections, productFamilies, users, withSystemTransaction } = await import('@schuco/db')
 const { and, eq } = await import('drizzle-orm')
 const { getDb } = await import('../src/lib/db')
-const { updateFamilyShares } = await import('../src/services/family-shares-service')
+const { getFamilyShares, updateFamilyShares } = await import('../src/services/family-shares-service')
 const { deleteProductFamily, importProductFamilyFromExcel, setProductFamilyPublishedStatus } = await import(
   '../src/services/product-families-service'
 )
@@ -78,7 +78,11 @@ const main = async () => {
           .values({ requesterCompanyId: supplier.companyId, addresseeCompanyId: technometal.id, status: 'accepted', respondedAt: new Date() })
           .onConflictDoNothing(),
       )
-      await updateFamilyShares(ctx, actor, family.id, [{ companyId: technometal.id, discountPct: SHARE_DISCOUNT_PCT }])
+      // The same discount on every line and option; markup and hours as in the workbook.
+      const { items } = await getFamilyShares(ctx, family.id)
+      await updateFamilyShares(ctx, actor, family.id, [
+        { companyId: technometal.id, items: items.map(({ name, characteristicName, ...item }) => ({ ...item, discountPct: SHARE_DISCOUNT_PCT })) },
+      ])
     }
   } catch (error) {
     await deleteProductFamily(ctx, actor, family.id)
