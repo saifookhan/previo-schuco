@@ -897,7 +897,8 @@ export const QuoteBuilder = ({ initialDetail, families, familyVersions }: QuoteB
                   {line ? (
                     <>
                       <FormSection title={t('sectionSizePosition')}>
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                        {/* items-end: a label that wraps (e.g. Italian "Nome/codice posizione") doesn't push its field below the others. */}
+                        <div className="grid grid-cols-2 items-end gap-4 sm:grid-cols-4">
                           <div className="col-span-2 space-y-1.5 sm:col-span-1">
                             <Label htmlFor="qb-position-code">{t('fieldPositionCode')}</Label>
                             <Input
