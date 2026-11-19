@@ -109,8 +109,11 @@ describe('computeLinePrice', () => {
     const small = computeLinePrice(line, 1000, 1000)
     expect(small.basePrice).toBe(120)
     expect(small.finalPrice).toBeCloseTo(120 * 0.9 * 1.5, 6)
-    expect(computeLinePrice(line, 2000, 1000).basePrice).toBe(160)
-    expect(computeCharacteristicPrice({ ...line, minValue: null }, 1000, 1000, 0).basePrice).toBe(80)
+    expect(small.minApplied).toBe(true)
+    const large = computeLinePrice(line, 2000, 1000)
+    expect(large.basePrice).toBe(160)
+    expect(large.minApplied).toBe(false)
+    expect(computeCharacteristicPrice({ ...line, minValue: null }, 1000, 1000, 0)).toMatchObject({ basePrice: 80, minApplied: false })
   })
 
   it('throws when a matrix lookup falls outside the table, rather than returning a wrong price', () => {

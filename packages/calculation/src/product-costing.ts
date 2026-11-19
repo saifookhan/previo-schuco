@@ -90,6 +90,8 @@ export interface CostResult {
   basePrice: number
   /** Price after discount and markup are applied. */
   finalPrice: number
+  /** The matrix/formula result was below `minValue`, so `basePrice` is the minimum. */
+  minApplied: boolean
 }
 
 /**
@@ -106,8 +108,8 @@ export interface CostResult {
  * @throws if a matrix lookup falls outside the table, or the formula fails to evaluate
  */
 export const computeLinePrice = (line: CostableLine, width: number, height: number): CostResult => {
-  const basePrice = computeRawPrice(line, width, height, line.value)
-  return applyDiscountAndMarkup(basePrice, line.discountPct, line.markupPct)
+  const { price, minApplied } = computeRawPrice(line, width, height, line.value)
+  return { ...applyDiscountAndMarkup(price, line.discountPct, line.markupPct), minApplied }
 }
 
 /**
@@ -129,8 +131,8 @@ export const computeCharacteristicPrice = (
   height: number,
   lineBasePrice: number,
 ): CostResult => {
-  const basePrice = computeRawPrice(characteristic, width, height, lineBasePrice)
-  return applyDiscountAndMarkup(basePrice, characteristic.discountPct, characteristic.markupPct)
+  const { price, minApplied } = computeRawPrice(characteristic, width, height, lineBasePrice)
+  return { ...applyDiscountAndMarkup(price, characteristic.discountPct, characteristic.markupPct), minApplied }
 }
 
 const computeRawPrice = (
@@ -138,9 +140,9 @@ const computeRawPrice = (
   width: number,
   height: number,
   valoreBaseInVendita: number,
-): number => {
+): { price: number; minApplied: boolean } => {
   const price = computeUnfloored(line, width, height, valoreBaseInVendita)
-  return line.minValue != null && price < line.minValue ? line.minValue : price
+  return line.minValue != null && price < line.minValue ? { price: line.minValue, minApplied: true } : { price, minApplied: false }
 }
 
 const computeUnfloored = (
@@ -166,7 +168,7 @@ const computeUnfloored = (
   })
 }
 
-const applyDiscountAndMarkup = (basePrice: number, discountPct: number, markupPct: number): CostResult => {
+const applyDiscountAndMarkup = (basePrice: number, discountPct: number, markupPct: number): Omit<CostResult, 'minApplied'> => {
   const afterDiscount = basePrice * (1 - discountPct / 100)
   const finalPrice = afterDiscount * (markupPct / 100)
   return { basePrice, finalPrice }
