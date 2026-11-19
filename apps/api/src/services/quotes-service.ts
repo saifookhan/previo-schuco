@@ -223,6 +223,12 @@ interface PricedPosition {
   lineManualUnitPrice: number | null
   /** The line's own €/unit contribution either way — `lineManualUnitPrice` in manual mode, the formula/matrix result in auto mode. Lets a caller show "here's what auto mode computed" even while manual is selected, instead of only exposing a value when it's actually in use. */
   lineUnitPrice: number
+  /** `lineUnitPrice` after the position's discount and markup. */
+  lineFinalUnitPrice: number
+  /** `lineUnitPrice` is the line's minimum (MinValue): its table/formula gave less. */
+  lineMinApplied: boolean
+  /** Per unit: the line's plus each chosen option's. */
+  installationHours: number
   description: string
   discountPct: number
   extraMarkupPct: number
@@ -240,6 +246,12 @@ interface PricedPosition {
     /** The option's own discount/markup (v2); null = the position's applied. */
     discountPct: number | null
     markupPct: number | null
+    /** What it is priced at: its own discount and markup, or the position's. */
+    effectiveDiscountPct: number
+    effectiveMarkupPct: number
+    finalUnitPrice: number
+    /** Its price is its minimum (MinValue), the table/formula gave less. */
+    minApplied: boolean
   }[]
 }
 
@@ -363,6 +375,7 @@ export const priceQuotePosition = async (
 
   const linePricingMode = input.pricingMode === 'manual' ? 'manual' : 'auto'
   let lineBasePrice: number
+  let lineMinApplied = false
   if (linePricingMode === 'manual') {
     // Manual mode never reads the line's matrix/formula — a deleted/invalid
     // matrix on this line must not block a manual override that doesn't
@@ -377,7 +390,7 @@ export const priceQuotePosition = async (
       throw new QuoteValidationError('Line references a pricing matrix that no longer exists')
     }
     try {
-      lineBasePrice = computeLinePrice(
+      const lineCost = computeLinePrice(
         {
           value: Number(line.value),
           formula: line.formula,
@@ -389,7 +402,9 @@ export const priceQuotePosition = async (
         },
         input.widthMm,
         input.heightMm,
-      ).basePrice
+      )
+      lineBasePrice = lineCost.basePrice
+      lineMinApplied = lineCost.minApplied
     } catch (error) {
       throw new QuoteValidationError(
         `Could not price this line at ${input.widthMm}x${input.heightMm}mm: ${(error as Error).message}`,
@@ -409,21 +424,12 @@ export const priceQuotePosition = async (
   const descriptionParts = [line.name]
   let characteristicsBasePrice = 0
   let characteristicsFinalPrice = 0
-  const characteristicRows: {
-    characteristicId: string
-    subCharacteristicId: string
-    characteristicName: string
-    subCharacteristicName: string
-    price: number
-    pricingMode: 'auto' | 'manual'
-    manualUnitPrice: number | null
-    discountPct: number | null
-    markupPct: number | null
-  }[] = []
+  const characteristicRows: PricedPosition['characteristicRows'] = []
 
   for (const { selection, main, sub } of selections) {
     const subPricingMode = selection.pricingMode === 'manual' ? 'manual' : 'auto'
     let subPrice: number
+    let subMinApplied = false
     if (subPricingMode === 'manual') {
       if (!isNonNegativeFinite(selection.manualUnitPrice)) {
         throw new QuoteValidationError(
@@ -458,6 +464,7 @@ export const priceQuotePosition = async (
             lineBasePrice,
           )
           subPrice = result.basePrice
+          subMinApplied = result.minApplied
         } catch (error) {
           throw new QuoteValidationError(`Could not price "${main.name}: ${sub.name}": ${(error as Error).message}`)
         }
@@ -469,8 +476,11 @@ export const priceQuotePosition = async (
     const optionShare = shareItems?.get(sub.id)
     const ownDiscountPct = optionShare?.discountPct ?? (sub.discountPct == null ? null : Number(sub.discountPct))
     const ownMarkupPct = optionShare?.markupPct ?? (sub.markupPct == null ? null : Number(sub.markupPct))
+    const effectiveDiscountPct = ownDiscountPct ?? discountPct
+    const effectiveMarkupPct = ownMarkupPct ?? extraMarkupPct
+    const finalUnitPrice = subPrice * (1 - effectiveDiscountPct / 100) * (effectiveMarkupPct / 100)
     characteristicsBasePrice += subPrice
-    characteristicsFinalPrice += subPrice * (1 - (ownDiscountPct ?? discountPct) / 100) * ((ownMarkupPct ?? extraMarkupPct) / 100)
+    characteristicsFinalPrice += finalUnitPrice
     characteristicRows.push({
       characteristicId: main.id,
       subCharacteristicId: sub.id,
@@ -481,6 +491,10 @@ export const priceQuotePosition = async (
       manualUnitPrice: subPricingMode === 'manual' ? (selection.manualUnitPrice as number) : null,
       discountPct: ownDiscountPct,
       markupPct: ownMarkupPct,
+      effectiveDiscountPct,
+      effectiveMarkupPct,
+      finalUnitPrice,
+      minApplied: subMinApplied,
     })
     descriptionParts.push(`${main.name}: ${sub.name}`)
   }
@@ -489,8 +503,8 @@ export const priceQuotePosition = async (
   const basePricePerUnit = lineBasePrice + characteristicsBasePrice
   const basePrice = basePricePerUnit * input.quantity
   // The line at the position's discount/markup, each option at its own (or the position's).
-  const finalPrice =
-    (lineBasePrice * (1 - discountPct / 100) * (extraMarkupPct / 100) + characteristicsFinalPrice) * input.quantity
+  const lineFinalUnitPrice = lineBasePrice * (1 - discountPct / 100) * (extraMarkupPct / 100)
+  const finalPrice = (lineFinalUnitPrice + characteristicsFinalPrice) * input.quantity
 
   return {
     family,
@@ -498,6 +512,9 @@ export const priceQuotePosition = async (
     linePricingMode,
     lineManualUnitPrice: linePricingMode === 'manual' ? (input.manualUnitPrice as number) : null,
     lineUnitPrice: lineBasePrice,
+    lineFinalUnitPrice,
+    lineMinApplied,
+    installationHours,
     description: input.description?.trim() || descriptionParts.join(' — '),
     discountPct,
     extraMarkupPct,
@@ -516,8 +533,26 @@ export interface QuotePositionPreview {
   extraMarkupPct: number
   /** The line's own €/unit price computed under whichever pricingMode the input asked for — lets the form show "here's what auto computed" in the disabled field, same number `addQuotePosition` would store. */
   lineUnitPrice: number
-  /** Per-unit, pre-discount/markup — same basis `addQuotePosition` stores per characteristic row (each already reflects that selection's own pricingMode). */
-  characteristics: { characteristicId: string; subCharacteristicId: string; price: number }[]
+  /** The line's €/unit after the position's discount and markup. */
+  lineFinalUnitPrice: number
+  /** `lineUnitPrice` is the line's minimum (MinValue): its table/formula gave less. */
+  lineMinApplied: boolean
+  /** Installation hours per unit: the line's plus each chosen option's. */
+  installationHours: number
+  /**
+   * `price` is per unit, pre-discount/markup — same basis `addQuotePosition` stores per characteristic row (each
+   * already reflects that selection's own pricingMode); `finalUnitPrice` is after the discount and markup it is
+   * priced at (its own, or the position's).
+   */
+  characteristics: {
+    characteristicId: string
+    subCharacteristicId: string
+    price: number
+    discountPct: number
+    markupPct: number
+    finalUnitPrice: number
+    minApplied: boolean
+  }[]
 }
 
 /**
@@ -543,10 +578,17 @@ export const previewQuotePosition = async (
       discountPct: priced.discountPct,
       extraMarkupPct: priced.extraMarkupPct,
       lineUnitPrice: priced.lineUnitPrice,
+      lineFinalUnitPrice: priced.lineFinalUnitPrice,
+      lineMinApplied: priced.lineMinApplied,
+      installationHours: priced.installationHours,
       characteristics: priced.characteristicRows.map((r) => ({
         characteristicId: r.characteristicId,
         subCharacteristicId: r.subCharacteristicId,
         price: r.price,
+        discountPct: r.effectiveDiscountPct,
+        markupPct: r.effectiveMarkupPct,
+        finalUnitPrice: r.finalUnitPrice,
+        minApplied: r.minApplied,
       })),
     }
   })

@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 
 import { fetchFromApiResult } from '@/lib/api/server-client'
 import { QuoteBuilder } from '@/components/quote-builder'
-import type { PositionFamilyVersion } from '@/components/quote-position-card'
+import type { PositionFamilyVersion } from '@/components/quote-positions-nav'
 import type { ProductFamilySummary } from '@/types/product-family'
 import type { QuoteDetail } from '@/types/sales-quote'
 import { priceValidityStatus, priceValidityToday, type FamilyVersionsResponse } from '@schuco/contracts'

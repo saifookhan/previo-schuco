@@ -115,5 +115,21 @@ export interface QuotePositionPreview {
   discountPct: number
   extraMarkupPct: number
   lineUnitPrice: number
-  characteristics: { characteristicId: string; subCharacteristicId: string; price: number }[]
+  /** The line's €/unit after the position's discount and markup. */
+  lineFinalUnitPrice: number
+  /** `lineUnitPrice` is the line's minimum (MinValue): its table/formula gave less. */
+  lineMinApplied: boolean
+  /** Installation hours per unit: the line's plus each chosen option's. */
+  installationHours: number
+  /** `price` per unit before discount/markup; `finalUnitPrice` after the discount and markup it is priced at. */
+  characteristics: {
+    characteristicId: string
+    subCharacteristicId: string
+    price: number
+    discountPct: number
+    markupPct: number
+    finalUnitPrice: number
+    /** Its price is its minimum (MinValue). */
+    minApplied: boolean
+  }[]
 }

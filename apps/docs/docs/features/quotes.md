@@ -13,18 +13,29 @@ which only **supplier** companies have (in the demo data: Suppli).
 ## Flow
 
 1. **New quote** → reference, customer name, fiscal code, address, city, project location.
-2. Open the quote → **Add position**:
-   - **Product** — pick a family (own or shared with you) and a product line.
-   - **Size & position** — width, height, quantity, position name/code (custom codes allowed).
-   - **Pricing** — price is calculated automatically (**A**); switch to manual (**M**) to override it.
-     A live price preview updates as you type.
-   - **Characteristics** — options for the line, each also auto or manual priced.
-3. Edit, duplicate, delete and **reorder** positions.
-4. **Download PDF**.
+2. Open the quote. It has three panes:
+   - **Left — positions:** the quote overview, every position with its price, **New position** and the total. Click a
+     position to edit it; the selected one also has **move up / down**, **duplicate** and **delete**.
+   - **Middle — the position's form:**
+     - **Product** — pick a family (own or shared with you) and a product line.
+     - **Size & position** — position name/code (custom codes allowed), width, height, quantity.
+     - **Characteristics** — one row per option of the line, each auto (**A**) or manual (**M**) priced.
+     - **Pricing** — the line's price is calculated automatically (**A**); switch to manual (**M**) to override it.
+       Discount and markup.
+   - **Right — preview:**
+     - **Calculation** — how the price is built, live as you type: the line's list price, discount and markup, each
+       option at its own terms, the unit price, the quantity and the total, plus a **Formula trace** with every step.
+     - **PDF** — the quote's PDF as it is saved. It reloads after you add or save a position.
+3. **Add position** / **Save changes**. After saving, the position stays selected. Clicking another position (or
+   **New position**) with unsaved changes asks before discarding them.
+4. **Download PDF** (top right).
 
-![Quote with three positions](/img/screens/quote-detail.png)
+On a smaller screen the preview moves under the form; on a phone the three panes are tabs (**Positions**, **Edit**,
+**Preview**).
 
-![Add a position form](/img/screens/add-position.png)
+![Quote builder: positions, form and calculation](/img/screens/quote-detail.png)
+
+![The PDF preview](/img/screens/add-position.png)
 
 Positions from a shared family start with the discount, markup and installation hours set on the share for that line and its options. How every number is computed: [How prices are calculated](../pricing.md).
 
@@ -36,16 +47,17 @@ Positions from a shared family start with the discount, markup and installation 
   table cell by cell). **Hide changes** folds it; **Family page** opens the comparison there.
 - The changes are detected from the content of the two versions when the new one is uploaded, not from the file's name
   or highlighted cells, and stored with the version.
-- A position priced from an older version shows the version under its line name and, when a newer version can be
-  quoted, a **v3 available** badge: click it for what changed and the link to the comparison. The position keeps its
-  price; edit it to switch to the new version.
+- When a newer version of a position's family can be quoted, the position shows a branch icon in the list, and
+  opening it shows **v3 available** with what changed and the link to the comparison. The position keeps its price
+  until you switch: pick the new version in its form — the size, quantity and code stay, and so do the line and the
+  options that have the same names in the new version — then **Save changes**.
 - In the PDF, each family's heading shows its version, and under it what changed since the previous version: what was
   added or removed, and which items have price changes (price tables with their % range) or text changes. A copy's
   first version is not compared with the family it was copied from.
 
 ## History
 
-Open **History** at the bottom of a quote to see who created it and who added, edited, duplicated, reordered or
+Open **Quote overview** in the positions pane, then **History**, to see who created it and who added, edited, duplicated, reordered or
 removed which position, and when. Anyone who can see the quote can see its history.
 
 ![Quote history](/img/screens/quote-history.png)

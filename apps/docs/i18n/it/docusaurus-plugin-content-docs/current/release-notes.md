@@ -12,6 +12,7 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 **Settimana del 16 novembre**
 - **Condivisione per linea e opzione**: la finestra di condivisione elenca ogni linea di prodotto e opzione della famiglia, ognuna con il proprio **sconto**, **ricarico** e **ore di posa** per quell'azienda, partendo dai valori dell'Excel (0% / 100% / 0 dove non ne ha). In una nuova versione, ciò che l'azienda aveva sulla precedente (abbinato per nome) completa i valori che il nuovo Excel lascia vuoti. Lo sconto unico per azienda non c'è più. Vedi [Condivisione delle famiglie](./features/sharing.md).
 - **Preventivi da una famiglia condivisa**: ogni posizione parte dai valori della condivisione per la sua linea, e ogni opzione è calcolata con i valori della condivisione per quell'opzione.
+- **Nuovo layout del preventivo**: posizioni a sinistra, il modulo della posizione al centro e un'anteprima in tempo reale a destra — **Calcolo** (come si forma il prezzo, passo per passo, con la traccia formule) o il **PDF** del preventivo. Sul telefono le tre sezioni sono schede. Vedi [Preventivi](./features/quotes.md).
 - *Condivise con me* mostra **il tuo sconto max**: il più alto su una linea o opzione.
 
 **Settimana del 9 novembre**

@@ -13,6 +13,7 @@ What changed, newest first. Use it to see what's new to test.
 - **Sharing per line and option**: the share dialog lists every product line and option of the family, each with its own **discount**, **markup** and **installation hours** for that company, starting from the Excel's values (0% / 100% / 0 where it has none). On a new version, what the company got on the earlier one (matched by name) fills in the values the new Excel leaves empty. The single discount per company is gone. See [Family sharing](./features/sharing.md).
 - **Quotes from a shared family** start each position at the share's values for its line, and price each option at the share's values for that option.
 - *Shared with me* shows **your max discount**: the highest on any line or option.
+- **New quote builder layout**: positions on the left, the position's form in the middle, and a live preview on the right — **Calculation** (how the price is built, step by step, with a formula trace) or the quote's **PDF**. On a phone the three are tabs. See [Quotes](./features/quotes.md).
 
 **Week of 9 November**
 - **Excel template version 2**: the family's **Distributore** and **Note**, a **minimum purchase price** (`MinValue`) on lines and options, and per option its own **discount**, **markup** and **installation hours**. Version 1 workbooks still import. See [Excel import format](./excel-format.md).

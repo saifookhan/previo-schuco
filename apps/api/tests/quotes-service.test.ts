@@ -471,6 +471,15 @@ describe('createQuote + addQuotePosition', () => {
     // The line (555) at -25% ×1.4, the option (50) at -50% ×2.
     expect(defaulted.positions[0].finalPrice).toBe('632.75')
 
+    // The preview breaks that price down the same way, for the quote builder's calculation panel.
+    const preview = await previewQuotePosition(linkedCtx, position)
+    expect(preview.lineFinalUnitPrice).toBeCloseTo(582.75, 2)
+    expect(preview.lineMinApplied).toBe(false)
+    expect(preview.installationHours).toBe(2)
+    expect(preview.characteristics).toEqual([
+      { characteristicId: main.id, subCharacteristicId: sub.id, price: 50, discountPct: 50, markupPct: 200, finalUnitPrice: 50, minApplied: false },
+    ])
+
     const overridden = await addQuotePosition(linkedCtx, linkedActor, quote.id, { ...position, discountPct: 10 })
     expect(Number(overridden.positions[1].discountPct)).toBe(10) // the share's values are only a default
 
