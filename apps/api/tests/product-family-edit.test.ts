@@ -85,6 +85,15 @@ describe('validateLinePatch / validateCharacteristicPatch', () => {
     })
   })
 
+  it("empties a line's discount, markup or hours with null, but not its value", () => {
+    expect(validateLinePatch({ discountPct: null, markupPct: null, installationHoursPerUnit: null })).toEqual({
+      discountPct: null,
+      markupPct: null,
+      installationHoursPerUnit: null,
+    })
+    expect(() => validateLinePatch({ value: null })).toThrow(/value/)
+  })
+
   it('enforces per-field ranges', () => {
     expect(() => validateLinePatch({ discountPct: 101 })).toThrow(/discountPct/)
     expect(() => validateLinePatch({ markupPct: -1 })).toThrow(/markupPct/)

@@ -19,12 +19,13 @@ you are connected with on the [Partners](./partners.md) page; the dialog's searc
 - Each share is *"company A shares family F with company B"*, with a **Discount %**, a **Markup %** and
   **Installation hours** per unit for every product line and every option. These are the values B's quote
   positions start with — B can still change the position's discount and markup.
-- When you add a company, the values start from the family's own (the uploaded Excel's). Where the Excel has none
-  (a version 1 option), they start at 0% discount, 100% markup and 0 hours. A markup of `100%` means no markup;
+- When you add a company, the values start from the family's own (the uploaded Excel's). Where the Excel cell is
+  empty (or a version 1 option), they start at 0% discount, 100% markup and 0 hours. A markup of `100%` means no markup;
   `130%` adds 30%.
 - **New version:** shares belong to one version. When you add a company to a new version that you shared an
-  earlier version with, its values from then are filled in, matched by line and option name ("Values from another
-  version"). A line or option that is new in this version starts from the Excel's values.
+  earlier version with, its values from then fill in what the new Excel leaves empty, matched by line and option
+  name ("Values from another version"). A value the new Excel has always wins. A line or option that is new in this
+  version starts from the Excel's values. You can change any of them before saving.
 - Only the **owner**, or a company the family was itself shared with, may share it onward.
   This makes a chain, e.g. manufacturer → supplier → client.
 - **Unpublishing** the family, or removing a share upstream, immediately hides it from everyone

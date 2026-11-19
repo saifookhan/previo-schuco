@@ -60,6 +60,10 @@ vale 0 — una famiglia può avere i prezzi tutti nelle opzioni.
 Scrivere `10` significa 1000%.
 :::
 
+Una cella `Sconto %`, `MarkUp %` o `Ore di posa x UM` vuota significa nessuno (0%, ×1, 0 ore). In una nuova versione,
+lasciala vuota per mantenere ciò che ogni azienda aveva sulla versione precedente quando la condividi di nuovo; un
+valore scritto viene usato al suo posto. Vedi [Condivisione delle famiglie](./features/sharing.md).
+
 ## `Caracteristics`
 
 Una griglia, sette colonne per caratteristica:

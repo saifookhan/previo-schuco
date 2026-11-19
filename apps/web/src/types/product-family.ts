@@ -48,9 +48,10 @@ export interface ProductLine {
   minValue: string | null
   unitName: string
   unitSymbol: string
-  discountPct: string
-  markupPct: string
-  installationHoursPerUnit: string
+  /** Null = empty in the Excel: 0% discount, 100% markup (none), 0 hours. */
+  discountPct: string | null
+  markupPct: string | null
+  installationHoursPerUnit: string | null
   sortOrder: number
 }
 

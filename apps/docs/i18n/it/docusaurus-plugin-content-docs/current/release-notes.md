@@ -10,7 +10,7 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 ## Novembre 2026
 
 **Settimana del 16 novembre**
-- **Condivisione per linea e opzione**: la finestra di condivisione elenca ogni linea di prodotto e opzione della famiglia, ognuna con il proprio **sconto**, **ricarico** e **ore di posa** per quell'azienda, partendo dai valori dell'Excel (0% / 100% / 0 dove non ne ha). Una nuova versione parte da ciò che l'azienda aveva sulla precedente, abbinato per nome. Lo sconto unico per azienda non c'è più. Vedi [Condivisione delle famiglie](./features/sharing.md).
+- **Condivisione per linea e opzione**: la finestra di condivisione elenca ogni linea di prodotto e opzione della famiglia, ognuna con il proprio **sconto**, **ricarico** e **ore di posa** per quell'azienda, partendo dai valori dell'Excel (0% / 100% / 0 dove non ne ha). In una nuova versione, ciò che l'azienda aveva sulla precedente (abbinato per nome) completa i valori che il nuovo Excel lascia vuoti. Lo sconto unico per azienda non c'è più. Vedi [Condivisione delle famiglie](./features/sharing.md).
 - **Preventivi da una famiglia condivisa**: ogni posizione parte dai valori della condivisione per la sua linea, e ogni opzione è calcolata con i valori della condivisione per quell'opzione.
 - *Condivise con me* mostra **il tuo sconto max**: il più alto su una linea o opzione.
 

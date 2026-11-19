@@ -19,13 +19,14 @@ solo con aziende connesse nella pagina [Partner](./partners.md); la ricerca dell
 - Ogni condivisione è *"l'azienda A condivide la famiglia F con l'azienda B"*, con uno **Sconto %**, un
   **Ricarico %** e le **Ore di posa** per unità su ogni linea di prodotto e ogni opzione. Sono i valori con cui
   partono le posizioni di preventivo di B — B può comunque cambiare sconto e ricarico della posizione.
-- Quando aggiungi un'azienda, i valori partono da quelli della famiglia (dell'Excel caricato). Dove l'Excel non ne ha
-  (un'opzione di versione 1), partono da 0% di sconto, 100% di ricarico e 0 ore. Un ricarico del `100%` significa
+- Quando aggiungi un'azienda, i valori partono da quelli della famiglia (dell'Excel caricato). Dove la cella
+  dell'Excel è vuota (o per un'opzione di versione 1), partono da 0% di sconto, 100% di ricarico e 0 ore. Un ricarico del `100%` significa
   nessun ricarico; `130%` aggiunge il 30%.
 - **Nuova versione:** le condivisioni appartengono a una versione. Quando aggiungi a una nuova versione un'azienda
-  con cui avevi condiviso una versione precedente, vengono riproposti i suoi valori di allora, abbinati per nome di
-  linea e opzione ("Valori da un'altra versione"). Una linea o opzione nuova in questa versione parte dai valori
-  dell'Excel.
+  con cui avevi condiviso una versione precedente, i suoi valori di allora completano ciò che il nuovo Excel lascia
+  vuoto, abbinati per nome di linea e opzione ("Valori da un'altra versione"). Un valore presente nel nuovo Excel
+  vince sempre. Una linea o opzione nuova in questa versione parte dai valori dell'Excel. Puoi cambiarli tutti prima
+  di salvare.
 - Solo il **proprietario**, o un'azienda con cui la famiglia è stata condivisa, può condividerla a sua volta.
   Si crea così una catena, es. produttore → rivenditore → cliente.
 - **Ritirare dalla pubblicazione** la famiglia, o rimuovere una condivisione a monte, la nasconde subito

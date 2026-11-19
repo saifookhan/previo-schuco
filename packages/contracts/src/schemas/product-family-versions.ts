@@ -100,9 +100,10 @@ export interface FamilyVersionSnapshot {
     minValue?: Numeric | null
     unitName: string
     unitSymbol: string
-    discountPct: Numeric
-    markupPct: Numeric
-    installationHoursPerUnit: Numeric
+    /** Null = empty in the Excel: no discount, no markup (100), no hours. */
+    discountPct: Numeric | null
+    markupPct: Numeric | null
+    installationHoursPerUnit: Numeric | null
     sortOrder: number
   }[]
   characteristics: {
@@ -353,9 +354,10 @@ export const diffFamilyVersions = (older: FamilyVersionSnapshot, newer: FamilyVe
       ...field(id, 'unitSymbol', 'description', text(o.unitSymbol), text(n.unitSymbol)),
       ...pricingChanges(id, o, n, olderMatrices, newerMatrices),
       ...field(id, 'minValue', 'economic', number(o.minValue), number(n.minValue)),
-      ...field(id, 'discountPct', 'economic', number(o.discountPct), number(n.discountPct)),
-      ...field(id, 'markupPct', 'economic', number(o.markupPct), number(n.markupPct)),
-      ...field(id, 'installationHoursPerUnit', 'economic', number(o.installationHoursPerUnit), number(n.installationHoursPerUnit)),
+      // An empty value compares as what it means, so 0 → empty is not a change.
+      ...field(id, 'discountPct', 'economic', number(o.discountPct ?? 0), number(n.discountPct ?? 0)),
+      ...field(id, 'markupPct', 'economic', number(o.markupPct ?? 100), number(n.markupPct ?? 100)),
+      ...field(id, 'installationHoursPerUnit', 'economic', number(o.installationHoursPerUnit ?? 0), number(n.installationHoursPerUnit ?? 0)),
       ...links,
     ])
   })

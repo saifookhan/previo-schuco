@@ -350,7 +350,7 @@ export const priceQuotePosition = async (
       ? null
       : await getIncomingShareItems(tx, ctx.effectiveCompanyId, family.family.id)
   const lineShare = shareItems?.get(line.id)
-  const lineHours = lineShare?.installationHours ?? Number(line.installationHoursPerUnit)
+  const lineHours = lineShare?.installationHours ?? Number(line.installationHoursPerUnit ?? 0)
   // The position's installation hours: the line's, plus what each chosen option adds (v2 options
   // have their own "Ore di posa"). An "Ore di posa x [€/h]" option is priced on these hours; the
   // line's own formula keeps the line's hours, so labour isn't charged on both.
@@ -398,8 +398,8 @@ export const priceQuotePosition = async (
   }
 
   // Only defaults: always overridable via input.
-  const discountPct = input.discountPct ?? lineShare?.discountPct ?? Number(line.discountPct)
-  const extraMarkupPct = input.extraMarkupPct ?? lineShare?.markupPct ?? Number(line.markupPct)
+  const discountPct = input.discountPct ?? lineShare?.discountPct ?? Number(line.discountPct ?? 0)
+  const extraMarkupPct = input.extraMarkupPct ?? lineShare?.markupPct ?? Number(line.markupPct ?? 100)
   if (discountPct < 0 || discountPct > 100) {
     throw new QuoteValidationError('discountPct must be between 0 and 100')
   }

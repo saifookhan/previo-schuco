@@ -60,6 +60,10 @@ family can be priced entirely through its options.
 Typing `10` means 1000%.
 :::
 
+An empty `Sconto %`, `MarkUp %` or `Ore di posa x UM` cell means none (0%, ×1, 0 hours). On a new version, leave it
+empty to keep what each company got on the earlier version when you share it again; a value you type is used
+instead. See [Family sharing](./features/sharing.md).
+
 ## `Caracteristics`
 
 A grid, seven columns per characteristic:

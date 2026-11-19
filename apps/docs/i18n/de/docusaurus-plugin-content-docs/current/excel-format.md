@@ -60,6 +60,10 @@ leerer Preis ist 0 — eine Familie kann ihre Preise ganz über die Optionen hab
 `10` einzutippen bedeutet 1000 %.
 :::
 
+Eine leere Zelle `Sconto %`, `MarkUp %` oder `Ore di posa x UM` bedeutet keiner (0 %, ×1, 0 Stunden). Lassen Sie sie
+in einer neuen Version leer, um beim erneuten Teilen zu behalten, was jedes Unternehmen in der früheren Version hatte;
+ein eingetragener Wert wird stattdessen verwendet. Siehe [Familien teilen](./features/sharing.md).
+
 ## `Caracteristics`
 
 Ein Raster, sieben Spalten pro Merkmal:

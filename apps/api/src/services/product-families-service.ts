@@ -89,12 +89,12 @@ const isMatrix = (value: number | RawPricingMatrix): value is RawPricingMatrix =
  * Excel stores discount/markup as raw multipliers (`0.43` meaning 43%,
  * `1.5` meaning a 150% — i.e. 1.5x — multiplier), but the DB/costing
  * engine store and consume these "out of 100" (43, 150; see
- * `packages/calculation/src/product-costing.ts`'s `pct / 100`). Missing
- * -> the column's own DB default (0 discount / 100 markup, i.e. no-op).
+ * `packages/calculation/src/product-costing.ts`'s `pct / 100`). A blank cell stays null: no
+ * discount, no markup (100).
  * @param rawFraction - The sheet's raw decimal value, or null/undefined if the cell was blank
  */
-const toStoredPct = (rawFraction: number | null | undefined): string | undefined =>
-  rawFraction == null ? undefined : String(rawFraction * 100)
+const toStoredPct = (rawFraction: number | null | undefined): string | null =>
+  rawFraction == null ? null : String(rawFraction * 100)
 
 const auditActor = (actor: ProductFamilyActor) => ({
   actorType: 'user' as const,
@@ -313,9 +313,9 @@ export const importProductFamilyFromExcel = async (
         minValue: line.minValue == null ? null : String(line.minValue),
         unitName: line.unitName,
         unitSymbol: line.unitSymbol,
-        discountPct: toStoredPct(line.discountPct) ?? '0',
-        markupPct: toStoredPct(line.markupPct) ?? '100',
-        installationHoursPerUnit: String(line.installationHoursPerUnit),
+        discountPct: toStoredPct(line.discountPct),
+        markupPct: toStoredPct(line.markupPct),
+        installationHoursPerUnit: line.installationHoursPerUnit == null ? null : String(line.installationHoursPerUnit),
         sortOrder: index,
       })
       lineIdByName.set(line.name, lineId)
@@ -360,8 +360,8 @@ export const importProductFamilyFromExcel = async (
           value,
           pricingMatrixId,
           minValue: sub.minValue == null ? null : String(sub.minValue),
-          discountPct: toStoredPct(sub.discountPct) ?? null,
-          markupPct: toStoredPct(sub.markupPct) ?? null,
+          discountPct: toStoredPct(sub.discountPct),
+          markupPct: toStoredPct(sub.markupPct),
           installationHoursPerUnit: sub.installationHoursPerUnit == null ? null : String(sub.installationHoursPerUnit),
           sortOrder: subIndex,
         })

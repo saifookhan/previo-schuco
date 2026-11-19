@@ -35,7 +35,7 @@ export interface RawProductLine {
   description: string | null
   discountPct: number | null
   markupPct: number | null
-  installationHoursPerUnit: number
+  installationHoursPerUnit: number | null
   unitName: string
   unitSymbol: string
   /** A fixed number when the price list column held a plain value (0 when blank); a matrix when it named another sheet. */

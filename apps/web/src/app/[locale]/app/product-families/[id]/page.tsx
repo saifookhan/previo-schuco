@@ -245,7 +245,7 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
                   </td>
                   <td className="px-6 py-4 text-slate-600">{line.unitName || line.unitSymbol || '—'}</td>
                   <td className="px-6 py-4 text-slate-600">
-                    {Number(line.discountPct)}% / {Number(line.markupPct)}%
+                    {Number(line.discountPct ?? 0)}% / {Number(line.markupPct ?? 100)}%
                   </td>
                   <td className="px-6 py-4 text-slate-600">
                     {(characteristicNamesByLineId.get(line.id) ?? []).map((name) => (

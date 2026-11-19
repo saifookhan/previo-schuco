@@ -32,13 +32,34 @@ export interface FamilyShareActor {
 
 const optional = (value: string | null): number | null => (value == null ? null : Number(value))
 
+/** A line's or option's own values from the Excel; null where its cell was empty. */
+type OwnValues = { [K in keyof FamilyShareItemValues]: number | null }
+
+type ShareableItem = FamilyShareableItem & { own: OwnValues }
+
+const ownValues = (item: {
+  discountPct: string | null
+  markupPct: string | null
+  installationHoursPerUnit: string | null
+}): OwnValues => ({
+  discountPct: optional(item.discountPct),
+  markupPct: optional(item.markupPct),
+  installationHours: optional(item.installationHoursPerUnit),
+})
+
 /**
  * Every line and option (sub-characteristic) of the family, with the family's own values — the
- * Excel's — as the default a share starts from; an option without its own gets no discount, no
- * markup and no hours.
+ * Excel's — as the default a share starts from; an empty value means no discount, no markup and
+ * no hours.
  */
-const shareableItems = (detail: ProductFamilyDetail): FamilyShareableItem[] => {
+const shareableItems = (detail: ProductFamilyDetail): ShareableItem[] => {
   const nameOf = new Map(detail.characteristics.map((c) => [c.id, c.name]))
+  const withDefaults = (own: OwnValues) => ({
+    discountPct: own.discountPct ?? 0,
+    markupPct: own.markupPct ?? 100,
+    installationHours: own.installationHours ?? 0,
+    own,
+  })
   return [
     ...[...detail.lines]
       .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -47,9 +68,7 @@ const shareableItems = (detail: ProductFamilyDetail): FamilyShareableItem[] => {
         id: line.id,
         name: line.name,
         characteristicName: null,
-        discountPct: Number(line.discountPct),
-        markupPct: Number(line.markupPct),
-        installationHours: Number(line.installationHoursPerUnit),
+        ...withDefaults(ownValues(line)),
       })),
     ...detail.characteristics
       .filter((option) => option.parentId)
@@ -59,9 +78,7 @@ const shareableItems = (detail: ProductFamilyDetail): FamilyShareableItem[] => {
         id: option.id,
         name: option.name,
         characteristicName: nameOf.get(option.parentId!) ?? '',
-        discountPct: optional(option.discountPct) ?? 0,
-        markupPct: optional(option.markupPct) ?? 100,
-        installationHours: optional(option.installationHoursPerUnit) ?? 0,
+        ...withDefaults(ownValues(option)),
       })),
   ]
 }
@@ -113,18 +130,29 @@ export const getFamilyShares = async (ctx: TenantContext, familyId: string): Pro
     const keyOf = (characteristicName: string | null, name: string) =>
       characteristicName == null ? `line:${name}` : `option:${characteristicName}\u0000${name}`
     const byKey = new Map(items.map((item) => [keyOf(item.characteristicName, item.name), item]))
+    // A value this version's Excel has wins; only an empty one carries the old share's value forward.
     const previous = [...(await listPreviousVersionShareItems(tx, familyId, ctx.effectiveCompanyId))]
       .filter(([companyId]) => !shared.has(companyId))
       .map(([companyId, named]) => ({
         companyId,
         items: named.flatMap((old) => {
           const match = byKey.get(old.lineName != null ? keyOf(null, old.lineName) : keyOf(old.characteristicName, old.optionName!))
-          return match ? [{ kind: match.kind, id: match.id, ...valuesOf(old) }] : []
+          if (!match) return []
+          const { own } = match
+          return [
+            {
+              kind: match.kind,
+              id: match.id,
+              discountPct: own.discountPct ?? old.discountPct,
+              markupPct: own.markupPct ?? old.markupPct,
+              installationHours: own.installationHours ?? old.installationHours,
+            },
+          ]
         }),
       }))
     return {
       ownerCompanyId: detail.family.supplierCompanyId,
-      items,
+      items: items.map(({ own: _own, ...item }) => item),
       shares: shares.map((share) => ({
         companyId: share.companyId,
         companyName: share.companyName,

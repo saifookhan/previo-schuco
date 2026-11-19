@@ -20,12 +20,13 @@ möglich, mit denen Sie auf der Seite [Partner](./partners.md) verbunden sind; d
   und **Montagestunden** pro Einheit für jede Produktlinie und jede Option. Mit diesen Werten starten die
   Angebotspositionen von B — B kann Rabatt und Aufschlag der Position trotzdem ändern.
 - Wenn Sie ein Unternehmen hinzufügen, starten die Werte mit denen der Familie (aus der hochgeladenen Excel). Wo die
-  Excel keine hat (eine Option aus Version 1), starten sie mit 0 % Rabatt, 100 % Aufschlag und 0 Stunden. Ein
+  Excel-Zelle leer ist (oder bei einer Option aus Version 1), starten sie mit 0 % Rabatt, 100 % Aufschlag und 0 Stunden. Ein
   Aufschlag von `100 %` heißt kein Aufschlag; `130 %` schlägt 30 % auf.
 - **Neue Version:** Freigaben gehören zu einer Version. Wenn Sie ein Unternehmen zu einer neuen Version hinzufügen,
-  mit dem Sie eine frühere Version geteilt haben, werden seine damaligen Werte übernommen, nach Namen der Linie und
-  Option zugeordnet („Werte aus einer anderen Version“). Eine in dieser Version neue Linie oder Option startet mit
-  den Werten der Excel.
+  mit dem Sie eine frühere Version geteilt haben, füllen seine damaligen Werte aus, was die neue Excel leer lässt,
+  nach Namen der Linie und Option zugeordnet („Werte aus einer anderen Version“). Ein Wert aus der neuen Excel hat
+  immer Vorrang. Eine in dieser Version neue Linie oder Option startet mit den Werten der Excel. Sie können alle
+  Werte vor dem Speichern ändern.
 - Nur der **Besitzer** oder ein Unternehmen, mit dem die Familie selbst geteilt wurde, darf sie weiterteilen.
   So entsteht eine Kette, z. B. Hersteller → Händler → Kunde.
 - Das **Zurückziehen** der Veröffentlichung oder das Entfernen einer Freigabe weiter oben verbirgt die

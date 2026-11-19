@@ -140,12 +140,15 @@ const numberField = (label: string, raw: unknown, min: number, max: number): str
 export interface ValidatedLinePatch {
   formula?: string
   value?: string
-  discountPct?: string
-  markupPct?: string
-  installationHoursPerUnit?: string
+  discountPct?: string | null
+  markupPct?: string | null
+  installationHoursPerUnit?: string | null
 }
 
-/** Validates a partial product-line pricing edit; only the provided fields are checked/returned. */
+/**
+ * Validates a partial product-line pricing edit; only the provided fields are checked/returned.
+ * `null` empties discount, markup or hours, as an empty Excel cell does (none of them).
+ */
 export const validateLinePatch = (input: unknown): ValidatedLinePatch => {
   if (typeof input !== 'object' || input === null) {
     return fail('Request body must be an object')
@@ -154,11 +157,10 @@ export const validateLinePatch = (input: unknown): ValidatedLinePatch => {
   const patch: ValidatedLinePatch = {}
   if (body.formula !== undefined) patch.formula = validateFormula(body.formula)
   if (body.value !== undefined) patch.value = numberField('value', body.value, 0, MAX_PRICE)
-  if (body.discountPct !== undefined) patch.discountPct = numberField('discountPct', body.discountPct, 0, 100)
-  if (body.markupPct !== undefined) patch.markupPct = numberField('markupPct', body.markupPct, 0, 10000)
-  if (body.installationHoursPerUnit !== undefined) {
-    patch.installationHoursPerUnit = numberField('installationHoursPerUnit', body.installationHoursPerUnit, 0, 1e6)
-  }
+  const nullable = (key: string, min: number, max: number) => (body[key] === null ? null : numberField(key, body[key], min, max))
+  if (body.discountPct !== undefined) patch.discountPct = nullable('discountPct', 0, 100)
+  if (body.markupPct !== undefined) patch.markupPct = nullable('markupPct', 0, 10000)
+  if (body.installationHoursPerUnit !== undefined) patch.installationHoursPerUnit = nullable('installationHoursPerUnit', 0, 1e6)
   if (Object.keys(patch).length === 0) {
     return fail('No editable fields provided')
   }

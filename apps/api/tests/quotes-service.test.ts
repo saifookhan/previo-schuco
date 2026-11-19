@@ -11,6 +11,7 @@ import {
   createDb,
   quotes,
   productFamilyShareItems,
+  productLines,
   productFamilyShares,
   roles,
   users,
@@ -170,6 +171,27 @@ describe('createQuote + addQuotePosition', () => {
     expect(Number(position.finalPrice)).toBeCloseTo(474.53, 1)
 
     expect(afterAdd.quote.totalPrice).toBe(position.finalPrice)
+  })
+
+  it('prices a line whose Excel left discount, markup and hours empty with none of them', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    await withSystemTransaction(db, (tx) =>
+      tx.update(productLines).set({ discountPct: null, markupPct: null, installationHoursPerUnit: null }).where(eq(productLines.id, line.id)),
+    )
+
+    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-EMPTY', customerName: 'Test Customer' })
+    const { positions } = await addQuotePosition(ctx(), actor, quote.id, {
+      productFamilyId: family.id,
+      productLineId: line.id,
+      quantity: 1,
+      widthMm: 1000,
+      heightMm: 800,
+      characteristicSelections: [],
+    })
+    expect(Number(positions[0].discountPct)).toBe(0)
+    expect(Number(positions[0].extraMarkupPct)).toBe(100)
+    expect(positions[0].finalPrice).toBe('555.00')
   })
 
   it("layers a characteristic selection's price on top of the line price, using the line price as valore_base_in_vendita", async () => {

@@ -187,8 +187,8 @@ export const QuoteBuilder = ({ initialDetail, families, familyVersions }: QuoteB
     const selectedLine = family?.lines.find((l) => l.id === id)
     // On a family shared with this company the share's values for the line (same rule the API applies); otherwise the line's own.
     const shared = selectedLine ? family?.shareItems?.[selectedLine.id] : undefined
-    setDiscountPct(selectedLine ? (shared ? tidy(String(shared.discountPct)) : tidy(selectedLine.discountPct)) : '')
-    setExtraMarkupPct(selectedLine ? (shared ? tidy(String(shared.markupPct)) : tidy(selectedLine.markupPct)) : '')
+    setDiscountPct(selectedLine ? (shared ? tidy(String(shared.discountPct)) : tidy(selectedLine.discountPct ?? '0')) : '')
+    setExtraMarkupPct(selectedLine ? (shared ? tidy(String(shared.markupPct)) : tidy(selectedLine.markupPct ?? '100')) : '')
   }
 
   const cancelEdit = () => {

@@ -10,7 +10,7 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 ## November 2026
 
 **Woche vom 16. November**
-- **Teilen pro Linie und Option**: Der Teilen-Dialog listet jede Produktlinie und Option der Familie, jeweils mit eigenem **Rabatt**, **Aufschlag** und **Montagestunden** für dieses Unternehmen, ausgehend von den Werten der Excel (0 % / 100 % / 0, wo sie keine hat). Eine neue Version startet mit dem, was das Unternehmen in der früheren hatte, nach Namen zugeordnet. Der einzelne Rabatt pro Unternehmen entfällt. Siehe [Familien teilen](./features/sharing.md).
+- **Teilen pro Linie und Option**: Der Teilen-Dialog listet jede Produktlinie und Option der Familie, jeweils mit eigenem **Rabatt**, **Aufschlag** und **Montagestunden** für dieses Unternehmen, ausgehend von den Werten der Excel (0 % / 100 % / 0, wo sie keine hat). In einer neuen Version füllt das, was das Unternehmen in der früheren hatte (nach Namen zugeordnet), die Werte aus, die die neue Excel leer lässt. Der einzelne Rabatt pro Unternehmen entfällt. Siehe [Familien teilen](./features/sharing.md).
 - **Angebote aus einer geteilten Familie**: Jede Position startet mit den Werten der Freigabe für ihre Linie, und jede Option wird mit den Werten der Freigabe für diese Option berechnet.
 - *Mit mir geteilt* zeigt **Ihren max. Rabatt**: den höchsten auf einer Linie oder Option.
 

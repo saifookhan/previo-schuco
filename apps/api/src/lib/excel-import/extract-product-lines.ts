@@ -50,7 +50,7 @@ export const extractProductLines = (workbook: XLSX.WorkBook): RawProductLine[] =
       unitSymbol: row.Simbolo_UM as string,
       discountPct: optionalNumber(row['Sconto %']),
       markupPct: optionalNumber(row['MarkUp %']),
-      installationHoursPerUnit: optionalNumber(row['Ore di posa x UM']) ?? 0,
+      installationHoursPerUnit: optionalNumber(row['Ore di posa x UM']),
     }
   })
 }

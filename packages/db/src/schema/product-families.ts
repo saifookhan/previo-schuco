@@ -129,11 +129,10 @@ export const productLines = pgTable('product_lines', {
   minValue: numeric('min_value', { precision: 14, scale: 4 }),
   unitName: text('unit_name').notNull(),
   unitSymbol: text('unit_symbol').notNull(),
-  discountPct: numeric('discount_pct', { precision: 8, scale: 4 }).notNull().default('0'),
-  markupPct: numeric('markup_pct', { precision: 8, scale: 4 }).notNull().default('100'),
-  installationHoursPerUnit: numeric('installation_hours_per_unit', { precision: 14, scale: 4 })
-    .notNull()
-    .default('0'),
+  /** Excel "Sconto %", "MarkUp %" and "Ore di posa x UM". Null = empty in the Excel: 0% discount, 100% markup (none) and 0 hours. */
+  discountPct: numeric('discount_pct', { precision: 8, scale: 4 }),
+  markupPct: numeric('markup_pct', { precision: 8, scale: 4 }),
+  installationHoursPerUnit: numeric('installation_hours_per_unit', { precision: 14, scale: 4 }),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

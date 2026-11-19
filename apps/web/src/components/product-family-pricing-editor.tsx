@@ -14,9 +14,10 @@ import { showToast } from '@/lib/toast'
 interface LineValues {
   value: string
   formula: string
-  discountPct: string
-  markupPct: string
-  installationHoursPerUnit: string
+  /** Null = empty (as in the Excel): no discount, no markup, no hours. */
+  discountPct: string | null
+  markupPct: string | null
+  installationHoursPerUnit: string | null
 }
 
 type Props =
@@ -80,9 +81,17 @@ export const ProductFamilyPricingEditor = (props: Props) => {
   }
 
   const save = async () => {
-    // A characteristic can clear a field (blank -> null: it may price via a matrix instead); a line can't.
+    // A characteristic can clear a field (blank -> null: it may price via a matrix instead); a line can
+    // clear its discount, markup and hours (blank -> null: none, like an empty Excel cell).
+    const blankToNull = (key: string) => (form[key].trim() === '' ? null : form[key])
     const payload = isLine
-      ? form
+      ? {
+          value: form.value,
+          formula: form.formula,
+          discountPct: blankToNull('discountPct'),
+          markupPct: blankToNull('markupPct'),
+          installationHoursPerUnit: blankToNull('installationHoursPerUnit'),
+        }
       : { value: form.value.trim() === '' ? null : form.value, formula: form.formula.trim() === '' ? null : form.formula }
 
     setSaving(true)
@@ -107,13 +116,14 @@ export const ProductFamilyPricingEditor = (props: Props) => {
     }
   }
 
-  const field = (key: string, label: string, opts?: { mono?: boolean; hint?: string }) => (
+  const field = (key: string, label: string, opts?: { mono?: boolean; hint?: string; placeholder?: string }) => (
     <div className="space-y-1" key={key}>
       <Label htmlFor={`pf-edit-${key}`}>{label}</Label>
       <Input
         id={`pf-edit-${key}`}
         value={form[key] ?? ''}
         inputMode={key === 'formula' ? 'text' : 'decimal'}
+        placeholder={opts?.placeholder}
         className={opts?.mono ? 'font-mono' : undefined}
         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
       />
@@ -162,9 +172,10 @@ export const ProductFamilyPricingEditor = (props: Props) => {
               {field('formula', t('fieldFormula'), { mono: true, hint: t('formulaHint') })}
               {isLine ? (
                 <>
-                  {field('discountPct', t('fieldDiscount'))}
-                  {field('markupPct', t('fieldMarkup'), { hint: t('markupHint') })}
-                  {field('installationHoursPerUnit', t('fieldInstallationHours'))}
+                  {/* Empty = none; the placeholder shows what that means. */}
+                  {field('discountPct', t('fieldDiscount'), { placeholder: '0' })}
+                  {field('markupPct', t('fieldMarkup'), { hint: t('markupHint'), placeholder: '100' })}
+                  {field('installationHoursPerUnit', t('fieldInstallationHours'), { placeholder: '0' })}
                 </>
               ) : (
                 <p className="text-xs text-slate-400">{t('characteristicBlankHint')}</p>

@@ -261,10 +261,11 @@ describe('family shares', () => {
     expect(await getFamilyShareItems(ctxOf(client), familyId)).toBeNull()
   })
 
-  it('starts a company added to a new version from what it got on the previous one, matched by name', async () => {
+  it("starts a company added to a new version from what it got on the previous one, matched by name, where the new version's Excel is empty", async () => {
     const versionIds: string[] = []
     try {
-      const make = async (supersedesId: string | null, lineNames: string[]) =>
+      type LineSpec = string | { name: string; discountPct: string }
+      const make = async (supersedesId: string | null, lineSpecs: LineSpec[]) =>
         withSystemTransaction(db, async (tx) => {
           const [family] = await tx
             .insert(productFamilies)
@@ -273,7 +274,14 @@ describe('family shares', () => {
           versionIds.push(family.id)
           const lines = await tx
             .insert(productLines)
-            .values(lineNames.map((name) => ({ productFamilyId: family.id, name, unitName: 'Pezzo', unitSymbol: 'PZ' })))
+            .values(
+              lineSpecs.map((spec) => ({
+                productFamilyId: family.id,
+                unitName: 'Pezzo',
+                unitSymbol: 'PZ',
+                ...(typeof spec === 'string' ? { name: spec } : spec),
+              })),
+            )
             .returning({ id: productLines.id, name: productLines.name })
           const [colour] = await tx.insert(characteristics).values({ productFamilyId: family.id, name: 'Colore' }).returning({ id: characteristics.id })
           const [ral] = await tx
@@ -282,14 +290,16 @@ describe('family shares', () => {
             .returning({ id: characteristics.id })
           return { id: family.id, line: (name: string) => lines.find((l) => l.name === name)!.id, ral: ral.id }
         })
-      const v1 = await make(null, ['Line A', 'Old line'])
-      const v2 = await make(v1.id, ['Line A', 'New line'])
+      const v1 = await make(null, ['Line A', 'Old line', 'Priced line'])
+      // The new Excel gives "Priced line" a discount and leaves its markup and hours empty.
+      const v2 = await make(v1.id, ['Line A', 'New line', { name: 'Priced line', discountPct: '20' }])
       await updateFamilyShares(ctxOf(manufacturer), actorOf(manufacturer), v1.id, [
         {
           companyId: client,
           items: [
             { kind: 'line', id: v1.line('Line A'), discountPct: 12, markupPct: 140, installationHours: 3 },
             { kind: 'line', id: v1.line('Old line'), discountPct: 50, markupPct: 100, installationHours: 0 },
+            { kind: 'line', id: v1.line('Priced line'), discountPct: 35, markupPct: 150, installationHours: 2 },
             { kind: 'option', id: v1.ral, discountPct: 7, markupPct: 115, installationHours: 1 },
           ],
         },
@@ -299,10 +309,12 @@ describe('family shares', () => {
       expect(previous).toHaveLength(1)
       expect(previous[0].companyId).toBe(client)
       // The removed line has nothing to carry over to; the new one starts from its default in the dialog.
-      expect(previous[0].items).toHaveLength(2)
+      expect(previous[0].items).toHaveLength(3)
       expect(previous[0].items).toEqual(
         expect.arrayContaining([
           { kind: 'line', id: v2.line('Line A'), discountPct: 12, markupPct: 140, installationHours: 3 },
+          // The Excel's discount wins; the empty markup and hours come from the old share.
+          { kind: 'line', id: v2.line('Priced line'), discountPct: 20, markupPct: 150, installationHours: 2 },
           { kind: 'option', id: v2.ral, discountPct: 7, markupPct: 115, installationHours: 1 },
         ]),
       )

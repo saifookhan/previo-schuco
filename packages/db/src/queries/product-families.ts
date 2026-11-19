@@ -62,9 +62,9 @@ export interface InsertProductLineInput {
   minValue?: string | null
   unitName: string
   unitSymbol: string
-  discountPct: string
-  markupPct: string
-  installationHoursPerUnit: string
+  discountPct: string | null
+  markupPct: string | null
+  installationHoursPerUnit: string | null
   sortOrder: number
 }
 
@@ -572,9 +572,9 @@ export const updatePricingMatrix = async (
 export interface UpdateProductLineInput {
   formula?: string
   value?: string
-  discountPct?: string
-  markupPct?: string
-  installationHoursPerUnit?: string
+  discountPct?: string | null
+  markupPct?: string | null
+  installationHoursPerUnit?: string | null
 }
 
 /** Updates a product line's pricing fields. Returns null if the line isn't in that family / isn't writable. */
