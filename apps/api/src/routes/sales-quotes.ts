@@ -2,23 +2,28 @@ import type { Context } from 'hono'
 import { Hono } from 'hono'
 
 import {
+  createSalesQuoteRequestSchema,
+  priceLinesRequestSchema,
+  saveQuoteRequestSchema,
+  setQuoteStatusRequestSchema,
+} from '@schuco/contracts'
+
+import {
+  QuoteConflictError,
   QuoteValidationError,
-  addQuotePosition,
   createQuote,
-  duplicatePosition,
   getQuote,
   getQuoteHistory,
+  getQuotePrintData,
+  getQuoteRevisionDetail,
+  getQuoteRevisions,
   listMyQuotes,
-  previewQuotePosition,
-  removeQuotePosition,
-  reorderPositions,
-  updateQuotePosition,
+  priceQuoteLines,
+  saveQuoteVersion,
+  setQuoteVersionStatusById,
   type QuoteActor,
 } from '../services/quotes-service'
-import { getFamilyVersionNotes } from '../services/product-families-service'
-import { logger } from '../lib/logger'
-import { renderQuotePdf } from '../lib/quote-pdf'
-import { isUuid, rejectNonUuidParams } from '../lib/uuid'
+import { rejectNonUuidParams } from '../lib/uuid'
 import type { AuthVariables } from '../middleware/auth'
 import { requireAuth, requirePermission } from '../middleware/auth'
 import { respondWithRecordHistory } from './record-history'
@@ -28,7 +33,8 @@ import { respondWithRecordHistory } from './record-history'
  * demo at /api/quotes — that route predates the product-family catalog
  * and nothing calls it; kept as-is rather than touched here, out of scope
  * for this change). A quote belongs to the supplier company that creates
- * it, priced against its own product-family catalog.
+ * it; each of its versions is one document (header, intro, product
+ * families with their lines, closing, print settings) saved as a whole.
  */
 export const salesQuotes = new Hono<{ Variables: AuthVariables }>()
 
@@ -47,15 +53,28 @@ const quoteErrorResponse = (c: Context<{ Variables: AuthVariables }>, error: unk
   if (error instanceof QuoteValidationError) {
     return c.json({ error: error.message }, 400)
   }
+  if (error instanceof QuoteConflictError) {
+    return c.json({ error: error.message }, 409)
+  }
   throw error
 }
 
-/** Creates a new draft quote (customer details, no positions yet). */
+/** `?version=N`: a whole number from 1, or undefined for the latest; null when it is something else. */
+const versionQuery = (c: Context): number | undefined | null => {
+  const raw = c.req.query('version')
+  if (raw === undefined) return undefined
+  const version = Number(raw)
+  return Number.isInteger(version) && version >= 1 ? version : null
+}
+
+/** Creates a new draft quote with an empty first version. */
 salesQuotes.post('/', requireAuth, requirePermission('quote.edit'), async (c) => {
-  const body = await c.req.json().catch(() => null)
+  const parsed = createSalesQuoteRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400)
+  }
   try {
-    const quote = await createQuote(ctxFrom(c), actorFrom(c), body ?? {})
-    return c.json({ quote }, 201)
+    return c.json(await createQuote(ctxFrom(c), actorFrom(c), parsed.data), 201)
   } catch (error) {
     return quoteErrorResponse(c, error)
   }
@@ -63,163 +82,92 @@ salesQuotes.post('/', requireAuth, requirePermission('quote.edit'), async (c) =>
 
 /** Lists this caller's own quotes. */
 salesQuotes.get('/', requireAuth, requirePermission('quote.view'), async (c) => {
-  const quoteList = await listMyQuotes(ctxFrom(c))
-  return c.json({ quotes: quoteList })
+  return c.json({ quotes: await listMyQuotes(ctxFrom(c)) })
 })
 
-/** Full detail: quote header + every position + each position's selected characteristics. */
+/**
+ * The catalog €/pz of each line — the builder's live prices, the same a save stores. Static
+ * path, registered before the `/:id` routes.
+ */
+salesQuotes.post('/price-lines', requireAuth, requirePermission('quote.edit'), async (c) => {
+  const parsed = priceLinesRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400)
+  }
+  return c.json({ lines: await priceQuoteLines(ctxFrom(c), parsed.data) })
+})
+
+/** A quote with one of its versions (`?version=N`, default the latest), and whether each catalog family on it can still price it. */
 salesQuotes.get('/:id', rejectNonUuidParams, requireAuth, requirePermission('quote.view'), async (c) => {
-  const id = c.req.param('id')
-  if (!id) {
-    return c.json({ error: 'Missing id' }, 400)
+  const version = versionQuery(c)
+  if (version === null) {
+    return c.json({ error: 'Invalid version' }, 400)
   }
-  const detail = await getQuote(ctxFrom(c), id)
-  if (!detail) {
-    return c.json({ error: 'Not found' }, 404)
-  }
-  return c.json(detail)
+  const detail = await getQuote(ctxFrom(c), c.req.param('id')!, version)
+  return detail ? c.json(detail) : c.json({ error: 'Not found' }, 404)
 })
 
-/** The quote's change history (who added/edited/removed positions, when) — for anyone who can see the quote. */
+/** Everything the printed quote shows (`?version=N`, default the latest): the version, the company, its branch and the sales contact. */
+salesQuotes.get('/:id/print', rejectNonUuidParams, requireAuth, requirePermission('quote.view'), async (c) => {
+  const version = versionQuery(c)
+  if (version === null) {
+    return c.json({ error: 'Invalid version' }, 400)
+  }
+  const data = await getQuotePrintData(ctxFrom(c), c.req.param('id')!, version)
+  return data ? c.json(data) : c.json({ error: 'Not found' }, 404)
+})
+
+/** The quote's audit history (created, saved, new versions, status changes) — for anyone who can see the quote. */
 salesQuotes.get('/:id/history', rejectNonUuidParams, requireAuth, requirePermission('quote.view'), (c) =>
   respondWithRecordHistory(c, (id, query) => getQuoteHistory(ctxFrom(c), id, query)),
 )
 
-// Different path depth than '/:id/positions' below (3 segments vs 2), so —
-// unlike the PATCH .../reorder vs .../:positionId case — registration
-// order here genuinely doesn't matter to Hono's router. Still placed
-// first on principle: a static-vs-param ambiguity is a mistake to let
-// happen again, not one to rely on being harmless this time.
-/** Dry-run pricing for the add/edit position form — same computation, writes nothing. */
-salesQuotes.post('/:id/positions/preview', rejectNonUuidParams, requireAuth, requirePermission('quote.edit'), async (c) => {
-  const body = await c.req.json().catch(() => null)
-  const id = c.req.param('id')
-  const positionId: unknown = body?.positionId
+/** Saves a version: fixed in place (`mode: 'update'`, drafts only) or as the quote's next version (`mode: 'newVersion'`). */
+salesQuotes.put('/:id/versions/:versionId', rejectNonUuidParams, requireAuth, requirePermission('quote.edit'), async (c) => {
+  const parsed = saveQuoteRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400)
+  }
   try {
-    const preview = await previewQuotePosition(
-      ctxFrom(c),
-      body ?? {},
-      id && isUuid(id) && typeof positionId === 'string' ? { quoteId: id, positionId } : undefined,
+    return c.json(await saveQuoteVersion(ctxFrom(c), actorFrom(c), c.req.param('id')!, c.req.param('versionId')!, parsed.data))
+  } catch (error) {
+    return quoteErrorResponse(c, error)
+  }
+})
+
+/** Marks a version sent, accepted or rejected. */
+salesQuotes.post('/:id/versions/:versionId/status', rejectNonUuidParams, requireAuth, requirePermission('quote.edit'), async (c) => {
+  const parsed = setQuoteStatusRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400)
+  }
+  try {
+    return c.json(
+      await setQuoteVersionStatusById(ctxFrom(c), actorFrom(c), c.req.param('id')!, c.req.param('versionId')!, parsed.data.status),
     )
-    return c.json(preview)
   } catch (error) {
     return quoteErrorResponse(c, error)
   }
 })
 
-/** Adds one priced line item to a draft quote (picks a product line + characteristic values, computes the price). */
-salesQuotes.post('/:id/positions', rejectNonUuidParams, requireAuth, requirePermission('quote.edit'), async (c) => {
-  const id = c.req.param('id')
-  if (!id) {
-    return c.json({ error: 'Missing id' }, 400)
-  }
-  const body = await c.req.json().catch(() => null)
-  try {
-    const detail = await addQuotePosition(ctxFrom(c), actorFrom(c), id, body ?? {})
-    return c.json(detail, 201)
-  } catch (error) {
-    return quoteErrorResponse(c, error)
-  }
+/** Every save of a version, newest first, with what changed in each. */
+salesQuotes.get('/:id/versions/:versionId/revisions', rejectNonUuidParams, requireAuth, requirePermission('quote.view'), async (c) => {
+  const revisions = await getQuoteRevisions(ctxFrom(c), c.req.param('id')!, c.req.param('versionId')!)
+  return revisions ? c.json({ revisions }) : c.json({ error: 'Not found' }, 404)
 })
 
-/** Removes a position from a quote. */
-salesQuotes.delete('/:id/positions/:positionId', rejectNonUuidParams, requireAuth, requirePermission('quote.edit'), async (c) => {
-  const id = c.req.param('id')
-  const positionId = c.req.param('positionId')
-  if (!id || !positionId) {
-    return c.json({ error: 'Missing id' }, 400)
-  }
-  try {
-    const detail = await removeQuotePosition(ctxFrom(c), actorFrom(c), id, positionId)
-    return c.json(detail)
-  } catch (error) {
-    return quoteErrorResponse(c, error)
-  }
-})
-
-/** Reorders a quote's positions (body: { positionIds: string[] }, must list every current position id exactly once). */
-salesQuotes.patch('/:id/positions/reorder', rejectNonUuidParams, requireAuth, requirePermission('quote.edit'), async (c) => {
-  const id = c.req.param('id')
-  if (!id) {
-    return c.json({ error: 'Missing id' }, 400)
-  }
-  const body = (await c.req.json().catch(() => null)) as { positionIds?: unknown } | null
-  try {
-    const detail = await reorderPositions(ctxFrom(c), actorFrom(c), id, (body?.positionIds ?? []) as string[])
-    return c.json(detail)
-  } catch (error) {
-    return quoteErrorResponse(c, error)
-  }
-})
-
-// IMPORTANT: this generic `:positionId` PATCH must stay registered AFTER
-// the static `/reorder` PATCH route above — Hono resolves an ambiguous
-// static-vs-param conflict by registration order, not specificity, so
-// registering this one first would swallow every `PATCH .../reorder`
-// call as `positionId: "reorder"` (confirmed: this exact bug shipped
-// once already and silently broke the move-up/move-down buttons).
-/** Re-prices an existing position in place (same width/height/qty/characteristic fields as adding one). */
-salesQuotes.patch('/:id/positions/:positionId', rejectNonUuidParams, requireAuth, requirePermission('quote.edit'), async (c) => {
-  const id = c.req.param('id')
-  const positionId = c.req.param('positionId')
-  if (!id || !positionId) {
-    return c.json({ error: 'Missing id' }, 400)
-  }
-  if (positionId === 'reorder') {
-    return c.json({ error: 'Not found' }, 404)
-  }
-  const body = await c.req.json().catch(() => null)
-  try {
-    const detail = await updateQuotePosition(ctxFrom(c), actorFrom(c), id, positionId, body ?? {})
-    return c.json(detail)
-  } catch (error) {
-    return quoteErrorResponse(c, error)
-  }
-})
-
-/** Duplicates a position as a new one appended to the end of the quote. */
-salesQuotes.post('/:id/positions/:positionId/duplicate', rejectNonUuidParams, requireAuth, requirePermission('quote.edit'), async (c) => {
-  const id = c.req.param('id')
-  const positionId = c.req.param('positionId')
-  if (!id || !positionId) {
-    return c.json({ error: 'Missing id' }, 400)
-  }
-  try {
-    const detail = await duplicatePosition(ctxFrom(c), actorFrom(c), id, positionId)
-    return c.json(detail, 201)
-  } catch (error) {
-    return quoteErrorResponse(c, error)
-  }
-})
-
-/** Streams the quote as a PDF document, with each family's version and what changed since the version before. */
-salesQuotes.get('/:id/pdf', rejectNonUuidParams, requireAuth, requirePermission('quote.view'), async (c) => {
-  const id = c.req.param('id')
-  if (!id) {
-    return c.json({ error: 'Missing id' }, 400)
-  }
-  const detail = await getQuote(ctxFrom(c), id)
-  if (!detail) {
-    return c.json({ error: 'Not found' }, 404)
-  }
-
-  // The reference is free text (only checked non-empty at creation) — strip
-  // anything that could break the header (quotes, CR/LF, backslashes) rather
-  // than trust it verbatim in a Content-Disposition value.
-  const safeFilename = detail.quote.reference.replace(/[^a-zA-Z0-9 ._-]/g, '_') || 'quote'
-
-  // The version notes are an extra: if they can't be loaded, the PDF still goes out without them.
-  const versionNotes = await getFamilyVersionNotes(
-    ctxFrom(c),
-    detail.positions.map((position) => position.productFamilyId),
-  ).catch((error: unknown) => {
-    logger.warn({ err: error, requestId: c.get('requestId'), quoteId: id }, 'quote PDF without family version notes')
-    return undefined
-  })
-  const pdfBuffer = await renderQuotePdf(detail, versionNotes)
-  return c.body(new Uint8Array(pdfBuffer), 200, {
-    'Content-Type': 'application/pdf',
-    'Content-Disposition': `inline; filename="${safeFilename}.pdf"`,
-    'Cache-Control': 'private, no-store',
-  })
-})
+/** One past save of a version, with the document as it was then. */
+salesQuotes.get(
+  '/:id/versions/:versionId/revisions/:revision',
+  rejectNonUuidParams,
+  requireAuth,
+  requirePermission('quote.view'),
+  async (c) => {
+    const revision = Number(c.req.param('revision')!)
+    if (!Number.isInteger(revision) || revision < 1) {
+      return c.json({ error: 'Not found' }, 404)
+    }
+    const detail = await getQuoteRevisionDetail(ctxFrom(c), c.req.param('id')!, c.req.param('versionId')!, revision)
+    return detail ? c.json(detail) : c.json({ error: 'Not found' }, 404)
+  },
+)

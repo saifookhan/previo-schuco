@@ -413,6 +413,16 @@ export const isProductFamilyInLibrary = async (db: DbLike, companyId: string, fa
   return !hidden
 }
 
+/** Of `familyIds`, the ones the company took out of its library (one query for many families). */
+export const listFamiliesHiddenFromLibrary = async (db: DbLike, companyId: string, familyIds: string[]): Promise<Set<string>> => {
+  if (familyIds.length === 0) return new Set()
+  const rows = await db
+    .select({ id: productFamilyLibraryHidden.productFamilyId })
+    .from(productFamilyLibraryHidden)
+    .where(and(eq(productFamilyLibraryHidden.companyId, companyId), inArray(productFamilyLibraryHidden.productFamilyId, familyIds)))
+  return new Set(rows.map((row) => row.id))
+}
+
 /**
  * Puts a family back in, or takes it out of, a company's library. Idempotent.
  * RLS only lets a company write its own rows, for families it can see.

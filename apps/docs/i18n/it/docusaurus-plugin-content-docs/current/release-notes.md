@@ -9,6 +9,14 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 
 ## Novembre 2026
 
+**Settimana del 23 novembre**
+- **Preventivi rifatti sul design del cliente a pagina unica**: moduli di testo d'intestazione, famiglie di prodotto con le linee una per riga e *Riepilogo e Chiusura* (testi, dettaglio per prodotto, raggruppamento per categoria, totale, piano di pagamento, attività), tutto ordinabile con il trascinamento. Vedi [Preventivi](./features/quotes.md).
+- **Versioni**: una bozza si può correggere o salvare come nuova versione; una versione inviata ha solo una nuova versione. Stato: bozza → inviato → accettato / rifiutato.
+- **Cronologia modifiche** di ogni salvataggio, con cosa è cambiato; ogni salvataggio si può aprire e ripristinare.
+- **Stampa**: *Anteprima Preventivo* su pagine A4, stampata o salvata in PDF dal browser, con impostazioni di stampa. Il vecchio download PDF non c'è più.
+- **Listini scaduti**: le bozze passano alla versione valida più recente della famiglia e vengono ricalcolate; se non c'è, salvataggio e stampa sono bloccati con un link per caricare una nuova versione.
+- **Impostazioni → Azienda**: dati fiscali, unità locali (logo, colore, contatti, utenti), telefoni dei referenti e testi salvati.
+
 **Settimana del 16 novembre**
 - **Condivisione per linea e opzione**: la finestra di condivisione elenca ogni linea di prodotto e opzione della famiglia, ognuna con il proprio **sconto**, **ricarico** e **ore di posa** per quell'azienda, partendo dai valori dell'Excel (0% / 100% / 0 dove non ne ha). In una nuova versione, ciò che l'azienda aveva sulla precedente (abbinato per nome) completa i valori che il nuovo Excel lascia vuoti. Lo sconto unico per azienda non c'è più. Vedi [Condivisione delle famiglie](./features/sharing.md).
 - **Preventivi da una famiglia condivisa**: ogni posizione parte dai valori della condivisione per la sua linea, e ogni opzione è calcolata con i valori della condivisione per quell'opzione.

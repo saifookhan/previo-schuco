@@ -8,13 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useRouter } from '@/i18n/navigation'
-import type { QuoteSummary } from '@/types/sales-quote'
+import type { CreateSalesQuoteRequest, SalesQuoteDetailResponse } from '@schuco/contracts'
 
 /**
- * "New quote" button + modal: captures the customer/header details a
- * quote needs up front (there's no later edit for these — only positions
- * can be added/removed after creation), then jumps straight into the
- * quote builder for the new draft.
+ * "New quote" button + modal: the reference and the customer, then straight into the quote
+ * builder for the new draft (where the customer and project can still be changed).
  */
 export const QuoteNewButton = () => {
   const t = useTranslations('quotes')
@@ -53,12 +51,23 @@ export const QuoteNewButton = () => {
     setSaving(true)
     setError(null)
     try {
+      const orNull = (value: string) => value.trim() || null
+      const body: CreateSalesQuoteRequest = {
+        reference: form.reference.trim(),
+        header: {
+          customerName: form.customerName.trim(),
+          customerFiscalCode: orNull(form.customerFiscalCode),
+          customerAddress: orNull(form.customerAddress),
+          customerCity: orNull(form.customerCity),
+          projectLocation: orNull(form.projectLocation),
+        },
+      }
       const response = await fetch('/api/sales-quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(body),
       })
-      const data = (await response.json().catch(() => ({}))) as { quote?: QuoteSummary; error?: string }
+      const data = (await response.json().catch(() => ({}))) as Partial<SalesQuoteDetailResponse> & { error?: string }
       if (!response.ok || !data.quote) {
         setError(data.error ? `${t('newQuoteFailed')}: ${data.error}` : t('newQuoteFailed'))
         return

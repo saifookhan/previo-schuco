@@ -27,11 +27,11 @@ describe('UUID path params', () => {
     expect(quote.status).toBe(404)
   })
 
-  it('a malformed position id under a valid quote id is 404, not 500', async () => {
-    const remove = await salesQuotes.request(`/${FAMILY}/positions/not-a-uuid`, { method: 'DELETE' })
-    const duplicate = await salesQuotes.request(`/${FAMILY}/positions/not-a-uuid/duplicate`, { method: 'POST' })
-    expect(remove.status).toBe(404)
-    expect(duplicate.status).toBe(404)
+  it('a malformed version id under a valid quote id is 404, not 500', async () => {
+    const save = await salesQuotes.request(`/${FAMILY}/versions/not-a-uuid`, { method: 'PUT' })
+    const revisions = await salesQuotes.request(`/${FAMILY}/versions/not-a-uuid/revisions`)
+    expect(save.status).toBe(404)
+    expect(revisions.status).toBe(404)
   })
 
   it('a well-formed family id still reaches auth (401), so unknown ids are not all rejected as malformed', async () => {

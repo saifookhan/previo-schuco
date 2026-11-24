@@ -1,29 +1,64 @@
 import {
-  deleteQuotePosition as deleteQuotePositionQuery,
-  deleteQuotePositionCharacteristics as deleteQuotePositionCharacteristicsQuery,
-  getProductFamiliesPublishStatus,
+  getBusinessUnitLogo,
+  getCompanyProfile,
+  getIncomingShareItems,
   getProductFamilyById,
   getProductFamilyDetail,
-  getQuotePositionFamilyId,
-  getQuoteDetail as getQuoteDetailQuery,
+  getQuoteRevision,
+  getQuoteRow,
+  getQuoteVersion,
+  getQuoteVersionById,
   insertQuote,
-  insertQuotePosition,
-  insertQuotePositionCharacteristic,
-  getIncomingShareItems,
+  insertQuoteRevision,
+  insertQuoteVersion,
   isFamilySharedWith,
   isProductFamilyInLibrary,
+  listFamiliesHiddenFromLibrary,
+  listFamiliesSharedWith,
+  listBusinessUnitsWithUsers,
+  listProductFamilyVersionsOfChains,
+  listQuoteRevisions,
+  listQuoteVersions,
   listQuotes,
+  listSalesContacts,
+  lockQuote,
   quoteExists,
-  recalculateQuoteTotal,
-  reorderQuotePositions as reorderQuotePositionsQuery,
-  updateQuotePosition as updateQuotePositionQuery,
-  type QuoteDetail,
-  type QuoteSummary,
+  setQuoteVersionStatus,
+  updateQuoteSummary,
+  updateQuoteVersionDocument,
+  type DbLike,
+  type QuoteRow,
+  type QuoteVersionWithUsers,
 } from '@schuco/db'
 import { computeCharacteristicPrice, computeLinePrice, type PricingMatrix } from '@schuco/calculation'
-import { priceValidityStatus, priceValidityToday, type AuditLogListResponse, type RecordHistoryQuery } from '@schuco/contracts'
+import {
+  defaultQuotePrintSettings,
+  isEditableQuoteStatus,
+  priceValidityStatus,
+  priceValidityToday,
+  quoteDocumentSchema,
+  quoteTotal,
+  type AuditLogListResponse,
+  type ClosingBlock,
+  type CreateSalesQuoteRequest,
+  type PriceLinesRequest,
+  type PricedLine,
+  type QuoteChange,
+  type QuoteDocument,
+  type QuoteFamilyStatus,
+  type QuoteRevision,
+  type QuoteRevisionDetail,
+  type QuoteStatus,
+  type QuoteSummary,
+  type QuoteVersion,
+  type RecordHistoryQuery,
+  type QuotePrintData,
+  type SalesQuoteDetailResponse,
+  type SaveQuoteRequest,
+} from '@schuco/contracts'
 
-import { PG_UNIQUE_VIOLATION, pgErrorCode } from '../lib/pg-error'
+import { diffQuoteDocuments } from '../lib/quote-diff'
+import { sanitizeRichText } from '../lib/sanitize-rich-text'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
 import { listAuditPage, recordAuditEvent, toHistoryEntry } from './audit-service'
 
@@ -36,178 +71,19 @@ export interface QuoteActor {
 /** The request references a product family/line/characteristic that doesn't exist or isn't visible to the caller, or the numbers don't make sense. */
 export class QuoteValidationError extends Error {}
 
-export type QuoteDetailWithValidity = {
-  quote: QuoteDetail['quote']
-  positions: (QuoteDetail['positions'][number] & { isValid: boolean })[]
-}
+/** The version was saved by someone else since the caller loaded it (`baseRevision` is stale). */
+export class QuoteConflictError extends Error {}
 
-/**
- * Loads a quote and flags each position `isValid: false` when its catalog
- * family is no longer published (e.g. the supplier unpublished it, or
- * published a newer version instead — see product-families-service's
- * `createNewVersionFromExcel`). Pricing/names stay exactly as snapshotted
- * either way; this is a display hint, not a pricing change. The family row
- * itself can never be gone (quote_positions.product_family_id is a RESTRICT
- * FK), so a batched publish-status lookup is all that's needed.
- */
-const finalizeQuoteDetail = async (
-  tx: Parameters<typeof getQuoteDetailQuery>[0],
-  quoteId: string,
-): Promise<QuoteDetailWithValidity | null> => {
-  const detail = await getQuoteDetailQuery(tx, quoteId)
-  if (!detail) {
-    return null
-  }
-  const familyIds = [...new Set(detail.positions.map((p) => p.productFamilyId))]
-  const publishStatus = await getProductFamiliesPublishStatus(tx, familyIds)
-  return {
-    quote: detail.quote,
-    positions: detail.positions.map((position) => ({
-      ...position,
-      isValid: publishStatus.get(position.productFamilyId) ?? false,
-    })),
-  }
-}
+type ProductFamilyDetail = NonNullable<Awaited<ReturnType<typeof getProductFamilyDetail>>>
 
-export interface CreateQuoteInput {
-  reference: string
-  customerName: string
-  customerFiscalCode?: string | null
-  customerAddress?: string | null
-  customerCity?: string | null
-  projectLocation?: string | null
-  introText?: string | null
-  paymentTerms?: string | null
-  validityDays?: number
-}
+const auditActor = (actor: QuoteActor) => ({
+  actorType: 'user' as const,
+  actorUserId: actor.actorUserId,
+  actorCompanyId: actor.actorCompanyId,
+  requestId: actor.requestId,
+})
 
-/** Creates an empty draft quote (no positions yet) owned by the caller's own company. */
-export const createQuote = async (
-  ctx: TenantContext,
-  actor: QuoteActor,
-  input: CreateQuoteInput,
-): Promise<QuoteSummary> => {
-  if (!input.reference.trim() || !input.customerName.trim()) {
-    throw new QuoteValidationError('reference and customerName are required')
-  }
-
-  return withTenantDb(ctx, async (tx) => {
-    // Insert from an explicit allowlist, never `...input` — `input` is the
-    // raw request body (no Zod parse on this route), and spreading it
-    // after supplierCompanyId/createdByUserId would let those (plus
-    // status/totalPrice/id, none of which CreateQuoteInput even declares)
-    // be overridden by whatever the caller sent. RLS would reject a
-    // mismatched supplierCompanyId for a normal company-admin, but not for
-    // a super-admin — this must be safe unconditionally, not "usually
-    // caught by RLS".
-    const quoteId = await insertQuote(tx, {
-      supplierCompanyId: ctx.effectiveCompanyId,
-      createdByUserId: actor.actorUserId,
-      reference: input.reference,
-      customerName: input.customerName,
-      customerFiscalCode: input.customerFiscalCode,
-      customerAddress: input.customerAddress,
-      customerCity: input.customerCity,
-      projectLocation: input.projectLocation,
-      introText: input.introText,
-      paymentTerms: input.paymentTerms,
-      validityDays: input.validityDays,
-    })
-    await recordAuditEvent(
-      tx,
-      {
-        actorType: 'user',
-        actorUserId: actor.actorUserId,
-        actorCompanyId: actor.actorCompanyId,
-        requestId: actor.requestId,
-      },
-      ctx.effectiveCompanyId,
-      {
-        action: 'quote.create',
-        resourceType: 'quote',
-        resourceId: quoteId,
-        metadata: { reference: input.reference },
-      },
-    )
-    const detail = await getQuoteDetailQuery(tx, quoteId)
-    return detail!.quote
-  })
-}
-
-export const listMyQuotes = (ctx: TenantContext): Promise<QuoteSummary[]> =>
-  withTenantDb(ctx, (tx) => listQuotes(tx, ctx.effectiveCompanyId))
-
-export const getQuote = (ctx: TenantContext, quoteId: string): Promise<QuoteDetailWithValidity | null> =>
-  withTenantDb(ctx, (tx) => finalizeQuoteDetail(tx, quoteId))
-
-export interface AddQuotePositionInput {
-  productFamilyId: string
-  productLineId: string
-  quantity: number
-  widthMm: number
-  heightMm: number
-  /** {mainCharacteristicId, subCharacteristicId} — one per characteristic the caller is choosing a value for; a characteristic not listed here just isn't part of this position's price/description. Each selection has its own independent auto/manual pricing toggle (pricingMode), same shape as the position's own line pricing below. */
-  characteristicSelections: {
-    characteristicId: string
-    subCharacteristicId: string
-    pricingMode?: 'auto' | 'manual'
-    manualUnitPrice?: number
-  }[]
-  /** Overrides the line's own catalog discount/markup as the position's starting point (still independently editable afterward). Omit to use the line's own values, or on a shared family the share's. */
-  discountPct?: number
-  extraMarkupPct?: number
-  /** Overrides the auto-built description (line name + selected characteristic names). */
-  description?: string
-  /** 'manual' (the reference app's per-row "A"/"M" toggle) replaces the formula/matrix-computed line price with manualUnitPrice below. Defaults to 'auto'. */
-  pricingMode?: 'auto' | 'manual'
-  /** Required when pricingMode is 'manual' — the line's own €/unit price, typed in directly instead of computed. */
-  manualUnitPrice?: number
-  /** Overrides the auto-assigned "P01"/"P02"/... code (the reference app's "Add POS" naming dialog) — free text, must be unique within the quote. Omit/blank for the usual auto-numbered code. */
-  positionCode?: string
-}
-
-const isPositiveFinite = (n: number): boolean => Number.isFinite(n) && n > 0
-const isNonNegativeFinite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0
-
-/**
- * Resolves this position's code: `requestedCode` (trimmed) when the
- * caller named one (the reference app's "Add POS" dialog), otherwise the
- * usual auto-numbered "P01"/"P02"/... derived from the max of what's
- * actually there, not positions.length (a remove-then-add must not
- * reissue an already-used code — see the comment this replaced). A named
- * code must be unique within the quote; `excludePositionId` lets an edit
- * keep its own current code without tripping that check against itself.
- * @throws {QuoteValidationError} the requested code is already used by a different position in this quote
- */
-/**
- * True for a Postgres unique_violation (error code 23505). `resolvePositionCode`'s
- * uniqueness check is only a read-then-check against this transaction's own
- * snapshot (default READ COMMITTED, no row lock) — two concurrent requests
- * choosing the same custom code could both pass it. The DB's own unique
- * index (`quote_positions_quote_id_position_code_idx`) is what actually
- * prevents the duplicate from committing; this just turns its violation
- * into the same QuoteValidationError the pre-check would have thrown,
- * instead of a raw 500.
- */
-const isPositionCodeConflict = (error: unknown): boolean => pgErrorCode(error) === PG_UNIQUE_VIOLATION
-
-const resolvePositionCode = (
-  existingPositions: { id: string; positionCode: string }[],
-  requestedCode: string | undefined,
-  excludePositionId?: string,
-): string => {
-  const trimmed = requestedCode?.trim()
-  if (trimmed) {
-    const clash = existingPositions.some((p) => p.id !== excludePositionId && p.positionCode === trimmed)
-    if (clash) {
-      throw new QuoteValidationError(`Position code "${trimmed}" is already used by another position in this quote`)
-    }
-    return trimmed
-  }
-  const nextPositionNumber =
-    existingPositions.reduce((max, p) => Math.max(max, Number(p.positionCode.replace(/\D/g, '')) || 0), 0) + 1
-  return `P${String(nextPositionNumber).padStart(2, '0')}`
-}
+// ── Catalog pricing ───────────────────────────────────────────────────────────
 
 const asMatrix = (widths: number[], heights: number[], matrix: (number | null)[][]): PricingMatrix => ({
   widths,
@@ -215,108 +91,9 @@ const asMatrix = (widths: number[], heights: number[], matrix: (number | null)[]
   matrix,
 })
 
-/** Everything `addQuotePosition`/`updateQuotePosition` need to insert or update a priced position row — computed once by `priceQuotePosition` so neither one re-implements the pricing chain. */
-interface PricedPosition {
-  family: NonNullable<Awaited<ReturnType<typeof getProductFamilyDetail>>>
-  line: NonNullable<Awaited<ReturnType<typeof getProductFamilyDetail>>>['lines'][number]
-  linePricingMode: 'auto' | 'manual'
-  lineManualUnitPrice: number | null
-  /** The line's own €/unit contribution either way — `lineManualUnitPrice` in manual mode, the formula/matrix result in auto mode. Lets a caller show "here's what auto mode computed" even while manual is selected, instead of only exposing a value when it's actually in use. */
-  lineUnitPrice: number
-  /** `lineUnitPrice` after the position's discount and markup. */
-  lineFinalUnitPrice: number
-  /** `lineUnitPrice` is the line's minimum (MinValue): its table/formula gave less. */
-  lineMinApplied: boolean
-  /** Per unit: the line's plus each chosen option's. */
-  installationHours: number
-  description: string
-  discountPct: number
-  extraMarkupPct: number
-  totalM2: number
-  basePrice: number
-  finalPrice: number
-  characteristicRows: {
-    characteristicId: string
-    subCharacteristicId: string
-    characteristicName: string
-    subCharacteristicName: string
-    price: number
-    pricingMode: 'auto' | 'manual'
-    manualUnitPrice: number | null
-    /** The option's own discount/markup (v2); null = the position's applied. */
-    discountPct: number | null
-    markupPct: number | null
-    /** What it is priced at: its own discount and markup, or the position's. */
-    effectiveDiscountPct: number
-    effectiveMarkupPct: number
-    finalUnitPrice: number
-    /** Its price is its minimum (MinValue), the table/formula gave less. */
-    minApplied: boolean
-  }[]
-}
-
-/**
- * New quote positions may only use a family that is in the quoting company's library,
- * ready for invoicing, and whose prices are valid today (Italian time); positions
- * already on a quote keep theirs.
- * @throws {QuoteValidationError} the family is out of the company's library, isn't ready for invoicing, or its price validity hasn't started yet or has ended
- */
-const assertUsableForNewPositions = async (
-  tx: Parameters<typeof getProductFamilyDetail>[0],
-  companyId: string,
-  family: {
-    id: string
-    name: string
-    readyForInvoicing: boolean
-    priceValidFrom: string | null
-    priceValidTo: string | null
-  },
-): Promise<void> => {
-  if (!(await isProductFamilyInLibrary(tx, companyId, family.id))) {
-    throw new QuoteValidationError(`"${family.name}" is not in your company's library`)
-  }
-  if (!family.readyForInvoicing) {
-    throw new QuoteValidationError(`"${family.name}" is not ready for invoicing`)
-  }
-  const validity = priceValidityStatus(family, priceValidityToday())
-  if (validity === 'upcoming') {
-    throw new QuoteValidationError(`The prices of "${family.name}" are valid from ${family.priceValidFrom}`)
-  }
-  if (validity === 'expired') {
-    throw new QuoteValidationError(`The prices of "${family.name}" expired on ${family.priceValidTo}`)
-  }
-}
-
-/**
- * Resolves the chosen product line + each selected characteristic in the
- * caller's own product-family catalog and computes this position's price
- * at the given width/height/quantity, using the shared costing engine
- * (`@schuco/calculation`, the same code the catalog itself is priced
- * with). Shared by `addQuotePosition` and `updateQuotePosition` — pricing
- * is snapshotted into the row either way, never recomputed from the live
- * catalog on a later read.
- * Only a family in the company's library, ready for invoicing and with prices valid today can be used — except by
- * `keepFamilyId`: an existing position may be edited without switching away
- * from the (possibly expired) family it was priced from.
- * @throws {QuoteValidationError} bad input, the family/line/characteristic isn't visible to the caller, or the family is out of the company's library, isn't ready for invoicing, or its prices aren't valid today
- */
-export const priceQuotePosition = async (
-  ctx: TenantContext,
-  tx: Parameters<typeof getProductFamilyDetail>[0],
-  input: AddQuotePositionInput,
-  { keepFamilyId }: { keepFamilyId?: string } = {},
-): Promise<PricedPosition> => {
-  if (!isPositiveFinite(input.quantity) || !Number.isInteger(input.quantity)) {
-    throw new QuoteValidationError('quantity must be a positive whole number')
-  }
-  if (!isPositiveFinite(input.widthMm) || !isPositiveFinite(input.heightMm)) {
-    throw new QuoteValidationError('widthMm and heightMm must be positive numbers')
-  }
-  if (!Array.isArray(input.characteristicSelections)) {
-    throw new QuoteValidationError('characteristicSelections must be an array')
-  }
-
-  const family = await getProductFamilyDetail(tx, input.productFamilyId)
+/** A family the company may price quote lines from: its own, or a published one shared with it. */
+const loadPricingFamily = async (tx: DbLike, companyId: string, familyId: string): Promise<ProductFamilyDetail> => {
+  const family = await getProductFamilyDetail(tx, familyId)
   // A quote belongs to the supplier issuing it. It may be priced from that
   // company's own catalog, or from a PUBLISHED family that was shared with
   // the company, directly or through a chain (product_family_shares). A
@@ -325,655 +102,768 @@ export const priceQuotePosition = async (
   // X-Tenant-Id (ADR 0008), so a bypass here would let a super-admin acting
   // as company A attach an arbitrary company's family to a quote owned by A;
   // they must act as the supplier itself and pass this same check.
-  const isUsableFamily =
+  const usable =
     !!family &&
-    (family.family.supplierCompanyId === ctx.effectiveCompanyId ||
-      (family.family.isPublished && (await isFamilySharedWith(tx, family.family.id, ctx.effectiveCompanyId))))
-  if (!family || !isUsableFamily) {
+    (family.family.supplierCompanyId === companyId ||
+      (family.family.isPublished && (await isFamilySharedWith(tx, family.family.id, companyId))))
+  if (!family || !usable) {
     throw new QuoteValidationError('Product family not found or not visible')
   }
-  if (family.family.id !== keepFamilyId) {
-    await assertUsableForNewPositions(tx, ctx.effectiveCompanyId, family.family)
+  return family
+}
+
+/**
+ * New lines may only use a family that is in the quoting company's library and ready for
+ * invoicing; and no line (new or kept) may use one whose prices aren't valid today (Italian
+ * time) — an expired family has to be replaced by a newer version of it.
+ * @throws {QuoteValidationError} the family is out of the company's library, isn't ready for invoicing, or its price validity hasn't started yet or has ended
+ */
+const assertFamilyUsable = async (
+  tx: DbLike,
+  companyId: string,
+  family: ProductFamilyDetail['family'],
+  { isNew }: { isNew: boolean },
+): Promise<void> => {
+  if (isNew) {
+    if (!(await isProductFamilyInLibrary(tx, companyId, family.id))) {
+      throw new QuoteValidationError(`"${family.name}" is not in your company's library`)
+    }
+    if (!family.readyForInvoicing) {
+      throw new QuoteValidationError(`"${family.name}" is not ready for invoicing`)
+    }
   }
+  const validity = priceValidityStatus(family, priceValidityToday())
+  if (validity === 'upcoming') {
+    throw new QuoteValidationError(`The prices of "${family.name}" are valid from ${family.priceValidFrom}`)
+  }
+  if (validity === 'expired') {
+    throw new QuoteValidationError(
+      `The prices of "${family.name}" expired on ${family.priceValidTo}: switch to a newer version of it, or upload one`,
+    )
+  }
+}
+
+export interface CatalogLineInput {
+  productLineId: string
+  widthMm: number | null
+  heightMm: number | null
+  options: { characteristicId: string; subCharacteristicId: string }[]
+}
+
+export interface PricedCatalogLine {
+  /** €/pz: the line and each option, each after the discount and markup it is priced at. */
+  unitPrice: number
+  /** Per unit: the line's plus each option's. */
+  installationHours: number
+  unit: string
+  lineName: string
+  minApplied: boolean
+  options: { characteristicId: string; subCharacteristicId: string; name: string; value: string }[]
+  /** How `unitPrice` was reached: the line's and each option's price before discount and markup, and the ones applied to it. */
+  breakdown: {
+    line: { basePrice: number; discountPct: number; markupPct: number }
+    options: { basePrice: number; discountPct: number; markupPct: number }[]
+  }
+}
+
+type ShareItems = Awaited<ReturnType<typeof getIncomingShareItems>>
+
+/**
+ * What the family's share gives the company, loaded once per loaded family (callers load each
+ * family once per request), not once per line.
+ */
+const shareItemsCache = new WeakMap<ProductFamilyDetail, Map<string, Promise<ShareItems>>>()
+const shareItemsFor = (tx: DbLike, companyId: string, family: ProductFamilyDetail): Promise<ShareItems> => {
+  let byCompany = shareItemsCache.get(family)
+  if (!byCompany) {
+    byCompany = new Map()
+    shareItemsCache.set(family, byCompany)
+  }
+  let items = byCompany.get(companyId)
+  if (!items) {
+    items = getIncomingShareItems(tx, companyId, family.family.id)
+    byCompany.set(companyId, items)
+  }
+  return items
+}
+
+/**
+ * The €/pz of one catalog line at its size with its options, with the shared costing engine
+ * (`@schuco/calculation`, the same code the catalog itself is priced with). The line and each
+ * option are priced at their own discount and markup: the share's when the family is shared
+ * with the company, otherwise the family's own (an option without its own takes the line's).
+ * @throws {QuoteValidationError} no size, a line/option not in the family, or the engine can't price it
+ */
+export const priceCatalogLine = async (
+  tx: DbLike,
+  companyId: string,
+  family: ProductFamilyDetail,
+  input: CatalogLineInput,
+): Promise<PricedCatalogLine> => {
   const line = family.lines.find((l) => l.id === input.productLineId)
   if (!line) {
     throw new QuoteValidationError('Product line not found in this family')
   }
-
+  if (!input.widthMm || !input.heightMm) {
+    throw new QuoteValidationError(`"${line.name}" needs a width and a height to be priced`)
+  }
+  const widthMm = input.widthMm
+  const heightMm = input.heightMm
   const matrixById = new Map(family.matrices.map((m) => [m.id, m]))
 
-  const selections = input.characteristicSelections.map((selection) => {
+  const selections = input.options.map((selection) => {
     const main = family.characteristics.find((c) => c.id === selection.characteristicId && !c.parentId)
     const sub = family.characteristics.find(
       (c) => c.id === selection.subCharacteristicId && c.parentId === selection.characteristicId,
     )
     if (!main || !sub) {
-      throw new QuoteValidationError(
-        `Characteristic selection ${selection.characteristicId}/${selection.subCharacteristicId} not found in this family`,
-      )
+      throw new QuoteValidationError(`Option ${selection.characteristicId}/${selection.subCharacteristicId} not found in this family`)
     }
-    return { selection, main, sub }
+    return { main, sub }
   })
+
   // On a family shared with this company, each line and option starts at what the share gives it
   // (discount, markup, installation hours) instead of the family's own values; one the share has
   // no values for keeps the family's.
-  const shareItems =
-    family.family.supplierCompanyId === ctx.effectiveCompanyId
-      ? null
-      : await getIncomingShareItems(tx, ctx.effectiveCompanyId, family.family.id)
+  const shareItems = family.family.supplierCompanyId === companyId ? null : await shareItemsFor(tx, companyId, family)
   const lineShare = shareItems?.get(line.id)
   const lineHours = lineShare?.installationHours ?? Number(line.installationHoursPerUnit ?? 0)
-  // The position's installation hours: the line's, plus what each chosen option adds (v2 options
-  // have their own "Ore di posa"). An "Ore di posa x [€/h]" option is priced on these hours; the
-  // line's own formula keeps the line's hours, so labour isn't charged on both.
+  // The line's installation hours plus what each chosen option adds (v2 options have their own
+  // "Ore di posa"). An "Ore di posa x [€/h]" option is priced on these hours; the line's own
+  // formula keeps the line's hours, so labour isn't charged on both.
   const installationHours =
     lineHours +
-    selections.reduce(
-      (sum, { sub }) => sum + (shareItems?.get(sub.id)?.installationHours ?? Number(sub.installationHoursPerUnit ?? 0)),
-      0,
-    )
+    selections.reduce((sum, { sub }) => sum + (shareItems?.get(sub.id)?.installationHours ?? Number(sub.installationHoursPerUnit ?? 0)), 0)
 
-  const linePricingMode = input.pricingMode === 'manual' ? 'manual' : 'auto'
+  const lineMatrix = line.pricingMatrixId ? matrixById.get(line.pricingMatrixId) : undefined
+  if (line.pricingMatrixId && !lineMatrix) {
+    throw new QuoteValidationError('Line references a pricing matrix that no longer exists')
+  }
   let lineBasePrice: number
-  let lineMinApplied = false
-  if (linePricingMode === 'manual') {
-    // Manual mode never reads the line's matrix/formula — a deleted/invalid
-    // matrix on this line must not block a manual override that doesn't
-    // need it at all (checked only in the 'auto' branch below).
-    if (!isNonNegativeFinite(input.manualUnitPrice)) {
-      throw new QuoteValidationError('manualUnitPrice must be a non-negative number when pricingMode is "manual"')
-    }
-    lineBasePrice = input.manualUnitPrice
-  } else {
-    const lineMatrix = line.pricingMatrixId ? matrixById.get(line.pricingMatrixId) : undefined
-    if (line.pricingMatrixId && !lineMatrix) {
-      throw new QuoteValidationError('Line references a pricing matrix that no longer exists')
-    }
-    try {
-      const lineCost = computeLinePrice(
-        {
-          value: Number(line.value),
-          formula: line.formula,
-          pricingMatrix: lineMatrix ? asMatrix(lineMatrix.widths, lineMatrix.heights, lineMatrix.matrix) : null,
-          minValue: line.minValue == null ? null : Number(line.minValue),
-          installationHoursPerUnit: lineHours,
-          discountPct: 0,
-          markupPct: 100,
-        },
-        input.widthMm,
-        input.heightMm,
-      )
-      lineBasePrice = lineCost.basePrice
-      lineMinApplied = lineCost.minApplied
-    } catch (error) {
-      throw new QuoteValidationError(
-        `Could not price this line at ${input.widthMm}x${input.heightMm}mm: ${(error as Error).message}`,
-      )
-    }
+  let minApplied = false
+  try {
+    const lineCost = computeLinePrice(
+      {
+        value: Number(line.value),
+        formula: line.formula,
+        pricingMatrix: lineMatrix ? asMatrix(lineMatrix.widths, lineMatrix.heights, lineMatrix.matrix) : null,
+        minValue: line.minValue == null ? null : Number(line.minValue),
+        installationHoursPerUnit: lineHours,
+        discountPct: 0,
+        markupPct: 100,
+      },
+      widthMm,
+      heightMm,
+    )
+    lineBasePrice = lineCost.basePrice
+    minApplied = lineCost.minApplied
+  } catch (error) {
+    throw new QuoteValidationError(`Could not price "${line.name}" at ${widthMm}x${heightMm}mm: ${(error as Error).message}`)
   }
 
-  // Only defaults: always overridable via input.
-  const discountPct = input.discountPct ?? lineShare?.discountPct ?? Number(line.discountPct ?? 0)
-  const extraMarkupPct = input.extraMarkupPct ?? lineShare?.markupPct ?? Number(line.markupPct ?? 100)
-  if (discountPct < 0 || discountPct > 100) {
-    throw new QuoteValidationError('discountPct must be between 0 and 100')
-  }
-  if (extraMarkupPct < 0 || extraMarkupPct > 10000) {
-    throw new QuoteValidationError('extraMarkupPct must be between 0 and 10000')
-  }
-  const descriptionParts = [line.name]
-  let characteristicsBasePrice = 0
-  let characteristicsFinalPrice = 0
-  const characteristicRows: PricedPosition['characteristicRows'] = []
+  const discountPct = lineShare?.discountPct ?? Number(line.discountPct ?? 0)
+  const markupPct = lineShare?.markupPct ?? Number(line.markupPct ?? 100)
+  let unitPrice = lineBasePrice * (1 - discountPct / 100) * (markupPct / 100)
+  const optionPrices: PricedCatalogLine['breakdown']['options'] = []
 
-  for (const { selection, main, sub } of selections) {
-    const subPricingMode = selection.pricingMode === 'manual' ? 'manual' : 'auto'
-    let subPrice: number
-    let subMinApplied = false
-    if (subPricingMode === 'manual') {
-      if (!isNonNegativeFinite(selection.manualUnitPrice)) {
-        throw new QuoteValidationError(
-          `manualUnitPrice must be a non-negative number for "${main.name}: ${sub.name}" when its pricingMode is "manual"`,
+  for (const { main, sub } of selections) {
+    const subMatrix = sub.pricingMatrixId ? matrixById.get(sub.pricingMatrixId) : undefined
+    if (sub.pricingMatrixId && !subMatrix) {
+      throw new QuoteValidationError('Selected option references a pricing matrix that no longer exists')
+    }
+    let subPrice = 0
+    // An option with no formula/value and no matrix is a free/included option (e.g. a default
+    // color) — costs nothing, same as the reference workbook's blank-price rows.
+    if (subMatrix || sub.formula) {
+      try {
+        const result = computeCharacteristicPrice(
+          {
+            value: sub.value == null ? 0 : Number(sub.value),
+            formula: sub.formula ?? 'valore',
+            pricingMatrix: subMatrix ? asMatrix(subMatrix.widths, subMatrix.heights, subMatrix.matrix) : null,
+            minValue: sub.minValue == null ? null : Number(sub.minValue),
+            installationHoursPerUnit: installationHours,
+            discountPct: 0,
+            markupPct: 100,
+          },
+          widthMm,
+          heightMm,
+          lineBasePrice,
         )
-      }
-      subPrice = selection.manualUnitPrice
-    } else {
-      const subMatrix = sub.pricingMatrixId ? matrixById.get(sub.pricingMatrixId) : undefined
-      if (sub.pricingMatrixId && !subMatrix) {
-        throw new QuoteValidationError('Selected option references a pricing matrix that no longer exists')
-      }
-
-      subPrice = 0
-      // A characteristic sub-value with no formula/value and no matrix is a
-      // free/included option (e.g. a default color) — costs nothing, same as
-      // the reference workbook's blank-price rows.
-      if (subMatrix || sub.formula) {
-        try {
-          const result = computeCharacteristicPrice(
-            {
-              value: sub.value == null ? 0 : Number(sub.value),
-              formula: sub.formula ?? 'valore',
-              pricingMatrix: subMatrix ? asMatrix(subMatrix.widths, subMatrix.heights, subMatrix.matrix) : null,
-              minValue: sub.minValue == null ? null : Number(sub.minValue),
-              installationHoursPerUnit: installationHours,
-              discountPct: 0,
-              markupPct: 100,
-            },
-            input.widthMm,
-            input.heightMm,
-            lineBasePrice,
-          )
-          subPrice = result.basePrice
-          subMinApplied = result.minApplied
-        } catch (error) {
-          throw new QuoteValidationError(`Could not price "${main.name}: ${sub.name}": ${(error as Error).message}`)
-        }
+        subPrice = result.basePrice
+        minApplied ||= result.minApplied
+      } catch (error) {
+        throw new QuoteValidationError(`Could not price "${main.name}: ${sub.name}": ${(error as Error).message}`)
       }
     }
-
     // An option has its own discount and markup when the share gives it some, or (v2) the family
-    // does; otherwise the position's apply to it.
+    // does; otherwise the line's apply to it.
     const optionShare = shareItems?.get(sub.id)
     const ownDiscountPct = optionShare?.discountPct ?? (sub.discountPct == null ? null : Number(sub.discountPct))
     const ownMarkupPct = optionShare?.markupPct ?? (sub.markupPct == null ? null : Number(sub.markupPct))
-    const effectiveDiscountPct = ownDiscountPct ?? discountPct
-    const effectiveMarkupPct = ownMarkupPct ?? extraMarkupPct
-    const finalUnitPrice = subPrice * (1 - effectiveDiscountPct / 100) * (effectiveMarkupPct / 100)
-    characteristicsBasePrice += subPrice
-    characteristicsFinalPrice += finalUnitPrice
-    characteristicRows.push({
-      characteristicId: main.id,
-      subCharacteristicId: sub.id,
-      characteristicName: main.name,
-      subCharacteristicName: sub.name,
-      price: subPrice,
-      pricingMode: subPricingMode,
-      manualUnitPrice: subPricingMode === 'manual' ? (selection.manualUnitPrice as number) : null,
-      discountPct: ownDiscountPct,
-      markupPct: ownMarkupPct,
-      effectiveDiscountPct,
-      effectiveMarkupPct,
-      finalUnitPrice,
-      minApplied: subMinApplied,
-    })
-    descriptionParts.push(`${main.name}: ${sub.name}`)
+    const option = { basePrice: subPrice, discountPct: ownDiscountPct ?? discountPct, markupPct: ownMarkupPct ?? markupPct }
+    optionPrices.push(option)
+    unitPrice += option.basePrice * (1 - option.discountPct / 100) * (option.markupPct / 100)
   }
-
-  const totalM2 = (input.widthMm * input.heightMm * input.quantity) / 1_000_000
-  const basePricePerUnit = lineBasePrice + characteristicsBasePrice
-  const basePrice = basePricePerUnit * input.quantity
-  // The line at the position's discount/markup, each option at its own (or the position's).
-  const lineFinalUnitPrice = lineBasePrice * (1 - discountPct / 100) * (extraMarkupPct / 100)
-  const finalPrice = (lineFinalUnitPrice + characteristicsFinalPrice) * input.quantity
 
   return {
-    family,
-    line,
-    linePricingMode,
-    lineManualUnitPrice: linePricingMode === 'manual' ? (input.manualUnitPrice as number) : null,
-    lineUnitPrice: lineBasePrice,
-    lineFinalUnitPrice,
-    lineMinApplied,
+    unitPrice: Math.round(unitPrice * 10_000) / 10_000,
     installationHours,
-    description: input.description?.trim() || descriptionParts.join(' — '),
-    discountPct,
-    extraMarkupPct,
-    totalM2,
-    basePrice,
-    finalPrice,
-    characteristicRows,
+    unit: line.unitSymbol,
+    lineName: line.name,
+    minApplied,
+    options: selections.map(({ main, sub }) => ({
+      characteristicId: main.id,
+      subCharacteristicId: sub.id,
+      name: main.name,
+      value: sub.name,
+    })),
+    breakdown: { line: { basePrice: lineBasePrice, discountPct, markupPct }, options: optionPrices },
   }
 }
 
-export interface QuotePositionPreview {
-  totalM2: number
-  basePrice: number
-  finalPrice: number
-  discountPct: number
-  extraMarkupPct: number
-  /** The line's own €/unit price computed under whichever pricingMode the input asked for — lets the form show "here's what auto computed" in the disabled field, same number `addQuotePosition` would store. */
-  lineUnitPrice: number
-  /** The line's €/unit after the position's discount and markup. */
-  lineFinalUnitPrice: number
-  /** `lineUnitPrice` is the line's minimum (MinValue): its table/formula gave less. */
-  lineMinApplied: boolean
-  /** Installation hours per unit: the line's plus each chosen option's. */
-  installationHours: number
-  /**
-   * `price` is per unit, pre-discount/markup — same basis `addQuotePosition` stores per characteristic row (each
-   * already reflects that selection's own pricingMode); `finalUnitPrice` is after the discount and markup it is
-   * priced at (its own, or the position's).
-   */
-  characteristics: {
-    characteristicId: string
-    subCharacteristicId: string
-    price: number
-    discountPct: number
-    markupPct: number
-    finalUnitPrice: number
-    minApplied: boolean
-  }[]
+/**
+ * The catalog €/pz of each line, as a save would store it — for the builder's live prices. A
+ * line that can't be priced gets its error instead; the others are still priced.
+ */
+export const priceQuoteLines = (ctx: TenantContext, input: PriceLinesRequest): Promise<PricedLine[]> =>
+  withTenantDb(ctx, async (tx) => {
+    const families = new Map<string, Promise<ProductFamilyDetail>>()
+    const loadFamily = (id: string) => {
+      if (!families.has(id)) {
+        families.set(
+          id,
+          loadPricingFamily(tx, ctx.effectiveCompanyId, id).then(async (family) => {
+            await assertFamilyUsable(tx, ctx.effectiveCompanyId, family.family, { isNew: false })
+            return family
+          }),
+        )
+      }
+      return families.get(id)!
+    }
+    const results: PricedLine[] = []
+    // One at a time: they share the transaction's single connection.
+    for (const line of input.lines) {
+      try {
+        const family = await loadFamily(line.productFamilyId)
+        const priced = await priceCatalogLine(tx, ctx.effectiveCompanyId, family, line)
+        results.push({
+          key: line.key,
+          ok: true,
+          unitPrice: priced.unitPrice,
+          installationHours: priced.installationHours,
+          unit: priced.unit,
+          minApplied: priced.minApplied,
+        })
+      } catch (error) {
+        if (!(error instanceof QuoteValidationError)) throw error
+        results.push({ key: line.key, ok: false, error: error.message })
+      }
+    }
+    return results
+  })
+
+// ── Reading ───────────────────────────────────────────────────────────────────
+
+const toSummary = (quote: QuoteRow): QuoteSummary => ({
+  id: quote.id,
+  reference: quote.reference,
+  status: quote.status,
+  customerName: quote.customerName,
+  projectLocation: quote.projectLocation,
+  totalPrice: quote.totalPrice,
+  latestVersion: quote.latestVersion,
+  createdAt: quote.createdAt.toISOString(),
+  updatedAt: quote.updatedAt.toISOString(),
+})
+
+const toVersion = (row: QuoteVersionWithUsers): QuoteVersion => ({
+  id: row.id,
+  quoteId: row.quoteId,
+  version: row.version,
+  status: row.status,
+  revision: row.revision,
+  document: quoteDocumentSchema.parse(row.document),
+  totalPrice: row.totalPrice,
+  createdBy: row.createdByUserId ? { id: row.createdByUserId, name: row.createdByName } : null,
+  updatedBy: row.updatedByUserId ? { id: row.updatedByUserId, name: row.updatedByName } : null,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
+  sentAt: row.sentAt?.toISOString() ?? null,
+})
+
+const catalogFamilyIds = (document: QuoteDocument): string[] => [
+  ...new Set(document.families.map((family) => family.productFamilyId).filter((id): id is string => id !== null)),
+]
+
+/**
+ * Whether each catalog family the document uses can still price it, and for one that can't
+ * (expired, or no longer published), the newest version of it the company could quote from today.
+ */
+const familyStatuses = async (tx: DbLike, companyId: string, document: QuoteDocument): Promise<QuoteFamilyStatus[]> => {
+  const ids = catalogFamilyIds(document)
+  if (ids.length === 0) return []
+  const today = priceValidityToday()
+  const chains = await listProductFamilyVersionsOfChains(tx, ids)
+  type ChainFamily = NonNullable<Awaited<ReturnType<typeof getProductFamilyById>>>
+  type Candidate = NonNullable<ReturnType<typeof chains.get>>[number]
+  const rows: { family: ChainFamily | Candidate; status: QuoteFamilyStatus['status']; candidates: Candidate[] }[] = []
+  for (const id of ids) {
+    const family = (chains.get(id) ?? []).find((f) => f.id === id) ?? (await getProductFamilyById(tx, id))
+    if (!family) continue
+    const validity = priceValidityStatus(family, today)
+    const status: QuoteFamilyStatus['status'] =
+      validity !== 'current' ? validity : family.supplierCompanyId !== companyId && !family.isPublished ? 'unpublished' : 'current'
+    // Newest first: the versions after it that could price the quote today.
+    const candidates =
+      status === 'expired' || status === 'unpublished'
+        ? (chains.get(id) ?? [])
+            .filter(
+              (f) =>
+                f.version > family.version &&
+                f.readyForInvoicing &&
+                priceValidityStatus(f, today) === 'current' &&
+                (f.supplierCompanyId === companyId || f.isPublished),
+            )
+            .reverse()
+        : []
+    rows.push({ family, status, candidates })
+  }
+
+  // Whether each candidate is in the company's library and reaches it: one query each for all of them.
+  const candidateIds = [...new Set(rows.flatMap((row) => row.candidates.map((c) => c.id)))]
+  const hidden = await listFamiliesHiddenFromLibrary(tx, companyId, candidateIds)
+  const shared = await listFamiliesSharedWith(
+    tx,
+    candidateIds.filter((id) => rows.some((row) => row.candidates.some((c) => c.id === id && c.supplierCompanyId !== companyId))),
+    companyId,
+  )
+  return rows.map(({ family, status, candidates }) => {
+    const usable = candidates.find((c) => !hidden.has(c.id) && (c.supplierCompanyId === companyId || shared.has(c.id)))
+    return {
+      productFamilyId: family.id,
+      name: family.name,
+      version: family.version,
+      status,
+      priceValidTo: family.priceValidTo,
+      replacement: usable ? { id: usable.id, version: usable.version, name: usable.name } : null,
+    }
+  })
+}
+
+const loadDetail = async (
+  tx: DbLike,
+  companyId: string,
+  quote: QuoteRow,
+  versionNumber: number,
+): Promise<SalesQuoteDetailResponse | null> => {
+  const version = await getQuoteVersion(tx, quote.id, versionNumber)
+  if (!version) return null
+  const dto = toVersion(version)
+  return {
+    quote: toSummary(quote),
+    versions: (await listQuoteVersions(tx, quote.id)).map((v) => ({
+      id: v.id,
+      version: v.version,
+      status: v.status,
+      totalPrice: v.totalPrice,
+      updatedAt: v.updatedAt.toISOString(),
+    })),
+    version: dto,
+    familyStatus: await familyStatuses(tx, companyId, dto.document),
+  }
+}
+
+export const listMyQuotes = (ctx: TenantContext): Promise<QuoteSummary[]> =>
+  withTenantDb(ctx, async (tx) => (await listQuotes(tx, ctx.effectiveCompanyId)).map(toSummary))
+
+/** A quote with one of its versions (the latest by default); null when the quote or the version doesn't exist or isn't visible. */
+export const getQuote = (ctx: TenantContext, quoteId: string, versionNumber?: number): Promise<SalesQuoteDetailResponse | null> =>
+  withTenantDb(ctx, async (tx) => {
+    const quote = await getQuoteRow(tx, quoteId)
+    if (!quote) return null
+    return loadDetail(tx, ctx.effectiveCompanyId, quote, versionNumber ?? quote.latestVersion)
+  })
+
+// ── Creating ──────────────────────────────────────────────────────────────────
+
+/** The payment plan and activities a new quote starts from (the client's defaults; all editable). */
+const DEFAULT_PAYMENTS: [string, number][] = [
+  ['Acconto alla firma del contratto', 30],
+  ['Stato avanzamento lavori (SAL)', 40],
+  ['Saldo a completamento lavori', 30],
+]
+const DEFAULT_ACTIVITIES: [string, boolean][] = [
+  ['Fornitura materiali', true],
+  ['Posa in opera', true],
+  ['Rimozione infissi esistenti', true],
+  ['Opere murarie di contorno', true],
+  ['Trasporto e logistica', true],
+  ['Collaudo e verifica finale', true],
+  ['Pulizia del cantiere', true],
+  ['Progettazione esecutiva', false],
+  ['Assistenza post-vendita', false],
+  ['Documentazione tecnica', false],
+]
+
+/** The blocks a new quote's closing starts with, in the client's order. */
+/** Replit's opening letter, signed generically (the sales contact and branch already head the print). */
+const DEFAULT_INTRO_HTML = [
+  '<p>Gentile Cliente,</p><p></p>',
+  "<p>come anticipato, abbiamo il piacere di sottoporLe la nostra proposta per la fornitura dei serramenti relativi all'immobile indicato, elaborata a seguito di un'attenta analisi delle Sue esigenze e delle caratteristiche specifiche dell'abitazione.</p><p></p>",
+  '<p>Il nostro intervento prevede una gestione diretta e completa di ogni fase del lavoro, dalla fornitura alla posa in opera, svolta nel pieno rispetto delle normative vigenti e secondo elevati standard qualitativi.</p><p></p>',
+  '<p>Al termine dell\'installazione Le verrà consegnata tutta la documentazione tecnica necessaria, pensata per accompagnarLa nel tempo nella corretta gestione e manutenzione dei serramenti.</p><p></p>',
+  '<p>Restiamo a Sua completa disposizione per qualsiasi chiarimento o approfondimento e saremo lieti di affiancarLa con attenzione e professionalità nelle successive fasi del progetto.</p><p></p>',
+  '<p>Cordiali saluti</p>',
+].join('')
+
+const DEFAULT_CLOSING_PRE_HTML = "<p>Validità dell'offerta: 30 giorni dalla data di emissione</p>"
+
+/** Replit's closing conditions; the payment split lives in the payment plan block, so it is not repeated here. */
+const DEFAULT_CLOSING_POST_HTML = [
+  '<p>IVA: Da definire</p><p></p>',
+  '<p>Eventuali forniture parziali/anticipate dovranno essere saldate ad avviso merce pronta o alla consegna (SAL), a seconda della tipologia di prodotti.</p><p></p>',
+  '<p>Detrazioni fiscali Ecobonus o Casa Bonus a seconda del tipo di intervento edilizio e regime fiscale.</p><p></p>',
+  "<p>Qualora il contratto non si perfezioni, per circostanze riferibili al Cliente e/o ai soggetti terzi da questi incaricati (imprese, professionisti, etc.), l'acconto versato verrà trattenuto dal Fornitore a titolo di penale e a copertura delle spese sostenute per le attività di pianificazione, organizzazione, studio e verifica tecnica.</p><p></p>",
+  '<p>Firma del Cliente per accettazione</p><p></p>',
+  '<p>Luogo e Data _________________</p><p>Nome e Cognome _________________</p><p>Firma _________________</p><p></p>',
+  "<p>Il Cliente conferma di accettare espressamente la trattenuta dell'acconto da parte del Fornitore, in caso di mancato perfezionamento del contratto di fornitura.</p><p></p>",
+  '<p>Firma _________________</p><p></p>',
+  '<p>Costituiscono parte integrante della presente offerta i seguenti documenti:</p>',
+  '<ul><li><p>Informativa relativa al trattamento dei dati personali;</p></li><li><p>Condizioni generali di fornitura;</p></li><li><p>Dichiarazione di responsabilità per applicazione IVA agevolata (se pertinente);</p></li></ul>',
+].join('')
+
+const defaultClosing = (): ClosingBlock[] => [
+  { id: 'c-text-1', type: 'text', html: DEFAULT_CLOSING_PRE_HTML },
+  { id: 'c-families', type: 'familySummary' },
+  { id: 'c-categories', type: 'categorySummary' },
+  { id: 'c-total', type: 'total' },
+  {
+    id: 'c-payments',
+    type: 'payments',
+    rows: DEFAULT_PAYMENTS.map(([description, pct], index) => ({ id: `pag-${index + 1}`, description, pct })),
+  },
+  {
+    id: 'c-activities',
+    type: 'activities',
+    rows: DEFAULT_ACTIVITIES.map(([description, included], index) => ({ id: `att-${index + 1}`, description, included, enabled: true })),
+  },
+  { id: 'c-text-2', type: 'text', html: DEFAULT_CLOSING_POST_HTML },
+]
+
+/** Creates a draft quote whose first version has no families yet but Replit's default texts, payments and activities, the caller as its sales contact and their branch (their first) heading it. */
+export const createQuote = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  input: CreateSalesQuoteRequest,
+): Promise<SalesQuoteDetailResponse> =>
+  withTenantDb(ctx, async (tx) => {
+    const units = await listBusinessUnitsWithUsers(tx, ctx.effectiveCompanyId, { withLogos: false })
+    const document: QuoteDocument = {
+      header: {
+        customerName: input.header.customerName,
+        customerFiscalCode: input.header.customerFiscalCode,
+        customerAddress: input.header.customerAddress,
+        customerCity: input.header.customerCity,
+        projectLocation: input.header.projectLocation,
+        quoteDate: input.header.quoteDate ?? priceValidityToday(),
+        notes: input.header.notes ?? '',
+      },
+      intro: [{ id: 'm-1', html: DEFAULT_INTRO_HTML }],
+      families: [],
+      closing: defaultClosing(),
+      printSettings: {
+        ...defaultQuotePrintSettings,
+        salesContactUserId: actor.actorUserId,
+        businessUnitId: (units.find((unit) => unit.userIds.includes(actor.actorUserId)) ?? units[0])?.id ?? null,
+      },
+    }
+    // Insert from an explicit allowlist — never spread the request body (see the route).
+    const quoteId = await insertQuote(tx, {
+      supplierCompanyId: ctx.effectiveCompanyId,
+      createdByUserId: actor.actorUserId,
+      reference: input.reference,
+      customerName: document.header.customerName,
+      projectLocation: document.header.projectLocation,
+      totalPrice: '0.00',
+    })
+    const version = await insertQuoteVersion(tx, {
+      quoteId,
+      version: 1,
+      status: 'draft',
+      document,
+      totalPrice: '0.00',
+      createdByUserId: actor.actorUserId,
+    })
+    await insertQuoteRevision(tx, {
+      quoteVersionId: version.id,
+      revision: 1,
+      document,
+      totalPrice: '0.00',
+      changes: [],
+      fromVersion: null,
+      savedByUserId: actor.actorUserId,
+    })
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: 'quote.create',
+      resourceType: 'quote',
+      resourceId: quoteId,
+      metadata: { reference: input.reference },
+    })
+    const quote = await getQuoteRow(tx, quoteId)
+    return (await loadDetail(tx, ctx.effectiveCompanyId, quote!, 1))!
+  })
+
+// ── Saving ────────────────────────────────────────────────────────────────────
+
+/**
+ * The document as it will be stored: rich text sanitized, and every catalog line checked
+ * against its family and (unless its price was typed in) repriced from the catalog, with the
+ * option names as the catalog has them. Families the version didn't have before must also be
+ * in the company's library and ready for invoicing.
+ * @throws {QuoteValidationError} an unusable family, a line or option not in its family, or a line the engine can't price
+ */
+const prepareDocument = async (
+  tx: DbLike,
+  companyId: string,
+  document: QuoteDocument,
+  previous: QuoteDocument,
+): Promise<QuoteDocument> => {
+  const knownFamilyIds = new Set(catalogFamilyIds(previous))
+  const families: QuoteDocument['families'] = []
+  for (const family of document.families) {
+    if (!family.productFamilyId) {
+      if (family.lines.some((line) => line.productLineId !== null || line.priceMode !== 'manual')) {
+        throw new QuoteValidationError(`"${family.name}" is not from the catalog, so its lines need their own price`)
+      }
+      families.push(family)
+      continue
+    }
+    const detail = await loadPricingFamily(tx, companyId, family.productFamilyId)
+    await assertFamilyUsable(tx, companyId, detail.family, { isNew: !knownFamilyIds.has(family.productFamilyId) })
+    const lines: QuoteDocument['families'][number]['lines'] = []
+    for (const line of family.lines) {
+      if (!line.productLineId) {
+        if (line.priceMode !== 'manual') {
+          throw new QuoteValidationError(`"${line.name}" is not from the catalog, so it needs its own price`)
+        }
+        lines.push(line)
+        continue
+      }
+      if (line.priceMode === 'manual') {
+        if (!detail.lines.some((l) => l.id === line.productLineId)) {
+          throw new QuoteValidationError(`"${line.name}" is not a line of "${detail.family.name}"`)
+        }
+        lines.push(line)
+        continue
+      }
+      const priced = await priceCatalogLine(tx, companyId, detail, { ...line, productLineId: line.productLineId })
+      lines.push({ ...line, unitPrice: priced.unitPrice, options: priced.options })
+    }
+    families.push({ ...family, lines })
+  }
+  return {
+    ...document,
+    intro: document.intro.map((module) => ({ ...module, html: sanitizeRichText(module.html) })),
+    families,
+    closing: document.closing.map((block) => (block.type === 'text' ? { ...block, html: sanitizeRichText(block.html) } : block)),
+  }
+}
+
+const mirrorLatest = (tx: DbLike, quoteId: string, latestVersion: number, status: QuoteStatus, document: QuoteDocument, totalPrice: string) =>
+  updateQuoteSummary(tx, quoteId, {
+    status,
+    customerName: document.header.customerName,
+    projectLocation: document.header.projectLocation,
+    totalPrice,
+    latestVersion,
+  })
+
+/**
+ * Saves the builder's document. `update` fixes the version in place as its next revision (a
+ * draft only); `newVersion` stores it as the quote's next version, a draft, and leaves this one
+ * as it was. Either way the full document and what changed are kept in the history.
+ * @throws {QuoteValidationError} no such version, a non-draft fixed in place, or an invalid document
+ * @throws {QuoteConflictError} someone saved the version after `baseRevision`
+ */
+export const saveQuoteVersion = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  quoteId: string,
+  versionId: string,
+  input: SaveQuoteRequest,
+): Promise<SalesQuoteDetailResponse> =>
+  withTenantDb(ctx, async (tx) => {
+    const quote = await lockQuote(tx, quoteId)
+    if (!quote) throw new QuoteValidationError('Quote not found')
+    const version = await getQuoteVersionById(tx, quoteId, versionId)
+    if (!version) throw new QuoteValidationError('Version not found')
+    if (version.revision !== input.baseRevision) {
+      throw new QuoteConflictError('This version was saved by someone else in the meantime: reload it to see their changes')
+    }
+    if (input.mode === 'update' && !isEditableQuoteStatus(version.status)) {
+      throw new QuoteValidationError(`Version ${version.version} was ${version.status}: save your changes as a new version`)
+    }
+    const previous = quoteDocumentSchema.parse(version.document)
+    const document = await prepareDocument(tx, ctx.effectiveCompanyId, input.document, previous)
+    const totalPrice = quoteTotal(document).toFixed(2)
+    const changes: QuoteChange[] = diffQuoteDocuments(previous, document)
+
+    let savedVersion: number
+    if (input.mode === 'update') {
+      const saved = await updateQuoteVersionDocument(tx, version.id, input.baseRevision, {
+        document,
+        totalPrice,
+        updatedByUserId: actor.actorUserId,
+      })
+      if (!saved) throw new QuoteConflictError('This version was saved by someone else in the meantime: reload it to see their changes')
+      await insertQuoteRevision(tx, {
+        quoteVersionId: version.id,
+        revision: input.baseRevision + 1,
+        document,
+        totalPrice,
+        changes,
+        fromVersion: null,
+        savedByUserId: actor.actorUserId,
+      })
+      savedVersion = version.version
+      if (version.version === quote.latestVersion) {
+        await mirrorLatest(tx, quoteId, quote.latestVersion, version.status, document, totalPrice)
+      }
+    } else {
+      savedVersion = quote.latestVersion + 1
+      const created = await insertQuoteVersion(tx, {
+        quoteId,
+        version: savedVersion,
+        status: 'draft',
+        document,
+        totalPrice,
+        createdByUserId: actor.actorUserId,
+      })
+      await insertQuoteRevision(tx, {
+        quoteVersionId: created.id,
+        revision: 1,
+        document,
+        totalPrice,
+        changes,
+        fromVersion: version.version,
+        savedByUserId: actor.actorUserId,
+      })
+      await mirrorLatest(tx, quoteId, savedVersion, 'draft', document, totalPrice)
+    }
+
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: input.mode === 'update' ? 'quote.save' : 'quote.new_version',
+      resourceType: 'quote',
+      resourceId: quoteId,
+      metadata: { version: savedVersion, fromVersion: input.mode === 'update' ? undefined : version.version, changes: changes.length },
+    })
+    const fresh = await getQuoteRow(tx, quoteId)
+    return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, savedVersion))!
+  })
+
+/** Allowed status changes: a draft is sent; a sent version is accepted or rejected (or sent again after being reopened is not possible — make a new version). */
+const NEXT_STATUSES: Record<QuoteStatus, QuoteStatus[]> = {
+  draft: ['sent'],
+  sent: ['accepted', 'rejected'],
+  accepted: ['rejected'],
+  rejected: ['accepted'],
 }
 
 /**
- * Dry-run pricing — same computation as `addQuotePosition`/`updateQuotePosition`,
- * but writes nothing. Lets the quote builder show a live "estimated price"
- * as the sales user edits width/height/qty/characteristics/discount/manual
- * values, without creating or changing a real position on every keystroke.
- * @throws {QuoteValidationError} bad input, or the family/line/characteristic isn't visible to the caller
+ * Marks a version sent, accepted or rejected. A draft can only be sent while all of its catalog
+ * families have prices valid today and are published (an expired one must be replaced first).
+ * @throws {QuoteValidationError} no such version, a change that isn't allowed, or a family that can't price today
  */
-export const previewQuotePosition = async (
+export const setQuoteVersionStatusById = async (
   ctx: TenantContext,
-  input: AddQuotePositionInput,
-  /** When previewing an edit: the position, so its own family stays usable (see `priceQuotePosition`). */
-  editing?: { quoteId: string; positionId: string },
-): Promise<QuotePositionPreview> =>
+  actor: QuoteActor,
+  quoteId: string,
+  versionId: string,
+  status: QuoteStatus,
+): Promise<SalesQuoteDetailResponse> =>
   withTenantDb(ctx, async (tx) => {
-    const keepFamilyId = editing ? await getQuotePositionFamilyId(tx, editing.quoteId, editing.positionId) : null
-    const priced = await priceQuotePosition(ctx, tx, input, { keepFamilyId: keepFamilyId ?? undefined })
+    const quote = await lockQuote(tx, quoteId)
+    if (!quote) throw new QuoteValidationError('Quote not found')
+    const version = await getQuoteVersionById(tx, quoteId, versionId)
+    if (!version) throw new QuoteValidationError('Version not found')
+    if (!NEXT_STATUSES[version.status].includes(status)) {
+      throw new QuoteValidationError(`A ${version.status} version can't be marked ${status}`)
+    }
+    const document = quoteDocumentSchema.parse(version.document)
+    if (status === 'sent') {
+      const blocked = (await familyStatuses(tx, ctx.effectiveCompanyId, document)).find((family) => family.status !== 'current')
+      if (blocked) {
+        throw new QuoteValidationError(
+          blocked.status === 'expired'
+            ? `The prices of "${blocked.name}" expired on ${blocked.priceValidTo}: switch to a newer version of it, or upload one`
+            : blocked.status === 'upcoming'
+              ? `The prices of "${blocked.name}" are not valid yet`
+              : `"${blocked.name}" is no longer published: switch to a newer version of it, or upload one`,
+        )
+      }
+    }
+    await setQuoteVersionStatus(tx, version.id, {
+      status,
+      sentAt: status === 'sent' ? new Date() : version.sentAt,
+      updatedByUserId: actor.actorUserId,
+    })
+    if (version.version === quote.latestVersion) {
+      await mirrorLatest(tx, quoteId, quote.latestVersion, status, document, version.totalPrice)
+    }
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: 'quote.set_status',
+      resourceType: 'quote',
+      resourceId: quoteId,
+      metadata: { version: version.version, from: version.status, to: status },
+    })
+    const fresh = await getQuoteRow(tx, quoteId)
+    return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, version.version))!
+  })
+
+// ── History ───────────────────────────────────────────────────────────────────
+
+/** Every save of a version, newest first; null when the quote or version doesn't exist or isn't visible. */
+export const getQuoteRevisions = (ctx: TenantContext, quoteId: string, versionId: string): Promise<QuoteRevision[] | null> =>
+  withTenantDb(ctx, async (tx) => {
+    const version = await getQuoteVersionById(tx, quoteId, versionId)
+    if (!version) return null
+    return (await listQuoteRevisions(tx, version.id)).map((row) => ({
+      revision: row.revision,
+      savedAt: row.savedAt.toISOString(),
+      savedBy: row.savedByUserId ? { id: row.savedByUserId, name: row.savedByName } : null,
+      totalPrice: row.totalPrice,
+      changes: row.changes as QuoteChange[],
+      fromVersion: row.fromVersion,
+    }))
+  })
+
+/** One past save of a version, with its document; null when there is none. */
+export const getQuoteRevisionDetail = (
+  ctx: TenantContext,
+  quoteId: string,
+  versionId: string,
+  revision: number,
+): Promise<QuoteRevisionDetail | null> =>
+  withTenantDb(ctx, async (tx) => {
+    const version = await getQuoteVersionById(tx, quoteId, versionId)
+    if (!version) return null
+    const row = await getQuoteRevision(tx, version.id, revision)
+    if (!row) return null
     return {
-      totalM2: priced.totalM2,
-      basePrice: priced.basePrice,
-      finalPrice: priced.finalPrice,
-      discountPct: priced.discountPct,
-      extraMarkupPct: priced.extraMarkupPct,
-      lineUnitPrice: priced.lineUnitPrice,
-      lineFinalUnitPrice: priced.lineFinalUnitPrice,
-      lineMinApplied: priced.lineMinApplied,
-      installationHours: priced.installationHours,
-      characteristics: priced.characteristicRows.map((r) => ({
-        characteristicId: r.characteristicId,
-        subCharacteristicId: r.subCharacteristicId,
-        price: r.price,
-        discountPct: r.effectiveDiscountPct,
-        markupPct: r.effectiveMarkupPct,
-        finalUnitPrice: r.finalUnitPrice,
-        minApplied: r.minApplied,
-      })),
+      revision: row.revision,
+      savedAt: row.savedAt.toISOString(),
+      savedBy: row.savedByUserId ? { id: row.savedByUserId, name: row.savedByName } : null,
+      totalPrice: row.totalPrice,
+      changes: row.changes as QuoteChange[],
+      fromVersion: row.fromVersion,
+      document: quoteDocumentSchema.parse(row.document),
     }
   })
 
 /**
- * Adds one priced line item to a draft quote (see `priceQuotePosition`).
- * @throws {QuoteValidationError} bad input, or the family/line/characteristic isn't visible to the caller
- */
-export const addQuotePosition = async (
-  ctx: TenantContext,
-  actor: QuoteActor,
-  quoteId: string,
-  input: AddQuotePositionInput,
-): Promise<QuoteDetailWithValidity> =>
-  withTenantDb(ctx, async (tx) => {
-    const existingQuote = await getQuoteDetailQuery(tx, quoteId)
-    if (!existingQuote) {
-      throw new QuoteValidationError('Quote not found')
-    }
-
-    const priced = await priceQuotePosition(ctx, tx, input)
-
-    const positionCode = resolvePositionCode(existingQuote.positions, input.positionCode)
-    // Derived from the max of what's actually there, not positions.length —
-    // a remove-then-add must not reissue an already-used sortOrder.
-    const nextSortOrder = existingQuote.positions.reduce((max, p) => Math.max(max, p.sortOrder), -1) + 1
-    let positionId: string
-    try {
-      positionId = await insertQuotePosition(tx, {
-        quoteId,
-        productFamilyId: input.productFamilyId,
-        productLineId: input.productLineId,
-        productFamilyName: priced.family.family.name,
-        productLineName: priced.line.name,
-        positionCode,
-        quantity: input.quantity,
-        widthMm: String(input.widthMm),
-        heightMm: String(input.heightMm),
-        description: priced.description,
-        unitName: priced.line.unitName,
-        unitSymbol: priced.line.unitSymbol,
-        discountPct: String(priced.discountPct),
-        extraMarkupPct: String(priced.extraMarkupPct),
-        pricingMode: priced.linePricingMode,
-        lineManualUnitPrice: priced.lineManualUnitPrice == null ? null : String(priced.lineManualUnitPrice),
-        totalM2: priced.totalM2.toFixed(4),
-        basePrice: priced.basePrice.toFixed(2),
-        finalPrice: priced.finalPrice.toFixed(2),
-        sortOrder: nextSortOrder,
-      })
-    } catch (error) {
-      if (isPositionCodeConflict(error)) {
-        throw new QuoteValidationError(
-          `Position code "${positionCode}" is already used by another position in this quote`,
-        )
-      }
-      throw error
-    }
-
-    for (const row of priced.characteristicRows) {
-      await insertQuotePositionCharacteristic(tx, {
-        quotePositionId: positionId,
-        characteristicId: row.characteristicId,
-        subCharacteristicId: row.subCharacteristicId,
-        characteristicName: row.characteristicName,
-        subCharacteristicName: row.subCharacteristicName,
-        price: (row.price * input.quantity).toFixed(2),
-        pricingMode: row.pricingMode,
-        manualUnitPrice: row.manualUnitPrice == null ? null : String(row.manualUnitPrice),
-        discountPct: row.discountPct == null ? null : String(row.discountPct),
-        markupPct: row.markupPct == null ? null : String(row.markupPct),
-      })
-    }
-
-    await recalculateQuoteTotal(tx, quoteId)
-    await recordAuditEvent(
-      tx,
-      {
-        actorType: 'user',
-        actorUserId: actor.actorUserId,
-        actorCompanyId: actor.actorCompanyId,
-        requestId: actor.requestId,
-      },
-      ctx.effectiveCompanyId,
-      {
-        action: 'quote.add_position',
-        resourceType: 'quote',
-        resourceId: quoteId,
-        metadata: { positionCode, productLineId: input.productLineId },
-      },
-    )
-
-    const detail = await finalizeQuoteDetail(tx, quoteId)
-    return detail!
-  })
-
-/**
- * Re-prices an existing position in place (same positionCode/sortOrder) —
- * lets a sales user go back and change size/characteristics/manual prices
- * after the fact, instead of having to delete and re-add (see
- * `priceQuotePosition`).
- * @throws {QuoteValidationError} bad input, position not found in this quote, or the family/line/characteristic isn't visible to the caller
- */
-export const updateQuotePosition = async (
-  ctx: TenantContext,
-  actor: QuoteActor,
-  quoteId: string,
-  positionId: string,
-  input: AddQuotePositionInput,
-): Promise<QuoteDetailWithValidity> =>
-  withTenantDb(ctx, async (tx) => {
-    const existingQuote = await getQuoteDetailQuery(tx, quoteId)
-    if (!existingQuote) {
-      throw new QuoteValidationError('Quote not found')
-    }
-    const existingPosition = existingQuote.positions.find((p) => p.id === positionId)
-    if (!existingPosition) {
-      throw new QuoteValidationError('Position not found in this quote')
-    }
-
-    const priced = await priceQuotePosition(ctx, tx, input, { keepFamilyId: existingPosition.productFamilyId })
-    // Blank/omitted positionCode means "leave it alone" here (unlike
-    // addQuotePosition, where blank means "auto-assign the next one") —
-    // an edit must never silently renumber a position the caller didn't
-    // ask to rename. Only resolvePositionCode (uniqueness check) when an
-    // actual rename was requested.
-    const positionCode = input.positionCode?.trim()
-      ? resolvePositionCode(existingQuote.positions, input.positionCode, positionId)
-      : existingPosition.positionCode
-
-    try {
-      await updateQuotePositionQuery(tx, quoteId, positionId, {
-        productFamilyId: input.productFamilyId,
-        productLineId: input.productLineId,
-        productFamilyName: priced.family.family.name,
-        productLineName: priced.line.name,
-        positionCode,
-        quantity: input.quantity,
-        widthMm: String(input.widthMm),
-        heightMm: String(input.heightMm),
-        description: priced.description,
-        unitName: priced.line.unitName,
-        unitSymbol: priced.line.unitSymbol,
-        discountPct: String(priced.discountPct),
-        extraMarkupPct: String(priced.extraMarkupPct),
-        pricingMode: priced.linePricingMode,
-        lineManualUnitPrice: priced.lineManualUnitPrice == null ? null : String(priced.lineManualUnitPrice),
-        totalM2: priced.totalM2.toFixed(4),
-        basePrice: priced.basePrice.toFixed(2),
-        finalPrice: priced.finalPrice.toFixed(2),
-      })
-    } catch (error) {
-      if (isPositionCodeConflict(error)) {
-        throw new QuoteValidationError(
-          `Position code "${positionCode}" is already used by another position in this quote`,
-        )
-      }
-      throw error
-    }
-
-    // Replace, not merge — simplest way to guarantee stale selections from
-    // before this edit never linger (e.g. a characteristic the user
-    // deselected must not still have a row here).
-    await deleteQuotePositionCharacteristicsQuery(tx, positionId)
-    for (const row of priced.characteristicRows) {
-      await insertQuotePositionCharacteristic(tx, {
-        quotePositionId: positionId,
-        characteristicId: row.characteristicId,
-        subCharacteristicId: row.subCharacteristicId,
-        characteristicName: row.characteristicName,
-        subCharacteristicName: row.subCharacteristicName,
-        price: (row.price * input.quantity).toFixed(2),
-        pricingMode: row.pricingMode,
-        manualUnitPrice: row.manualUnitPrice == null ? null : String(row.manualUnitPrice),
-        discountPct: row.discountPct == null ? null : String(row.discountPct),
-        markupPct: row.markupPct == null ? null : String(row.markupPct),
-      })
-    }
-
-    await recalculateQuoteTotal(tx, quoteId)
-    await recordAuditEvent(
-      tx,
-      {
-        actorType: 'user',
-        actorUserId: actor.actorUserId,
-        actorCompanyId: actor.actorCompanyId,
-        requestId: actor.requestId,
-      },
-      ctx.effectiveCompanyId,
-      {
-        action: 'quote.update_position',
-        resourceType: 'quote',
-        resourceId: quoteId,
-        metadata: {
-          positionCode: existingPosition.positionCode,
-          productLineId: input.productLineId,
-        },
-      },
-    )
-
-    const detail = await finalizeQuoteDetail(tx, quoteId)
-    return detail!
-  })
-
-/** Removes a position from a quote and recalculates the quote's total. */
-export const removeQuotePosition = async (
-  ctx: TenantContext,
-  actor: QuoteActor,
-  quoteId: string,
-  positionId: string,
-): Promise<QuoteDetailWithValidity> =>
-  withTenantDb(ctx, async (tx) => {
-    const deleted = await deleteQuotePositionQuery(tx, quoteId, positionId)
-    if (!deleted) {
-      throw new QuoteValidationError('Position not found in this quote')
-    }
-    await recalculateQuoteTotal(tx, quoteId)
-    await recordAuditEvent(
-      tx,
-      {
-        actorType: 'user',
-        actorUserId: actor.actorUserId,
-        actorCompanyId: actor.actorCompanyId,
-        requestId: actor.requestId,
-      },
-      ctx.effectiveCompanyId,
-      {
-        action: 'quote.remove_position',
-        resourceType: 'quote',
-        resourceId: quoteId,
-        metadata: { positionId, positionCode: deleted.positionCode },
-      },
-    )
-    const detail = await finalizeQuoteDetail(tx, quoteId)
-    return detail!
-  })
-
-/**
- * Reorders a quote's positions to match `positionIds` (must list every
- * current position id exactly once — partial/reshuffled subsets are
- * rejected rather than silently guessed at).
- */
-export const reorderPositions = async (
-  ctx: TenantContext,
-  actor: QuoteActor,
-  quoteId: string,
-  positionIds: string[],
-): Promise<QuoteDetailWithValidity> =>
-  withTenantDb(ctx, async (tx) => {
-    if (!Array.isArray(positionIds) || positionIds.length === 0) {
-      throw new QuoteValidationError('positionIds must be a non-empty array')
-    }
-    const existingQuote = await getQuoteDetailQuery(tx, quoteId)
-    if (!existingQuote) {
-      throw new QuoteValidationError('Quote not found')
-    }
-    const existingIds = new Set(existingQuote.positions.map((p) => p.id))
-    const givenIds = new Set(positionIds)
-    if (
-      givenIds.size !== positionIds.length ||
-      givenIds.size !== existingIds.size ||
-      [...existingIds].some((id) => !givenIds.has(id))
-    ) {
-      throw new QuoteValidationError('positionIds must list every current position exactly once')
-    }
-
-    await reorderQuotePositionsQuery(tx, quoteId, positionIds)
-    await recordAuditEvent(
-      tx,
-      {
-        actorType: 'user',
-        actorUserId: actor.actorUserId,
-        actorCompanyId: actor.actorCompanyId,
-        requestId: actor.requestId,
-      },
-      ctx.effectiveCompanyId,
-      {
-        action: 'quote.reorder_positions',
-        resourceType: 'quote',
-        resourceId: quoteId,
-        metadata: {},
-      },
-    )
-    const detail = await finalizeQuoteDetail(tx, quoteId)
-    return detail!
-  })
-
-/** Duplicates one position (and its characteristic selections) as a new position appended to the end of the quote — a fast way to quote a near-identical size/config. */
-export const duplicatePosition = async (
-  ctx: TenantContext,
-  actor: QuoteActor,
-  quoteId: string,
-  positionId: string,
-): Promise<QuoteDetailWithValidity> =>
-  withTenantDb(ctx, async (tx) => {
-    const existingQuote = await getQuoteDetailQuery(tx, quoteId)
-    if (!existingQuote) {
-      throw new QuoteValidationError('Quote not found')
-    }
-    const source = existingQuote.positions.find((p) => p.id === positionId)
-    if (!source) {
-      throw new QuoteValidationError('Position not found in this quote')
-    }
-    // A duplicate is a new position, so the same rules as adding one apply.
-    const sourceFamily = await getProductFamilyById(tx, source.productFamilyId)
-    if (sourceFamily) {
-      await assertUsableForNewPositions(tx, ctx.effectiveCompanyId, sourceFamily)
-    }
-
-    // Always auto-numbered, never the source's own code — a custom name is
-    // unique to one position, copying it onto a duplicate would collide.
-    const positionCode = resolvePositionCode(existingQuote.positions, undefined)
-    const nextSortOrder = existingQuote.positions.reduce((max, p) => Math.max(max, p.sortOrder), -1) + 1
-
-    let newPositionId: string
-    try {
-      newPositionId = await insertQuotePosition(tx, {
-        quoteId,
-        productFamilyId: source.productFamilyId,
-        productLineId: source.productLineId,
-        productFamilyName: source.productFamilyName,
-        productLineName: source.productLineName,
-        positionCode,
-        quantity: source.quantity,
-        widthMm: source.widthMm,
-        heightMm: source.heightMm,
-        description: source.description,
-        unitName: source.unitName,
-        unitSymbol: source.unitSymbol,
-        discountPct: source.discountPct,
-        extraMarkupPct: source.extraMarkupPct,
-        pricingMode: source.pricingMode,
-        lineManualUnitPrice: source.lineManualUnitPrice,
-        totalM2: source.totalM2,
-        basePrice: source.basePrice,
-        finalPrice: source.finalPrice,
-        sortOrder: nextSortOrder,
-      })
-    } catch (error) {
-      if (isPositionCodeConflict(error)) {
-        throw new QuoteValidationError(
-          `Position code "${positionCode}" is already used by another position in this quote`,
-        )
-      }
-      throw error
-    }
-    for (const characteristic of source.characteristics) {
-      await insertQuotePositionCharacteristic(tx, {
-        quotePositionId: newPositionId,
-        characteristicId: characteristic.characteristicId,
-        subCharacteristicId: characteristic.subCharacteristicId,
-        characteristicName: characteristic.characteristicName,
-        subCharacteristicName: characteristic.subCharacteristicName,
-        price: characteristic.price,
-        pricingMode: characteristic.pricingMode,
-        manualUnitPrice: characteristic.manualUnitPrice,
-        discountPct: characteristic.discountPct,
-        markupPct: characteristic.markupPct,
-      })
-    }
-
-    await recalculateQuoteTotal(tx, quoteId)
-    await recordAuditEvent(
-      tx,
-      {
-        actorType: 'user',
-        actorUserId: actor.actorUserId,
-        actorCompanyId: actor.actorCompanyId,
-        requestId: actor.requestId,
-      },
-      ctx.effectiveCompanyId,
-      {
-        action: 'quote.duplicate_position',
-        resourceType: 'quote',
-        resourceId: quoteId,
-        metadata: { sourcePositionId: positionId, positionCode },
-      },
-    )
-    const detail = await finalizeQuoteDetail(tx, quoteId)
-    return detail!
-  })
-
-/**
- * A quote's change history (its audit entries), newest first — for anyone who
- * can see the quote. Returns null when the quote doesn't exist or isn't visible.
+ * A quote's audit entries (created, saved, new versions, status changes), newest first — for
+ * anyone who can see the quote. Returns null when the quote doesn't exist or isn't visible.
  * @throws {InvalidAuditCursorError} `query.cursor` was not produced by this API
  */
 export const getQuoteHistory = (
@@ -986,4 +876,51 @@ export const getQuoteHistory = (
       return null
     }
     return listAuditPage(tx, { resourceType: 'quote', resourceId: quoteId }, query.cursor, query.limit, toHistoryEntry)
+  })
+
+// ── Printing ──────────────────────────────────────────────────────────────────
+
+
+/** Everything the printed quote shows: the version, the company's fiscal data, the branch and the sales contact. */
+export const getQuotePrintData = (ctx: TenantContext, quoteId: string, versionNumber?: number): Promise<QuotePrintData | null> =>
+  withTenantDb(ctx, async (tx) => {
+    const quote = await getQuoteRow(tx, quoteId)
+    if (!quote) return null
+    const row = await getQuoteVersion(tx, quoteId, versionNumber ?? quote.latestVersion)
+    if (!row) return null
+    const version = toVersion(row)
+    const profile = await getCompanyProfile(tx, quote.supplierCompanyId)
+    const units = await listBusinessUnitsWithUsers(tx, quote.supplierCompanyId, { withLogos: false })
+    const contacts = await listSalesContacts(tx, quote.supplierCompanyId)
+    const settings = version.document.printSettings
+    const unit = units.find((u) => u.id === settings.businessUnitId) ?? units[0] ?? null
+    // Only the logo of the branch heading the pages.
+    const logoDataUrl = unit ? await getBusinessUnitLogo(tx, quote.supplierCompanyId, unit.id) : null
+    return {
+      quote: toSummary(quote),
+      version,
+      company: {
+        name: profile?.name ?? '',
+        vatNumber: profile?.vatNumber ?? '',
+        fiscalAddress: profile?.fiscalAddress ?? null,
+        fiscalCode: profile?.fiscalCode ?? null,
+        sdiCode: profile?.sdiCode ?? null,
+        email: profile?.email ?? null,
+        pecEmail: profile?.pecEmail ?? null,
+        phone: profile?.phone ?? null,
+      },
+      businessUnit: unit
+        ? {
+            id: unit.id,
+            name: unit.name,
+            address: unit.address,
+            email: unit.email,
+            phone: unit.phone,
+            primaryColor: unit.primaryColor,
+            logoDataUrl,
+            userIds: unit.userIds,
+          }
+        : null,
+      salesContact: contacts.find((contact) => contact.id === settings.salesContactUserId) ?? null,
+    }
   })

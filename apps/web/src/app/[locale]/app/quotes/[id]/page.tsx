@@ -2,24 +2,34 @@ import { AlertTriangle } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 
+import { QuoteEditor } from '@/components/quote-editor/quote-editor'
 import { fetchFromApiResult } from '@/lib/api/server-client'
-import { QuoteBuilder } from '@/components/quote-builder'
-import type { PositionFamilyVersion } from '@/components/quote-positions-nav'
 import type { ProductFamilySummary } from '@/types/product-family'
-import type { QuoteDetail } from '@/types/sales-quote'
-import { priceValidityStatus, priceValidityToday, type FamilyVersionsResponse } from '@schuco/contracts'
+import {
+  priceValidityStatus,
+  priceValidityToday,
+  type CompanyProfileResponse,
+  type SalesQuoteDetailResponse,
+  type TextTemplate,
+} from '@schuco/contracts'
 
 interface QuoteDetailPageProps {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ version?: string }>
 }
 
-/** Quote builder: header summary, add positions from the product-family catalog, live position list, PDF export. */
-const QuoteDetailPage = async ({ params }: QuoteDetailPageProps) => {
+/** The quote builder for one version of the quote (`?version=N`, the latest by default). */
+const QuoteDetailPage = async ({ params, searchParams }: QuoteDetailPageProps) => {
   const { id } = await params
+  const { version } = await searchParams
   const t = await getTranslations('quotes')
-  const [quoteResult, familiesResult] = await Promise.all([
-    fetchFromApiResult<QuoteDetail>(`/api/sales-quotes/${id}`),
+  const versionQuery = version && /^\d+$/.test(version) ? `?version=${version}` : ''
+  const [quoteResult, familiesResult, profileResult, templatesResult] = await Promise.all([
+    fetchFromApiResult<SalesQuoteDetailResponse>(`/api/sales-quotes/${id}${versionQuery}`),
     fetchFromApiResult<{ families: ProductFamilySummary[] }>('/api/product-families'),
+    // Branch names and sales contacts only: the editor shows no logos.
+    fetchFromApiResult<CompanyProfileResponse>('/api/company/profile?logos=false'),
+    fetchFromApiResult<{ templates: TextTemplate[] }>('/api/company/text-templates'),
   ])
 
   if (quoteResult.status !== 'ok') {
@@ -36,30 +46,22 @@ const QuoteDetailPage = async ({ params }: QuoteDetailPageProps) => {
     )
   }
 
-  // New positions can only come from published families in the company's library that are ready
-  // for invoicing and whose prices are valid today (the API enforces the same).
+  // New families can only come from published ones in the company's library that are ready for
+  // invoicing and whose prices are valid today (the API enforces the same on save).
   const today = priceValidityToday()
   const families = (familiesResult.data?.families ?? []).filter(
     (f) => f.isPublished && f.inLibrary !== false && f.readyForInvoicing && priceValidityStatus(f, today) === 'current',
   )
 
-  // For each family the positions were priced from: its version, and the newest version of it
-  // that can be quoted now (the positions keep their price; the builder offers to look at the changes).
-  const usableIds = new Set(families.map((f) => f.id))
-  const usedFamilyIds = [...new Set(quoteResult.data.positions.map((p) => p.productFamilyId))]
-  const versionResults = await Promise.all(
-    usedFamilyIds.map((familyId) => fetchFromApiResult<FamilyVersionsResponse>(`/api/product-families/${familyId}/versions?graph=false`)),
+  return (
+    <QuoteEditor
+      key={quoteResult.data.version.id}
+      initialDetail={quoteResult.data}
+      families={families}
+      profile={profileResult.data}
+      initialTemplates={templatesResult.data?.templates ?? []}
+    />
   )
-  const familyVersions: Record<string, PositionFamilyVersion> = {}
-  usedFamilyIds.forEach((familyId, i) => {
-    const result = versionResults[i]
-    const own = result.status === 'ok' ? result.data.versions.find((v) => v.id === familyId) : undefined
-    if (result.status !== 'ok' || !own) return
-    const newer = result.data.versions.filter((v) => v.version > own.version && usableIds.has(v.id)).at(-1)
-    familyVersions[familyId] = { version: own.version, newer: newer ? { id: newer.id, version: newer.version } : undefined }
-  })
-
-  return <QuoteBuilder initialDetail={quoteResult.data} families={families} familyVersions={familyVersions} />
 }
 
 export default QuoteDetailPage

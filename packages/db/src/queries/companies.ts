@@ -105,3 +105,39 @@ export const getCompanyById = async (db: DbLike, id: string): Promise<CompanySum
   const row = rows[0]
   return row ? { id: row.id, name: row.name, capabilities: capabilitiesOf(row) } : null
 }
+
+/** The company's details printed on its quotes (see `companyProfileSchema` in @schuco/contracts). */
+export type CompanyProfileRow = Pick<
+  CompanyRow,
+  'name' | 'vatNumber' | 'fiscalAddress' | 'fiscalCode' | 'sdiCode' | 'email' | 'pecEmail' | 'phone'
+>
+
+const profileColumns = {
+  name: companies.name,
+  vatNumber: companies.vatNumber,
+  fiscalAddress: companies.fiscalAddress,
+  fiscalCode: companies.fiscalCode,
+  sdiCode: companies.sdiCode,
+  email: companies.email,
+  pecEmail: companies.pecEmail,
+  phone: companies.phone,
+}
+
+/** The company's profile (RLS: only the caller's own company, or any for a super-admin). */
+export const getCompanyProfile = async (db: DbLike, companyId: string): Promise<CompanyProfileRow | null> => {
+  const [row] = await db.select(profileColumns).from(companies).where(eq(companies.id, companyId))
+  return row ?? null
+}
+
+export const updateCompanyProfile = async (
+  db: DbLike,
+  companyId: string,
+  input: Omit<CompanyProfileRow, 'name' | 'vatNumber'>,
+): Promise<CompanyProfileRow | null> => {
+  const [row] = await db
+    .update(companies)
+    .set({ ...input, updatedAt: new Date() })
+    .where(eq(companies.id, companyId))
+    .returning(profileColumns)
+  return row ?? null
+}

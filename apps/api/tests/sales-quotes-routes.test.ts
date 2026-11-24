@@ -1,42 +1,33 @@
+process.env.DATABASE_URL =
+  process.env.TEST_DATABASE_URL ??
+  `postgresql://previo_app:${process.env.APP_DB_PASSWORD ?? 'previo_app'}@localhost:5434/previo_test`
+
 import { describe, expect, it } from 'vitest'
 
 import { salesQuotes } from '../src/routes/sales-quotes'
 
 /**
- * Route-registration-order regression test (no DB/auth needed — this is
- * purely about which handler Hono picks for an ambiguous path, not about
- * what either handler does). Hono resolves a static route vs. a param
- * route at the same position by **registration order**, not specificity:
- * registering the generic `/:id/positions/:positionId` PATCH before the
- * static `/:id/positions/reorder` PATCH makes every reorder request match
- * the generic route instead, with `positionId` literally set to the
- * string "reorder" — this exact bug shipped once already and silently
- * broke the quote builder's move-up/move-down buttons (every reorder
- * call 400'd with "Position not found in this quote"). See the ordering
- * comment in `sales-quotes.ts` right above the generic PATCH route.
+ * Routing only (no DB/auth needed): every endpoint the builder calls is
+ * registered, so a request reaches auth (401) instead of matching nothing
+ * (404). Hono resolves a static route vs. a param route at the same
+ * position by registration order, so the static `/price-lines` must stay
+ * a route of its own and never be read as a quote id.
  */
-describe('sales-quotes route registration order', () => {
-  it('registers the static PATCH /:id/positions/reorder route before the generic PATCH /:id/positions/:positionId route', () => {
-    const patchRoutes = salesQuotes.routes.filter((r) => r.method === 'PATCH' && r.path.includes('/positions'))
-    const reorderIndex = patchRoutes.findIndex((r) => r.path.endsWith('/reorder'))
-    const genericIndex = patchRoutes.findIndex((r) => r.path.endsWith('/:positionId'))
-
-    expect(reorderIndex).toBeGreaterThanOrEqual(0)
-    expect(genericIndex).toBeGreaterThanOrEqual(0)
-    expect(reorderIndex).toBeLessThan(genericIndex)
-  })
-
-  it("a PATCH to .../positions/reorder is never routed to the generic positionId handler (belt-and-suspenders guard, in case registration order ever regresses)", async () => {
-    // No auth header — requireAuth/requireRoles run first and would 401
-    // before any positionId logic, which is exactly what we want here:
-    // this only needs to prove *routing*, not full request handling. A
-    // 401 means Hono matched a real route (auth middleware ran); only a
-    // 404 would mean no route matched at all.
-    const res = await salesQuotes.request('/00000000-0000-0000-0000-000000000000/positions/reorder', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ positionIds: [] }),
-    })
-    expect(res.status).not.toBe(404)
+describe('sales-quotes routes', () => {
+  const VERSION = '00000000-0000-0000-0000-000000000000'
+  it.each([
+    ['POST', '/'],
+    ['GET', '/'],
+    ['POST', '/price-lines'],
+    ['GET', `/${VERSION}`],
+    ['GET', `/${VERSION}/print`],
+    ['GET', `/${VERSION}/history`],
+    ['PUT', `/${VERSION}/versions/${VERSION}`],
+    ['POST', `/${VERSION}/versions/${VERSION}/status`],
+    ['GET', `/${VERSION}/versions/${VERSION}/revisions`],
+    ['GET', `/${VERSION}/versions/${VERSION}/revisions/1`],
+  ])('%s %s reaches auth', async (method, path) => {
+    const res = await salesQuotes.request(path, { method })
+    expect(res.status).toBe(401)
   })
 })

@@ -16,6 +16,8 @@ export const users = pgTable(
     cognitoSub: text('cognito_sub').unique(),
     email: text('email').notNull().unique(),
     name: text('name'),
+    /** Printed as the quote's sales contact ("Vostro referente"). */
+    phone: text('phone'),
     // Null until the user accepts their invite (or resets a never-set
     // password) — see auth_tokens / auth-service.ts. An 'invited' user has
     // no password yet and can't log in via /api/auth/login until they do.

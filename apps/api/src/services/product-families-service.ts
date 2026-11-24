@@ -52,7 +52,6 @@ import {
   type RecordHistoryQuery,
 } from '@schuco/contracts'
 
-import type { FamilyVersionNote } from '../lib/quote-pdf'
 import { isUuid } from '../lib/uuid'
 import { extractEmbeddedImages } from '../lib/excel-import/extract-embedded-images'
 import { parseProductFamilyWorkbook, type ParsedWorkbook } from '../lib/excel-import'
@@ -639,36 +638,6 @@ export const compareProductFamilyVersions = (
       changes,
       counts: countFamilyChanges(changes),
     }
-  })
-}
-
-/**
- * For the quote PDF: each family's version and the changes since the version before it in its
- * chain, as the caller sees the chain (a client stepping over a draft compares with the version
- * before that). Families the caller can't see are left out.
- */
-export const getFamilyVersionNotes = (ctx: TenantContext, familyIds: string[]): Promise<Map<string, FamilyVersionNote>> => {
-  const ids = [...new Set(familyIds.filter(isUuid))]
-  if (!ids.length) return Promise.resolve(new Map())
-  return withTenantDb(ctx, async (tx) => {
-    const notes = new Map<string, FamilyVersionNote>()
-    // Every family's chain and stored change lists in one query each; each family loaded at most once.
-    const chains = await listProductFamilyVersionsOfChains(tx, ids)
-    const stored = await listStoredFamilyChanges(tx, ids)
-    const loaded: ProductFamilyDetail[] = []
-    for (const familyId of ids) {
-      const chain = chains.get(familyId) ?? []
-      const index = chain.findIndex((v) => v.id === familyId)
-      if (index < 0) continue
-      const previous = chain[index - 1]
-      const changes = previous ? await familyChanges(tx, previous.id, familyId, { stored, loaded }) : null
-      notes.set(familyId, {
-        version: chain[index].version,
-        previousVersion: changes ? previous.version : null,
-        changes: changes ?? [],
-      })
-    }
-    return notes
   })
 }
 

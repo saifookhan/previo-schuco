@@ -7,9 +7,8 @@ import { LoadingRegion, LoadingRegionProvider } from '@/components/ui/loading-re
 import { Link } from '@/i18n/navigation'
 import { fetchFromApiResult } from '@/lib/api/server-client'
 import { QuoteNewButton } from '@/components/quote-new-button'
-import type { QuoteSummary } from '@/types/sales-quote'
-
-const EUR = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' })
+import { EUR } from '@/lib/format'
+import type { QuoteSummary } from '@schuco/contracts'
 
 const statusVariant = (status: QuoteSummary['status']): 'success' | 'muted' | 'warning' => {
   if (status === 'accepted') return 'success'
@@ -17,7 +16,7 @@ const statusVariant = (status: QuoteSummary['status']): 'success' | 'muted' | 'w
   return 'muted'
 }
 
-/** Supplier's own quotes: create a new one, or open an existing draft to keep building it. */
+/** Supplier's own quotes: create a new one, or open one at its latest version. */
 const QuotesPage = async () => {
   const t = await getTranslations('quotes')
   const result = await fetchFromApiResult<{ quotes: QuoteSummary[] }>('/api/sales-quotes')
@@ -54,11 +53,13 @@ const QuotesPage = async () => {
                   <p className="text-sm">{t('emptyState')}</p>
                 </div>
               ) : (
-                <table className="w-full min-w-[720px] text-sm">
+                <table className="w-full min-w-[880px] text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 text-left text-slate-500">
                       <th className="px-6 py-3 font-medium">{t('reference')}</th>
                       <th className="px-6 py-3 font-medium">{t('customer')}</th>
+                      <th className="px-6 py-3 font-medium">{t('project')}</th>
+                      <th className="px-6 py-3 font-medium">{t('version')}</th>
                       <th className="px-6 py-3 font-medium">{t('status')}</th>
                       <th className="px-6 py-3 font-medium">{t('total')}</th>
                       <th className="px-6 py-3 font-medium">{t('created')}</th>
@@ -73,6 +74,8 @@ const QuotesPage = async () => {
                           </Link>
                         </td>
                         <td className="px-6 py-4 text-slate-600">{quote.customerName}</td>
+                        <td className="px-6 py-4 text-slate-500">{quote.projectLocation ?? '—'}</td>
+                        <td className="px-6 py-4 text-slate-500">v{quote.latestVersion}</td>
                         <td className="px-6 py-4">
                           <Badge variant={statusVariant(quote.status)}>{t(`statusValue.${quote.status}`)}</Badge>
                         </td>

@@ -48,6 +48,18 @@ export const isFamilySharedWith = async (db: DbLike, familyId: string, companyId
   return rows[0]?.reaches === true
 }
 
+/** Of `familyIds`, the ones shared with the company (directly or through a partner), in one query. */
+export const listFamiliesSharedWith = async (db: DbLike, familyIds: string[], companyId: string): Promise<Set<string>> => {
+  if (familyIds.length === 0) return new Set()
+  const rows = await db.execute<{ id: string }>(
+    sql`SELECT id FROM unnest(ARRAY[${sql.join(
+      familyIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    )}]) AS id WHERE app_family_reaches_company(id, ${companyId}::uuid)`,
+  )
+  return new Set(rows.map((row) => row.id))
+}
+
 const itemValues = {
   productLineId: productFamilyShareItems.productLineId,
   characteristicId: productFamilyShareItems.characteristicId,
