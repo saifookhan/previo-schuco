@@ -48,13 +48,18 @@ An end-to-end run through the main flows. Use [Demo logins](./demo-logins.md) to
 ## Quotes — as `admin@suppli-demo.it`
 
 - [ ] Create a quote.
-- [ ] Add *Finestra 1 anta*, 800 × 1200, qty 4, Triplo vetro / Antracite / Con chiave → **1 857,02 €**
+- [ ] **Add product family** → *Finestra 1 anta*; on its line set 800 × 1200, Q.tà 4 and, under the characteristics, Triplo vetro / Antracite / Con chiave → Totale **1 857,02 €**
       (see the [worked example](./pricing.md#worked-example)).
 - [ ] Try a size bigger than the price table (e.g. 1300 × 900) → a clear error, no price.
-- [ ] Switch a position and a characteristic to manual price.
-- [ ] Edit, duplicate, reorder and delete positions.
-- [ ] Download the PDF and check totals.
-- [ ] Open *History* on the quote — every step above is listed with your name.
+- [ ] Type your own €/pz on a line — it turns manual (italics); the arrow next to it brings back the catalog price. Extra% 110 and Sc% 10 change Netto and Totale.
+- [ ] Mark a line and a family **ALT** — they leave the subtotal and the total.
+- [ ] Duplicate, drag, move with the arrows and delete lines and families; reorder the closing blocks, the categories and the payment rows; drag an activity between *Included* and *Not included*.
+- [ ] Add an intro text, save it as a saved text, and add it again from **Saved texts**.
+- [ ] **Save** → **Fix version 1**; then mark it **Sent**; edit again → only **Save as a new version** is offered → v2.
+- [ ] **Change history** lists each save with what changed; open an older one and **Restore** it.
+- [ ] **Preview** → A4 pages with branch logo, *Vostro referente* and the footer; **Print / Save PDF**; untick fields in **Print settings** and check they disappear (the discount column stays while a line has a discount).
+- [ ] Set the family's validity to the past: a draft moves to the newest valid version with a notice; without a newer version, Save and Preview are disabled with a link to upload one.
+- [ ] *Settings → Company*: change the fiscal data, add a branch with a logo and colour, set a sales contact's phone — the preview shows them.
 - [ ] As `sales@technometal-demo.it`: no option to create quotes.
 
 ## Users & onboarding

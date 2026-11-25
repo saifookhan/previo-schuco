@@ -302,6 +302,21 @@ export const listProductFamilyVersions = (db: DbLike, familyId: string): Promise
     .orderBy(asc(productFamilies.version), asc(productFamilies.createdAt))
 
 /**
+ * Locks every version in `familyId`'s chain (that the caller may update) until the transaction
+ * ends, so two saves that each check the chain's dates can't both pass. Re-read the chain in a
+ * later statement: under READ COMMITTED that one sees what the other save committed.
+ * @param db - RLS-scoped transaction
+ * @param familyId - Any version in the chain
+ */
+export const lockProductFamilyVersions = async (db: DbLike, familyId: string): Promise<void> => {
+  await db
+    .select({ id: productFamilies.id })
+    .from(productFamilies)
+    .where(sql`${productFamilies.id} IN (SELECT app_family_version_chain(${familyId}::uuid))`)
+    .for('update')
+}
+
+/**
  * The chains of all of `familyIds` in one query, keyed by the id each was asked for: every version
  * the caller can see, oldest first (same rules as `listProductFamilyVersions`). Keyed rather than
  * left to the caller to link up by `supersedesId`, since a version the caller can't see would
@@ -411,6 +426,16 @@ export const isProductFamilyInLibrary = async (db: DbLike, companyId: string, fa
     .from(productFamilyLibraryHidden)
     .where(and(eq(productFamilyLibraryHidden.companyId, companyId), eq(productFamilyLibraryHidden.productFamilyId, familyId)))
   return !hidden
+}
+
+/** Of `familyIds`, the ones the company took out of its library (one query for many families). */
+export const listFamiliesHiddenFromLibrary = async (db: DbLike, companyId: string, familyIds: string[]): Promise<Set<string>> => {
+  if (familyIds.length === 0) return new Set()
+  const rows = await db
+    .select({ id: productFamilyLibraryHidden.productFamilyId })
+    .from(productFamilyLibraryHidden)
+    .where(and(eq(productFamilyLibraryHidden.companyId, companyId), inArray(productFamilyLibraryHidden.productFamilyId, familyIds)))
+  return new Set(rows.map((row) => row.id))
 }
 
 /**

@@ -25,6 +25,30 @@ export const priceValidityStatus = (
   return 'current'
 }
 
+export type PriceValidity = { priceValidFrom: string | null; priceValidTo: string | null }
+
+/** The 409 body when dates would share a day with another version of the family. */
+export interface PriceValidityOverlapResponse {
+  error: string
+  overlap: PriceValidity & { version: number }
+}
+
+/**
+ * The first of `others` (e.g. the other versions of a family) whose validity shares a day with
+ * `validity`'s: both ends inclusive, a null end open — so another version with neither date
+ * (imported before validity existed) is valid every day, as `priceValidityStatus` treats it.
+ * `validity` itself without dates is not checked: the API always asks for "Valid from", so only
+ * server-side imports without dates get here.
+ */
+export const findOverlappingValidity = <T extends PriceValidity>(validity: PriceValidity, others: T[]): T | undefined =>
+  validity.priceValidFrom === null && validity.priceValidTo === null
+    ? undefined
+    : others.find(
+        (other) =>
+          (other.priceValidTo === null || validity.priceValidFrom === null || validity.priceValidFrom <= other.priceValidTo) &&
+          (validity.priceValidTo === null || other.priceValidFrom === null || other.priceValidFrom <= validity.priceValidTo),
+      )
+
 const isRealDate = (value: string) => {
   const parsed = new Date(`${value}T00:00:00Z`)
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value)

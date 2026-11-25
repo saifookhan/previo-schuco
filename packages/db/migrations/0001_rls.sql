@@ -440,12 +440,13 @@ REVOKE UPDATE, DELETE ON audit_log FROM previo_app;
 -- Quotes (Phase 3): a supplier's quotes to their own end customers.
 -- Unlike product_families, quotes are never shared/published — visibility
 -- is a straight "belongs to my company" check, same shape as companies'
--- own policy. Child tables (quote_positions, quote_position_characteristics)
--- delegate via a join back to quotes, mirroring the product-families
--- child-table pattern above.
+-- own policy. Child tables (quote_versions, quote_revisions) delegate via a
+-- join back to quotes, mirroring the product-families child-table pattern
+-- above.
 ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE quote_positions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE quote_position_characteristics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_revisions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_text_templates ENABLE ROW LEVEL SECURITY;
 
 CREATE OR REPLACE FUNCTION app_owns_quote(target_quote_id uuid) RETURNS boolean AS $$
   SELECT app_is_super_admin() OR EXISTS (
@@ -463,24 +464,31 @@ CREATE POLICY quotes_tenant ON quotes
     OR (supplier_company_id = app_current_company_id() AND app_company_is_supplier())
   );
 
-DROP POLICY IF EXISTS quote_positions_tenant ON quote_positions;
-CREATE POLICY quote_positions_tenant ON quote_positions
+DROP POLICY IF EXISTS quote_versions_tenant ON quote_versions;
+CREATE POLICY quote_versions_tenant ON quote_versions
   FOR ALL
   USING (app_owns_quote(quote_id))
   WITH CHECK (app_owns_quote(quote_id));
 
-DROP POLICY IF EXISTS quote_position_characteristics_tenant ON quote_position_characteristics;
-CREATE POLICY quote_position_characteristics_tenant ON quote_position_characteristics
+DROP POLICY IF EXISTS quote_revisions_tenant ON quote_revisions;
+CREATE POLICY quote_revisions_tenant ON quote_revisions
   FOR ALL
   USING (
     app_is_super_admin() OR EXISTS (
-      SELECT 1 FROM quote_positions qp
-      WHERE qp.id = quote_position_id AND app_owns_quote(qp.quote_id)
+      SELECT 1 FROM quote_versions qv
+      WHERE qv.id = quote_version_id AND app_owns_quote(qv.quote_id)
     )
   )
   WITH CHECK (
     app_is_super_admin() OR EXISTS (
-      SELECT 1 FROM quote_positions qp
-      WHERE qp.id = quote_position_id AND app_owns_quote(qp.quote_id)
+      SELECT 1 FROM quote_versions qv
+      WHERE qv.id = quote_version_id AND app_owns_quote(qv.quote_id)
     )
   );
+
+-- A company's saved quote texts.
+DROP POLICY IF EXISTS quote_text_templates_tenant ON quote_text_templates;
+CREATE POLICY quote_text_templates_tenant ON quote_text_templates
+  FOR ALL
+  USING (app_is_super_admin() OR company_id = app_current_company_id())
+  WITH CHECK (app_is_super_admin() OR company_id = app_current_company_id());

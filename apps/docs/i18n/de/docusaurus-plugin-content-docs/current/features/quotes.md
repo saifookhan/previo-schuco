@@ -12,61 +12,72 @@ title: Angebote
 
 ## Ablauf
 
-1. **Neues Angebot** → Referenz, Kundenname, Steuernummer, Adresse, Ort, Projektstandort.
-2. Angebot öffnen. Es hat drei Bereiche:
-   - **Links — Positionen:** die Angebotsübersicht, jede Position mit ihrem Preis, **Neue Position** und die Summe. Eine
-     Position anklicken, um sie zu bearbeiten; die ausgewählte hat außerdem **nach oben / unten**, **duplizieren** und
-     **löschen**.
-   - **Mitte — das Formular der Position:**
-     - **Produkt** — eine Familie (eigene oder mit dir geteilte) und eine Produktlinie wählen.
-     - **Maße & Position** — Positionsname/-code (eigene Codes erlaubt), Breite, Höhe, Menge.
-     - **Merkmale** — eine Zeile pro Option der Linie, jede automatisch (**A**) oder manuell (**M**) bepreist.
-     - **Preis** — der Preis der Linie wird automatisch berechnet (**A**); auf manuell (**M**) umschalten, um ihn zu
-       überschreiben. Rabatt und Aufschlag.
-   - **Rechts — Vorschau:**
-     - **Berechnung** — wie sich der Preis zusammensetzt, live beim Tippen: Listenpreis der Linie, Rabatt und Aufschlag,
-       jede Option zu ihren eigenen Konditionen, Stückpreis, Menge und Summe, dazu ein **Formelverlauf** mit jedem
-       Schritt.
-     - **PDF** — das PDF des Angebots, wie es gespeichert ist. Es lädt neu, nachdem du eine Position hinzufügst oder
-       speicherst.
-3. **Position hinzufügen** / **Änderungen speichern**. Nach dem Speichern bleibt die Position ausgewählt. Wer mit
-   ungespeicherten Änderungen eine andere Position (oder **Neue Position**) anklickt, wird vorher gefragt.
-4. **PDF herunterladen** (oben rechts).
+1. **Neues Angebot** → Referenz und Kunde (Steuernummer, Adresse, Ort und Projekt sind optional und später änderbar).
+2. Das Angebot öffnet sich auf einer Seite, wie im Design des Kunden:
+   - **Obere Leiste** — Referenz, Version und Status, Kunde und Projekt (anklicken, um Kunde, Steuernummer, Adresse,
+     Ort, Projekt, Datum und interne Notizen zu ändern), die **Summe zzgl. MwSt** und die Schaltflächen
+     **Druckeinstellungen**, **Vorschau**, **Export** (demnächst), **Änderungsverlauf** und **Speichern**.
+   - **Einleitung** — Textmodule (Überschriften, Fett, Listen, Ausrichtung, Links, Bilder bis 1 MB). Leeren Text oder
+     einen der **gespeicherten Texte** des Unternehmens hinzufügen; jeder Text kann als neuer gespeicherter Text
+     gesichert werden. Ziehen oder Pfeile zum Sortieren.
+   - **Produktfamilien** — **Produktfamilie hinzufügen** wählt eine Familie aus dem Katalog (veröffentlicht, in der
+     Bibliothek, abrechnungsbereit und heute gültig; Suche und Kategoriefilter) oder ein **leeres Produkt** von Hand.
+     Jede Familie hat das Gültigkeitsabzeichen, **ALT/STD**, Duplizieren, Löschen, Einklappen und **Details &
+     Spezifikationen** (Kategorie, Beschreibung, Notizen und technische Tabelle).
+   - **Linien** — je eine Zeile: Pos, Menge, Linie, ME, B, H, m², Extra%, €/Stk, Rab%, Netto €, Gesamt, MwSt,
+     Montage h, dann ALT/STD, Duplizieren, Löschen, Merkmale und Sperre. Linien und Familien lassen sich ziehen oder
+     mit Pfeilen verschieben.
+   - **Zusammenfassung und Abschluss** — sortierbare Blöcke: Texte, *Details nach Produkt*, *Gruppierung nach
+     Kategorie* (Kategorien sortierbar), *Angebotssumme*, *Zahlungsplan* (mit Prüfung auf 100%) und *Leistungen*
+     (zwischen **Inbegriffen** und **Nicht inbegriffen** ziehen; das Auge blendet eine im Druck aus). Neue Angebote
+     beginnen mit dem Standard-Zahlungsplan und den Standard-Leistungen des Kunden.
+3. **Speichern** fragt wie: bei einem **Entwurf** **Version N korrigieren** oder **Als neue Version speichern**; bei
+   einer **gesendeten**, angenommenen oder abgelehnten Version nur **Als neue Version speichern** — eine gesendete
+   Version ändert sich nie.
+4. **Vorschau** öffnet *Anteprima Preventivo* in einem neuen Tab: A4-Seiten mit Logo und Farbe der Niederlassung im
+   Kopf, Steuerdaten und *Seite X von Y* in der Fußzeile. **Drucken / Als PDF speichern** nutzt den Druckdialog des
+   Browsers. Ungespeicherte Änderungen werden mit angezeigt.
 
-Auf einem kleineren Bildschirm rückt die Vorschau unter das Formular; auf dem Handy sind die drei Bereiche Tabs
-(**Positionen**, **Bearbeiten**, **Vorschau**).
+## Preise
 
-![Angebot: Positionen, Formular und Berechnung](/img/screens/quote-detail.png)
+- **€/Stk** ist der Listenpreis der Linie mit ihren Merkmalen (mit Rabatt und Aufschlag der Familie oder der
+  Freigabe). Er wird neu berechnet, sobald Linie, Merkmale oder Maße sich ändern, und bei jedem Speichern erneut auf dem Server.
+- **Netto** = €/Stk × (1 + Extra%/100) × (1 − Rab%/100); **Gesamt** = Menge × Netto.
+- Alternative Linien (**ALT**) zählen nicht zur Zwischensumme der Familie, alternative Familien nicht zur Angebotssumme.
+- Ein eigener €/Stk macht die Linie manuell (kursiv); der Pfeil daneben führt zum Listenpreis zurück.
+- Die Sperre friert nur die Zeile im Editor ein; Preis und Druck bleiben unverändert.
 
-![Die PDF-Vorschau](/img/screens/add-position.png)
+Wie jede Zahl berechnet wird: [Wie Preise berechnet werden](../pricing.md).
 
-Positionen aus einer geteilten Familie starten mit Rabatt, Aufschlag und Montagestunden, die die Freigabe für diese Linie und ihre Optionen festlegt. Wie jede Zahl berechnet wird: [Wie Preise berechnet werden](../pricing.md).
+## Druckeinstellungen
 
-## Familienversionen im Angebot
+Wer als **Ansprechpartner** gedruckt wird (*Vostro referente*: Name, E-Mail, Telefon), welche **Niederlassung** die
+Seiten führt (wenn der Ansprechpartner für mehrere arbeitet) und welche Teile gedruckt werden: Ansprechpartner,
+Familienbeschreibungen, Merkmale der Zeilen, Details nach Produkt, Gruppierung nach Kategorie, Angebotssumme,
+Zahlungsplan, Leistungen, Spalten Extra % und Rabatt %. Die Rabattspalte ist Pflicht, solange eine Zeile einen Rabatt hat.
 
-- Die Familienliste zeigt die Version jeder Familie, z. B. „Finestra (v2)“. Sobald eine Familie gewählt ist, öffnet
-  sich darunter als Baum, was diese Version gegenüber der vorherigen geändert hat (hinzugefügt, entfernt,
-  wirtschaftlich, Beschreibung), wie auf der Seite der Familie: Änderungsarten ausblenden, zur Liste wechseln, eine
-  Änderung anklicken für vorher und nachher (oder die Preistabelle Zelle für Zelle). **Änderungen ausblenden** klappt
-  ihn zu; **Familienseite** öffnet dort den Vergleich.
-- Die Änderungen werden beim Hochladen der neuen Version aus dem Inhalt der beiden Versionen erkannt, nicht aus dem
-  Dateinamen oder markierten Zellen, und mit der Version gespeichert.
-- Wenn eine neuere Version der Familie einer Position angeboten werden kann, zeigt die Position in der Liste ein
-  Verzweigungssymbol, und beim Öffnen **v3 verfügbar** mit den Änderungen und dem Link zum Vergleich. Die Position
-  behält ihren Preis, bis du wechselst: wähle in ihrem Formular die neue Version — Maße, Menge und Code bleiben, ebenso
-  die Linie und die Optionen mit gleichem Namen in der neuen Version — und dann **Änderungen speichern**.
-- Im PDF zeigt die Überschrift jeder Familie ihre Version und darunter, was sich seit der vorherigen Version geändert
-  hat: was hinzugefügt oder entfernt wurde und welche Einträge Preisänderungen (Preistabellen mit ihrer %-Spanne) oder
-  Textänderungen haben. Die erste Version einer Kopie wird nicht mit der Familie verglichen, aus der sie kopiert wurde.
+Kopf, Fußzeile und Ansprechpartner kommen aus **Einstellungen → Unternehmen**: Steuerdaten, Niederlassungen (Logo bis
+512 KB, Farbe, Adresse, E-Mail, Telefon, Benutzer), Telefon jedes Benutzers und die gespeicherten Texte.
+
+## Versionen und abgelaufene Preislisten
+
+- Jede Version hat ihr eigenes Dokument; das Versionsmenü in der oberen Leiste wechselt zwischen ihnen und ändert den
+  Status: Entwurf → **gesendet** → **angenommen** / **abgelehnt**.
+- Sind die Preise einer Familie abgelaufen, verschiebt ein **Entwurf** ihre Linien auf die neueste gültige Version der
+  Familie (nach Namen von Linie und Merkmal) und berechnet sie neu, mit einem Hinweis, was verschoben wurde und was
+  nicht. Eine gesendete Version behält ihre Preise; **Preise aktualisieren** übernimmt die neue Version in die
+  Änderungen, die dann eine neue Version werden.
+- Gibt es keine gültige Version der Familie, sind Speichern und Drucken gesperrt und das Angebot verweist auf die
+  Familie, um eine neue Preisliste hochzuladen.
 
 ## Verlauf
 
-In den Positionen **Angebotsübersicht** und dann **Verlauf** öffnen, um zu sehen, wer es erstellt hat und wer welche Position hinzugefügt,
-bearbeitet, dupliziert, umsortiert oder entfernt hat, und wann. Wer das Angebot sehen kann, sieht auch den Verlauf.
+**Änderungsverlauf** listet jede Speicherung der Version — wer, wann, die Summe und was sich geändert hat (Felder des
+Kopfes, Familien und Linien, hinzugefügte/entfernte/umsortierte Elemente, Abschluss und Druckeinstellungen). Jede
+Speicherung lässt sich schreibgeschützt öffnen und **Wiederherstellen** als Ausgangspunkt. Das Audit-Protokoll des
+Angebots (Erstellung, Speichern, neue Version, Status) bleibt wie bisher.
 
-![Angebotsverlauf](/img/screens/quote-history.png)
+## Noch nicht gebaut
 
-## Noch nicht umgesetzt
-
-- Status-Ablauf — jedes Angebot bleibt **Entwurf** (Gesendet / Angenommen / Abgelehnt gibt es nur im Datenmodell).
-- Kopfdaten bearbeiten, ganzes Angebot löschen, ganzes Angebot duplizieren.
+- Export nach Word und Excel, Bilder im Druck, Versand des Angebots per E-Mail aus der App.
+- Ein ganzes Angebot löschen oder duplizieren.

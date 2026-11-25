@@ -6,6 +6,7 @@ import {
   priceValidityRequestSchema,
   productFamilyImportFieldsSchema,
   updateFamilySharesRequestSchema,
+  type PriceValidityOverlapResponse,
   type ProductFamilyImportFields,
 } from '@schuco/contracts'
 import type { Context, Next } from 'hono'
@@ -20,6 +21,7 @@ import {
 } from '../services/family-shares-service'
 import {
   ExcelImportError,
+  PriceValidityOverlapError,
   ProductFamilyHistoryForbiddenError,
   compareProductFamilyVersions,
   createNewVersionFromExcel,
@@ -164,7 +166,8 @@ productFamilies.post('/import', rejectUnlessMultipart, requireAuth, requirePermi
 /**
  * Re-imports an updated Excel workbook as a new version of an existing
  * family (`version + 1`, `supersedesId` set) — the existing version is
- * left untouched, published or not, and keeps its own validity dates.
+ * left untouched, published or not, and keeps its own validity dates;
+ * 409 when the new version's dates overlap another version's.
  */
 productFamilies.post(
   '/:id/new-version',
@@ -194,6 +197,9 @@ productFamilies.post(
       if (error instanceof ExcelImportError) {
         return c.json({ error: error.message }, 400)
       }
+      if (error instanceof PriceValidityOverlapError) {
+        return c.json({ error: error.message, overlap: error.overlap } satisfies PriceValidityOverlapResponse, 409)
+      }
       if (error instanceof Error && error.message === 'Product family not found') {
         return c.json({ error: error.message }, 404)
       }
@@ -218,6 +224,9 @@ productFamilies.put('/:id/price-validity', rejectNonUuidParams, requireAuth, req
   } catch (error) {
     if (error instanceof ProductFamilyNotFoundError) {
       return c.json({ error: error.message }, 404)
+    }
+    if (error instanceof PriceValidityOverlapError) {
+      return c.json({ error: error.message, overlap: error.overlap } satisfies PriceValidityOverlapResponse, 409)
     }
     throw error
   }

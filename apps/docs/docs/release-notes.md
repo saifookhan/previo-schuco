@@ -9,6 +9,15 @@ What changed, newest first. Use it to see what's new to test.
 
 ## November 2026
 
+**Week of 23 November**
+- **Quotes rebuilt as the client's single-page design**: introduction text modules, product families with their lines on one row each, and *Riepilogo e Chiusura* (texts, detail by product, grouping by category, total, payment plan, activities), all sortable by drag and drop. See [Quotes](./features/quotes.md).
+- **Versions**: a draft can be fixed in place or saved as a new version; a sent version only gets a new version. Status: draft → sent → accepted / rejected.
+- **Change history** of every save, with what changed; any save can be opened and restored.
+- **Print**: *Anteprima Preventivo* on A4 pages, printed or saved as PDF by the browser, with print settings for what shows. The old PDF download is gone.
+- **Expired price lists**: drafts move to the newest valid version of the family and are repriced; without one, saving and printing are blocked with a link to upload a new version.
+- **Settings → Company**: fiscal data, branches (logo, colour, contacts, users), sales contacts' phones and saved texts.
+- **No overlapping price validity**: two versions of a family can't share a day. Overlapping dates in the list, on the family's page or on a new version upload are refused with the version they overlap. See [Product families](./features/product-families.md#price-validity).
+
 **Week of 16 November**
 - **Sharing per line and option**: the share dialog lists every product line and option of the family, each with its own **discount**, **markup** and **installation hours** for that company, starting from the Excel's values (0% / 100% / 0 where it has none). On a new version, what the company got on the earlier one (matched by name) fills in the values the new Excel leaves empty. The single discount per company is gone. See [Family sharing](./features/sharing.md).
 - **Quotes from a shared family** start each position at the share's values for its line, and price each option at the share's values for that option.

@@ -18,6 +18,14 @@ export const companies = pgTable(
     isClient: boolean('is_client').notNull().default(false),
     name: text('name').notNull(),
     vatNumber: text('vat_number').notNull(),
+    // Printed in the footer of the company's quotes (with `name` as the legal name and `vatNumber` as the Partita IVA).
+    fiscalAddress: text('fiscal_address'),
+    fiscalCode: text('fiscal_code'),
+    /** Codice univoco (SDI) for e-invoicing. */
+    sdiCode: text('sdi_code'),
+    email: text('email'),
+    pecEmail: text('pec_email'),
+    phone: text('phone'),
     /** Deactivated instead of deleted — a company has users/catalog/quotes cascading off it, so admin-panel "delete" is a reversible toggle, not a DELETE statement. */
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

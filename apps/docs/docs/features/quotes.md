@@ -12,57 +12,69 @@ which only **supplier** companies have (in the demo data: Suppli).
 
 ## Flow
 
-1. **New quote** → reference, customer name, fiscal code, address, city, project location.
-2. Open the quote. It has three panes:
-   - **Left — positions:** the quote overview, every position with its price, **New position** and the total. Click a
-     position to edit it; the selected one also has **move up / down**, **duplicate** and **delete**.
-   - **Middle — the position's form:**
-     - **Product** — pick a family (own or shared with you) and a product line.
-     - **Size & position** — position name/code (custom codes allowed), width, height, quantity.
-     - **Characteristics** — one row per option of the line, each auto (**A**) or manual (**M**) priced.
-     - **Pricing** — the line's price is calculated automatically (**A**); switch to manual (**M**) to override it.
-       Discount and markup.
-   - **Right — preview:**
-     - **Calculation** — how the price is built, live as you type: the line's list price, discount and markup, each
-       option at its own terms, the unit price, the quantity and the total, plus a **Formula trace** with every step.
-     - **PDF** — the quote's PDF as it is saved. It reloads after you add or save a position.
-3. **Add position** / **Save changes**. After saving, the position stays selected. Clicking another position (or
-   **New position**) with unsaved changes asks before discarding them.
-4. **Download PDF** (top right).
+1. **New quote** → reference and customer (fiscal code, address, city and project are optional and can be changed later).
+2. The quote opens on one page, as in the client's design:
+   - **Top bar** — the reference, the version and its status, the customer and project (click them to edit the
+     customer, fiscal code, address, city, project, date and internal notes), the **total VAT excluded**, and the
+     buttons **Print settings**, **Preview**, **Export** (coming soon), **Change history** and **Save**.
+   - **Intestazione** — text modules (rich text: headings, bold, lists, alignment, links, images up to 1 MB). Add an
+     empty text or one of the company's **saved texts**; any text can be saved as a new saved text. Drag or use the arrows
+     to reorder.
+   - **Product families** — **Add product family** picks a family from the catalog (published, in your library, ready
+     for invoicing and valid today; search and category filter) or an **Empty product** typed in by hand. Each family has
+     its validity badge, **ALT/STD**, duplicate, delete, collapse, and **Details & specifications** (category,
+     description, notes and the technical table).
+   - **Lines** — one row each: Pos, Q.tà, Linea, U.M., B, H, m², Extra%, €/pz, Sc%, Netto €, Totale, IVA, Ore posa, then
+     ALT/STD, duplicate, delete, characteristics and lock. Lines and families can be dragged or moved with the arrows.
+   - **Riepilogo e Chiusura** — sortable blocks: texts, *Detail by product*, *Grouping by category* (categories can be
+     reordered), *Offer total*, *Payment plan* (with a check that it adds up to 100%) and *Activities* (drag between
+     **Included** and **Not included**; the eye hides one from the print). New quotes start with the client's default
+     payment plan and activities.
+3. **Save** asks how: on a **draft**, **Fix version N** (in place) or **Save as a new version**; on a version that was
+   **sent**, accepted or rejected, only **Save as a new version** — a sent version never changes.
+4. **Preview** opens *Anteprima Preventivo* in a new tab: A4 pages with the branch's logo and colour in the header, the
+   company's fiscal data and *Pagina X di Y* in the footer. **Print / Save PDF** uses the browser's print dialog. Unsaved
+   changes are shown too.
 
-On a smaller screen the preview moves under the form; on a phone the three panes are tabs (**Positions**, **Edit**,
-**Preview**).
+## Prices
 
-![Quote builder: positions, form and calculation](/img/screens/quote-detail.png)
+- **€/pz** is the catalog price of the line with its options (at the family's or the share's discount and markup). It
+  is recalculated as soon as the line, its options or its size change, and again by the server on every save.
+- **Netto** = €/pz × (1 + Extra%/100) × (1 − Sc%/100); **Totale** = Q.tà × Netto.
+- Alternative lines (**ALT**) are left out of their family's subtotal, alternative families out of the quote total.
+- Typing a €/pz of your own makes the line manual (shown in italics); the arrow next to it goes back to the catalog price.
+- The lock only freezes the row in the editor; it has no effect on the price or the print.
 
-![The PDF preview](/img/screens/add-position.png)
+How every number is computed: [How prices are calculated](../pricing.md).
 
-Positions from a shared family start with the discount, markup and installation hours set on the share for that line and its options. How every number is computed: [How prices are calculated](../pricing.md).
+## Print settings
 
-## Family versions in a quote
+Who prints as **sales contact** (*Vostro referente*: name, email, phone), which **branch** heads the pages (when the
+contact works for more than one), and which parts print: sales contact, family descriptions, line characteristics,
+detail by product, grouping by category, offer total, payment plan, activities, Extra % and Discount % columns. The
+discount column is required while any line has a discount.
 
-- The family list shows each family's version, e.g. “Finestra (v2)”. As soon as a family is picked, what that version
-  changed compared with the previous one (added, removed, economic, description) opens below it as a tree, the same as
-  on the family's page: hide kinds of change, switch to a list, click a change for its before and after (or the price
-  table cell by cell). **Hide changes** folds it; **Family page** opens the comparison there.
-- The changes are detected from the content of the two versions when the new one is uploaded, not from the file's name
-  or highlighted cells, and stored with the version.
-- When a newer version of a position's family can be quoted, the position shows a branch icon in the list, and
-  opening it shows **v3 available** with what changed and the link to the comparison. The position keeps its price
-  until you switch: pick the new version in its form — the size, quantity and code stay, and so do the line and the
-  options that have the same names in the new version — then **Save changes**.
-- In the PDF, each family's heading shows its version, and under it what changed since the previous version: what was
-  added or removed, and which items have price changes (price tables with their % range) or text changes. A copy's
-  first version is not compared with the family it was copied from.
+The header, footer and sales contacts come from **Settings → Company**: fiscal data, branches (logo up to 512 KB,
+colour, address, email, phone, users), each user's phone, and the saved texts.
+
+## Versions and expired price lists
+
+- Every version keeps its own document; the version menu in the top bar switches between them and changes the status:
+  draft → **sent** → **accepted** / **rejected**.
+- When a family's prices have expired, a **draft** moves its lines to the newest valid version of that family (matched
+  by line and option name) and reprices them, with a notice of what was moved and what could not be matched. A sent
+  version keeps its prices; **Update prices** applies the newer version to your edits, which then become a new version.
+- If there is no valid version of the family, saving and printing are blocked and the quote links to the family to
+  upload a new price list.
 
 ## History
 
-Open **Quote overview** in the positions pane, then **History**, to see who created it and who added, edited, duplicated, reordered or
-removed which position, and when. Anyone who can see the quote can see its history.
-
-![Quote history](/img/screens/quote-history.png)
+**Change history** lists every save of the version — who, when, the total, and what changed (fields of the header,
+families and lines, added/removed/reordered items, closing and print settings). Any save can be opened read-only and
+**Restored** as the starting point of new edits. The quote's audit trail (created, saved, new version, status) is kept
+as before.
 
 ## Not built yet
 
-- Status workflow — every quote stays **Draft** (Sent / Accepted / Rejected exist in the data model only).
-- Editing the quote header, deleting a whole quote, duplicating a whole quote.
+- Word and Excel export, images in the print, sending the quote by email from the app.
+- Deleting or duplicating a whole quote.

@@ -1,4 +1,4 @@
-import { boolean, pgTable, primaryKey, uuid } from 'drizzle-orm/pg-core'
+import { boolean, index, pgTable, primaryKey, uuid } from 'drizzle-orm/pg-core'
 
 import { businessUnits } from './business-units'
 import { users } from './users'
@@ -15,5 +15,9 @@ export const userBusinessUnits = pgTable(
       .references(() => businessUnits.id, { onDelete: 'cascade' }),
     canEdit: boolean('can_edit').notNull().default(false),
   },
-  (table) => [primaryKey({ columns: [table.userId, table.businessUnitId] })],
+  (table) => [
+    primaryKey({ columns: [table.userId, table.businessUnitId] }),
+    // A branch's users (the company profile, and the sales contacts it offers on a quote).
+    index('user_business_units_business_unit_id_idx').on(table.businessUnitId),
+  ],
 )

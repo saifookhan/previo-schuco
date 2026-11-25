@@ -48,13 +48,18 @@ Ein kompletter Durchlauf der wichtigsten Abläufe. Mit den [Demo-Anmeldungen](./
 ## Angebote — als `admin@suppli-demo.it`
 
 - [ ] Ein Angebot erstellen.
-- [ ] *Finestra 1 anta* hinzufügen, 800 × 1200, Menge 4, Triplo vetro / Antracite / Con chiave → **1 857,02 €**
+- [ ] **Produktfamilie hinzufügen** → *Finestra 1 anta*; auf der Linie 800 × 1200, Menge 4 und bei den Merkmalen Triplo vetro / Antracite / Con chiave → Gesamt **1 857,02 €**
       (siehe [Rechenbeispiel](./pricing.md#rechenbeispiel)).
 - [ ] Ein Maß größer als die Tabelle versuchen (z. B. 1300 × 900) → klare Fehlermeldung, kein Preis.
-- [ ] Eine Position und ein Merkmal auf manuellen Preis umstellen.
-- [ ] Positionen bearbeiten, duplizieren, umsortieren und löschen.
-- [ ] Das PDF herunterladen und die Summen prüfen.
-- [ ] *Verlauf* im Angebot öffnen — jeder Schritt oben steht mit deinem Namen da.
+- [ ] Einen eigenen €/Stk auf einer Linie eingeben — sie wird manuell (kursiv); der Pfeil daneben holt den Listenpreis zurück. Extra% 110 und Rab% 10 ändern Netto und Gesamt.
+- [ ] Eine Linie und eine Familie als **ALT** markieren — sie fallen aus Zwischensumme und Summe.
+- [ ] Linien und Familien duplizieren, ziehen, mit Pfeilen verschieben und löschen; Abschlussblöcke, Kategorien und Raten umsortieren; eine Leistung zwischen *Inbegriffen* und *Nicht inbegriffen* ziehen.
+- [ ] Einen Einleitungstext hinzufügen, als gespeicherten Text sichern und über **Gespeicherte Texte** erneut einfügen.
+- [ ] **Speichern** → **Version 1 korrigieren**; dann als **Gesendet** markieren; erneut ändern → nur **Als neue Version speichern** → v2.
+- [ ] **Änderungsverlauf** listet jede Speicherung mit den Änderungen; eine ältere öffnen und **Wiederherstellen**.
+- [ ] **Vorschau** → A4-Seiten mit Logo der Niederlassung, *Vostro referente* und Fußzeile; **Drucken / Als PDF speichern**; Felder in den **Druckeinstellungen** abwählen und prüfen, dass sie verschwinden (die Rabattspalte bleibt, solange eine Zeile Rabatt hat).
+- [ ] Die Gültigkeit der Familie in die Vergangenheit setzen: ein Entwurf wechselt mit Hinweis auf die neueste gültige Version; ohne neuere Version sind Speichern und Vorschau gesperrt, mit Link zum Hochladen.
+- [ ] *Einstellungen → Unternehmen*: Steuerdaten ändern, eine Niederlassung mit Logo und Farbe anlegen, das Telefon eines Ansprechpartners setzen — die Vorschau zeigt sie.
 - [ ] Als `sales@technometal-demo.it`: keine Möglichkeit, Angebote zu erstellen.
 
 ## Benutzer & Onboarding

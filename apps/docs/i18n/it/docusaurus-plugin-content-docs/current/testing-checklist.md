@@ -48,13 +48,18 @@ Un percorso completo dei flussi principali. Usa gli [Accessi demo](./demo-logins
 ## Preventivi — come `admin@suppli-demo.it`
 
 - [ ] Crea un preventivo.
-- [ ] Aggiungi *Finestra 1 anta*, 800 × 1200, qtà 4, Triplo vetro / Antracite / Con chiave → **1 857,02 €**
+- [ ] **Aggiungi famiglia di prodotto** → *Finestra 1 anta*; sulla linea imposta 800 × 1200, Q.tà 4 e, nelle caratteristiche, Triplo vetro / Antracite / Con chiave → Totale **1 857,02 €**
       (vedi l'[esempio svolto](./pricing.md#esempio-svolto)).
 - [ ] Prova una misura più grande della tabella (es. 1300 × 900) → errore chiaro, nessun prezzo.
-- [ ] Passa una posizione e una caratteristica al prezzo manuale.
-- [ ] Modifica, duplica, riordina ed elimina posizioni.
-- [ ] Scarica il PDF e controlla i totali.
-- [ ] Apri *Cronologia* nel preventivo — ogni passo sopra è elencato con il tuo nome.
+- [ ] Scrivi un €/pz proprio su una linea — diventa manuale (corsivo); la freccia accanto riporta il prezzo di listino. Extra% 110 e Sc% 10 cambiano Netto e Totale.
+- [ ] Segna una linea e una famiglia **ALT** — escono dal subtotale e dal totale.
+- [ ] Duplica, trascina, sposta con le frecce ed elimina linee e famiglie; riordina i blocchi di chiusura, le categorie e le rate; trascina un'attività tra *Incluse* e *Non incluse*.
+- [ ] Aggiungi un testo d'intestazione, salvalo come testo salvato e aggiungilo di nuovo da **Testi salvati**.
+- [ ] **Salva** → **Correggi la versione 1**; poi segnala come **Inviato**; modifica di nuovo → c'è solo **Salva come nuova versione** → v2.
+- [ ] **Cronologia modifiche** elenca ogni salvataggio con cosa è cambiato; aprine uno vecchio e **Ripristina**.
+- [ ] **Anteprima** → pagine A4 con logo dell'unità, *Vostro referente* e piè di pagina; **Stampa / Salva PDF**; togli campi nelle **Impostazioni di stampa** e verifica che spariscano (la colonna sconto resta se una riga ha uno sconto).
+- [ ] Porta la validità della famiglia nel passato: una bozza passa alla versione valida più recente con un avviso; senza versione più recente, Salva e Anteprima sono disattivati con un link per caricarla.
+- [ ] *Impostazioni → Azienda*: cambia i dati fiscali, aggiungi un'unità con logo e colore, imposta il telefono di un referente — l'anteprima li mostra.
 - [ ] Come `sales@technometal-demo.it`: nessuna possibilità di creare preventivi.
 
 ## Utenti e onboarding

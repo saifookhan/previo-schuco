@@ -5,13 +5,23 @@ process.env.DATABASE_URL =
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { auditLog, companies, createDb, productFamilyChanges, roles, users, withSystemTransaction } from '@schuco/db'
+import {
+  auditLog,
+  companies,
+  createDb,
+  getProductFamilyDetail as getProductFamilyDetailQuery,
+  productFamilyChanges,
+  roles,
+  users,
+  withSystemTransaction,
+} from '@schuco/db'
 import { countFamilyChanges, type FamilyChangeNode } from '@schuco/contracts'
 import { and, eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { parseProductFamilyWorkbook } from '../src/lib/excel-import'
 import { getDb } from '../src/lib/db'
+import { withTenantDb } from '../src/lib/tenant-db'
 import {
   ExcelImportError,
   backfillFamilyChanges,
@@ -22,7 +32,7 @@ import {
   setProductFamilyPublishedStatus,
   updateProductLine,
 } from '../src/services/product-families-service'
-import { previewQuotePosition } from '../src/services/quotes-service'
+import { priceCatalogLine } from '../src/services/quotes-service'
 
 /**
  * The v2 Excel template, over the example workbooks the business sent
@@ -85,6 +95,9 @@ let actorUserId = ''
 const actor = { actorUserId: '', actorCompanyId: '', requestId: 'test-request' }
 const ctx = () => ({ effectiveCompanyId: supplierId, isSuperAdmin: false })
 const usable = { publish: true, readyForInvoicing: true }
+/** One catalog line's €/pz, as a quote prices it. */
+const priceLine = (familyId: string, input: Parameters<typeof priceCatalogLine>[3]) =>
+  withTenantDb(ctx(), async (tx) => priceCatalogLine(tx, supplierId, (await getProductFamilyDetailQuery(tx, familyId))!, input))
 
 beforeAll(async () => {
   await withSystemTransaction(getDb(), async (tx) => {
@@ -256,19 +269,12 @@ describe('pricing a position from a v2 family', () => {
       return { characteristicId: parent.id, subCharacteristicId: child.id }
     }
     const price = (selections: ReturnType<typeof pick>[]) =>
-      previewQuotePosition(ctx(), {
-        productFamilyId: family.id,
-        productLineId: line.id,
-        quantity: 1,
-        widthMm: 1000,
-        heightMm: 1400,
-        characteristicSelections: selections,
-      })
+      priceLine(family.id, { productLineId: line.id, widthMm: 1000, heightMm: 1400, options: selections })
     const installation = pick('Posa in opera', 'Inclusa (a Ore)')
     // 3 h × 50 €/h = 150 (above the 140 minimum); with RC3 (+2 h): 5 h × 50 = 250.
-    expect((await price([installation])).characteristics[0].price).toBe(150)
+    expect((await price([installation])).breakdown.options[0].basePrice).toBe(150)
     const withRc3 = await price([pick('Classe antieffrazione', 'RC3'), installation])
-    expect(withRc3.characteristics.map((c) => c.price)).toEqual([0, 250])
+    expect(withRc3.breakdown.options.map((o) => o.basePrice)).toEqual([0, 250])
   })
 
   it('prices each option at its own discount and markup, and the line at the position\'s', async () => {
@@ -277,17 +283,17 @@ describe('pricing a position from a v2 family', () => {
     const guides = detail.characteristics.find((c) => !c.parentId && c.name === 'Guide')!
     const guide = detail.characteristics.find((c) => c.parentId === guides.id && c.name.startsWith('Guide base'))!
     const line = detail.lines.find((l) => detail.relations.some((r) => r.productLineId === l.id && r.characteristicId === guides.id))!
-    const preview = await previewQuotePosition(ctx(), {
-      productFamilyId: family.id,
+    const priced = await priceLine(family.id, {
       productLineId: line.id,
-      quantity: 1,
       widthMm: 1000,
       heightMm: 1500,
-      characteristicSelections: [{ characteristicId: guides.id, subCharacteristicId: guide.id }],
+      options: [{ characteristicId: guides.id, subCharacteristicId: guide.id }],
     })
     // Guide: 2 × 1.5 m × 7.15 = 21.45 (above its 15 minimum), at its own 30% discount and 150% markup.
-    expect(preview.characteristics[0].price).toBeCloseTo(21.45, 6)
-    const lineFinal = preview.lineUnitPrice * (1 - preview.discountPct / 100) * (preview.extraMarkupPct / 100)
-    expect(preview.finalPrice).toBeCloseTo(lineFinal + 21.45 * 0.7 * 1.5, 6)
+    expect(priced.breakdown.options[0]).toMatchObject({ discountPct: 30, markupPct: 150 })
+    expect(priced.breakdown.options[0].basePrice).toBeCloseTo(21.45, 6)
+    const { line: lineCost } = priced.breakdown
+    const lineFinal = lineCost.basePrice * (1 - lineCost.discountPct / 100) * (lineCost.markupPct / 100)
+    expect(priced.unitPrice).toBeCloseTo(lineFinal + 21.45 * 0.7 * 1.5, 4)
   })
 })

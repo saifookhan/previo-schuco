@@ -30,6 +30,12 @@ const jsonResponse = (
   },
 })
 
+const idParam = (name: string) => ({ name, in: 'path', required: true, schema: { type: 'string', format: 'uuid' } })
+const versionParam = { name: 'version', in: 'query', required: false, schema: { type: 'integer', minimum: 1 } }
+const jsonBody = (description: string) => ({ required: true, description, content: { 'application/json': { schema: { type: 'object' } } } })
+const badRequest = () => ({ '400': { description: 'Invalid body', content: { 'application/json': { schema: ref('ErrorResponse') } } } })
+const notFound = (description: string) => ({ '404': { description, content: { 'application/json': { schema: ref('ErrorResponse') } } } })
+
 const errorResponses = (): Record<string, unknown> => ({
   '401': {
     description: 'Missing or invalid authentication',
@@ -90,7 +96,8 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
       { name: 'Admin', description: 'Cross-tenant platform administration (super-admin)' },
       { name: 'Products', description: 'Product families (the catalog)' },
       { name: 'Partners', description: 'Connections between clients and suppliers, and the notifications about them' },
-      { name: 'Quotes', description: 'Sales quotes built from the product-family catalog' },
+      { name: 'Quotes', description: 'Sales quotes built from the product-family catalog: versions, saves and print data' },
+      { name: 'Company', description: 'The company profile printed on quotes: fiscal data, branches, sales contacts and saved texts' },
     ],
     paths: {
       '/health': {
@@ -587,7 +594,7 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
         get: {
           tags: ['Quotes'],
           summary: "List the caller's sales quotes",
-          description: 'Catalog-backed quotes (quote.view). There is no /api/quotes collection.',
+          description: 'One row per quote with its latest version (quote.view). There is no /api/quotes collection.',
           operationId: 'listSalesQuotes',
           security: [{ bearerAuth: [] }],
           responses: {
@@ -606,19 +613,193 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
             ...errorResponses(),
           },
         },
+        post: {
+          tags: ['Quotes'],
+          summary: 'Create a quote',
+          description: 'A draft with an empty version 1, the default closing blocks and the caller as sales contact (quote.edit).',
+          operationId: 'createSalesQuote',
+          security: [{ bearerAuth: [] }],
+          requestBody: jsonBody('{ reference, header: { customerName, customerFiscalCode, customerAddress, customerCity, projectLocation } }'),
+          responses: { '201': { description: 'The quote with its first version' }, ...badRequest(), ...errorResponses() },
+        },
+      },
+      '/api/sales-quotes/price-lines': {
+        post: {
+          tags: ['Quotes'],
+          summary: 'Catalog price of quote lines',
+          description: 'The €/pz, unit and installation hours each line would be saved with, or why it cannot be priced (quote.edit).',
+          operationId: 'priceSalesQuoteLines',
+          security: [{ bearerAuth: [] }],
+          requestBody: jsonBody('{ lines: [{ key, productFamilyId, productLineId, widthMm, heightMm, options: [{ characteristicId, subCharacteristicId }] }] }'),
+          responses: { '200': { description: '{ lines: [{ key, ok, unitPrice, installationHours, unit, minApplied } | { key, ok: false, error }] }' }, ...badRequest(), ...errorResponses() },
+        },
       },
       '/api/sales-quotes/{id}': {
         get: {
           tags: ['Quotes'],
           summary: 'Sales quote detail',
+          description: 'The quote, its versions, one version (`version`, default the latest) and whether each catalog family on it can still price it.',
           operationId: 'getSalesQuote',
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          parameters: [idParam('id'), versionParam],
+          responses: { '200': { description: 'Quote, versions, version document and family status' }, ...notFound('No such quote or version'), ...errorResponses() },
+        },
+      },
+      '/api/sales-quotes/{id}/print': {
+        get: {
+          tags: ['Quotes'],
+          summary: 'Data of the printed quote',
+          description: "One version with the company's fiscal data, the branch heading the pages and the sales contact (quote.view).",
+          operationId: 'getSalesQuotePrint',
+          security: [{ bearerAuth: [] }],
+          parameters: [idParam('id'), versionParam],
+          responses: { '200': { description: 'Print data' }, ...notFound('No such quote or version'), ...errorResponses() },
+        },
+      },
+      '/api/sales-quotes/{id}/versions/{versionId}': {
+        put: {
+          tags: ['Quotes'],
+          summary: 'Save a quote version',
+          description:
+            '`mode: update` fixes a draft in place; `mode: newVersion` saves the document as the next version. Catalog lines are repriced on the server; every save is kept with what it changed (quote.edit).',
+          operationId: 'saveSalesQuoteVersion',
+          security: [{ bearerAuth: [] }],
+          parameters: [idParam('id'), idParam('versionId')],
+          requestBody: jsonBody('{ document, mode: "update" | "newVersion", baseRevision }'),
           responses: {
-            '200': { description: 'Quote and its positions' },
-            '404': { description: 'No such quote, or the id is not a UUID', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            '200': { description: 'The quote at the saved version' },
+            ...badRequest(),
+            ...notFound('No such quote or version'),
+            '409': { description: 'The version was saved by someone else since `baseRevision`', content: { 'application/json': { schema: ref('ErrorResponse') } } },
             ...errorResponses(),
           },
+        },
+      },
+      '/api/sales-quotes/{id}/versions/{versionId}/status': {
+        post: {
+          tags: ['Quotes'],
+          summary: 'Change the status of a version',
+          description: 'draft → sent; sent → accepted or rejected; accepted ↔ rejected. Sending is refused while a family on it is not valid (quote.edit).',
+          operationId: 'setSalesQuoteVersionStatus',
+          security: [{ bearerAuth: [] }],
+          parameters: [idParam('id'), idParam('versionId')],
+          requestBody: jsonBody('{ status }'),
+          responses: { '200': { description: 'The quote at that version' }, ...badRequest(), ...notFound('No such quote or version'), ...errorResponses() },
+        },
+      },
+      '/api/sales-quotes/{id}/versions/{versionId}/revisions': {
+        get: {
+          tags: ['Quotes'],
+          summary: 'Saves of a version',
+          description: 'Newest first, each with who saved it and what changed (quote.view).',
+          operationId: 'listSalesQuoteRevisions',
+          security: [{ bearerAuth: [] }],
+          parameters: [idParam('id'), idParam('versionId')],
+          responses: { '200': { description: '{ revisions }' }, ...notFound('No such quote or version'), ...errorResponses() },
+        },
+      },
+      '/api/sales-quotes/{id}/versions/{versionId}/revisions/{revision}': {
+        get: {
+          tags: ['Quotes'],
+          summary: 'One save of a version, with its document',
+          operationId: 'getSalesQuoteRevision',
+          security: [{ bearerAuth: [] }],
+          parameters: [idParam('id'), idParam('versionId'), { name: 'revision', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } }],
+          responses: { '200': { description: 'The revision and its document' }, ...notFound('No such revision'), ...errorResponses() },
+        },
+      },
+      '/api/company/profile': {
+        get: {
+          tags: ['Company'],
+          summary: 'Company profile for printed quotes',
+          description: 'Fiscal data, branches (logo, colour, contacts, users) and sales contacts (quote.view).',
+          operationId: 'getCompanyProfile',
+          security: [{ bearerAuth: [] }],
+          responses: { '200': { description: '{ profile, businessUnits, salesContacts }' }, ...notFound('No such company'), ...errorResponses() },
+        },
+        put: {
+          tags: ['Company'],
+          summary: 'Update the fiscal data',
+          operationId: 'updateCompanyProfile',
+          security: [{ bearerAuth: [] }],
+          requestBody: jsonBody('{ name, vatNumber, fiscalAddress, fiscalCode, sdiCode, email, pecEmail, phone } (users.manage)'),
+          responses: { '200': { description: 'The profile after the update' }, ...badRequest(), ...errorResponses() },
+        },
+      },
+      '/api/company/business-units': {
+        post: {
+          tags: ['Company'],
+          summary: 'Add a branch',
+          operationId: 'createBusinessUnit',
+          security: [{ bearerAuth: [] }],
+          requestBody: jsonBody('{ name, address, email, phone, primaryColor, logoDataUrl, userIds } (users.manage)'),
+          responses: { '201': { description: 'The profile after the change' }, ...badRequest(), ...errorResponses() },
+        },
+      },
+      '/api/company/business-units/{unitId}': {
+        put: {
+          tags: ['Company'],
+          summary: 'Update a branch',
+          operationId: 'updateBusinessUnit',
+          security: [{ bearerAuth: [] }],
+          parameters: [idParam('unitId')],
+          requestBody: jsonBody('{ name, address, email, phone, primaryColor, logoDataUrl, userIds } (users.manage)'),
+          responses: { '200': { description: 'The profile after the change' }, ...badRequest(), ...notFound('No such branch'), ...errorResponses() },
+        },
+        delete: {
+          tags: ['Company'],
+          summary: 'Remove a branch',
+          operationId: 'deleteBusinessUnit',
+          security: [{ bearerAuth: [] }],
+          parameters: [idParam('unitId')],
+          responses: { '200': { description: 'The profile after the change' }, ...notFound('No such branch'), ...errorResponses() },
+        },
+      },
+      '/api/company/sales-contacts/{userId}': {
+        put: {
+          tags: ['Company'],
+          summary: "Set a sales contact's phone",
+          operationId: 'updateSalesContact',
+          security: [{ bearerAuth: [] }],
+          parameters: [idParam('userId')],
+          requestBody: jsonBody('{ phone } (users.manage)'),
+          responses: { '200': { description: 'The profile after the change' }, ...badRequest(), ...notFound('No such user'), ...errorResponses() },
+        },
+      },
+      '/api/company/text-templates': {
+        get: {
+          tags: ['Company'],
+          summary: 'Saved texts for quotes',
+          operationId: 'listTextTemplates',
+          security: [{ bearerAuth: [] }],
+          responses: { '200': { description: '{ templates }' }, ...errorResponses() },
+        },
+        post: {
+          tags: ['Company'],
+          summary: 'Save a text',
+          operationId: 'createTextTemplate',
+          security: [{ bearerAuth: [] }],
+          requestBody: jsonBody('{ name, html } (quote.edit; the HTML is sanitized)'),
+          responses: { '201': { description: 'The saved text' }, ...badRequest(), ...errorResponses() },
+        },
+      },
+      '/api/company/text-templates/{templateId}': {
+        put: {
+          tags: ['Company'],
+          summary: 'Update a saved text',
+          operationId: 'updateTextTemplate',
+          security: [{ bearerAuth: [] }],
+          parameters: [idParam('templateId')],
+          requestBody: jsonBody('{ name, html } (quote.edit)'),
+          responses: { '200': { description: 'The saved text' }, ...badRequest(), ...notFound('No such text'), ...errorResponses() },
+        },
+        delete: {
+          tags: ['Company'],
+          summary: 'Delete a saved text',
+          operationId: 'deleteTextTemplate',
+          security: [{ bearerAuth: [] }],
+          parameters: [idParam('templateId')],
+          responses: { '200': { description: '{ ok: true }' }, ...notFound('No such text'), ...errorResponses() },
         },
       },
     },

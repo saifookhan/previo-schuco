@@ -15,6 +15,8 @@ import {
   deleteProductFamily,
   duplicateProductFamily,
   getProductFamilyDetail,
+  getProductFamilyVersions,
+  PriceValidityOverlapError,
   importProductFamilyFromExcel,
   ExcelImportError,
   listProductFamilies,
@@ -569,13 +571,64 @@ describe('upload dialog: preview, then save with the confirmed fields', () => {
       actor,
       supplierCompanyId,
       { buffer: fixtureBuffer, originalName: 'v1.xlsx' },
-      { priceValidFrom: '2026-01-01', priceValidTo: null },
+      { priceValidFrom: '2026-01-01', priceValidTo: '2026-12-31' },
     )
     const v2 = await createNewVersionFromExcel(ctx(), actor, v1.id, { buffer: fixtureBuffer, originalName: 'v2.xlsx' }, { priceValidFrom: '2027-01-01' })
 
     expect(v2).toMatchObject({ version: v1.version + 1, priceValidFrom: '2027-01-01', priceValidTo: null, isPublished: false })
     const v1After = await getProductFamilyDetail(ctx(), v1.id)
-    expect(v1After!.family).toMatchObject({ priceValidFrom: '2026-01-01', priceValidTo: null })
+    expect(v1After!.family).toMatchObject({ priceValidFrom: '2026-01-01', priceValidTo: '2026-12-31' })
+  })
+
+  it('refuses a new version whose dates share a day with another version, and saves nothing', async () => {
+    const v1 = await importProductFamilyFromExcel(
+      ctx(),
+      actor,
+      supplierCompanyId,
+      { buffer: fixtureBuffer, originalName: 'v1.xlsx' },
+      { priceValidFrom: '2026-01-01', priceValidTo: null },
+    )
+    const upload = { buffer: fixtureBuffer, originalName: 'v2.xlsx' }
+    await expect(createNewVersionFromExcel(ctx(), actor, v1.id, upload, { priceValidFrom: '2027-01-01' })).rejects.toThrow(PriceValidityOverlapError)
+    expect((await getProductFamilyVersions(ctx(), v1.id))!.versions).toHaveLength(1)
+
+    await setProductFamilyPriceValidityDates(ctx(), actor, v1.id, { priceValidFrom: '2026-01-01', priceValidTo: '2026-12-31' })
+    // The last day of v1 is still taken.
+    await expect(createNewVersionFromExcel(ctx(), actor, v1.id, upload, { priceValidFrom: '2026-12-31' })).rejects.toThrow('overlap version 1')
+    await expect(createNewVersionFromExcel(ctx(), actor, v1.id, upload, { priceValidFrom: '2027-01-01' })).resolves.toMatchObject({ version: 2 })
+  })
+
+  it('counts a version without dates as valid every day', async () => {
+    const legacy = await importProductFamilyFromExcel(ctx(), actor, supplierCompanyId, { buffer: fixtureBuffer, originalName: 'v1.xlsx' })
+    const upload = { buffer: fixtureBuffer, originalName: 'v2.xlsx' }
+    await expect(createNewVersionFromExcel(ctx(), actor, legacy.id, upload, { priceValidFrom: '2030-01-01' })).rejects.toThrow(PriceValidityOverlapError)
+
+    await setProductFamilyPriceValidityDates(ctx(), actor, legacy.id, { priceValidFrom: '2020-01-01', priceValidTo: '2029-12-31' })
+    await expect(createNewVersionFromExcel(ctx(), actor, legacy.id, upload, { priceValidFrom: '2030-01-01' })).resolves.toMatchObject({ version: 2 })
+  })
+
+  it('refuses changing a version to dates another version already covers, keeping the old dates', async () => {
+    const v1 = await importProductFamilyFromExcel(
+      ctx(),
+      actor,
+      supplierCompanyId,
+      { buffer: fixtureBuffer, originalName: 'v1.xlsx' },
+      { priceValidFrom: '2026-01-01', priceValidTo: '2026-06-30' },
+    )
+    const v2 = await createNewVersionFromExcel(ctx(), actor, v1.id, { buffer: fixtureBuffer, originalName: 'v2.xlsx' }, { priceValidFrom: '2026-07-01', priceValidTo: '2026-12-31' })
+
+    await expect(setProductFamilyPriceValidityDates(ctx(), actor, v1.id, { priceValidFrom: '2026-01-01', priceValidTo: null })).rejects.toThrow(
+      PriceValidityOverlapError,
+    )
+    await expect(setProductFamilyPriceValidityDates(ctx(), actor, v2.id, { priceValidFrom: '2026-06-15', priceValidTo: '2026-12-31' })).rejects.toThrow(
+      'overlap version 1',
+    )
+    expect((await getProductFamilyDetail(ctx(), v1.id))!.family).toMatchObject({ priceValidFrom: '2026-01-01', priceValidTo: '2026-06-30' })
+    expect((await getProductFamilyDetail(ctx(), v2.id))!.family).toMatchObject({ priceValidFrom: '2026-07-01', priceValidTo: '2026-12-31' })
+
+    // Moving a version within its own days is fine.
+    await setProductFamilyPriceValidityDates(ctx(), actor, v2.id, { priceValidFrom: '2026-08-01', priceValidTo: null })
+    expect((await getProductFamilyDetail(ctx(), v2.id))!.family).toMatchObject({ priceValidFrom: '2026-08-01', priceValidTo: null })
   })
 
   it('starts a new family not ready for invoicing; only the owner changes it, and each change is audited', async () => {
@@ -629,7 +682,7 @@ describe('upload dialog: preview, then save with the confirmed fields', () => {
     })
     expect(copy.hasPriceList).toBe(false)
     // Set by hand, so a new version keeps it too.
-    const v2 = await createNewVersionFromExcel(ctx(), actor, family.id, { buffer: fixtureBuffer, originalName: 'v2.xlsx' }, { priceValidFrom: '2027-01-01' })
+    const v2 = await createNewVersionFromExcel(ctx(), actor, family.id, { buffer: fixtureBuffer, originalName: 'v2.xlsx' })
     expect(v2.hasPriceList).toBe(false)
 
     const entries = await withSystemTransaction(db, (tx) =>

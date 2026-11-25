@@ -1,42 +1,17 @@
-'use client'
+import { AlertTriangle } from 'lucide-react'
+import { getTranslations } from 'next-intl/server'
 
-import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { CompanySettings } from '@/components/company-settings/company-settings'
+import { fetchFromApiResult } from '@/lib/api/server-client'
+import type { CompanyProfileResponse, TextTemplate } from '@schuco/contracts'
 
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { DEMO_COMPANY, type CompanyDetails } from '@/types/settings'
-
-/**
- * Demo company details form.
- */
-const CompanyPage = () => {
-  const t = useTranslations('settingsCompany')
-  const [company, setCompany] = useState<CompanyDetails>(DEMO_COMPANY)
-  const [saved, setSaved] = useState(false)
-
-  const update = (field: keyof CompanyDetails, value: string) => {
-    setCompany((prev) => ({ ...prev, [field]: value }))
-    setSaved(false)
-  }
-
-  const handleSave = () => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
-
-  const fields: { key: keyof CompanyDetails; label: string }[] = [
-    { key: 'name', label: t('fieldName') },
-    { key: 'vatNumber', label: t('fieldVatNumber') },
-    { key: 'address', label: t('fieldAddress') },
-    { key: 'city', label: t('fieldCity') },
-    { key: 'country', label: t('fieldCountry') },
-    { key: 'phone', label: t('fieldPhone') },
-    { key: 'email', label: t('fieldEmail') },
-    { key: 'website', label: t('fieldWebsite') },
-  ]
+/** The company's details as its quotes print them: fiscal data, branches, sales contacts, saved texts. */
+const CompanyPage = async () => {
+  const t = await getTranslations('settingsCompany')
+  const [profileResult, templatesResult] = await Promise.all([
+    fetchFromApiResult<CompanyProfileResponse>('/api/company/profile'),
+    fetchFromApiResult<{ templates: TextTemplate[] }>('/api/company/text-templates'),
+  ])
 
   return (
     <div className="p-6 md:p-8">
@@ -44,30 +19,14 @@ const CompanyPage = () => {
         <h1 className="text-2xl font-bold text-slate-900">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-500">{t('subtitle')}</p>
       </div>
-
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>{t('companyDetails')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {fields.map(({ key, label }) => (
-            <div key={key} className="space-y-2">
-              <Label htmlFor={key}>{label}</Label>
-              <Input
-                id={key}
-                value={company[key]}
-                onChange={(e) => update(key, e.target.value)}
-              />
-            </div>
-          ))}
-          <div className="flex items-center gap-3 pt-2">
-            <Button onClick={handleSave}>{t('saveChanges')}</Button>
-            {saved && (
-              <span className="text-sm text-green-600">{t('savedSuccessfully')}</span>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {profileResult.status === 'ok' ? (
+        <CompanySettings initialProfile={profileResult.data} initialTemplates={templatesResult.data?.templates ?? []} />
+      ) : (
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          {t('errorLoading')}
+        </div>
+      )}
     </div>
   )
 }

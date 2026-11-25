@@ -9,48 +9,51 @@ import {
   auditLog,
   companies,
   createDb,
-  quotes,
   productFamilyShareItems,
-  productLines,
   productFamilyShares,
+  productLines,
+  quotes,
   roles,
   users,
   withSystemTransaction,
   type Db,
 } from '@schuco/db'
+import type { QuoteDocument, QuoteFamily, QuoteLine, SalesQuoteDetailResponse } from '@schuco/contracts'
 import { eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { getDb } from '../src/lib/db'
-import { renderQuotePdf } from '../src/lib/quote-pdf'
 import {
+  createNewVersionFromExcel,
   getProductFamilyDetail,
   importProductFamilyFromExcel,
-  setProductFamilyPriceValidityDates,
   setProductFamilyLibraryStatus,
+  setProductFamilyPriceValidityDates,
   setProductFamilyPublishedStatus,
   setProductFamilyReadyForInvoicingStatus,
 } from '../src/services/product-families-service'
 import {
+  QuoteConflictError,
   QuoteValidationError,
-  addQuotePosition,
   createQuote,
-  duplicatePosition,
   getQuote,
+  getQuotePrintData,
+  getQuoteRevisionDetail,
+  getQuoteRevisions,
   listMyQuotes,
-  previewQuotePosition,
-  removeQuotePosition,
-  reorderPositions,
-  updateQuotePosition,
+  priceQuoteLines,
+  saveQuoteVersion,
+  setQuoteVersionStatusById,
 } from '../src/services/quotes-service'
 
 /**
- * Service-layer test (ADR 0012): builds a real quote — imports the real
- * supplier workbook, adds a priced position against it (matrix-priced
- * line + a characteristic selection), and checks the numbers match what
- * the pricing tests already verified by hand for this fixture at
- * width=1000/height=800 (line 555, discount 43%, markup 150%).
+ * Service-layer test (ADR 0012): builds real quotes from the real supplier workbook. The
+ * fixture's matrix line at width=1000/height=800 costs 555, at the line's own 43% discount and
+ * 150% markup — so its catalog €/pz is 555 × 0.57 × 1.5 = 474.525 (verified by hand in the
+ * pricing tests).
  */
+
+const CATALOG_UNIT_PRICE = 474.525
 
 let db: Db
 let supplierCompanyId: string
@@ -58,17 +61,11 @@ let actorUserId: string
 const extraCompanyIds: string[] = []
 let linkedClientCompanyId: string
 const fixtureBuffer = readFileSync(join(__dirname, 'fixtures/product-family-sample.xlsx'))
+const fixtureFile = { buffer: fixtureBuffer, originalName: 'product-family-sample.xlsx' }
 const actor = { actorUserId: '', actorCompanyId: '', requestId: 'test-request' }
 
 const ctx = () => ({ effectiveCompanyId: supplierCompanyId, isSuperAdmin: false })
-const importFreshFamily = () =>
-  importProductFamilyFromExcel(
-    ctx(),
-    actor,
-    supplierCompanyId,
-    { buffer: fixtureBuffer, originalName: 'product-family-sample.xlsx' },
-    { readyForInvoicing: true },
-  )
+const importFreshFamily = () => importProductFamilyFromExcel(ctx(), actor, supplierCompanyId, fixtureFile, { readyForInvoicing: true })
 /** Shares a family `supplierCompanyId` → `linkedClientCompanyId`, with the given values for some lines and options. */
 const shareWithLinkedCompany = (familyId: string, items: Omit<typeof productFamilyShareItems.$inferInsert, 'shareId'>[] = []) =>
   withSystemTransaction(db, async (tx) => {
@@ -80,10 +77,63 @@ const shareWithLinkedCompany = (familyId: string, items: Omit<typeof productFami
       await tx.insert(productFamilyShareItems).values(items.map((item) => ({ ...item, shareId: share.id })))
     }
   })
-const matrixLineOf = async (familyId: string) => {
-  const detail = await getProductFamilyDetail(ctx(), familyId)
+const matrixLineOf = async (familyId: string, context = ctx()) => {
+  const detail = await getProductFamilyDetail(context, familyId)
   return detail!.lines.find((l) => l.name.startsWith('N95 L'))!
 }
+
+const newQuote = (reference: string, context = ctx(), quoteActor = actor) =>
+  createQuote(context, quoteActor, {
+    reference,
+    header: { customerName: 'Test Customer', customerFiscalCode: null, customerAddress: null, customerCity: null, projectLocation: null },
+  })
+
+const catalogLine = (productLineId: string, overrides: Partial<QuoteLine> = {}): QuoteLine => ({
+  id: `l-${Math.random().toString(36).slice(2)}`,
+  code: 'P01',
+  productLineId,
+  name: 'N95',
+  quantity: 1,
+  unit: 'pz',
+  widthMm: 1000,
+  heightMm: 800,
+  options: [],
+  priceMode: 'catalog',
+  unitPrice: 0,
+  extraMarkupPct: 0,
+  discountPct: 0,
+  vatRate: '22%',
+  installationHours: null,
+  locked: false,
+  isAlternative: false,
+  ...overrides,
+})
+
+const familyOf = (productFamilyId: string | null, lines: QuoteLine[], overrides: Partial<QuoteFamily> = {}): QuoteFamily => ({
+  id: `f-${Math.random().toString(36).slice(2)}`,
+  productFamilyId,
+  name: 'Finestre',
+  category: 'Serramenti',
+  isAlternative: false,
+  description: '',
+  notes: '',
+  lines,
+  ...overrides,
+})
+
+/** Saves `families` (and any other changes) into the quote's current version. */
+const save = (
+  detail: SalesQuoteDetailResponse,
+  change: Partial<QuoteDocument>,
+  mode: 'update' | 'newVersion' = 'update',
+  context = ctx(),
+  quoteActor = actor,
+) =>
+  saveQuoteVersion(context, quoteActor, detail.quote.id, detail.version.id, {
+    document: { ...detail.version.document, ...change },
+    mode,
+    baseRevision: detail.version.revision,
+  })
 
 beforeAll(async () => {
   db = getDb()
@@ -105,6 +155,7 @@ beforeAll(async () => {
       .values({
         cognitoSub: 'quote-svc-test-actor',
         email: 'quote-svc-test-actor@example.com',
+        name: 'Quote Tester',
         companyId: supplierCompanyId,
         roleId: 'company-admin',
         status: 'active',
@@ -113,9 +164,8 @@ beforeAll(async () => {
     actorUserId = user.id
     actor.actorUserId = actorUserId
 
-    // A company linked as this supplier's client — RLS lets it SELECT the
-    // supplier's *published* families (app_can_view_product_family), which
-    // is exactly the gap addQuotePosition's ownership check guards against.
+    // A company linked as this supplier's client — RLS lets it SELECT the supplier's
+    // *published* families, which is exactly the gap the share check guards against.
     const [linkedClient] = await tx
       .insert(companies)
       .values({ isClient: true, isSupplier: true, name: 'Quote Service Test Linked Client', vatNumber: 'QSVC-CLIENT' })
@@ -132,45 +182,73 @@ afterAll(async () => {
     .where(inArray(auditLog.effectiveCompanyId, [supplierCompanyId, linkedClientCompanyId, ...extraCompanyIds]))
 
   await withSystemTransaction(db, async (tx) => {
-    // Quotes must go first: quote_positions.product_family_id is RESTRICT, and a
-    // single company delete fires the quotes-cascade and product_families-cascade
-    // in an order Postgres doesn't guarantee, so deleting quotes explicitly here
-    // avoids a transient FK violation during company cleanup.
     await tx.delete(quotes).where(inArray(quotes.supplierCompanyId, [supplierCompanyId, linkedClientCompanyId, ...extraCompanyIds]))
     await tx.delete(users).where(inArray(users.id, [actorUserId]))
     await tx.delete(companies).where(inArray(companies.id, [supplierCompanyId, linkedClientCompanyId, ...extraCompanyIds]))
   })
 })
 
-describe('createQuote + addQuotePosition', () => {
-  it('prices a matrix-based line at a given size using the same costing engine as the catalog, and totals correctly', async () => {
+describe('createQuote', () => {
+  it('starts a draft with an empty first version, the default closing and the caller as sales contact', async () => {
+    const detail = await newQuote('TEST-Q-SVC-NEW')
+    expect(detail.quote).toMatchObject({ reference: 'TEST-Q-SVC-NEW', status: 'draft', totalPrice: '0.00', latestVersion: 1 })
+    expect(detail.versions.map((v) => v.version)).toEqual([1])
+    expect(detail.version).toMatchObject({ version: 1, status: 'draft', revision: 1, createdBy: { id: actorUserId, name: 'Quote Tester' } })
+    expect(detail.version.document.families).toEqual([])
+    expect(detail.version.document.closing.map((block) => block.type)).toEqual([
+      'text',
+      'familySummary',
+      'categorySummary',
+      'total',
+      'payments',
+      'activities',
+      'text',
+    ])
+    const closing = detail.version.document.closing
+    expect(detail.version.document.intro[0].html).toContain('Gentile Cliente')
+    expect(closing.filter((block) => block.type === 'text').every((block) => block.type === 'text' && block.html !== '')).toBe(true)
+    const payments = closing.find((block) => block.type === 'payments')
+    const activities = closing.find((block) => block.type === 'activities')
+    expect(payments?.type === 'payments' && payments.rows.reduce((sum, row) => sum + row.pct, 0)).toBe(100)
+    expect(activities?.type === 'activities' && activities.rows.filter((row) => !row.included).map((row) => row.description)).toEqual([
+      'Progettazione esecutiva',
+      'Assistenza post-vendita',
+      'Documentazione tecnica',
+    ])
+    expect(detail.version.document.printSettings.salesContactUserId).toBe(actorUserId)
+    expect(await getQuoteRevisions(ctx(), detail.quote.id, detail.version.id)).toEqual([
+      expect.objectContaining({ revision: 1, changes: [], fromVersion: null }),
+    ])
+  })
+
+  it('is refused for a company that is not a supplier (RLS)', async () => {
+    const [clientOnly] = await withSystemTransaction(db, (tx) =>
+      tx.insert(companies).values({ isClient: true, name: 'Quote Service Test Client Only', vatNumber: 'QSVC-CLIENT-ONLY' }).returning({ id: companies.id }),
+    )
+    try {
+      const clientCtx = { effectiveCompanyId: clientOnly.id, isSuperAdmin: false }
+      await expect(newQuote('TEST-Q-SVC-CLIENT-ONLY', clientCtx, { ...actor, actorCompanyId: clientOnly.id })).rejects.toThrow()
+    } finally {
+      await withSystemTransaction(db, (tx) => tx.delete(companies).where(eq(companies.id, clientOnly.id)))
+    }
+  })
+})
+
+describe('pricing lines', () => {
+  it('prices a catalog line with the same costing engine as the catalog, one error per line it cannot price', async () => {
     const family = await importFreshFamily()
     const line = await matrixLineOf(family.id)
-
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-1', customerName: 'Test Customer' })
-    expect(quote.status).toBe('draft')
-    expect(quote.totalPrice).toBe('0.00')
-
-    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
+    const priced = await priceQuoteLines(ctx(), {
+      lines: [
+        { key: 'ok', productFamilyId: family.id, productLineId: line.id, widthMm: 1000, heightMm: 800, options: [] },
+        { key: 'no-size', productFamilyId: family.id, productLineId: line.id, widthMm: null, heightMm: 800, options: [] },
+        { key: 'too-big', productFamilyId: family.id, productLineId: line.id, widthMm: 99_000, heightMm: 99_000, options: [] },
+      ],
     })
-
-    expect(afterAdd.positions).toHaveLength(1)
-    const position = afterAdd.positions[0]
-    expect(position.positionCode).toBe('P01')
-    expect(position.productFamilyName).toBe(family.name)
-    expect(position.productLineName).toBe(line.name)
-    // Matrix lookup at 1000x800 = 555 (verified by hand for this fixture — see product-costing.test.ts).
-    expect(position.basePrice).toBe('555.00')
-    // 555 * (1 - 43/100) * (150/100) = 474.525 -> the line's own catalog discount/markup, used as the position's default.
-    expect(Number(position.finalPrice)).toBeCloseTo(474.53, 1)
-
-    expect(afterAdd.quote.totalPrice).toBe(position.finalPrice)
+    expect(priced[0]).toMatchObject({ key: 'ok', ok: true, minApplied: false })
+    expect(priced[0].ok && priced[0].unitPrice).toBeCloseTo(CATALOG_UNIT_PRICE, 4)
+    expect(priced[1]).toMatchObject({ key: 'no-size', ok: false, error: expect.stringMatching(/width and a height/) })
+    expect(priced[2]).toMatchObject({ key: 'too-big', ok: false })
   })
 
   it('prices a line whose Excel left discount, markup and hours empty with none of them', async () => {
@@ -179,806 +257,306 @@ describe('createQuote + addQuotePosition', () => {
     await withSystemTransaction(db, (tx) =>
       tx.update(productLines).set({ discountPct: null, markupPct: null, installationHoursPerUnit: null }).where(eq(productLines.id, line.id)),
     )
-
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-EMPTY', customerName: 'Test Customer' })
-    const { positions } = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
+    const [priced] = await priceQuoteLines(ctx(), {
+      lines: [{ key: 'a', productFamilyId: family.id, productLineId: line.id, widthMm: 1000, heightMm: 800, options: [] }],
     })
-    expect(Number(positions[0].discountPct)).toBe(0)
-    expect(Number(positions[0].extraMarkupPct)).toBe(100)
-    expect(positions[0].finalPrice).toBe('555.00')
+    expect(priced).toMatchObject({ ok: true, unitPrice: 555, installationHours: 0 })
   })
 
-  it("layers a characteristic selection's price on top of the line price, using the line price as valore_base_in_vendita", async () => {
+  it("adds an option's price on top of the line's", async () => {
     const family = await importFreshFamily()
-    const familyDetail = await getProductFamilyDetail(ctx(), family.id)
+    const detail = (await getProductFamilyDetail(ctx(), family.id))!
     const line = await matrixLineOf(family.id)
-    const main = familyDetail!.characteristics.find((c) => !c.parentId)!
-    const sub = familyDetail!.characteristics.find((c) => c.parentId === main.id)!
-
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-2', customerName: 'Test Customer' })
-    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 2,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [{ characteristicId: main.id, subCharacteristicId: sub.id }],
-    })
-
-    const position = afterAdd.positions[0]
-    expect(position.characteristics).toHaveLength(1)
-    expect(position.characteristics[0].characteristicName).toBe(main.name)
-    expect(position.characteristics[0].subCharacteristicName).toBe(sub.name)
-    // quantity=2, so basePrice reflects 2 units of (line + characteristic) — strictly more than 2 units of the line alone.
-    expect(Number(position.basePrice)).toBeGreaterThan(555 * 2)
-  })
-
-  it('pricingMode "manual" on the line replaces the formula/matrix price with manualUnitPrice (the reference app\'s "A"/"M" toggle)', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-MANUAL-1', customerName: 'Test Customer' })
-    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-      pricingMode: 'manual',
-      manualUnitPrice: 999,
-      discountPct: 0,
-      extraMarkupPct: 100,
-    })
-
-    const position = afterAdd.positions[0]
-    // 999, NOT the matrix's 555 — manual bypasses the formula/matrix entirely.
-    expect(position.basePrice).toBe('999.00')
-    expect(position.finalPrice).toBe('999.00')
-    expect(position.pricingMode).toBe('manual')
-    expect(position.lineManualUnitPrice).toBe('999.0000')
-  })
-
-  it('pricingMode "manual" on one characteristic selection overrides only that selection\'s price, independent of the line\'s own (still auto) price', async () => {
-    const family = await importFreshFamily()
-    const familyDetail = await getProductFamilyDetail(ctx(), family.id)
-    const line = await matrixLineOf(family.id)
-    const main = familyDetail!.characteristics.find((c) => !c.parentId)!
-    const sub = familyDetail!.characteristics.find((c) => c.parentId === main.id)!
-
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-MANUAL-2', customerName: 'Test Customer' })
-    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [
-        { characteristicId: main.id, subCharacteristicId: sub.id, pricingMode: 'manual', manualUnitPrice: 50 },
-      ],
-      discountPct: 0,
-      extraMarkupPct: 100,
-    })
-
-    const position = afterAdd.positions[0]
-    expect(position.characteristics[0].pricingMode).toBe('manual')
-    expect(position.characteristics[0].price).toBe('50.00')
-    // Line stays auto-priced at the matrix's 555; only the characteristic was overridden.
-    expect(position.basePrice).toBe('605.00')
-  })
-
-  it('rejects pricingMode "manual" without a manualUnitPrice, or with a negative one, instead of silently falling back to 0', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-MANUAL-3', customerName: 'Test Customer' })
-
-    await expect(
-      addQuotePosition(ctx(), actor, quote.id, {
-        productFamilyId: family.id,
-        productLineId: line.id,
-        quantity: 1,
-        widthMm: 1000,
-        heightMm: 800,
-        characteristicSelections: [],
-        pricingMode: 'manual',
-      }),
-    ).rejects.toThrow(QuoteValidationError)
-
-    await expect(
-      addQuotePosition(ctx(), actor, quote.id, {
-        productFamilyId: family.id,
-        productLineId: line.id,
-        quantity: 1,
-        widthMm: 1000,
-        heightMm: 800,
-        characteristicSelections: [],
-        pricingMode: 'manual',
-        manualUnitPrice: -10,
-      }),
-    ).rejects.toThrow(QuoteValidationError)
-  })
-
-  it('duplicatePosition preserves manual pricing (line and characteristic) on the copy', async () => {
-    const family = await importFreshFamily()
-    const familyDetail = await getProductFamilyDetail(ctx(), family.id)
-    const line = await matrixLineOf(family.id)
-    const main = familyDetail!.characteristics.find((c) => !c.parentId)!
-    const sub = familyDetail!.characteristics.find((c) => c.parentId === main.id)!
-
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-MANUAL-4', customerName: 'Test Customer' })
-    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [
-        { characteristicId: main.id, subCharacteristicId: sub.id, pricingMode: 'manual', manualUnitPrice: 50 },
-      ],
-      pricingMode: 'manual',
-      manualUnitPrice: 999,
-    })
-
-    const afterDuplicate = await duplicatePosition(ctx(), actor, quote.id, afterAdd.positions[0].id)
-    const copy = afterDuplicate.positions[1]
-    expect(copy.pricingMode).toBe('manual')
-    expect(copy.lineManualUnitPrice).toBe('999.0000')
-    expect(copy.characteristics[0].pricingMode).toBe('manual')
-  })
-
-  it('rejects an out-of-range size instead of silently mispricing', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-3', customerName: 'Test Customer' })
-
-    await expect(
-      addQuotePosition(ctx(), actor, quote.id, {
-        productFamilyId: family.id,
-        productLineId: line.id,
-        quantity: 1,
-        widthMm: 99999,
-        heightMm: 99999,
-        characteristicSelections: [],
-      }),
-    ).rejects.toThrow(QuoteValidationError)
-  })
-
-  it('re-numbers position codes and sortOrder from what actually survives, not positions.length (remove-then-add must not collide)', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-RENUMBER', customerName: 'Test Customer' })
-
-    const addOne = () =>
-      addQuotePosition(ctx(), actor, quote.id, {
-        productFamilyId: family.id,
-        productLineId: line.id,
-        quantity: 1,
-        widthMm: 1000,
-        heightMm: 800,
-        characteristicSelections: [],
-      })
-
-    const afterP1 = await addOne()
-    const afterP2 = await addOne()
-    const afterP3 = await addOne()
-    expect(afterP3.positions.map((p) => p.positionCode)).toEqual(['P01', 'P02', 'P03'])
-
-    // Remove the middle one, then add a new position — it must not reissue "P03".
-    await removeQuotePosition(ctx(), actor, quote.id, afterP2.positions[1].id)
-    const afterReAdd = await addOne()
-
-    const codes = afterReAdd.positions.map((p) => p.positionCode)
-    expect(new Set(codes).size).toBe(codes.length)
-    const sortOrders = afterReAdd.positions.map((p) => p.sortOrder)
-    expect(new Set(sortOrders).size).toBe(sortOrders.length)
-  })
-
-  it("lets a company quote from a PUBLISHED family shared with it, under its own quote", async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    await setProductFamilyPublishedStatus(ctx(), actor, family.id, true)
-    await shareWithLinkedCompany(family.id)
-
-    const linkedCtx = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: false }
-    const linkedActor = { actorUserId, actorCompanyId: linkedClientCompanyId, requestId: 'test-request' }
-    expect(await getProductFamilyDetail(linkedCtx, family.id)).not.toBeNull()
-
-    const linkedQuote = await createQuote(linkedCtx, linkedActor, {
-      reference: 'TEST-Q-SVC-LINKED-CATALOG',
-      customerName: 'Test Customer',
-    })
-    const detail = await addQuotePosition(linkedCtx, linkedActor, linkedQuote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-    })
-    expect(linkedQuote.supplierCompanyId).toBe(linkedClientCompanyId)
-    expect(detail.positions).toHaveLength(1)
-  })
-
-  it("rejects quoting from a family that was not shared with the caller", async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    await setProductFamilyPublishedStatus(ctx(), actor, family.id, true)
-
-    const [stranger] = await withSystemTransaction(db, (tx) =>
-      tx
-        .insert(companies)
-        .values({ isSupplier: true, name: 'Quote Service Test Unlinked Supplier', vatNumber: 'QSVC-UNLINKED' })
-        .returning({ id: companies.id }),
-    )
-    try {
-      const strangerCtx = { effectiveCompanyId: stranger.id, isSuperAdmin: false }
-      const strangerActor = { actorUserId, actorCompanyId: stranger.id, requestId: 'test-request' }
-      const strangerQuote = await createQuote(strangerCtx, strangerActor, {
-        reference: 'TEST-Q-SVC-UNLINKED',
-        customerName: 'Test Customer',
-      })
-      await expect(
-        addQuotePosition(strangerCtx, strangerActor, strangerQuote.id, {
+    const main = detail.characteristics.find((c) => !c.parentId)!
+    const sub = detail.characteristics.find((c) => c.parentId === main.id && (c.formula || c.pricingMatrixId))!
+    const [priced] = await priceQuoteLines(ctx(), {
+      lines: [
+        {
+          key: 'a',
           productFamilyId: family.id,
           productLineId: line.id,
-          quantity: 1,
           widthMm: 1000,
           heightMm: 800,
-          characteristicSelections: [],
-        }),
-      ).rejects.toThrow(QuoteValidationError)
-    } finally {
-      extraCompanyIds.push(stranger.id) // audit_log is append-only for the app role — afterAll cleans up with the superuser
-    }
-  })
-
-  it("starts a shared family's positions at the share's values for the line and prices each option at its own", async () => {
-    const family = await importFreshFamily()
-    const familyDetail = await getProductFamilyDetail(ctx(), family.id)
-    const line = await matrixLineOf(family.id)
-    const otherLine = familyDetail!.lines.find((l) => l.id !== line.id)!
-    const main = familyDetail!.characteristics.find((c) => !c.parentId)!
-    const sub = familyDetail!.characteristics.find((c) => c.parentId === main.id)!
-    await setProductFamilyPublishedStatus(ctx(), actor, family.id, true)
-    await shareWithLinkedCompany(family.id, [
-      { productLineId: line.id, discountPct: '25', markupPct: '140', installationHoursPerUnit: '2' },
-      { characteristicId: sub.id, discountPct: '50', markupPct: '200', installationHoursPerUnit: '0' },
-    ])
-
-    const linkedCtx = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: false }
-    const linkedActor = { actorUserId, actorCompanyId: linkedClientCompanyId, requestId: 'test-request' }
-    const quote = await createQuote(linkedCtx, linkedActor, { reference: 'TEST-Q-SVC-SHARE-DISCOUNT', customerName: 'Test Customer' })
-    const position = {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [{ characteristicId: main.id, subCharacteristicId: sub.id, pricingMode: 'manual' as const, manualUnitPrice: 50 }],
-    }
-
-    const defaulted = await addQuotePosition(linkedCtx, linkedActor, quote.id, position)
-    expect(Number(defaulted.positions[0].discountPct)).toBe(25)
-    expect(Number(defaulted.positions[0].extraMarkupPct)).toBe(140)
-    expect(Number(defaulted.positions[0].characteristics[0].discountPct)).toBe(50)
-    expect(Number(defaulted.positions[0].characteristics[0].markupPct)).toBe(200)
-    // The line (555) at -25% ×1.4, the option (50) at -50% ×2.
-    expect(defaulted.positions[0].finalPrice).toBe('632.75')
-
-    // The preview breaks that price down the same way, for the quote builder's calculation panel.
-    const preview = await previewQuotePosition(linkedCtx, position)
-    expect(preview.lineFinalUnitPrice).toBeCloseTo(582.75, 2)
-    expect(preview.lineMinApplied).toBe(false)
-    expect(preview.installationHours).toBe(2)
-    expect(preview.characteristics).toEqual([
-      { characteristicId: main.id, subCharacteristicId: sub.id, price: 50, discountPct: 50, markupPct: 200, finalUnitPrice: 50, minApplied: false },
-    ])
-
-    const overridden = await addQuotePosition(linkedCtx, linkedActor, quote.id, { ...position, discountPct: 10 })
-    expect(Number(overridden.positions[1].discountPct)).toBe(10) // the share's values are only a default
-
-    // A line the share has no values for keeps the family's own.
-    const fallback = await addQuotePosition(linkedCtx, linkedActor, quote.id, {
-      ...position,
-      productLineId: otherLine.id,
-      characteristicSelections: [],
-      pricingMode: 'manual',
-      manualUnitPrice: 100, // its own price table may not cover this size
+          options: [{ characteristicId: main.id, subCharacteristicId: sub.id }],
+        },
+      ],
     })
-    expect(Number(fallback.positions[2].discountPct)).toBe(Number(otherLine.discountPct))
-    expect(Number(fallback.positions[2].extraMarkupPct)).toBe(Number(otherLine.markupPct))
-
-    // The owner's own quotes never pick up a share's values.
-    const ownQuote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-OWN-DISCOUNT', customerName: 'Test Customer' })
-    const own = await addQuotePosition(ctx(), actor, ownQuote.id, position)
-    expect(Number(own.positions[0].discountPct)).toBe(Number(line.discountPct))
-    expect(Number(own.positions[0].extraMarkupPct)).toBe(Number(line.markupPct))
-  })
-
-  it('a super-admin acting as another tenant (X-Tenant-Id) cannot price from a family that tenant does not own', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-
-    // Super-admin acting AS linkedClientCompanyId — isSuperAdmin stays true (ADR 0008),
-    // but effectiveCompanyId is the client, not the supplier who owns `family`.
-    const superAdminActingAsClient = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: true }
-    const superAdminActor = { actorUserId, actorCompanyId: linkedClientCompanyId, requestId: 'test-request' }
-
-    const quote = await createQuote(superAdminActingAsClient, superAdminActor, {
-      reference: 'TEST-Q-SVC-SUPERADMIN-CROSS-TENANT',
-      customerName: 'Test Customer',
-    })
-
-    await expect(
-      addQuotePosition(superAdminActingAsClient, superAdminActor, quote.id, {
-        productFamilyId: family.id,
-        productLineId: line.id,
-        quantity: 1,
-        widthMm: 1000,
-        heightMm: 800,
-        characteristicSelections: [],
-      }),
-    ).rejects.toThrow(QuoteValidationError)
-  })
-
-  it('createQuote ignores server-owned fields in the input instead of letting them override the caller/company', async () => {
-    const maliciousInput = {
-      reference: 'TEST-Q-SVC-ALLOWLIST',
-      customerName: 'Test Customer',
-      // None of these are declared on CreateQuoteInput, but nothing stops
-      // a raw request body from including them (the route does no Zod
-      // parse) — insertQuote must never let them win over the safe values.
-      supplierCompanyId: '00000000-0000-0000-0000-000000000000',
-      createdByUserId: '00000000-0000-0000-0000-000000000000',
-      status: 'accepted',
-      totalPrice: '999999.99',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any
-
-    const quote = await createQuote(ctx(), actor, maliciousInput)
-    expect(quote.supplierCompanyId).toBe(supplierCompanyId)
-    expect(quote.createdByUserId).toBe(actorUserId)
-    expect(quote.status).toBe('draft')
-    expect(quote.totalPrice).toBe('0.00')
-  })
-
-  it('removeQuotePosition recalculates the quote total', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-4', customerName: 'Test Customer' })
-
-    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-    })
-    expect(Number(afterAdd.quote.totalPrice)).toBeGreaterThan(0)
-
-    const afterRemove = await removeQuotePosition(ctx(), actor, quote.id, afterAdd.positions[0].id)
-    expect(afterRemove.positions).toHaveLength(0)
-    expect(afterRemove.quote.totalPrice).toBe('0.00')
-  })
-
-  it("a different company cannot add a position to (or even see) another supplier's quote", async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-5', customerName: 'Test Customer' })
-
-    const strangerCtx = { effectiveCompanyId: '00000000-0000-0000-0000-000000000000', isSuperAdmin: false }
-    expect(await getQuote(strangerCtx, quote.id)).toBeNull()
-    await expect(
-      addQuotePosition(strangerCtx, actor, quote.id, {
-        productFamilyId: family.id,
-        productLineId: line.id,
-        quantity: 1,
-        widthMm: 1000,
-        heightMm: 800,
-        characteristicSelections: [],
-      }),
-    ).rejects.toThrow(QuoteValidationError)
-  })
-
-  it('renders a PDF that starts with the PDF magic bytes and is non-trivially sized', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-6', customerName: 'Test Customer' })
-    await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-    })
-
-    const detail = await getQuote(ctx(), quote.id)
-    const pdf = await renderQuotePdf(detail!)
-    expect(pdf.subarray(0, 4).toString('latin1')).toBe('%PDF')
-    expect(pdf.length).toBeGreaterThan(500)
-  })
-
-  it('reorders positions to match the given id order, and rejects a partial/foreign list', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-REORDER', customerName: 'Test Customer' })
-    const addOne = () =>
-      addQuotePosition(ctx(), actor, quote.id, {
-        productFamilyId: family.id,
-        productLineId: line.id,
-        quantity: 1,
-        widthMm: 1000,
-        heightMm: 800,
-        characteristicSelections: [],
-      })
-    await addOne()
-    await addOne()
-    const afterAdd = await addOne()
-    const [p1, p2, p3] = afterAdd.positions
-
-    const reordered = await reorderPositions(ctx(), actor, quote.id, [p3.id, p1.id, p2.id])
-    expect(reordered.positions.map((p) => p.id)).toEqual([p3.id, p1.id, p2.id])
-    expect(reordered.positions.map((p) => p.sortOrder)).toEqual([0, 1, 2])
-
-    await expect(reorderPositions(ctx(), actor, quote.id, [p1.id, p2.id])).rejects.toThrow(QuoteValidationError)
-    await expect(
-      reorderPositions(ctx(), actor, quote.id, [p1.id, p2.id, '00000000-0000-0000-0000-000000000000']),
-    ).rejects.toThrow(QuoteValidationError)
-  })
-
-  it("addQuotePosition honors a custom positionCode instead of auto-numbering, and rejects a duplicate one (the reference app's \"Add POS\" naming dialog)", async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-POSCODE-1', customerName: 'Test Customer' })
-
-    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-      positionCode: 'Frame A',
-    })
-    expect(afterAdd.positions[0].positionCode).toBe('Frame A')
-
-    // Second position with no code -> still auto-numbers from P01 (ignores the custom name already used).
-    const afterSecond = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-    })
-    expect(afterSecond.positions[1].positionCode).toBe('P01')
-
-    await expect(
-      addQuotePosition(ctx(), actor, quote.id, {
-        productFamilyId: family.id,
-        productLineId: line.id,
-        quantity: 1,
-        widthMm: 1000,
-        heightMm: 800,
-        characteristicSelections: [],
-        positionCode: 'Frame A', // already used above
-      }),
-    ).rejects.toThrow(QuoteValidationError)
-  })
-
-  it('updateQuotePosition leaves positionCode unchanged when none is given, but renames it (with the same uniqueness check) when one is', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-POSCODE-2', customerName: 'Test Customer' })
-    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-    })
-    const original = afterAdd.positions[0]
-    expect(original.positionCode).toBe('P01')
-
-    const unchangedEdit = await updateQuotePosition(ctx(), actor, quote.id, original.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 2,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-      // positionCode omitted — must NOT be renumbered as a side effect of editing.
-    })
-    expect(unchangedEdit.positions[0].positionCode).toBe('P01')
-
-    const renamedEdit = await updateQuotePosition(ctx(), actor, quote.id, original.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 2,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-      positionCode: 'Main Door',
-    })
-    expect(renamedEdit.positions[0].positionCode).toBe('Main Door')
-  })
-
-  it('updateQuotePosition re-prices an existing position in place, keeping its positionCode/sortOrder, and recalculates the quote total', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-UPD-1', customerName: 'Test Customer' })
-
-    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-    })
-    const original = afterAdd.positions[0]
-    expect(original.basePrice).toBe('555.00') // matrix lookup at 1000x800
-
-    const afterUpdate = await updateQuotePosition(ctx(), actor, quote.id, original.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 2, // was 1
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-    })
-
-    expect(afterUpdate.positions).toHaveLength(1)
-    const updated = afterUpdate.positions[0]
-    expect(updated.id).toBe(original.id)
-    expect(updated.positionCode).toBe(original.positionCode)
-    expect(updated.sortOrder).toBe(original.sortOrder)
-    expect(updated.quantity).toBe(2)
-    expect(updated.basePrice).toBe('1110.00') // 555 * 2
-    expect(afterUpdate.quote.totalPrice).toBe(updated.finalPrice)
-  })
-
-  it('updateQuotePosition replaces characteristic selections rather than merging — a deselected one leaves no stale row', async () => {
-    const family = await importFreshFamily()
-    const familyDetail = await getProductFamilyDetail(ctx(), family.id)
-    const line = await matrixLineOf(family.id)
-    const main = familyDetail!.characteristics.find((c) => !c.parentId)!
-    const sub = familyDetail!.characteristics.find((c) => c.parentId === main.id)!
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-UPD-2', customerName: 'Test Customer' })
-
-    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [{ characteristicId: main.id, subCharacteristicId: sub.id }],
-    })
-    expect(afterAdd.positions[0].characteristics).toHaveLength(1)
-
-    const afterUpdate = await updateQuotePosition(ctx(), actor, quote.id, afterAdd.positions[0].id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [], // deselected
-    })
-
-    expect(afterUpdate.positions[0].characteristics).toHaveLength(0)
-  })
-
-  it('updateQuotePosition rejects a positionId from a different quote, instead of silently updating the wrong one', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quoteA = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-UPD-3A', customerName: 'Test Customer' })
-    const quoteB = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-UPD-3B', customerName: 'Test Customer' })
-    const afterAdd = await addQuotePosition(ctx(), actor, quoteA.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-    })
-
-    await expect(
-      updateQuotePosition(ctx(), actor, quoteB.id, afterAdd.positions[0].id, {
-        productFamilyId: family.id,
-        productLineId: line.id,
-        quantity: 5,
-        widthMm: 1000,
-        heightMm: 800,
-        characteristicSelections: [],
-      }),
-    ).rejects.toThrow(QuoteValidationError)
-  })
-
-  it('duplicatePosition copies a position (and its characteristic selections) as a new appended position', async () => {
-    const family = await importFreshFamily()
-    const familyDetail = await getProductFamilyDetail(ctx(), family.id)
-    const line = await matrixLineOf(family.id)
-    const main = familyDetail!.characteristics.find((c) => !c.parentId)!
-    const sub = familyDetail!.characteristics.find((c) => c.parentId === main.id)!
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-DUP', customerName: 'Test Customer' })
-
-    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [{ characteristicId: main.id, subCharacteristicId: sub.id }],
-    })
-    const original = afterAdd.positions[0]
-
-    const afterDuplicate = await duplicatePosition(ctx(), actor, quote.id, original.id)
-    expect(afterDuplicate.positions).toHaveLength(2)
-    const copy = afterDuplicate.positions.find((p) => p.id !== original.id)!
-    expect(copy.positionCode).toBe('P02')
-    expect(copy.finalPrice).toBe(original.finalPrice)
-    expect(copy.characteristics).toHaveLength(1)
-    expect(copy.characteristics[0].subCharacteristicName).toBe(sub.name)
-    expect(Number(afterDuplicate.quote.totalPrice)).toBeCloseTo(Number(original.finalPrice) * 2, 2)
-  })
-
-  it('flags a position invalid once its catalog family is unpublished, without changing its snapshotted price', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    await setProductFamilyPublishedStatus(ctx(), actor, family.id, true)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-VALIDITY', customerName: 'Test Customer' })
-
-    const afterAdd = await addQuotePosition(ctx(), actor, quote.id, {
-      productFamilyId: family.id,
-      productLineId: line.id,
-      quantity: 1,
-      widthMm: 1000,
-      heightMm: 800,
-      characteristicSelections: [],
-    })
-    expect(afterAdd.positions[0].isValid).toBe(true)
-    const priceBefore = afterAdd.positions[0].finalPrice
-
-    await setProductFamilyPublishedStatus(ctx(), actor, family.id, false)
-    const afterUnpublish = await getQuote(ctx(), quote.id)
-    expect(afterUnpublish!.positions[0].isValid).toBe(false)
-    expect(afterUnpublish!.positions[0].finalPrice).toBe(priceBefore)
+    expect(priced.ok && priced.unitPrice).toBeGreaterThan(CATALOG_UNIT_PRICE)
   })
 })
 
-describe('capability gate', () => {
-  it('rejects creating a quote from a company that is not a supplier', async () => {
-    const [clientOnly] = await withSystemTransaction(db, (tx) =>
-      tx
-        .insert(companies)
-        .values({ isClient: true, name: 'Quote Service Test Client Only', vatNumber: 'QSVC-CLIENT-ONLY' })
-        .returning({ id: companies.id }),
+describe('saving a version', () => {
+  it('reprices catalog lines on the server, keeps manual ones as typed, and totals without alternatives', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await newQuote('TEST-Q-SVC-SAVE')
+
+    const saved = await save(quote, {
+      families: [
+        familyOf(family.id, [
+          // A client can't choose the catalog price: 1 is replaced by the catalog's.
+          catalogLine(line.id, { quantity: 2, unitPrice: 1, extraMarkupPct: 10, discountPct: 20 }),
+          catalogLine(line.id, { code: 'P02', priceMode: 'manual', unitPrice: 100 }),
+          catalogLine(line.id, { code: 'P03', isAlternative: true }),
+        ]),
+        familyOf(null, [catalogLine(line.id, { productLineId: null, priceMode: 'manual', unitPrice: 50, quantity: 3 })], {
+          name: 'Posa',
+        }),
+        familyOf(null, [catalogLine(line.id, { productLineId: null, priceMode: 'manual', unitPrice: 1000 })], { isAlternative: true }),
+      ],
+    })
+    const [catalog, manual, alternative] = saved.version.document.families[0].lines
+    expect(catalog.unitPrice).toBeCloseTo(CATALOG_UNIT_PRICE, 4)
+    expect(manual.unitPrice).toBe(100)
+    expect(alternative.unitPrice).toBeCloseTo(CATALOG_UNIT_PRICE, 4)
+    // 2 × 474.525 × 1.10 × 0.80 + 100 + 3 × 50; the alternative line and family are left out.
+    const expected = (2 * CATALOG_UNIT_PRICE * 1.1 * 0.8 + 100 + 150).toFixed(2)
+    expect(saved.version.totalPrice).toBe(expected)
+    expect(saved.quote.totalPrice).toBe(expected)
+    expect(saved.version.revision).toBe(2)
+  })
+
+  it('refuses a line of a hand-typed family that claims a catalog price', async () => {
+    const quote = await newQuote('TEST-Q-SVC-FREE')
+    await expect(
+      save(quote, { families: [familyOf(null, [catalogLine('00000000-0000-0000-0000-000000000000', { productLineId: null })])] }),
+    ).rejects.toThrow(/need their own price/)
+  })
+
+  it('strips scripts and event handlers from rich text', async () => {
+    const quote = await newQuote('TEST-Q-SVC-HTML')
+    const saved = await save(quote, {
+      intro: [{ id: 'm-1', html: '<p style="text-align: center" onclick="x()">Ciao<script>alert(1)</script> <a href="javascript:x()">link</a></p>' }],
+      closing: [{ id: 'c-1', type: 'text', html: '<img src="data:text/html;base64,AAAA"><strong>Fine</strong>' }],
+    })
+    expect(saved.version.document.intro[0].html).toBe('<p style="text-align:center">Ciao <a rel="noopener noreferrer" target="_blank">link</a></p>')
+    expect(saved.version.document.closing[0]).toEqual({ id: 'c-1', type: 'text', html: '<strong>Fine</strong>' })
+  })
+
+  it('keeps every save with what changed, and refuses a save over a newer one', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await newQuote('TEST-Q-SVC-HISTORY')
+    const first = await save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] })
+    const lineId = first.version.document.families[0].lines[0].id
+    const second = await save(first, {
+      header: { ...first.version.document.header, customerName: 'Altro Cliente' },
+      families: [{ ...first.version.document.families[0], lines: [{ ...first.version.document.families[0].lines[0], quantity: 4 }] }],
+    })
+    expect(second.version.revision).toBe(3)
+    expect(second.quote.customerName).toBe('Altro Cliente')
+
+    // Saving from what was loaded before the second save would overwrite it.
+    await expect(save(first, {})).rejects.toThrow(QuoteConflictError)
+
+    const revisions = (await getQuoteRevisions(ctx(), quote.quote.id, quote.version.id))!
+    expect(revisions.map((r) => r.revision)).toEqual([3, 2, 1])
+    expect(revisions[0].savedBy).toEqual({ id: actorUserId, name: 'Quote Tester' })
+    expect(revisions[0].changes).toEqual(
+      expect.arrayContaining([
+        { kind: 'header', field: 'customerName', from: 'Test Customer', to: 'Altro Cliente' },
+        { kind: 'line_changed', family: 'Finestre', line: 'P01 N95', field: 'quantity', from: 1, to: 4 },
+      ]),
     )
-    try {
-      const clientCtx = { effectiveCompanyId: clientOnly.id, isSuperAdmin: false }
-      const clientActor = { actorUserId, actorCompanyId: clientOnly.id, requestId: 'test-request' }
-      await expect(
-        createQuote(clientCtx, clientActor, { reference: 'TEST-Q-SVC-CLIENT-ONLY', customerName: 'Test Customer' }),
-      ).rejects.toThrow()
-    } finally {
-      await withSystemTransaction(db, (tx) => tx.delete(companies).where(eq(companies.id, clientOnly.id)))
+    expect(revisions[1].changes).toEqual([{ kind: 'family_added', family: 'Finestre' }])
+
+    const past = await getQuoteRevisionDetail(ctx(), quote.quote.id, quote.version.id, 2)
+    expect(past!.document.families[0].lines).toEqual([expect.objectContaining({ id: lineId, quantity: 1 })])
+    expect(await getQuoteRevisionDetail(ctx(), quote.quote.id, quote.version.id, 99)).toBeNull()
+  })
+
+  it('a sent version is never changed in place: its edits become the next version, a draft', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await newQuote('TEST-Q-SVC-VERSIONS')
+    const draft = await save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] })
+    const sent = await setQuoteVersionStatusById(ctx(), actor, quote.quote.id, draft.version.id, 'sent')
+    expect(sent.version).toMatchObject({ status: 'sent', sentAt: expect.any(String) })
+    expect(sent.quote.status).toBe('sent')
+
+    const edited = { families: [{ ...sent.version.document.families[0], name: 'Finestre bis' }] }
+    await expect(save(sent, edited)).rejects.toThrow(/save your changes as a new version/)
+    const v2 = await save(sent, edited, 'newVersion')
+    expect(v2.version).toMatchObject({ version: 2, status: 'draft', revision: 1 })
+    expect(v2.quote).toMatchObject({ latestVersion: 2, status: 'draft' })
+    expect(v2.versions.map((v) => [v.version, v.status])).toEqual([
+      [1, 'sent'],
+      [2, 'draft'],
+    ])
+    expect((await getQuoteRevisions(ctx(), quote.quote.id, v2.version.id))![0]).toMatchObject({
+      fromVersion: 1,
+      changes: [{ kind: 'family_changed', family: 'Finestre bis', field: 'name', from: 'Finestre', to: 'Finestre bis' }],
+    })
+
+    const v1 = await getQuote(ctx(), quote.quote.id, 1)
+    expect(v1!.version.document.families[0].name).toBe('Finestre')
+    await expect(setQuoteVersionStatusById(ctx(), actor, quote.quote.id, draft.version.id, 'sent')).rejects.toThrow(/can't be marked sent/)
+    expect((await setQuoteVersionStatusById(ctx(), actor, quote.quote.id, draft.version.id, 'accepted')).version.status).toBe('accepted')
+    // v1 isn't the latest, so the list keeps showing v2's status.
+    expect((await getQuote(ctx(), quote.quote.id))!.quote.status).toBe('draft')
+  })
+
+  it("can't be seen or saved by another company", async () => {
+    const quote = await newQuote('TEST-Q-SVC-ISOLATION')
+    const strangerCtx = { effectiveCompanyId: '00000000-0000-0000-0000-000000000000', isSuperAdmin: false }
+    expect(await getQuote(strangerCtx, quote.quote.id)).toBeNull()
+    expect(await getQuotePrintData(strangerCtx, quote.quote.id)).toBeNull()
+    expect(await getQuoteRevisions(strangerCtx, quote.quote.id, quote.version.id)).toBeNull()
+    await expect(save(quote, {}, 'update', strangerCtx)).rejects.toThrow(QuoteValidationError)
+  })
+})
+
+describe('families from other companies', () => {
+  it('a company prices a PUBLISHED family shared with it at the share\'s values, and the owner at its own', async () => {
+    const family = await importFreshFamily()
+    const detail = (await getProductFamilyDetail(ctx(), family.id))!
+    const line = await matrixLineOf(family.id)
+    const main = detail.characteristics.find((c) => !c.parentId)!
+    const sub = detail.characteristics.find((c) => c.parentId === main.id && !c.formula && !c.pricingMatrixId) ?? null
+    await setProductFamilyPublishedStatus(ctx(), actor, family.id, true)
+    await shareWithLinkedCompany(family.id, [{ productLineId: line.id, discountPct: '25', markupPct: '140', installationHoursPerUnit: '2' }])
+
+    const linkedCtx = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: false }
+    const linkedActor = { actorUserId, actorCompanyId: linkedClientCompanyId, requestId: 'test-request' }
+    const input = {
+      key: 'a',
+      productFamilyId: family.id,
+      productLineId: line.id,
+      widthMm: 1000,
+      heightMm: 800,
+      options: sub ? [{ characteristicId: main.id, subCharacteristicId: sub.id }] : [],
     }
+    // The line (555) at -25% ×1.4; a free option adds nothing.
+    const [shared] = await priceQuoteLines(linkedCtx, { lines: [input] })
+    expect(shared).toMatchObject({ ok: true, installationHours: 2 })
+    expect(shared.ok && shared.unitPrice).toBeCloseTo(582.75, 4)
+    const [own] = await priceQuoteLines(ctx(), { lines: [input] })
+    expect(own.ok && own.unitPrice).toBeCloseTo(CATALOG_UNIT_PRICE, 4)
+
+    // A save stores the same price, under the company's own quote.
+    const quote = await newQuote('TEST-Q-SVC-SHARED', linkedCtx, linkedActor)
+    const saved = await save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] }, 'update', linkedCtx, linkedActor)
+    expect(saved.version.document.families[0].lines[0].unitPrice).toBeCloseTo(582.75, 4)
+  })
+
+  it('refuses a family that was not shared with the caller, also for a super-admin acting as another tenant', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    await setProductFamilyPublishedStatus(ctx(), actor, family.id, true)
+    const [stranger] = await withSystemTransaction(db, (tx) =>
+      tx.insert(companies).values({ isSupplier: true, name: 'Quote Service Test Unlinked Supplier', vatNumber: 'QSVC-UNLINKED' }).returning({ id: companies.id }),
+    )
+    extraCompanyIds.push(stranger.id) // audit_log is append-only for the app role — afterAll cleans up with the superuser
+    for (const strangerCtx of [
+      { effectiveCompanyId: stranger.id, isSuperAdmin: false },
+      { effectiveCompanyId: stranger.id, isSuperAdmin: true },
+    ]) {
+      const strangerActor = { actorUserId, actorCompanyId: stranger.id, requestId: 'test-request' }
+      const quote = await newQuote('TEST-Q-SVC-UNLINKED', strangerCtx, strangerActor)
+      await expect(
+        save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] }, 'update', strangerCtx, strangerActor),
+      ).rejects.toThrow(/not found or not visible/)
+      const [priced] = await priceQuoteLines(strangerCtx, {
+        lines: [{ key: 'a', productFamilyId: family.id, productLineId: line.id, widthMm: 1000, heightMm: 800, options: [] }],
+      })
+      expect(priced.ok).toBe(false)
+    }
+  })
+})
+
+describe('price validity', () => {
+  it('a family new to the version must be in the library and ready for invoicing; one already on it may stay', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await newQuote('TEST-Q-SVC-LIBRARY')
+
+    await setProductFamilyReadyForInvoicingStatus(ctx(), actor, family.id, false)
+    await expect(save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] })).rejects.toThrow(/not ready for invoicing/)
+    await setProductFamilyReadyForInvoicingStatus(ctx(), actor, family.id, true)
+    const saved = await save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] })
+
+    await setProductFamilyLibraryStatus(ctx(), actor, family.id, false)
+    await setProductFamilyReadyForInvoicingStatus(ctx(), actor, family.id, false)
+    const kept = await save(saved, {
+      families: [{ ...saved.version.document.families[0], lines: [...saved.version.document.families[0].lines, catalogLine(line.id, { code: 'P02' })] }],
+    })
+    expect(kept.version.document.families[0].lines).toHaveLength(2)
+    await expect(save(kept, { families: [...kept.version.document.families, familyOf(family.id, [catalogLine(line.id)])] })).resolves.toBeTruthy()
+  })
+
+  it('an expired family blocks saving and sending, and points to the newer version to switch to', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await newQuote('TEST-Q-SVC-EXPIRED')
+    const saved = await save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] })
+
+    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2020-01-01', priceValidTo: '2020-12-31' })
+    const expired = (await getQuote(ctx(), quote.quote.id))!
+    expect(expired.familyStatus).toEqual([
+      expect.objectContaining({ productFamilyId: family.id, status: 'expired', priceValidTo: '2020-12-31', replacement: null }),
+    ])
+    await expect(save(expired, {})).rejects.toThrow(/expired on 2020-12-31: switch to a newer version/)
+    await expect(setQuoteVersionStatusById(ctx(), actor, quote.quote.id, saved.version.id, 'sent')).rejects.toThrow(/expired on 2020-12-31/)
+    const [priced] = await priceQuoteLines(ctx(), {
+      lines: [{ key: 'a', productFamilyId: family.id, productLineId: line.id, widthMm: 1000, heightMm: 800, options: [] }],
+    })
+    expect(priced).toMatchObject({ ok: false, error: expect.stringMatching(/expired/) })
+
+    const newer = await createNewVersionFromExcel(ctx(), actor, family.id, fixtureFile, { readyForInvoicing: true })
+    const withReplacement = (await getQuote(ctx(), quote.quote.id))!
+    expect(withReplacement.familyStatus[0].replacement).toEqual({ id: newer.id, version: newer.version, name: newer.name })
+
+    // Switching the family (and its lines) to the newer version reprices them from it and saves.
+    const newerLine = await matrixLineOf(newer.id)
+    const switched = await save(withReplacement, {
+      families: [
+        {
+          ...withReplacement.version.document.families[0],
+          productFamilyId: newer.id,
+          lines: withReplacement.version.document.families[0].lines.map((l) => ({ ...l, productLineId: newerLine.id })),
+        },
+      ],
+    })
+    expect(switched.familyStatus[0]).toMatchObject({ productFamilyId: newer.id, status: 'current' })
+    expect(switched.version.document.families[0].lines[0].unitPrice).toBeCloseTo(CATALOG_UNIT_PRICE, 4)
+  })
+
+  it('a sent version keeps its prices after its family expires', async () => {
+    const family = await importFreshFamily()
+    const line = await matrixLineOf(family.id)
+    const quote = await newQuote('TEST-Q-SVC-SENT-EXPIRED')
+    const saved = await save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] })
+    await setQuoteVersionStatusById(ctx(), actor, quote.quote.id, saved.version.id, 'sent')
+    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2020-01-01', priceValidTo: '2020-12-31' })
+    const later = (await getQuote(ctx(), quote.quote.id))!
+    expect(later.version.totalPrice).toBe(saved.version.totalPrice)
+    expect((await setQuoteVersionStatusById(ctx(), actor, quote.quote.id, saved.version.id, 'accepted')).version.status).toBe('accepted')
+  })
+})
+
+describe('printing', () => {
+  it('gives the version with the company, its first branch and the sales contact', async () => {
+    const quote = await newQuote('TEST-Q-SVC-PRINT')
+    const data = (await getQuotePrintData(ctx(), quote.quote.id))!
+    expect(data.version.version).toBe(1)
+    expect(data.company).toMatchObject({ name: 'Quote Service Test Supplier', vatNumber: 'QSVC-SUP' })
+    expect(data.businessUnit).toBeNull()
+    expect(data.salesContact).toMatchObject({ id: actorUserId, name: 'Quote Tester', email: 'quote-svc-test-actor@example.com' })
+    expect(await getQuotePrintData(ctx(), quote.quote.id, 9)).toBeNull()
   })
 })
 
 describe('listMyQuotes', () => {
   it("is scoped by effectiveCompanyId even for a super-admin — never every tenant's quotes", async () => {
-    await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-LIST-SUPPLIER', customerName: 'Test Customer' })
-
+    await newQuote('TEST-Q-SVC-LIST-SUPPLIER')
     const clientCtx = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: false }
-    const clientActor = { actorUserId, actorCompanyId: linkedClientCompanyId, requestId: 'test-request' }
-    await createQuote(clientCtx, clientActor, { reference: 'TEST-Q-SVC-LIST-CLIENT', customerName: 'Test Customer' })
+    await newQuote('TEST-Q-SVC-LIST-CLIENT', clientCtx, { actorUserId, actorCompanyId: linkedClientCompanyId, requestId: 'test-request' })
 
-    // A super-admin acting AS the supplier (X-Tenant-Id) must see only the supplier's quotes.
-    const superAdminAsSupplier = { effectiveCompanyId: supplierCompanyId, isSuperAdmin: true }
-    const supplierQuotes = await listMyQuotes(superAdminAsSupplier)
-    expect(supplierQuotes.every((q) => q.supplierCompanyId === supplierCompanyId)).toBe(true)
-    expect(supplierQuotes.some((q) => q.supplierCompanyId === linkedClientCompanyId)).toBe(false)
-
-    // Acting as the client instead must see only the client's quotes.
-    const superAdminAsClient = { effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: true }
-    const clientQuotes = await listMyQuotes(superAdminAsClient)
-    expect(clientQuotes.every((q) => q.supplierCompanyId === linkedClientCompanyId)).toBe(true)
-  })
-})
-
-describe('price validity', () => {
-  const positionOn = (familyId: string, lineId: string) => ({
-    productFamilyId: familyId,
-    productLineId: lineId,
-    quantity: 1,
-    widthMm: 1000,
-    heightMm: 800,
-    characteristicSelections: [],
-  })
-
-  it('refuses new positions from a family whose prices have expired or not started yet', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-VALID-1', customerName: 'Test Customer' })
-
-    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2020-01-01', priceValidTo: '2020-12-31' })
-    await expect(addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))).rejects.toThrow(/expired on 2020-12-31/)
-    await expect(previewQuotePosition(ctx(), positionOn(family.id, line.id))).rejects.toThrow(QuoteValidationError)
-
-    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2999-01-01', priceValidTo: null })
-    await expect(addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))).rejects.toThrow(/valid from 2999-01-01/)
-
-    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2020-01-01', priceValidTo: null })
-    const detail = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
-    expect(detail.positions).toHaveLength(1)
-  })
-
-  it('refuses new positions from a family that is not ready for invoicing, but keeps existing ones editable', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-INVOICING', customerName: 'Test Customer' })
-    const added = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
-
-    await setProductFamilyReadyForInvoicingStatus(ctx(), actor, family.id, false)
-    await expect(addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))).rejects.toThrow(/not ready for invoicing/)
-    await expect(duplicatePosition(ctx(), actor, quote.id, added.positions[0].id)).rejects.toThrow(/not ready for invoicing/)
-    const updated = await updateQuotePosition(ctx(), actor, quote.id, added.positions[0].id, { ...positionOn(family.id, line.id), quantity: 2 })
-    expect(updated.positions[0].quantity).toBe(2)
-
-    await setProductFamilyReadyForInvoicingStatus(ctx(), actor, family.id, true)
-    const detail = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
-    expect(detail.positions).toHaveLength(2)
-  })
-
-  it("refuses new positions from a family taken out of the company's library, but keeps existing ones editable", async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-LIBRARY', customerName: 'Test Customer' })
-    const added = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
-
-    await setProductFamilyLibraryStatus(ctx(), actor, family.id, false)
-    await expect(addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))).rejects.toThrow(/not in your company's library/)
-    await expect(duplicatePosition(ctx(), actor, quote.id, added.positions[0].id)).rejects.toThrow(/not in your company's library/)
-    const updated = await updateQuotePosition(ctx(), actor, quote.id, added.positions[0].id, { ...positionOn(family.id, line.id), quantity: 3 })
-    expect(updated.positions[0].quantity).toBe(3)
-
-    await setProductFamilyLibraryStatus(ctx(), actor, family.id, true)
-    expect((await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))).positions).toHaveLength(2)
-  })
-
-  it('still lets an existing position be edited after its family expires', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-VALID-2', customerName: 'Test Customer' })
-    const added = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
-    const position = added.positions[0]
-
-    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2020-01-01', priceValidTo: '2020-12-31' })
-
-    const updated = await updateQuotePosition(ctx(), actor, quote.id, position.id, { ...positionOn(family.id, line.id), quantity: 2 })
-    expect(updated.positions[0].quantity).toBe(2)
-    const preview = await previewQuotePosition(ctx(), positionOn(family.id, line.id), { quoteId: quote.id, positionId: position.id })
-    expect(preview.basePrice).toBe(555)
-  })
-
-  it('refuses to duplicate a position whose family has expired — the copy would be a new position', async () => {
-    const family = await importFreshFamily()
-    const line = await matrixLineOf(family.id)
-    const quote = await createQuote(ctx(), actor, { reference: 'TEST-Q-SVC-VALID-3', customerName: 'Test Customer' })
-    const added = await addQuotePosition(ctx(), actor, quote.id, positionOn(family.id, line.id))
-
-    await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2020-01-01', priceValidTo: '2020-12-31' })
-
-    await expect(duplicatePosition(ctx(), actor, quote.id, added.positions[0].id)).rejects.toThrow(/expired on 2020-12-31/)
+    const asSupplier = (await listMyQuotes({ effectiveCompanyId: supplierCompanyId, isSuperAdmin: true })).map((q) => q.reference)
+    expect(asSupplier).toContain('TEST-Q-SVC-LIST-SUPPLIER')
+    expect(asSupplier).not.toContain('TEST-Q-SVC-LIST-CLIENT')
+    const asClient = (await listMyQuotes({ effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: true })).map((q) => q.reference)
+    expect(asClient).toContain('TEST-Q-SVC-LIST-CLIENT')
+    expect(asClient).not.toContain('TEST-Q-SVC-LIST-SUPPLIER')
   })
 })

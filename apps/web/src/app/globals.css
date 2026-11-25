@@ -26,3 +26,68 @@ body {
     animation: none;
   }
 }
+
+/* A row or card just added in the quote builder flashes once (as in the client's design). */
+@keyframes highlight-flash {
+  0% {
+    background-color: rgba(250, 204, 21, 0.4);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-highlight {
+  animation: highlight-flash 600ms ease-out;
+}
+
+/* The quote's rich text (TipTap HTML) in the builder and in the printed quote. */
+.quote-rich h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin: 0.5em 0 0.25em;
+}
+.quote-rich h2 {
+  font-size: 1.2em;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+.quote-rich p {
+  margin: 0.25em 0;
+}
+.quote-rich ul,
+.quote-rich ol {
+  margin: 0.25em 0;
+  padding-left: 1.2em;
+}
+.quote-rich ul {
+  list-style: disc;
+}
+.quote-rich ol {
+  list-style: decimal;
+}
+.quote-rich hr {
+  margin: 0.75em 0;
+  border-color: #cbd5e1;
+}
+.quote-rich a {
+  color: #1e5f8c;
+  text-decoration: underline;
+}
+.quote-rich img {
+  max-width: 100%;
+  height: auto;
+}
+.quote-rich p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-highlight {
+    animation: none;
+  }
+}

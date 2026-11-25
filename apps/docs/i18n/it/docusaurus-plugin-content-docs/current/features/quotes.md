@@ -5,66 +5,77 @@ title: Preventivi
 
 # Preventivi
 
-**Dove:** *Preventivi* nella barra laterale · la visualizzazione richiede `quote.view`, creare e modificare
-richiede `quote.edit`, che hanno solo le aziende **supplier** (nei dati demo: Suppli).
+**Dove:** *Preventivi* nella barra laterale · per vedere serve `quote.view`, per creare e modificare serve `quote.edit`,
+che hanno solo le aziende **fornitore** (nei dati demo: Suppli).
 
 ![Elenco preventivi](/img/screens/quotes.png)
 
 ## Flusso
 
-1. **Nuovo preventivo** → riferimento, nome cliente, codice fiscale, indirizzo, città, luogo del progetto.
-2. Apri il preventivo. Ha tre sezioni:
-   - **A sinistra — posizioni:** il riepilogo del preventivo, ogni posizione con il suo prezzo, **Nuova posizione** e il
-     totale. Clicca una posizione per modificarla; quella selezionata ha anche **sposta su / giù**, **duplica** ed
-     **elimina**.
-   - **Al centro — il modulo della posizione:**
-     - **Prodotto** — scegli una famiglia (tua o condivisa con te) e una linea di prodotto.
-     - **Misure e posizione** — nome/codice posizione (codici personalizzati ammessi), larghezza, altezza, quantità.
-     - **Caratteristiche** — una riga per ogni opzione della linea, con prezzo automatico (**A**) o manuale (**M**).
-     - **Prezzo** — il prezzo della linea è calcolato automaticamente (**A**); passa a manuale (**M**) per
-       sovrascriverlo. Sconto e ricarico.
-   - **A destra — anteprima:**
-     - **Calcolo** — come si forma il prezzo, in tempo reale mentre scrivi: listino della linea, sconto e ricarico, ogni
-       opzione con le sue condizioni, prezzo unitario, quantità e totale, più una **Traccia formule** con ogni passaggio.
-     - **PDF** — il PDF del preventivo come è salvato. Si ricarica dopo che aggiungi o salvi una posizione.
-3. **Aggiungi posizione** / **Salva modifiche**. Dopo il salvataggio la posizione resta selezionata. Se clicchi
-   un'altra posizione (o **Nuova posizione**) con modifiche non salvate, ti viene chiesto prima di annullarle.
-4. **Scarica il PDF** (in alto a destra).
+1. **Nuovo preventivo** → riferimento e cliente (codice fiscale, indirizzo, città e progetto sono facoltativi e modificabili dopo).
+2. Il preventivo si apre su una sola pagina, come nel design del cliente:
+   - **Barra in alto** — riferimento, versione e stato, cliente e progetto (cliccali per modificare cliente, codice
+     fiscale, indirizzo, città, progetto, data e note interne), il **totale IVA esclusa** e i pulsanti **Impostazioni di
+     stampa**, **Anteprima**, **Esporta** (presto), **Cronologia modifiche** e **Salva**.
+   - **Intestazione** — moduli di testo (titoli, grassetto, elenchi, allineamento, link, immagini fino a 1 MB). Aggiungi un
+     testo vuoto o uno dei **testi salvati** dell'azienda; ogni testo può essere salvato come nuovo testo salvato.
+     Trascina o usa le frecce per riordinare.
+   - **Famiglie di prodotto** — **Aggiungi famiglia di prodotto** sceglie una famiglia dal catalogo (pubblicata, in
+     libreria, pronta per la fatturazione e valida oggi; ricerca e filtro per categoria) o un **Prodotto vuoto** a mano.
+     Ogni famiglia ha il badge di validità, **ALT/STD**, duplica, elimina, comprimi e **Dettagli & Specifiche**
+     (categoria, descrizione, note e tabella tecnica).
+   - **Linee** — una riga ciascuna: Pos, Q.tà, Linea, U.M., B, H, m², Extra%, €/pz, Sc%, Netto €, Totale, IVA, Ore posa,
+     poi ALT/STD, duplica, elimina, caratteristiche e blocco. Linee e famiglie si trascinano o si spostano con le frecce.
+   - **Riepilogo e Chiusura** — blocchi ordinabili: testi, *Dettaglio per prodotto*, *Raggruppamento per categoria*
+     (categorie riordinabili), *Totale offerta*, *Piano di pagamento* (con controllo del 100%) e *Attività* (trascina tra
+     **Incluse** e **Non incluse**; l'occhio la esclude dalla stampa). I nuovi preventivi partono con il piano di
+     pagamento e le attività predefinite del cliente.
+3. **Salva** chiede come: su una **bozza**, **Correggi la versione N** o **Salva come nuova versione**; su una versione
+   **inviata**, accettata o rifiutata, solo **Salva come nuova versione** — una versione inviata non cambia mai.
+4. **Anteprima** apre *Anteprima Preventivo* in una nuova scheda: pagine A4 con logo e colore dell'unità locale
+   nell'intestazione, dati fiscali e *Pagina X di Y* a piè di pagina. **Stampa / Salva PDF** usa la stampa del browser.
+   Mostra anche le modifiche non salvate.
 
-Su uno schermo più piccolo l'anteprima scende sotto il modulo; sul telefono le tre sezioni sono schede (**Posizioni**,
-**Modifica**, **Anteprima**).
+## Prezzi
 
-![Preventivo: posizioni, modulo e calcolo](/img/screens/quote-detail.png)
+- **€/pz** è il prezzo di listino della linea con le sue caratteristiche (con lo sconto e il ricarico della famiglia o
+  della condivisione). Si ricalcola appena cambiano linea, caratteristiche o misure, e di nuovo sul server a ogni salvataggio.
+- **Netto** = €/pz × (1 + Extra%/100) × (1 − Sc%/100); **Totale** = Q.tà × Netto.
+- Le linee alternative (**ALT**) non contano nel subtotale della famiglia, le famiglie alternative nel totale offerta.
+- Scrivere un €/pz proprio rende la linea manuale (in corsivo); la freccia accanto torna al prezzo di listino.
+- Il lucchetto blocca solo la riga nell'editor; non cambia prezzo né stampa.
 
-![L'anteprima del PDF](/img/screens/add-position.png)
+Come si calcola ogni numero: [Come vengono calcolati i prezzi](../pricing.md).
 
-Le posizioni da una famiglia condivisa partono con sconto, ricarico e ore di posa impostati sulla condivisione per quella linea e le sue opzioni. Come viene calcolato ogni numero: [Come vengono calcolati i prezzi](../pricing.md).
+## Impostazioni di stampa
 
-## Versioni della famiglia nel preventivo
+Chi stampa come **referente** (*Vostro referente*: nome, email, telefono), quale **unità locale** è in testa alle pagine
+(se il referente lavora per più unità) e quali parti stampare: referente, descrizioni delle famiglie, caratteristiche
+delle righe, dettaglio per prodotto, raggruppamento per categoria, totale offerta, piano di pagamento, attività,
+colonne Extra % e Sconto %. La colonna sconto è obbligatoria se una riga ha uno sconto.
 
-- L'elenco delle famiglie mostra la versione di ciascuna, ad es. “Finestra (v2)”. Appena scelta una famiglia, sotto si
-  apre come albero cosa ha cambiato quella versione rispetto alla precedente (aggiunte, rimosse, economiche,
-  descrittive), come nella pagina della famiglia: nascondi tipi di modifica, passa all'elenco, clicca una modifica per
-  il prima e dopo (o la tabella prezzi cella per cella). **Nascondi modifiche** lo chiude; **Pagina della famiglia**
-  apre lì il confronto.
-- Le modifiche vengono rilevate dal contenuto delle due versioni al caricamento della nuova, non dal nome del file né
-  dalle celle evidenziate, e salvate con la versione.
-- Quando si può preventivare una versione più recente della famiglia di una posizione, la posizione mostra un'icona di
-  ramo nell'elenco e, aprendola, **v3 disponibile** con cosa è cambiato e il link al confronto. La posizione mantiene il
-  suo prezzo finché non passi: scegli la nuova versione nel suo modulo — misure, quantità e codice restano, e così la
-  linea e le opzioni che hanno lo stesso nome nella nuova versione — poi **Salva modifiche**.
-- Nel PDF il titolo di ogni famiglia mostra la sua versione e, sotto, cosa è cambiato rispetto alla versione precedente:
-  cosa è stato aggiunto o rimosso e quali voci hanno modifiche di prezzo (le tabelle prezzi con il loro intervallo in %)
-  o di testo. La prima versione di una copia non viene confrontata con la famiglia da cui è stata copiata.
+Intestazione, piè di pagina e referenti vengono da **Impostazioni → Azienda**: dati fiscali, unità locali (logo fino a
+512 KB, colore, indirizzo, email, telefono, utenti), telefono di ogni utente e testi salvati.
+
+## Versioni e listini scaduti
+
+- Ogni versione ha il suo documento; il menu versione nella barra in alto passa dall'una all'altra e cambia lo stato:
+  bozza → **inviato** → **accettato** / **rifiutato**.
+- Quando i prezzi di una famiglia sono scaduti, una **bozza** sposta le sue linee sulla versione valida più recente di
+  quella famiglia (per nome di linea e caratteristica) e le ricalcola, con un avviso di cosa è stato spostato e cosa no.
+  Una versione inviata mantiene i suoi prezzi; **Aggiorna prezzi** applica la versione nuova alle modifiche, che
+  diventano una nuova versione.
+- Se non esiste una versione valida della famiglia, salvataggio e stampa sono bloccati e il preventivo rimanda alla
+  famiglia per caricare un nuovo listino.
 
 ## Cronologia
 
-Apri **Riepilogo preventivo** nelle posizioni, poi **Cronologia**, per vedere chi l’ha creato e chi ha aggiunto, modificato, duplicato,
-riordinato o eliminato quale posizione, e quando. Chi può vedere il preventivo può vederne la cronologia.
+**Cronologia modifiche** elenca ogni salvataggio della versione — chi, quando, il totale e cosa è cambiato (campi
+dell'intestazione, famiglie e linee, elementi aggiunti/rimossi/riordinati, chiusura e impostazioni di stampa). Ogni
+salvataggio si può aprire in sola lettura e **Ripristinare** come punto di partenza. Il registro di audit del preventivo
+(creazione, salvataggi, nuove versioni, stato) resta come prima.
 
-![Cronologia del preventivo](/img/screens/quote-history.png)
+## Non ancora disponibile
 
-## Non ancora realizzato
-
-- Flusso di stato — ogni preventivo resta **Bozza** (Inviato / Accettato / Rifiutato esistono solo nel modello dati).
-- Modifica dell'intestazione, eliminazione dell'intero preventivo, duplicazione dell'intero preventivo.
+- Esportazione Word ed Excel, immagini nella stampa, invio del preventivo per email dall'app.
+- Eliminare o duplicare un intero preventivo.
