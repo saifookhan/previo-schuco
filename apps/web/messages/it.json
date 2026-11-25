@@ -1175,5 +1175,30 @@
       "partner_request_rejected": "<b>{company}</b> ha rifiutato la tua richiesta di connessione.",
       "partner_connection_removed": "<b>{company}</b> ha rimosso la connessione con la tua azienda."
     }
+  },
+  "quoteChat": {
+    "title": "Assistente preventivi",
+    "open": "Apri l’assistente preventivi",
+    "close": "Chiudi",
+    "placeholder": "Chiedi di creare o modificare un preventivo",
+    "send": "Invia",
+    "working": "In corso…",
+    "unavailable": "L’assistente non è disponibile in questo momento.",
+    "empty": "Dimmi il cliente e il prodotto. Uso solo il listino corrente.",
+    "tools": {
+      "search_catalog": "Cerco nel catalogo",
+      "describe_family": "Leggo la famiglia prodotto",
+      "create_quote": "Creo il preventivo",
+      "add_product": "Aggiungo una nuova riga",
+      "duplicate_line": "Duplico la riga",
+      "duplicate_family": "Duplico la famiglia",
+      "move_line": "Sposto la riga",
+      "update_line": "Aggiorno la riga"
+    },
+    "starters": {
+      "newQuote": "Nuovo preventivo per Studio Rossi",
+      "count": "Quanti prodotti ci sono in Cassonetto Coibentato MyBox Revo?",
+      "example": "Aggiungi una riga MyBox Revo Light profondità 150, 1200×1400 mm, quantità 1"
+    }
   }
 }

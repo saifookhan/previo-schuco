@@ -132,6 +132,11 @@ services:
       # on here so local `pnpm dev` works without a Compose .env; set it
       # explicitly to turn both on or both off.
       ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-true}
+      # Quote assistant (Workers AI). Empty disables the chat route with a clear error.
+      # Compose reads these from the repo-root .env, not from .env.local.
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      LLM_MODEL: ${LLM_MODEL:-}
     volumes:
       - ./data/uploads:/app/data/uploads
     depends_on:
