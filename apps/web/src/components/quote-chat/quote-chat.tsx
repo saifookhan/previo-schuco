@@ -3,7 +3,7 @@
 import { MessageSquare, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useAuth } from '@/hooks/use-auth'
 import type { QuoteDocument } from '@schuco/contracts'
@@ -38,18 +38,29 @@ const TOOLS = [
   'update_line',
 ] as const
 
+/** Hands the open transcript to the quote page a chat action navigates to. A refresh drops it. */
+let carriedChat: { quoteId: string; messages: ChatMessage[]; suggestions: Suggestion[] } | null = null
+
 /** Chat that creates and edits a quote. Messages stay in this panel until it closes. */
 export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteChatProps) => {
   const t = useTranslations('quoteChat')
   const { can } = useAuth()
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const restored = carriedChat?.quoteId === quoteId ? carriedChat : null
+  const [open, setOpen] = useState(Boolean(restored))
   const [draft, setDraft] = useState('')
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(restored?.messages ?? [])
+  const [suggestions, setSuggestions] = useState<Suggestion[]>(restored?.suggestions ?? [])
   const [activity, setActivity] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (carriedChat?.quoteId === quoteId) carriedChat = null
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [quoteId])
 
   if (!can('quote.edit')) return null
 
@@ -71,6 +82,7 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
     setBusy(true)
     setActivity(t('working'))
     let assistant = ''
+    let nextSuggestions: Suggestion[] = []
     try {
       const response = await fetch('/api/quote-chat', {
         method: 'POST',
@@ -111,12 +123,17 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
             setMessages([...next, { role: 'assistant', content: snapshot }])
             setActivity(null)
           }
-          if (event === 'suggestions' && payload.items) setSuggestions(payload.items)
+          if (event === 'suggestions' && payload.items) {
+            nextSuggestions = payload.items
+            setSuggestions(payload.items)
+          }
           if (event === 'error' && payload.message) setError(payload.message)
           if (event === 'quote' && payload.quoteId) savedQuoteId = payload.quoteId
         }
       }
       if (savedQuoteId) {
+        const transcript = assistant ? [...next, { role: 'assistant' as const, content: assistant }] : next
+        if (savedQuoteId !== quoteId) carriedChat = { quoteId: savedQuoteId, messages: transcript, suggestions: nextSuggestions }
         if (onQuote) await onQuote(savedQuoteId)
         else if (!quoteId) router.push(`/app/quotes/${savedQuoteId}`)
       }
@@ -129,7 +146,7 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3">
+    <div className="fixed bottom-24 right-6 z-40 flex flex-col items-end gap-3">
       {open ? (
         <section className="flex h-[32rem] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
           <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
@@ -161,13 +178,13 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
             {error ? <p className="text-sm text-red-600">{error}</p> : null}
           </div>
           {chips.length > 0 && !busy ? (
-            <div className="flex gap-2 overflow-x-auto px-4 pb-2">
+            <div className="flex flex-wrap gap-2 px-4 pb-2">
               {chips.map((chip) => (
                 <button
                   key={chip.message}
                   type="button"
                   onClick={() => void send(chip.message)}
-                  className="shrink-0 rounded-full border border-slate-200 px-3 py-1 text-left text-xs text-slate-700 hover:border-slate-400"
+                  className="max-w-full whitespace-normal rounded-full border border-slate-200 px-3 py-1 text-left text-xs leading-snug text-slate-700 hover:border-slate-400"
                 >
                   {chip.label}
                 </button>
