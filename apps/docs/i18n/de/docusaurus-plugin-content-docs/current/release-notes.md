@@ -16,6 +16,7 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 - **Druck**: *Anteprima Preventivo* auf A4-Seiten, vom Browser gedruckt oder als PDF gespeichert, mit Druckeinstellungen. Der alte PDF-Download entfällt.
 - **Abgelaufene Preislisten**: Entwürfe wechseln auf die neueste gültige Version der Familie und werden neu berechnet; ohne eine solche sind Speichern und Drucken gesperrt, mit einem Link zum Hochladen einer neuen Version.
 - **Einstellungen → Unternehmen**: Steuerdaten, Niederlassungen (Logo, Farbe, Kontakte, Benutzer), Telefon der Ansprechpartner und gespeicherte Texte.
+- **Keine überlappende Preisgültigkeit**: zwei Versionen einer Familie dürfen keinen Tag gemeinsam haben. Überlappende Daten in der Liste, auf der Seite der Familie oder beim Hochladen einer neuen Version werden mit der betroffenen Version abgelehnt. Siehe [Produktfamilien](./features/product-families.md#preisgültigkeit).
 
 **Woche vom 16. November**
 - **Teilen pro Linie und Option**: Der Teilen-Dialog listet jede Produktlinie und Option der Familie, jeweils mit eigenem **Rabatt**, **Aufschlag** und **Montagestunden** für dieses Unternehmen, ausgehend von den Werten der Excel (0 % / 100 % / 0, wo sie keine hat). In einer neuen Version füllt das, was das Unternehmen in der früheren hatte (nach Namen zugeordnet), die Werte aus, die die neue Excel leer lässt. Der einzelne Rabatt pro Unternehmen entfällt. Siehe [Familien teilen](./features/sharing.md).

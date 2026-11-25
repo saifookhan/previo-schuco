@@ -1073,7 +1073,8 @@
     "saveFailed": "Could not save",
     "saveFailedUnreachable": "Could not save — could not reach the server",
     "validFromOf": "Valid from: {name}",
-    "validToOf": "Valid to: {name}"
+    "validToOf": "Valid to: {name}",
+    "overlapsVersion": "These dates overlap version {version} ({from} – {to}): change its dates first"
   },
   "productFamilyFilters": {
     "search": "Search",

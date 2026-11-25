@@ -16,6 +16,7 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 - **Stampa**: *Anteprima Preventivo* su pagine A4, stampata o salvata in PDF dal browser, con impostazioni di stampa. Il vecchio download PDF non c'è più.
 - **Listini scaduti**: le bozze passano alla versione valida più recente della famiglia e vengono ricalcolate; se non c'è, salvataggio e stampa sono bloccati con un link per caricare una nuova versione.
 - **Impostazioni → Azienda**: dati fiscali, unità locali (logo, colore, contatti, utenti), telefoni dei referenti e testi salvati.
+- **Validità prezzi senza sovrapposizioni**: due versioni di una famiglia non possono avere un giorno in comune. Date sovrapposte nell'elenco, nella pagina della famiglia o caricando una nuova versione vengono rifiutate indicando la versione con cui si sovrappongono. Vedi [Famiglie di prodotti](./features/product-families.md#validità-dei-prezzi).
 
 **Settimana del 16 novembre**
 - **Condivisione per linea e opzione**: la finestra di condivisione elenca ogni linea di prodotto e opzione della famiglia, ognuna con il proprio **sconto**, **ricarico** e **ore di posa** per quell'azienda, partendo dai valori dell'Excel (0% / 100% / 0 dove non ne ha). In una nuova versione, ciò che l'azienda aveva sulla precedente (abbinato per nome) completa i valori che il nuovo Excel lascia vuoti. Lo sconto unico per azienda non c'è più. Vedi [Condivisione delle famiglie](./features/sharing.md).

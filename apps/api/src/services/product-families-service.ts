@@ -20,6 +20,7 @@ import {
   insertProductLineCharacteristic,
   listProductFamilyCopies,
   listProductFamilyVersions,
+  lockProductFamilyVersions,
   listProductFamilyVersionsOfChains,
   listVisibleProductFamilies,
   isFamilySharedWith,
@@ -40,12 +41,15 @@ import {
   FAMILY_DIFF_VERSION,
   countFamilyChanges,
   diffFamilyVersions,
+  findOverlappingValidity,
   type FamilyChangeNode,
   type AuditLogListResponse,
   type DuplicateProductFamilyRequest,
   type FamilyVersionComparison,
   type FamilyVersionSummary,
   type FamilyVersionsResponse,
+  type PriceValidity,
+  type PriceValidityOverlapResponse,
   type PriceValidityRequest,
   type ProductFamilyImportPreview,
   type ProductFamilyImportWarning,
@@ -80,6 +84,33 @@ export class ExcelImportError extends Error {}
 
 /** The caller can see the family (it was shared with them) but its history belongs to the owning company. */
 export class ProductFamilyHistoryForbiddenError extends Error {}
+
+/** Two versions of one family would sell at the same day's prices: a quote couldn't tell which applies. */
+export class PriceValidityOverlapError extends Error {
+  readonly overlap: PriceValidityOverlapResponse['overlap']
+
+  constructor(other: PriceValidityOverlapResponse['overlap']) {
+    super(`These dates overlap version ${other.version} (${other.priceValidFrom ?? '…'} – ${other.priceValidTo ?? '…'}): change its dates first`)
+    this.overlap = { version: other.version, priceValidFrom: other.priceValidFrom, priceValidTo: other.priceValidTo }
+  }
+}
+
+/**
+ * Rejects `validity` when it shares a day with another version in `familyId`'s chain. Locks the
+ * chain first, so a concurrent save of another version's dates waits for this transaction.
+ * @throws {PriceValidityOverlapError} naming the first version it overlaps
+ */
+const assertNoValidityOverlap = async (
+  tx: Parameters<typeof listProductFamilyVersions>[0],
+  familyId: string,
+  validity: PriceValidity,
+  exceptId?: string,
+): Promise<void> => {
+  await lockProductFamilyVersions(tx, familyId)
+  const versions = await listProductFamilyVersions(tx, familyId)
+  const overlapping = findOverlappingValidity(validity, versions.filter((version) => version.id !== exceptId))
+  if (overlapping) throw new PriceValidityOverlapError(overlapping)
+}
 
 const isMatrix = (value: number | RawPricingMatrix): value is RawPricingMatrix =>
   typeof value === 'object'
@@ -228,6 +259,7 @@ export interface ProductFamilyImportOptions {
  * @param file - The uploaded workbook
  * @param options - Name override, price validity, publish, and `version` — which stores the given `version`/`supersedesId` and audits `product_family.new_version` instead of `product_family.import`.
  * @throws {ExcelImportError} the workbook is missing a required sheet, or uses an unrecognized Tipo_Listino
+ * @throws {PriceValidityOverlapError} a new version's dates share a day with another version of the family
  */
 export const importProductFamilyFromExcel = async (
   ctx: TenantContext,
@@ -251,6 +283,7 @@ export const importProductFamilyFromExcel = async (
   )
 
   const family = await withTenantDb(ctx, async (tx) => {
+    if (versionOptions) await assertNoValidityOverlap(tx, versionOptions.supersedesId, priceValidity)
     const familyId = await insertProductFamily(tx, {
       supplierCompanyId,
       name: options.name?.trim() || parsed.family.family_name!,
@@ -964,6 +997,7 @@ export const setProductFamilyLibraryStatus = async (
 /**
  * Changes the days a family's prices may be used on new quote positions.
  * Positions already on quotes keep their snapshotted prices either way.
+ * @throws {PriceValidityOverlapError} the dates share a day with another version of the family (nothing is saved)
  * @throws {ProductFamilyNotFoundError} no such family, or the caller doesn't own it (RLS blocked the UPDATE)
  */
 export const setProductFamilyPriceValidityDates = async (
@@ -974,8 +1008,12 @@ export const setProductFamilyPriceValidityDates = async (
 ): Promise<PriceValidityRequest> =>
   withTenantDb(ctx, async (tx) => {
     const before = await getProductFamilyById(tx, familyId)
-    const updated = before ? await setProductFamilyPriceValidity(tx, familyId, validity) : null
-    if (!before || !updated) {
+    if (!before) {
+      throw new ProductFamilyNotFoundError()
+    }
+    await assertNoValidityOverlap(tx, familyId, validity, familyId)
+    const updated = await setProductFamilyPriceValidity(tx, familyId, validity)
+    if (!updated) {
       throw new ProductFamilyNotFoundError()
     }
     await refreshFamilyChanges(tx, ctx, familyId)

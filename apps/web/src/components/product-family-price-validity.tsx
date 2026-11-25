@@ -13,15 +13,26 @@ import { useLoadingTransition } from '@/components/ui/loading-region'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
-import { priceValidityStatus } from '@schuco/contracts'
-
-interface PriceValidity {
-  priceValidFrom: string | null
-  priceValidTo: string | null
-}
+import { priceValidityStatus, type PriceValidity, type PriceValidityOverlapResponse } from '@schuco/contracts'
 
 /** A `YYYY-MM-DD` day as a Date at UTC midnight — format it with `timeZone: 'UTC'` so it never shifts a day. */
 const asDay = (day: string) => new Date(`${day}T00:00:00Z`)
+
+/**
+ * Says why a validity save failed: another version already covering some of the days (the
+ * server's 409 names it), else the server's own error after `fallback`.
+ */
+export const useValiditySaveError = () => {
+  const t = useTranslations('priceValidity')
+  const format = useFormatter()
+  const day = (value: string | null) => (value ? format.dateTime(asDay(value), { dateStyle: 'medium', timeZone: 'UTC' }) : '…')
+  return (data: { error?: string } | Partial<PriceValidityOverlapResponse>, fallback: string): string =>
+    'overlap' in data && data.overlap
+      ? t('overlapsVersion', { version: data.overlap.version, from: day(data.overlap.priceValidFrom), to: day(data.overlap.priceValidTo) })
+      : data.error
+        ? `${fallback}: ${data.error}`
+        : fallback
+}
 
 /** "Prices valid 1 Jan 2027 – 31 Dec 2027", "Prices valid from 1 Jan 2027", or null when the family has no dates. */
 export const usePriceValidityLabel = () => {
@@ -64,6 +75,7 @@ export const ProductFamilyPriceValidity = ({
   today: string
 }) => {
   const t = useTranslations('priceValidity')
+  const saveError = useValiditySaveError()
   const label = usePriceValidityLabel()
   const router = useRouter()
   const { can } = useAuth()
@@ -95,7 +107,7 @@ export const ProductFamilyPriceValidity = ({
       })
       const data = (await response.json().catch(() => ({}))) as { error?: string }
       if (!response.ok) {
-        setError(data.error ? `${t('saveFailed')}: ${data.error}` : t('saveFailed'))
+        setError(saveError(data, t('saveFailed')))
         return
       }
       setOpen(false)
@@ -191,6 +203,7 @@ export const PriceValidityDateInput = ({
   canEdit: boolean
 }) => {
   const t = useTranslations('priceValidity')
+  const saveError = useValiditySaveError()
   const format = useFormatter()
   const { can } = useAuth()
   const router = useRouter()
@@ -250,7 +263,7 @@ export const PriceValidityDateInput = ({
       if (!response.ok) {
         const data = (await response.json().catch(() => ({}))) as { error?: string }
         setValue(committed.current)
-        showToast(data.error ? `${t('saveFailed')}: ${data.error}` : t('saveFailed'), 'error')
+        showToast(`${familyName}: ${saveError(data, t('saveFailed'))}`, 'error')
         return
       }
       committed.current = next

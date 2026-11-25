@@ -69,6 +69,11 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
 
   const detail = result.data
   const { family, images, lines, characteristics, matrices, relations, editable, canViewHistory, canManage } = detail
+  // Where a new version's dates can start: after the last version's, when every version ends.
+  const chain = versionsResult.status === 'ok' ? versionsResult.data.versions : [family]
+  const lastValidTo = chain.every((v) => v.priceValidTo)
+    ? chain.reduce<string | null>((last, v) => (last && last > v.priceValidTo! ? last : v.priceValidTo), null)
+    : null
   const matrixById = new Map(matrices.map((m) => [m.id, m]))
   const mainCharacteristics = characteristics.filter((c) => !c.parentId)
   const subCharacteristicsByParent = new Map<string, typeof characteristics>()
@@ -164,7 +169,7 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
           />
           {canManage ? (
             <ProductFamilyUploadButton
-              version={{ familyId: family.id, familyName: family.name, readyForInvoicing: family.readyForInvoicing }}
+              version={{ familyId: family.id, familyName: family.name, readyForInvoicing: family.readyForInvoicing, lastValidTo }}
             />
           ) : null}
           <ProductFamilyShareButton familyId={family.id} familyName={family.name} isPublished={family.isPublished} />

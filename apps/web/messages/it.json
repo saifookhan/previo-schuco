@@ -1073,7 +1073,8 @@
     "saveFailed": "Impossibile salvare",
     "saveFailedUnreachable": "Impossibile salvare — server non raggiungibile",
     "validFromOf": "Data inizio validità: {name}",
-    "validToOf": "Data fine validità: {name}"
+    "validToOf": "Data fine validità: {name}",
+    "overlapsVersion": "Queste date si sovrappongono alla versione {version} ({from} – {to}): modifica prima le sue date"
   },
   "productFamilyFilters": {
     "search": "Cerca",

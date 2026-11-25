@@ -61,6 +61,11 @@ zeigt die Daten mit dem Badge **Demnächst** oder **Abgelaufen**; vor dieser Fun
 Daten und sind immer verwendbar.
 In der Liste ändert der Eigentümer die Daten direkt in der Zeile: gespeichert wird beim Verlassen des Feldes (oder mit
 Enter). *Gültig ab* kann nicht geleert werden; ein leeres *Gültig bis* bedeutet bis auf Weiteres.
+Zwei Versionen einer Familie dürfen keinen Tag gemeinsam haben: Daten, die sich mit einer anderen Version überschneiden
+(in der Liste, auf der Seite der Familie oder beim Hochladen einer neuen Version), werden mit Nummer und Daten dieser
+Version abgelehnt, und nichts wird gespeichert. Für eine neue Version geben Sie der aktuellen zuerst ein *Gültig bis*
+vor dem *Gültig ab* der neuen (der Upload-Dialog lässt die neue dann am Tag danach beginnen). Eine Version ohne Daten
+gilt an jedem Tag.
 
 ## Bereit zur Fakturierung
 

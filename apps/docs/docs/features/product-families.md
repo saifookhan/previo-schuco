@@ -60,6 +60,10 @@ already on quotes keep their prices and can still be edited. The list shows the 
 **Expired** badge; families imported before this existed have no dates and are always usable.
 In the list, the owner changes the dates right in the row: the change is saved when you leave the field (or press
 Enter). *Valid from* can't be emptied; emptying *Valid to* means until further notice.
+Two versions of a family can't share a day: dates that overlap another version (in the list, on the family's page or
+when uploading a new version) are refused with that version's number and dates, and nothing is saved. To start a new
+version, first give the current one a *Valid to* before the new version's *Valid from* (the upload dialog then starts
+the new version the day after). A version without dates counts as valid every day.
 
 ## Ready for invoicing
 

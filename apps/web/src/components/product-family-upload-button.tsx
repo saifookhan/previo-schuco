@@ -11,6 +11,7 @@ import {
   useProductFamilyDetailsError,
   type ProductFamilyDetails,
 } from '@/components/product-family-details-fields'
+import { useValiditySaveError } from '@/components/product-family-price-validity'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from '@/i18n/navigation'
@@ -19,7 +20,13 @@ import { priceValidityToday, type ProductFamilyImportPreview } from '@schuco/con
 
 interface ProductFamilyUploadButtonProps {
   /** Upload as a new version of this family; omit to import a new family. */
-  version?: { familyId: string; familyName: string; readyForInvoicing: boolean }
+  version?: {
+    familyId: string
+    familyName: string
+    readyForInvoicing: boolean
+    /** The last day any version is valid, when they all end — the new version's dates start after it. */
+    lastValidTo: string | null
+  }
 }
 
 const COUNT_KEYS = ['productLines', 'characteristics', 'options', 'priceTables', 'relations', 'images'] as const
@@ -30,8 +37,18 @@ const COUNT_KEYS = ['productLines', 'characteristics', 'options', 'priceTables',
  * price validity, whether to publish and whether it is ready for invoicing. Only "Save" stores anything — the same
  * file is sent again with the confirmed fields.
  */
+/** Today, or the day after `lastValidTo` when that is later: versions of a family can't share a day. */
+const firstFreeDay = (lastValidTo: string | null): string => {
+  const today = priceValidityToday()
+  if (!lastValidTo || lastValidTo < today) return today
+  const next = new Date(`${lastValidTo}T00:00:00Z`)
+  next.setUTCDate(next.getUTCDate() + 1)
+  return next.toISOString().slice(0, 10)
+}
+
 export const ProductFamilyUploadButton = ({ version }: ProductFamilyUploadButtonProps) => {
   const t = useTranslations('productFamilyUpload')
+  const saveError = useValiditySaveError()
   const router = useRouter()
   const { user, can } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -78,7 +95,7 @@ export const ProductFamilyUploadButton = ({ version }: ProductFamilyUploadButton
       setFields((current) => ({
         ...current,
         name: data.family.name,
-        priceValidFrom: current.priceValidFrom || priceValidityToday(),
+        priceValidFrom: current.priceValidFrom || firstFreeDay(version?.lastValidTo ?? null),
       }))
       setFile(picked)
       setPreview(data)
@@ -108,7 +125,7 @@ export const ProductFamilyUploadButton = ({ version }: ProductFamilyUploadButton
       const response = await fetch(url, { method: 'POST', body: formData })
       const data = (await response.json()) as { error?: string; family?: { id: string; name: string; version: number } }
       if (!response.ok || !data.family) {
-        setError(data.error ? `${t('saveFailed')}: ${data.error}` : t('saveFailed'))
+        setError(saveError(data, t('saveFailed')))
         return
       }
       close()

@@ -153,6 +153,7 @@ export {
   getProductFamilyDetail,
   listProductFamilyCopies,
   listProductFamilyVersions,
+  lockProductFamilyVersions,
   listProductFamilyVersionsOfChains,
   insertCharacteristic,
   insertPricingMatrix,

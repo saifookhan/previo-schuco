@@ -60,6 +60,11 @@ rifiuta. Le posizioni già nei preventivi mantengono i loro prezzi e restano mod
 il badge **Futura** o **Scaduta**; le famiglie importate prima di questa funzione non hanno date e sono sempre usabili.
 Nell'elenco il proprietario cambia le date direttamente nella riga: la modifica si salva quando esci dal campo (o con
 Invio). La *Data inizio validità* non si può svuotare; svuotare la *Data fine validità* significa fino a nuovo avviso.
+Due versioni di una famiglia non possono avere un giorno in comune: date che si sovrappongono a un'altra versione
+(nell'elenco, nella pagina della famiglia o caricando una nuova versione) vengono rifiutate indicando numero e date di
+quella versione, e non si salva nulla. Per iniziare una nuova versione, dai prima a quella attuale una *Data fine
+validità* precedente alla *Data inizio validità* della nuova (la finestra di caricamento fa poi partire la nuova dal
+giorno dopo). Una versione senza date conta come valida ogni giorno.
 
 ## Pronta per la fatturazione
 

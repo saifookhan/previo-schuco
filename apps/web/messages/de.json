@@ -1073,7 +1073,8 @@
     "saveFailed": "Speichern fehlgeschlagen",
     "saveFailedUnreachable": "Speichern fehlgeschlagen — Server nicht erreichbar",
     "validFromOf": "Gültig ab: {name}",
-    "validToOf": "Gültig bis: {name}"
+    "validToOf": "Gültig bis: {name}",
+    "overlapsVersion": "Diese Daten überschneiden sich mit Version {version} ({from} – {to}): Ändern Sie zuerst deren Daten"
   },
   "productFamilyFilters": {
     "search": "Suche",
