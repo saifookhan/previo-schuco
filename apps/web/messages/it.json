@@ -335,6 +335,7 @@
   },
   "productFamilyVersion": {
     "versionBadge": "Versione {version}",
+    "short": "V{version}",
     "current": "Attuale: Versione {version}",
     "supersedes": "Sostituisce una versione precedente",
     "supersededBy": "Esiste una versione più recente",
