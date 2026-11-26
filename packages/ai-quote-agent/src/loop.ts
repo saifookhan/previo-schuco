@@ -1,7 +1,7 @@
 import { hasSize, isEditRequest, isNewQuoteRequest, isNewRowRequest, isRemoving } from './intent'
 import { SYSTEM_PROMPT, TOOL_NAMES } from './prompt'
 import { QUOTE_TOOLS } from './tools'
-import type { AgentEvent, ModelMessage, ModelTurn, Suggestion, ToolOutcome } from './types'
+import type { AgentEvent, ModelMessage, ModelTurn, Suggestion, ToolCall, ToolOutcome } from './types'
 
 const MAX_ROUNDS = 8
 const TEXT_CHUNK = 24
@@ -111,8 +111,46 @@ export interface AgentRun {
   emit: (event: AgentEvent) => void | Promise<void>
 }
 
-/** The panel shows plain text, so markdown emphasis would appear as asterisks. */
-export const plainReply = (text: string): string => text.replace(/\*\*/g, '').replace(/__/g, '')
+/** The panel shows plain text, so markdown emphasis would appear as asterisks. Tool JSON never does. */
+export const plainReply = (text: string): string =>
+  text
+    .replace(/\*\*/g, '')
+    .replace(/__/g, '')
+    .replace(/```(?:json)?\s*[\s\S]*?```/gi, '')
+    .replace(/\[\s*\{\s*"name"\s*:\s*"[a-z0-9_]+"[\s\S]*?\}\s*\]/g, '')
+    .trim()
+
+/** A model sometimes prints a tool call instead of sending one. */
+export const toolCallsFromText = (text: string): ToolCall[] => {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]
+  const raw = (fenced ?? text).trim()
+  const arrayAt = raw.indexOf('[')
+  const objectAt = raw.indexOf('{')
+  const slice =
+    arrayAt >= 0 && (objectAt < 0 || arrayAt <= objectAt) ? raw.slice(arrayAt) : objectAt >= 0 ? raw.slice(objectAt) : ''
+  if (!slice) return []
+  const end = slice.startsWith('[') ? slice.lastIndexOf(']') : slice.lastIndexOf('}')
+  if (end < 1) return []
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(slice.slice(0, end + 1)) as unknown
+  } catch {
+    return []
+  }
+  const items = Array.isArray(parsed) ? parsed : [parsed]
+  return items.flatMap((item, index) => {
+    if (!item || typeof item !== 'object') return []
+    const record = item as { name?: unknown; arguments?: unknown }
+    if (typeof record.name !== 'string' || !/^[a-z0-9_]+$/.test(record.name)) return []
+    const args =
+      record.arguments === undefined
+        ? '{}'
+        : typeof record.arguments === 'string'
+          ? record.arguments
+          : JSON.stringify(record.arguments)
+    return [{ id: `text-${index + 1}`, name: record.name, arguments: args }]
+  })
+}
 
 const parseArgs = (raw: string): unknown => {
   try {
@@ -168,7 +206,9 @@ export const runQuoteAgent = async ({ messages, preamble, complete, execute, emi
 
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
     const turn = await complete(history)
-    if (turn.toolCalls.length === 0) {
+    const embedded = turn.toolCalls.length === 0 ? toolCallsFromText(turn.content ?? '') : []
+    const calls = turn.toolCalls.length > 0 ? turn.toolCalls : embedded
+    if (calls.length === 0) {
       const text = plainReply(turn.content ?? '')
       const nudge = nudged ? null : nudgeFor(text, latestUser, called)
       if (nudge) {
@@ -177,15 +217,15 @@ export const runQuoteAgent = async ({ messages, preamble, complete, execute, emi
         history.push({ role: 'user', content: nudge })
         continue
       }
-      await streamText(emit, text)
+      if (text) await streamText(emit, text)
       if (pendingSuggestions.length > 0) await emit({ type: 'suggestions', items: pendingSuggestions })
       return
     }
 
-    history.push({ role: 'assistant', content: turn.content, toolCalls: turn.toolCalls })
+    history.push({ role: 'assistant', content: embedded.length > 0 ? null : turn.content, toolCalls: calls })
     pendingSuggestions = []
     const spoken: string[] = []
-    for (const call of turn.toolCalls) {
+    for (const call of calls) {
       const blocked = blockedCall(call.name, latestUser, pendingSuggestions)
       if (blocked) {
         history.push({ role: 'tool', content: blocked, toolCallId: call.id })

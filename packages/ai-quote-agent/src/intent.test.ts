@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { issueConfirmToken, verifyConfirmToken } from './confirm'
+import { issueConfirmToken, removeTokenAllows, verifyConfirmToken } from './confirm'
 import { catalogQuery } from './match'
 import {
   choiceIndex,
   detectLanguage,
   isEditRequest,
   isNewQuoteRequest,
+  namedTarget,
   resolveDirectAction,
+  sizeForTurn,
+  sizeOnly,
+  sizesIn,
   userGaveSize,
 } from './intent'
 
@@ -45,14 +49,67 @@ describe('sizes and choices', () => {
   })
 
   it('runs the pending chip instead of asking again', () => {
+    const pendingChoices = [
+      {
+        label: 'pos 1 · a1b2 · Confezione 30',
+        message: 'add_product id l-1',
+        action: { tool: 'add_product', args: { lineName: 'Confezione 30 Filtri', familyId: '13243902-2aae-498e-9d5a-f769c2edc88a', widthMm: 2000, heightMm: 2000 } },
+      },
+      {
+        label: 'pos 2 · c3d4 · Confezione 10',
+        message: 'add_product id l-2',
+        action: { tool: 'add_product', args: { lineName: 'Confezione 10 Filtri', familyId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' } },
+      },
+    ]
+    for (const latestUser of ['1', 'the first', 'la prima']) {
+      expect(resolveDirectAction({ latestUser, pendingChoices })).toEqual(pendingChoices[0]?.action)
+    }
+  })
+
+  it('keeps a chosen line when the next message is only the size', () => {
     const action = resolveDirectAction({
-      latestUser: '1',
+      latestUser: '2500x500',
       pendingChoices: [
-        { label: 'one', message: 'one', action: { tool: 'add_product', args: { lineName: 'A' } } },
-        { label: 'two', message: 'two', action: { tool: 'add_product', args: { lineName: 'B' } } },
+        { label: 'size', message: 'size', action: { tool: 'add_product', args: { lineName: 'Confezione 30', familyId: 'fam-1' } } },
       ],
     })
-    expect(action).toEqual({ tool: 'add_product', args: { lineName: 'A' } })
+    expect(action).toEqual({ tool: 'add_product', args: { lineName: 'Confezione 30', familyId: 'fam-1', widthMm: 2500, heightMm: 500 } })
+  })
+})
+
+describe('sizes', () => {
+  const forms = ['2500x500', '2500 x 500', '2500X500', '2500×500', '2500*500', '2500 per 500', '2500 by 500', '2500x500 mm', '2500 mm x 500 mm']
+
+  it('reads every common width and height form', () => {
+    for (const form of forms) {
+      expect(sizesIn(form)).toEqual([{ widthMm: 2500, heightMm: 500 }])
+      expect(sizeOnly(form)).toEqual({ widthMm: 2500, heightMm: 500 })
+    }
+    expect(sizeOnly('2500x500')).toEqual({ widthMm: 2500, heightMm: 500 })
+    expect(sizeOnly('2500 per 500 mm')).toEqual({ widthMm: 2500, heightMm: 500 })
+    expect(sizeOnly('2500 by 500')).toEqual({ widthMm: 2500, heightMm: 500 })
+    expect(sizesIn('aggiungi confezione 2000x2000')).toEqual([{ widthMm: 2000, heightMm: 2000 }])
+    expect(sizesIn('cambia la misura a 2500*500 mm')).toEqual([{ widthMm: 2500, heightMm: 500 }])
+  })
+
+  it('uses the same parser for the user-typed check and for a missing tool size', () => {
+    expect(userGaveSize(['confezione 2000x2000'], 2000, 2000)).toBe(true)
+    expect(userGaveSize(['confezione 2000x2000'], 1200, 1400)).toBe(false)
+    expect(userGaveSize(['2500*500'], 2500, 500)).toBe(true)
+    expect(sizeForTurn(['aggiungi confezione 2500x500'], undefined, undefined)).toEqual({ widthMm: 2500, heightMm: 500 })
+    expect(sizeForTurn(['aggiungi confezione 2500x500'], 1200, 1400)).toBeUndefined()
+    expect(sizeForTurn(['aggiungi confezione 2500x500'], '1200x1400', undefined)).toBeUndefined()
+    expect(sizeForTurn(['cambia la misura della riga a 2500 per 500'], undefined, undefined)).toEqual({ widthMm: 2500, heightMm: 500 })
+    expect(catalogQuery('aggiungi confezione 2000x2000')).toBe('confezione')
+  })
+})
+
+describe('named rows', () => {
+  it('keeps the product the user named', () => {
+    expect(namedTarget('sconto 10% sulla Macchina VMC')).toBe('Macchina VMC')
+    expect(namedTarget('metti IVA 10% sulla riga Macchina VMC')).toBe('Macchina VMC')
+    expect(namedTarget('elimina la riga pos 2')).toMatch(/pos 2/i)
+    expect(namedTarget('set VAT exempt on all rows')).toBeNull()
   })
 })
 
@@ -61,6 +118,9 @@ describe('language and catalog query', () => {
     expect(detectLanguage('metti IVA sulla riga', 'en')).toBe('it')
     expect(detectLanguage('set the price of the row', 'it')).toBe('en')
     expect(detectLanguage('Bitte die Zeile hinzufügen', 'it')).toBe('de')
+    expect(detectLanguage('the first', 'it')).toBe('it')
+    expect(detectLanguage('1', 'it')).toBe('it')
+    expect(detectLanguage('2500x500', 'it')).toBe('it')
   })
 
   it('keeps the product words from an add sentence', () => {
@@ -80,5 +140,11 @@ describe('confirm token', () => {
   it('expires after five minutes', () => {
     const token = issueConfirmToken('secret', claims, 0)
     expect(verifyConfirmToken('secret', token, claims, 5 * 60 * 1000).ok).toBe(false)
+  })
+
+  it('still allows remove when the chip also carries the family', () => {
+    const token = issueConfirmToken('secret', { ...claims, args: { lineName: 'l-1' } }, 1_000)
+    expect(removeTokenAllows('secret', token, { quoteId: 'q', lineName: 'l-1' }, 1_000)).toBe(true)
+    expect(removeTokenAllows('secret', token, { quoteId: 'q', lineName: 'l-2' }, 1_000)).toBe(false)
   })
 })

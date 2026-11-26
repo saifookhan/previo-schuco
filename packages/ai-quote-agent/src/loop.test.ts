@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { plainReply, runQuoteAgent } from './loop'
+import { plainReply, runQuoteAgent, toolCallsFromText } from './loop'
 import type { AgentEvent, ModelMessage, ModelTurn } from './types'
 
 describe('plainReply', () => {
@@ -273,6 +273,27 @@ describe('runQuoteAgent', () => {
       emit: () => {},
     })
     expect(executed).toEqual(['update_line'])
+  })
+
+  it('runs a tool call that the model printed as JSON', async () => {
+    const executed: string[] = []
+    const events: AgentEvent[] = []
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'blocca la riga Macchina VMC' }],
+      complete: async () => ({ content: '[{"name":"get_quote","arguments":{}}]', toolCalls: [] }),
+      execute: async (name) => {
+        executed.push(name)
+        return { content: 'Quote for Rossi.', speak: 'Quote for Rossi.' }
+      },
+      emit: (event) => {
+        events.push(event)
+      },
+    })
+    expect(toolCallsFromText('[{"name":"get_quote","arguments":{}}]')[0]?.name).toBe('get_quote')
+    expect(executed).toEqual(['get_quote'])
+    const shown = events.filter((event) => event.type === 'text').map((event) => (event.type === 'text' ? event.delta : '')).join('')
+    expect(shown).toBe('Quote for Rossi.')
+    expect(shown).not.toContain('"name"')
   })
 
   it('adds the picked line instead of asking which one again', async () => {

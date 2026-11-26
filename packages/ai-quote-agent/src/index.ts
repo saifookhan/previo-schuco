@@ -1,7 +1,7 @@
 export { placeActivity } from './activities'
 export type { ActivityAction, ActivityPlacement } from './activities'
 export { completeWithCloudflare } from './cloudflare'
-export { issueConfirmToken, verifyConfirmToken } from './confirm'
+export { issueConfirmToken, readConfirmToken, removeTokenAllows, verifyConfirmToken } from './confirm'
 export type { ConfirmClaims } from './confirm'
 export {
   choiceIndex,
@@ -14,13 +14,18 @@ export {
   isUuid,
   languageName,
   mentionedId,
+  namedTarget,
   phrases,
   resolveDirectAction,
+  sizeForTurn,
+  sizeOnly,
   sizesIn,
+  stripSizes,
   userGaveSize,
+  wantsHiddenCatalog,
 } from './intent'
 export type { ChatLocale } from './intent'
-export { runQuoteAgent } from './loop'
+export { plainReply, runQuoteAgent, toolCallsFromText } from './loop'
 export { catalogQuery, expandQuery, foldName, nameMatches, positionQuery, quotedName, samePosition, selectNameMatches, withoutSize } from './match'
 export { SYSTEM_PROMPT } from './prompt'
 export { QUOTE_TOOLS } from './tools'
