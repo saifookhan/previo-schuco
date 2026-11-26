@@ -288,6 +288,7 @@
     "validity": "Validity dates",
     "tags": "Tags",
     "publishedStatus": "Status (published)",
+    "versions": "Versions",
     "inLibrary": "In library",
     "actions": "Actions",
     "expand": "Show details for {name}",
@@ -334,6 +335,7 @@
   },
   "productFamilyVersion": {
     "versionBadge": "Version {version}",
+    "current": "Current: Version {version}",
     "supersedes": "Supersedes an earlier version",
     "supersededBy": "A newer version exists",
     "viewPreviousVersion": "View previous version",

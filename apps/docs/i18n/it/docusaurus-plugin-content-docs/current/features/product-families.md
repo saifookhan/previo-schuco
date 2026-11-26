@@ -21,7 +21,7 @@ Ogni ambiente ne ha già una: **Demo Window W70** (vedi [Dati demo](../demo-data
 | Azione | Come | Note |
 |---|---|---|
 | Importa da Excel | **Importa da Excel** nell'elenco | Scegli il file, controllalo, imposta la validità dei prezzi — vedi [Importare da Excel](#importare-da-excel) |
-| Visualizza | Il nome della famiglia, o l'icona a sinistra della riga (apre una nuova scheda) | Un clic sul resto della riga la espande. È aperta una sola riga alla volta |
+| Visualizza | Il nome della famiglia, o l'icona a sinistra della riga (apre una nuova scheda) | Un clic sul resto della riga la espande. È aperta una sola riga alla volta. Il nome mostra la versione tra parentesi, per esempio Demo Window W70 (2); passandoci sopra compare Versione 2. La riga espansa indica la versione attuale e collega la precedente in una nuova scheda |
 | Modifica prezzi | **Modifica** su una linea, caratteristica o tabella | Valore, formula, sconto, markup, ore di posa |
 | Modifica una tabella | Modifica → aggiungi/rimuovi righe e colonne | Griglia larghezza × altezza |
 | Pubblica / ritira | Interruttore **Stato (pubblicato)** nella riga espansa (pulsante nella pagina della famiglia) | La riga mostra Pubblicato o Bozza. Solo le famiglie pubblicate si possono condividere |

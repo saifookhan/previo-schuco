@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronRight, ExternalLink, History } from 'lucide-react'
+import { ChevronRight, ExternalLink } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Fragment, useState, type MouseEvent, type ReactNode } from 'react'
 
@@ -64,7 +64,7 @@ const TagsCell = ({ family }: { family: ProductFamilySummary }) => {
   )
 }
 
-/** Technical name, the settings, the two dates, and delete — one open row at a time. */
+/** Technical name, versions, the settings, the two dates, and delete — one open row at a time. */
 const ExpandedFamily = ({ family, tab }: { family: ProductFamilySummary; tab: 'own' | 'shared' }) => {
   const t = useTranslations('productFamilies')
   const tFlags = useTranslations('productFamilyFlags')
@@ -72,15 +72,21 @@ const ExpandedFamily = ({ family, tab }: { family: ProductFamilySummary; tab: 'o
   return (
     <div className="space-y-4">
       {family.technicalName ? <p className="text-sm text-slate-500">{family.technicalName}</p> : null}
-      {family.supersedesId ? (
-        <Link
-          href={`/app/product-families/${family.supersedesId}`}
-          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand"
-        >
-          <History className="h-3.5 w-3.5" />
-          {tVersion('viewPreviousVersion')}
-        </Link>
-      ) : null}
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-slate-700">{t('versions')}</p>
+        <p className="text-sm text-slate-600">{tVersion('current', { version: family.version })}</p>
+        {family.supersedesId ? (
+          <Link
+            href={`/app/product-families/${family.supersedesId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm text-brand hover:underline"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            {tVersion('viewPreviousVersion')}
+          </Link>
+        ) : null}
+      </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <Setting label={t('publishedStatus')}>
           <ProductFamilyPublishSwitch
@@ -165,7 +171,7 @@ export const ProductFamilyTable = ({
   const tVersion = useTranslations('productFamilyVersion')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const shared = tab === 'shared'
-  const columnCount = shared ? 11 : 9
+  const columnCount = shared ? 10 : 8
 
   const toggle = (id: string) => setExpandedId((current) => (current === id ? null : id))
 
@@ -187,7 +193,6 @@ export const ProductFamilyTable = ({
           <th className="font-medium">{t('brand')}</th>
           {shared ? <th className="font-medium">{t('yourDiscount')}</th> : null}
           <th className="font-medium">{t('status')}</th>
-          <th className="font-medium">{t('version')}</th>
           <th className="font-medium">{t('validity')}</th>
           <th className="font-medium">{t('tags')}</th>
           <th className="text-right font-medium">{t('actions')}</th>
@@ -230,8 +235,12 @@ export const ProductFamilyTable = ({
                   </div>
                 </td>
                 <td className="min-w-[11rem] font-medium text-slate-900">
-                  <Link href={`/app/product-families/${family.id}`} className="hover:text-brand">
-                    {family.name}
+                  <Link
+                    href={`/app/product-families/${family.id}`}
+                    title={tVersion('versionBadge', { version: family.version })}
+                    className="hover:text-brand"
+                  >
+                    {family.name} ({family.version})
                   </Link>
                 </td>
                 {shared ? <td className="text-slate-600">{family.ownerCompanyName ?? '—'}</td> : null}
@@ -241,11 +250,6 @@ export const ProductFamilyTable = ({
                 <td>
                   <Badge variant={family.isPublished ? 'success' : 'muted'}>
                     {family.isPublished ? t('published') : t('draft')}
-                  </Badge>
-                </td>
-                <td>
-                  <Badge variant="muted" className="whitespace-nowrap">
-                    {tVersion('versionBadge', { version: family.version })}
                   </Badge>
                 </td>
                 <td>
