@@ -1186,6 +1186,7 @@
     "unavailable": "The assistant is not available right now.",
     "empty": "Tell me the customer and the product. I only use the current catalog.",
     "tools": {
+      "catalog_summary": "Counting the catalog",
       "search_catalog": "Looking through the catalog",
       "describe_family": "Reading the product family",
       "create_quote": "Creating the quote",
@@ -1193,6 +1194,8 @@
       "duplicate_line": "Duplicating the row",
       "duplicate_family": "Duplicating the family",
       "move_line": "Moving the row",
+      "add_text_module": "Adding a text module",
+      "add_activity": "Adding an activity",
       "update_line": "Updating the row"
     },
     "starters": {

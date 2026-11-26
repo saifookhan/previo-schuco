@@ -163,6 +163,7 @@ export {
   insertProductLineCharacteristic,
   isProductFamilyInLibrary,
   listFamiliesHiddenFromLibrary,
+  listProductLineNames,
   listVisibleProductFamilies,
   setProductFamilyHasPriceList,
   setProductFamilyInLibrary,

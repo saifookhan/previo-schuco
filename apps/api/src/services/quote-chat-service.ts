@@ -1,4 +1,4 @@
-import { expandQuery, nameMatches, type Suggestion } from '@schuco/ai-quote-agent'
+import { expandQuery, foldName, nameMatches, placeActivity, positionQuery, samePosition, withoutSize, type Suggestion } from '@schuco/ai-quote-agent'
 import {
   lineNetUnitPrice,
   lineTotal,
@@ -14,7 +14,7 @@ import {
 } from '@schuco/contracts'
 
 import type { TenantContext } from '../lib/tenant-db'
-import { getProductFamilyDetailWithLibrary, listProductFamilies } from './product-families-service'
+import { getProductFamilyDetailWithLibrary, listLinesForFamilies, listProductFamilies } from './product-families-service'
 import {
   QuoteConflictError,
   QuoteValidationError,
@@ -51,24 +51,37 @@ const summarizeDocument = (document: QuoteDocument): string => {
   const rows = document.families
     .map((family) => {
       const lines = family.lines
-        .map((line) => {
+        .map((line, index) => {
           const net = lineNetUnitPrice(line)
           const total = lineTotal(line)
-          return `  ${line.code} ${line.name} ${line.widthMm ?? '—'}×${line.heightMm ?? '—'} qty ${line.quantity} €/pc ${line.unitPrice} extra ${line.extraMarkupPct}% disc ${line.discountPct}% net ${net.toFixed(2)} total ${total.toFixed(2)} VAT ${line.vatRate} h ${line.installationHours ?? '—'} [${line.id}]`
+          return `  ${index + 1}. pos ${line.code} ${line.name} ${line.widthMm ?? '—'}×${line.heightMm ?? '—'} qty ${line.quantity} €/pc ${line.unitPrice} extra ${line.extraMarkupPct}% disc ${line.discountPct}% net ${net.toFixed(2)} total ${total.toFixed(2)} VAT ${line.vatRate} h ${line.installationHours ?? '—'} [${line.id}]`
         })
         .join('\n')
       return `${family.name} [${family.id}]\n${lines || '  (no rows)'}`
     })
     .join('\n')
-  return `${rows}\nQuote total ex VAT ${quoteTotal(document).toFixed(2)}`
+  const textPreview = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80)
+  const modules = document.intro.map((module, index) => `  ${index + 1}. ${textPreview(module.html) || '(empty)'}`).join('\n')
+  const activities = document.closing
+    .filter((block) => block.type === 'activities')
+    .flatMap((block) => block.rows)
+    .map((row) => `  ${row.description} | ${row.included ? 'included' : 'not included'} | ${row.enabled ? 'printed' : 'not printed'}`)
+    .join('\n')
+  return `${rows || '(no products)'}\nText modules:\n${modules || '  (none)'}\nActivities:\n${activities || '  (none)'}\nQuote total ex VAT ${quoteTotal(document).toFixed(2)}`
 }
 
-const findLines = (document: QuoteDocument, query: string): { family: QuoteFamily; line: QuoteLine }[] =>
-  document.families.flatMap((family) =>
-    family.lines
-      .filter((line) => nameMatches(line.name, query) || nameMatches(line.code, query) || line.id === query)
-      .map((line) => ({ family, line })),
-  )
+const findLines = (document: QuoteDocument, query: string): { family: QuoteFamily; line: QuoteLine }[] => {
+  const rows = document.families.flatMap((family) => family.lines.map((line) => ({ family, line })))
+  const byId = rows.filter(({ line }) => line.id === query)
+  if (byId.length > 0) return byId
+  if (positionQuery(query)) {
+    const byPos = rows.filter(({ line }) => samePosition(line.code, query))
+    if (byPos.length > 0) return byPos
+  }
+  const named = withoutSize(query)
+  if (!named) return []
+  return rows.filter(({ line }) => nameMatches(line.name, named) || nameMatches(line.code, named))
+}
 
 const findFamilies = (document: QuoteDocument, query: string): QuoteFamily[] =>
   document.families.filter((family) => nameMatches(family.name, query) || family.id === query)
@@ -89,7 +102,11 @@ const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
 
 const str = (value: unknown): string | undefined => (typeof value === 'string' && value.trim() ? value.trim() : undefined)
-const num = (value: unknown): number | undefined => (typeof value === 'number' && Number.isFinite(value) ? value : undefined)
+const num = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value)
+  return undefined
+}
 
 export const runQuoteChatTools = async (
   ctx: TenantContext,
@@ -130,6 +147,8 @@ const dispatch = async (
   args: Record<string, unknown>,
 ): Promise<ToolResult> => {
   switch (name) {
+    case 'catalog_summary':
+      return catalogSummary(ctx)
     case 'search_catalog':
       return searchCatalog(ctx, str(args.query) ?? '', args.includeHidden === true)
     case 'describe_family':
@@ -144,6 +163,10 @@ const dispatch = async (
       return duplicateFamily(ctx, actor, state, str(args.familyName) ?? '')
     case 'move_line':
       return moveLine(ctx, actor, state, str(args.lineName) ?? '', str(args.direction) === 'down' ? 'down' : 'up')
+    case 'add_text_module':
+      return addTextModule(ctx, actor, state, args)
+    case 'add_activity':
+      return addActivity(ctx, actor, state, args)
     case 'update_line':
       return updateLine(ctx, actor, state, args)
     default:
@@ -151,36 +174,79 @@ const dispatch = async (
   }
 }
 
+const familyLine = (family: {
+  id: string
+  name: string
+  version: number
+  brand: string | null
+  isPublished: boolean
+  inLibrary: boolean
+  readyForInvoicing: boolean
+  priceValidFrom: string | null
+  priceValidTo: string | null
+}): string => {
+  const status = family.isPublished ? 'published' : 'draft'
+  const addable = isQuotable(family) ? 'can add' : 'cannot add'
+  return `- ${family.name} | id ${family.id} | v${family.version} | ${family.brand || 'no brand'} | ${status} | ${validityLabel(family)} | ${addable}`
+}
+
+const catalogSummary = async (ctx: TenantContext): Promise<ToolResult> => {
+  const families = await listProductFamilies(ctx, { includeOutOfLibrary: true })
+  const current = families.filter(isQuotable)
+  const hidden = families.filter((family) => !isQuotable(family))
+  const lines = await listLinesForFamilies(ctx, families.map((family) => family.id))
+  const currentIds = new Set(current.map((family) => family.id))
+  const currentLines = lines.filter((line) => currentIds.has(line.productFamilyId)).length
+  const names = current.slice(0, 12).map((family) => familyLine(family)).join('\n')
+  return reply(
+    `Current families: ${current.length}. Product lines in those families: ${currentLines}. Draft or expired families: ${hidden.length} (${lines.length - currentLines} lines), not addable unless the user asks to see them.\nCurrent families:\n${names || '—'}`,
+  )
+}
+
 const searchCatalog = async (ctx: TenantContext, query: string, includeHidden: boolean): Promise<ToolResult> => {
   const families = await listProductFamilies(ctx, { includeOutOfLibrary: true })
   const queries = expandQuery(query)
-  const hits = families.filter((family) => queries.some((term) => nameMatches(family.name, term) || (family.brand ? nameMatches(family.brand, term) : false)))
+  const matchesFamily = (family: (typeof families)[number]) =>
+    queries.some((term) => nameMatches(family.name, term) || (family.brand ? nameMatches(family.brand, term) : false))
+  const hits = families.filter(matchesFamily)
   const visible = includeHidden ? hits : hits.filter(isQuotable)
   const hiddenCount = hits.length - hits.filter(isQuotable).length
-  if (visible.length === 0) {
+  const wantsLines = visible.length === 0 || /\d/.test(query)
+  const pool = wantsLines ? (visible.length > 0 ? visible : includeHidden ? families : families.filter(isQuotable)).slice(0, 40) : []
+  const productLines = await listLinesForFamilies(ctx, pool.map((family) => family.id))
+  const byFamily = new Map(pool.map((family) => [family.id, family]))
+  const lineHits = productLines.filter((line) => queries.some((term) => nameMatches(line.name, term))).slice(0, 8)
+  const lineText = lineHits
+    .map((line) => {
+      const family = byFamily.get(line.productFamilyId)
+      return family ? `- ${line.name} | family ${family.name} | familyId ${family.id} | ${isQuotable(family) ? 'can add' : 'cannot add'}` : null
+    })
+    .filter(Boolean)
+    .join('\n')
+
+  if (visible.length === 0 && lineHits.length === 0) {
     return reply(
       hiddenCount > 0
-        ? `No current family matches "${query}". ${hiddenCount} draft or expired match(es) exist. Ask the user before calling search_catalog again with includeHidden true. Do not add those.`
-        : `No family matches "${query}".`,
+        ? `No current family or product matches "${query}". ${hiddenCount} draft or expired family match(es) exist. Ask the user before calling search_catalog again with includeHidden true. Do not add those.`
+        : `No family or product matches "${query}". Call catalog_summary if the user wants to know what exists.`,
       hiddenCount > 0 ? [{ label: 'Mostra anche bozze e listini scaduti', message: `Mostra anche bozze e listini scaduti per ${query}` }] : undefined,
     )
   }
   const shown = visible.slice(0, 8)
-  const lines = shown.map((family) => {
-    const status = family.isPublished ? 'published' : 'draft'
-    const addable = isQuotable(family) ? 'can add' : 'cannot add'
-    return `- ${family.name} | id ${family.id} | v${family.version} | ${family.brand || 'no brand'} | ${status} | ${validityLabel(family)} | ${addable}`
-  })
-  const more = visible.length > 8 ? `\n${visible.length - 8} more not shown. Ask the user to narrow the name.` : ''
-  const choice = shown.length > 1 ? '\nSeveral matches. Ask the user which one. Do not add yet.' : '\nOne match. You may use this id.'
+  const familyText = shown.map((family) => familyLine(family)).join('\n')
+  const more = visible.length > 8 ? `\n${visible.length - 8} more families not shown. Ask the user to narrow the name.` : ''
+  const choice = shown.length > 1 ? '\nSeveral families match. Ask the user which one. Do not add yet.' : shown.length === 1 ? '\nOne family match. You may use this id.' : ''
   const suggestions =
     shown.length > 1
       ? shown.map((family) => ({
           label: `v${family.version} · ${family.name} · ${validityLabel(family)}`,
           message: `Usa la famiglia "${family.name}" versione ${family.version}, id ${family.id}`,
         }))
-      : undefined
-  return reply(`${lines.join('\n')}${more}${choice}`, suggestions)
+      : lineHits.length > 1
+        ? lineHits.slice(0, 8).map((line) => ({ label: line.name, message: `Aggiungi "${line.name}"` }))
+        : undefined
+  const products = lineText ? `\nProduct lines:\n${lineText}` : ''
+  return reply(`${familyText}${more}${choice}${products}`.trim(), suggestions)
 }
 
 const describeFamily = async (ctx: TenantContext, familyId: string): Promise<ToolResult> => {
@@ -207,6 +273,63 @@ const describeFamily = async (ctx: TenantContext, familyId: string): Promise<Too
   return reply(
     `${detail.family.name} v${detail.family.version} | ${isQuotable({ ...detail.family, inLibrary: detail.inLibrary }) ? 'can add' : 'cannot add'}\nLines:\n${lines}\nOptions:\n${groups || '—'}\nMatrix bounds: ${bounds.join('; ') || 'none'}`,
   )
+}
+
+const paragraphHtml = (value: string): string => {
+  const escaped = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+  return `<p>${escaped}</p>`
+}
+
+const addTextModule = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  state: ChatState,
+  args: Record<string, unknown>,
+): Promise<ToolResult> => {
+  const text = typeof args.text === 'string' ? args.text.trim() : ''
+  if (text.length > 10_000) return reply('That text is too long.')
+  const place = str(args.place) === 'closing' ? 'closing' : 'intro'
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const html = paragraphHtml(text)
+  if (place === 'closing') {
+    if (document.closing.length >= 50) return reply('The closing already has 50 blocks.')
+    document.closing.push({ id: localId('c'), type: 'text', html })
+  } else {
+    if (document.intro.length >= 50) return reply('The introduction already has 50 text modules.')
+    document.intro.push({ id: localId('m'), html })
+  }
+  const saved = await persist(ctx, actor, state, document)
+  return reply(`Added a text module to the ${place}: "${text || '(empty)'}".\n${saved.content}`)
+}
+
+const addActivity = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  state: ChatState,
+  args: Record<string, unknown>,
+): Promise<ToolResult> => {
+  const description = str(args.description)
+  if (!description) return reply('Activity description is required.')
+  if (description.length > 500) return reply('Activity description is too long (500 characters).')
+  const included = typeof args.included === 'boolean' ? args.included : true
+  const enabled = typeof args.printed === 'boolean' ? args.printed : true
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const block = document.closing.find((item) => item.type === 'activities')
+  const rows = block?.type === 'activities' ? block.rows : []
+  const placed = placeActivity(rows, { id: localId('att'), description, included, enabled })
+  const zone = included ? 'included' : 'not included'
+  const print = enabled ? 'printed' : 'not printed'
+  if (placed.action === 'unchanged') {
+    const existing = placed.rows.find((row) => foldName(row.description) === foldName(description))
+    return reply(`"${existing?.description ?? description}" is already ${zone} and ${print}.`)
+  }
+  if (block?.type === 'activities') block.rows = placed.rows
+  else document.closing.push({ id: localId('c'), type: 'activities', rows: placed.rows })
+  const saved = await persist(ctx, actor, state, document)
+  const verb = placed.action === 'added' ? 'Added' : 'Moved'
+  return reply(`${verb} activity "${description}" (${zone}, ${print}).\n${saved.content}`)
 }
 
 const requireQuote = (state: ChatState): SalesQuoteDetailResponse => {
@@ -371,7 +494,8 @@ const moveLine = async (
   const [moved] = family.lines.splice(index, 1)
   family.lines.splice(next, 0, moved!)
   const saved = await persist(ctx, actor, state, document)
-  return reply(`Moved ${line.name} ${direction}.\n${saved.content}`)
+  const order = family.lines.map((item, place) => `${place + 1}. ${item.name}`).join(', ')
+  return reply(`Moved ${line.name} ${direction}. Order is now ${order}.\n${saved.content}`)
 }
 
 const updateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
@@ -394,7 +518,11 @@ const updateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatStat
   const unitPrice = num(args.unitPrice)
   if (extra !== undefined) line.extraMarkupPct = extra
   if (discount !== undefined) line.discountPct = Math.min(100, Math.max(0, discount))
-  if (quantity !== undefined) line.quantity = Math.max(1, Math.round(quantity))
+  if (quantity !== undefined) {
+    const pieces = Math.round(quantity)
+    if (pieces < 1 || pieces > 1_000_000) return reply('Quantity must be a whole number from 1 to 1000000.')
+    line.quantity = pieces
+  }
   if (hours !== undefined) line.installationHours = hours
   const vat = str(args.vatRate)
   if (vat) {

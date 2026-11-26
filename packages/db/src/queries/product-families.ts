@@ -196,6 +196,28 @@ export const listVisibleProductFamilies = (db: DbLike, companyId: string): Promi
     )
     .orderBy(desc(productFamilies.createdAt))
 
+export interface ProductLineName {
+  id: string
+  productFamilyId: string
+  name: string
+  unitSymbol: string
+}
+
+/** Names of the lines in the given families. The caller has already decided which families are visible. */
+export const listProductLineNames = (db: DbLike, familyIds: string[]): Promise<ProductLineName[]> =>
+  familyIds.length === 0
+    ? Promise.resolve([])
+    : db
+        .select({
+          id: productLines.id,
+          productFamilyId: productLines.productFamilyId,
+          name: productLines.name,
+          unitSymbol: productLines.unitSymbol,
+        })
+        .from(productLines)
+        .where(inArray(productLines.productFamilyId, familyIds))
+        .orderBy(asc(productLines.sortOrder), asc(productLines.name))
+
 export interface ProductFamilyDetail {
   family: ProductFamilySummary & {
     description1: string | null
