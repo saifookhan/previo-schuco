@@ -72,7 +72,7 @@ const ExpandedFamily = ({ family, tab }: { family: ProductFamilySummary; tab: 'o
   return (
     <div className="space-y-4">
       {family.technicalName ? <p className="text-sm text-slate-500">{family.technicalName}</p> : null}
-      <div className="flex items-start justify-between gap-8">
+      <div className="flex items-start gap-16">
         <div className="min-w-0 space-y-4">
           <div className="grid w-fit grid-cols-[max-content_auto] items-center justify-items-start gap-x-3 gap-y-2">
             <Setting label={t('publishedStatus')}>
@@ -187,7 +187,7 @@ export const ProductFamilyTable = ({
   }
 
   return (
-    <table className="w-full min-w-[1040px] text-sm [&_td]:px-3 [&_td]:py-3 [&_th]:px-3 [&_th]:py-3 [&_td]:align-middle [&_th]:align-middle [&_td:first-child]:pl-6 [&_th:first-child]:pl-6">
+    <table className="w-max text-sm [&_td]:whitespace-nowrap [&_td]:px-4 [&_td]:py-3 [&_th]:whitespace-nowrap [&_th]:px-4 [&_th]:py-3 [&_td]:align-middle [&_th]:align-middle [&_td:first-child]:pl-6 [&_th:first-child]:pl-6">
       <thead>
         <tr className="border-b border-slate-100 text-left text-slate-500">
           <th className="w-16" />
@@ -287,7 +287,7 @@ export const ProductFamilyTable = ({
               </tr>
               {open ? (
                 <tr className="border-b border-slate-100 bg-slate-50/80">
-                  <td colSpan={columnCount}>
+                  <td colSpan={columnCount} className="whitespace-normal">
                     <ExpandedFamily family={family} tab={tab} />
                   </td>
                 </tr>
