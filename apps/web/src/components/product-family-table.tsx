@@ -41,20 +41,23 @@ const Setting = ({ label, children }: { label: string; children: ReactNode }) =>
   </div>
 )
 
-/** The flags that are on, as named tags. The switches that change them sit in the expanded row. */
+/** One color per flag, so the stacked tags stay distinguishable. */
+const TAGS = [
+  { key: 'hasPriceList', label: 'hasPriceList', className: 'bg-sky-100 text-sky-800', on: (family: ProductFamilySummary) => family.hasPriceList },
+  { key: 'readyForInvoicing', label: 'readyForInvoicing', className: 'bg-violet-100 text-violet-800', on: (family: ProductFamilySummary) => family.readyForInvoicing },
+  { key: 'inLibrary', label: 'inLibrary', className: 'bg-teal-100 text-teal-800', on: (family: ProductFamilySummary) => family.inLibrary ?? true },
+] as const
+
+/** The flags that are on, stacked. The switches that change them sit in the expanded row. */
 const TagsCell = ({ family }: { family: ProductFamilySummary }) => {
   const t = useTranslations('productFamilies')
-  const tags = [
-    family.hasPriceList ? t('hasPriceList') : null,
-    family.readyForInvoicing ? t('readyForInvoicing') : null,
-    (family.inLibrary ?? true) ? t('inLibrary') : null,
-  ].filter((tag) => tag !== null)
+  const tags = TAGS.filter((tag) => tag.on(family))
   if (tags.length === 0) return <span className="text-slate-400">—</span>
   return (
-    <div className="flex max-w-xs flex-wrap gap-1">
+    <div className="flex flex-col items-start gap-1">
       {tags.map((tag) => (
-        <Badge key={tag} variant="muted" className="whitespace-nowrap">
-          {tag}
+        <Badge key={tag.key} className={cn('whitespace-nowrap', tag.className)}>
+          {t(tag.label)}
         </Badge>
       ))}
     </div>
