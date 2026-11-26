@@ -25,7 +25,7 @@ The model may call these. It never receives a company id or a user id. Prices an
 | `search_catalog` | Families and product lines matching the user's words, including a partial or slightly misspelled name. Drafts and expired price lists are omitted unless the user asked to see them. At most eight rows, with version and validity. |
 | `describe_family` | Lines, option groups, and matrix bounds of one family. No matrix cells. |
 | `create_quote` | A new draft for a customer. |
-| `add_product` | A new catalog row. Width and height are required. Several matching lines are returned as choices and nothing is added. |
+| `add_product` | A new catalog row. Width and height are required. A quantity here is the new row's pieces. The same line in several families is returned as one choice per family, and nothing is added until a family id is given. |
 | `duplicate_line` | A copy of one row, with the next position number. "The first one" is Pos 1. A size written after the name is ignored. |
 | `duplicate_family` | A copy of one family block and its rows. |
 | `move_line` | Move a row up or down inside its family. "Make the first product the second" moves Pos 1 down. |

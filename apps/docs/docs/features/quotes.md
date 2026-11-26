@@ -76,7 +76,7 @@ as before.
 
 ## Quote assistant
 
-On the quotes list and on a quote, users who can edit quotes get a chat button. The assistant creates a draft, adds a catalog product as a new row, duplicates a row or a family, moves a row, changes quantity, width, height, extra %, €/pc, discount, VAT, and installation hours, including by Pos such as “pos 1”, adds a closing activity to Included or Not included, and adds a text module. Net € and the total stay calculated. Prices come from the catalog. The conversation is kept only in the browser; closing or refreshing clears it, and the saved quote remains. Draft and expired families are hidden unless you ask to see them, and they are still not added. When several current families or lines match, the assistant asks which one and does not pick.
+On the quotes list and on a quote, users who can edit quotes get a chat button. The assistant creates a draft, adds a catalog product as a new row, duplicates a row or a family, moves a row, changes quantity, width, height, extra %, €/pc, discount, VAT, and installation hours, including by Pos such as “pos 1”, adds a closing activity to Included or Not included, and adds a text module. Net € and the total stay calculated. Prices come from the catalog. The conversation is kept only in the browser; closing or refreshing clears it, and the saved quote remains. Draft and expired families are hidden unless you ask to see them, and they are still not added. When several current families or lines match, the assistant asks which one and does not pick. The same line in several families is one chip per family, and a click sends that family's id. "Aggiungi una riga" with a size and a quantity adds a new row.
 
 ## Not built yet
 
