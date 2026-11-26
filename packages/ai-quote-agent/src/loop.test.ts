@@ -175,4 +175,26 @@ describe('runQuoteAgent', () => {
     })
     expect(events.some((event) => event.type === 'status' && event.tool === 'move_line')).toBe(true)
   })
+
+  it('asks again when a text module is searched as a product', async () => {
+    const events: AgentEvent[] = []
+    const turns: ModelTurn[] = [
+      { content: 'I found no families that match "text module".', toolCalls: [] },
+      { content: null, toolCalls: [{ id: 'call-1', name: 'add_text_module', arguments: '{"text":"saif testing"}' }] },
+      { content: 'Ho aggiunto il modulo testo saif testing.', toolCalls: [] },
+    ]
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'add a text module, saif testing' }],
+      complete: async () => turns.shift()!,
+      execute: async (name, args) => {
+        expect(name).toBe('add_text_module')
+        expect(args).toEqual({ text: 'saif testing' })
+        return { content: 'Added a text module to the intro: "saif testing".' }
+      },
+      emit: (event) => {
+        events.push(event)
+      },
+    })
+    expect(events.some((event) => event.type === 'status' && event.tool === 'add_text_module')).toBe(true)
+  })
 })

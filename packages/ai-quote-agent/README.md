@@ -29,6 +29,7 @@ The model may call these. It never receives a company id or a user id. Prices an
 | `duplicate_line` | A copy of one row, with the next position number. "The first one" is Pos 1. A size written after the name is ignored. |
 | `duplicate_family` | A copy of one family block and its rows. |
 | `move_line` | Move a row up or down inside its family. "Make the first product the second" moves Pos 1 down. |
+| `add_text_module` | A paragraph in the introduction, or in the closing when the user says so. Not a catalog product. |
 | `add_activity` | One closing activity in Included or Not included. The same description is not added twice; a later call moves it. |
 | `update_line` | Quantity, width, height, extra %, discount, €/pc, VAT (`22%`, `10%`, `4%`, `Es.`), and installation hours. `lineName` may be the Pos, such as `pos 1`. Net € and the total are not inputs. |
 

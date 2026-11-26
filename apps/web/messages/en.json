@@ -1194,6 +1194,7 @@
       "duplicate_line": "Duplicating the row",
       "duplicate_family": "Duplicating the family",
       "move_line": "Moving the row",
+      "add_text_module": "Adding a text module",
       "add_activity": "Adding an activity",
       "update_line": "Updating the row"
     },

@@ -1194,6 +1194,7 @@
       "duplicate_line": "Duplico la riga",
       "duplicate_family": "Duplico la famiglia",
       "move_line": "Sposto la riga",
+      "add_text_module": "Aggiungo un modulo testo",
       "add_activity": "Aggiungo un'attività",
       "update_line": "Aggiorno la riga"
     },

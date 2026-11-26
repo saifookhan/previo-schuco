@@ -10,6 +10,9 @@ const SIZE = /\d{2,5}\s*[x×]\s*\d{2,5}/
 
 /** One extra round when the model answers in prose instead of calling a tool it has. */
 const nudgeFor = (text: string, latestUser: string, called: ReadonlySet<string>): string | null => {
+  if (/\b(text module|modulo testo|textmodul)\b/i.test(latestUser) && !called.has('add_text_module')) {
+    return 'The user asked for a text module, not a catalog family. Call add_text_module now with the text they gave. Do not search the catalog.'
+  }
   if (
     /\b(first|prima|primo|erste)\b/i.test(latestUser) &&
     /\b(second|secondo|zweite)\b/i.test(latestUser) &&

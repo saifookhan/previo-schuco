@@ -36,6 +36,7 @@ const TOOLS = [
   'duplicate_line',
   'duplicate_family',
   'move_line',
+  'add_text_module',
   'add_activity',
   'update_line',
 ] as const

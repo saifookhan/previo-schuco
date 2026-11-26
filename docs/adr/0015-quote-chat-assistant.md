@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Sales users want to create and edit a quote by conversation: search the catalog, add a family as a new row, duplicate a row or a family, move a row, change quantity, width, height, extra markup, unit price, discount, VAT, and installation hours, including by Pos such as “pos 1”, and add a closing activity to Included or Not included. Net and total stay calculated.
+Sales users want to create and edit a quote by conversation: search the catalog, add a family as a new row, duplicate a row or a family, move a row, change quantity, width, height, extra markup, unit price, discount, VAT, and installation hours, including by Pos such as “pos 1”, add a closing activity to Included or Not included, and add a text module. Net and total stay calculated.
 
 The demo runs on the existing Schüco catalog in PostgreSQL. Near-duplicate family names are the real problem, not the number of rows. Drafts and expired price lists must stay out of the quote unless the user asks to see them, and even then they are not added. Prices must come from the existing calculation, never from the model.
 

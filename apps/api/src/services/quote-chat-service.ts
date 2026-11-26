@@ -60,12 +60,14 @@ const summarizeDocument = (document: QuoteDocument): string => {
       return `${family.name} [${family.id}]\n${lines || '  (no rows)'}`
     })
     .join('\n')
+  const textPreview = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80)
+  const modules = document.intro.map((module, index) => `  ${index + 1}. ${textPreview(module.html) || '(empty)'}`).join('\n')
   const activities = document.closing
     .filter((block) => block.type === 'activities')
     .flatMap((block) => block.rows)
     .map((row) => `  ${row.description} | ${row.included ? 'included' : 'not included'} | ${row.enabled ? 'printed' : 'not printed'}`)
     .join('\n')
-  return `${rows || '(no products)'}\nActivities:\n${activities || '  (none)'}\nQuote total ex VAT ${quoteTotal(document).toFixed(2)}`
+  return `${rows || '(no products)'}\nText modules:\n${modules || '  (none)'}\nActivities:\n${activities || '  (none)'}\nQuote total ex VAT ${quoteTotal(document).toFixed(2)}`
 }
 
 const findLines = (document: QuoteDocument, query: string): { family: QuoteFamily; line: QuoteLine }[] => {
@@ -161,6 +163,8 @@ const dispatch = async (
       return duplicateFamily(ctx, actor, state, str(args.familyName) ?? '')
     case 'move_line':
       return moveLine(ctx, actor, state, str(args.lineName) ?? '', str(args.direction) === 'down' ? 'down' : 'up')
+    case 'add_text_module':
+      return addTextModule(ctx, actor, state, args)
     case 'add_activity':
       return addActivity(ctx, actor, state, args)
     case 'update_line':
@@ -269,6 +273,34 @@ const describeFamily = async (ctx: TenantContext, familyId: string): Promise<Too
   return reply(
     `${detail.family.name} v${detail.family.version} | ${isQuotable({ ...detail.family, inLibrary: detail.inLibrary }) ? 'can add' : 'cannot add'}\nLines:\n${lines}\nOptions:\n${groups || '—'}\nMatrix bounds: ${bounds.join('; ') || 'none'}`,
   )
+}
+
+const paragraphHtml = (value: string): string => {
+  const escaped = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+  return `<p>${escaped}</p>`
+}
+
+const addTextModule = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  state: ChatState,
+  args: Record<string, unknown>,
+): Promise<ToolResult> => {
+  const text = typeof args.text === 'string' ? args.text.trim() : ''
+  if (text.length > 10_000) return reply('That text is too long.')
+  const place = str(args.place) === 'closing' ? 'closing' : 'intro'
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const html = paragraphHtml(text)
+  if (place === 'closing') {
+    if (document.closing.length >= 50) return reply('The closing already has 50 blocks.')
+    document.closing.push({ id: localId('c'), type: 'text', html })
+  } else {
+    if (document.intro.length >= 50) return reply('The introduction already has 50 text modules.')
+    document.intro.push({ id: localId('m'), html })
+  }
+  const saved = await persist(ctx, actor, state, document)
+  return reply(`Added a text module to the ${place}: "${text || '(empty)'}".\n${saved.content}`)
 }
 
 const addActivity = async (

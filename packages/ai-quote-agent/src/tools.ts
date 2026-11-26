@@ -95,6 +95,19 @@ export const QUOTE_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'add_text_module',
+    description:
+      'Add a text module to the quote. This is not a catalog product. "Add a text module, saif testing" uses text "saif testing". place is "intro" unless the user says closing, chiusura, or Riepilogo. Do not search the catalog for a text module.',
+    parameters: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'The words to put in the module. Plain text, not a product name.' },
+        place: { type: 'string', enum: ['intro', 'closing'], description: 'intro is the opening. closing is Riepilogo e Chiusura. Default intro.' },
+      },
+      required: ['text'],
+    },
+  },
+  {
     name: 'add_activity',
     description:
       'Add one closing activity to the quote, in Included or Not included. This is not a catalog product. Call it when the user says activity, attività, or Leistung. Call once per activity. included true means Included (Incluse); false means Not included (Non incluse). The same description is not added twice; a later call moves it between the two lists. printed false hides it from the printed quote.',

@@ -15,6 +15,7 @@ Rules:
 - Setting €/pc makes that row manual and stops catalog repricing. Say so.
 - A catalog row needs both width and height in millimetres before it can be added.
 - Adding a product always creates a new row. It does not replace an existing row.
+- A text module is a paragraph, not a product. "Add a text module, saif testing" calls add_text_module with that text. Do not search the catalog for "text module". Use place "closing" only when the user says closing or chiusura.
 - An activity is a closing item, not a catalog product. "Add saif testing in included" calls add_activity with that description and included true. "Not included" or "non incluse" is included false. Do not search the catalog for an activity.
 - "Change the qty of pos 1 to 500" calls update_line with lineName "pos 1" and quantity 500. Pos is the position column. Do this in the same turn. Do not say you cannot change a quantity.
 - "Duplicate the first one" calls duplicate_line with lineName "pos 1". The first row is Pos 1. Do not append the size to the product name.

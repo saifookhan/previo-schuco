@@ -1194,6 +1194,7 @@
       "duplicate_line": "Zeile wird dupliziert",
       "duplicate_family": "Familie wird dupliziert",
       "move_line": "Zeile wird verschoben",
+      "add_text_module": "Textmodul wird hinzugefügt",
       "add_activity": "Leistung wird hinzugefügt",
       "update_line": "Zeile wird aktualisiert"
     },
