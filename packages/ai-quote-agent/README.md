@@ -26,7 +26,7 @@ The model may call these. It never receives a company id or a user id. Prices an
 | `describe_family` | Lines, option groups, and matrix bounds of one family. No matrix cells. |
 | `create_quote` | A new draft for a customer. |
 | `add_product` | A new catalog row. Width and height are required. Several matching lines are returned as choices and nothing is added. |
-| `duplicate_line` | A copy of one row, with the next position number. |
+| `duplicate_line` | A copy of one row, with the next position number. "The first one" is Pos 1. A size written after the name is ignored. |
 | `duplicate_family` | A copy of one family block and its rows. |
 | `move_line` | Move a row up or down inside its family. |
 | `add_activity` | One closing activity in Included or Not included. The same description is not added twice; a later call moves it. |

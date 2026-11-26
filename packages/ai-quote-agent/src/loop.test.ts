@@ -131,4 +131,26 @@ describe('runQuoteAgent', () => {
     expect(text).toBe('- Name: Cassonetto\n- VAT: 4%')
     expect(text.includes('**')).toBe(false)
   })
+
+  it('asks again when a duplicate of the first row is not copied', async () => {
+    const events: AgentEvent[] = []
+    const turns: ModelTurn[] = [
+      { content: 'I could not find the row "Cassonetto 1000×300".', toolCalls: [] },
+      { content: null, toolCalls: [{ id: 'call-1', name: 'duplicate_line', arguments: '{"lineName":"pos 1"}' }] },
+      { content: 'Ho duplicato la prima riga.', toolCalls: [] },
+    ]
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'make a duplicate for the first one.' }],
+      complete: async () => turns.shift()!,
+      execute: async (name, args) => {
+        expect(name).toBe('duplicate_line')
+        expect(args).toEqual({ lineName: 'pos 1' })
+        return { content: 'Duplicated pos 1' }
+      },
+      emit: (event) => {
+        events.push(event)
+      },
+    })
+    expect(events.some((event) => event.type === 'status' && event.tool === 'duplicate_line')).toBe(true)
+  })
 })

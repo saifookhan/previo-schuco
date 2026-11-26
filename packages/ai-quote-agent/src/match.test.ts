@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { expandQuery, nameMatches, samePosition } from './match'
+import { expandQuery, nameMatches, samePosition, withoutSize } from './match'
 
 describe('nameMatches', () => {
   it('ignores case and accents', () => {
@@ -23,6 +23,15 @@ describe('samePosition', () => {
     expect(samePosition('P01', 'posizione 1')).toBe(true)
     expect(samePosition('1', '1')).toBe(true)
     expect(samePosition('10', 'pos 1')).toBe(false)
+    expect(samePosition('1', 'the first one')).toBe(true)
+    expect(samePosition('1', 'prima riga')).toBe(true)
+  })
+})
+
+describe('withoutSize', () => {
+  it('drops a size glued onto a product name', () => {
+    expect(withoutSize('Cassonetto MyBox Revo Light profondità 80 1000×300')).toBe('Cassonetto MyBox Revo Light profondità 80')
+    expect(nameMatches('Cassonetto MyBox Revo Light profondità 80', withoutSize('Cassonetto MyBox Revo Light profondità 80 1000×300'))).toBe(true)
   })
 })
 

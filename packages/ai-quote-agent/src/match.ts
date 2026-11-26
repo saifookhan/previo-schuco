@@ -67,14 +67,19 @@ const tokenMatches = (foldedName: string, token: string): boolean => {
   })
 }
 
-/** "pos 1", "posizione 1", and "1" are the Pos column, not a product name. */
+/** "pos 1", "the first one", and "1" are the Pos column, not a product name. */
 export const positionQuery = (query: string): string | null => {
   const folded = foldName(query)
+  if (/^(?:the |il |la )?(?:first|prima|primo|erste|erster)(?: (?:one|product|row|riga|prodotto|zeile|articolo))?$/.test(folded)) return '1'
   const labeled = folded.match(/^(?:pos(?:ition|izione)?|riga|zeile|row)\s*(\d+)$/)
   const digits = labeled?.[1] ?? (/^\d+$/.test(folded) ? folded : null)
   if (!digits) return null
   return digits.replace(/^0+/, '') || '0'
 }
+
+/** Drop a trailing size such as 1000×300 so it does not have to appear in the product name. */
+export const withoutSize = (query: string): string =>
+  query.replace(/\d{2,5}\s*[x×]\s*\d{2,5}(?:\s*(?:mm|millimetri|millimeters|millimeter))?/gi, ' ').replace(/\s+/g, ' ').trim()
 
 const positionDigits = (code: string): string => code.replace(/\D/g, '').replace(/^0+/, '') || '0'
 

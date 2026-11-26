@@ -1,4 +1,4 @@
-import { expandQuery, foldName, nameMatches, placeActivity, positionQuery, samePosition, type Suggestion } from '@schuco/ai-quote-agent'
+import { expandQuery, foldName, nameMatches, placeActivity, positionQuery, samePosition, withoutSize, type Suggestion } from '@schuco/ai-quote-agent'
 import {
   lineNetUnitPrice,
   lineTotal,
@@ -76,7 +76,9 @@ const findLines = (document: QuoteDocument, query: string): { family: QuoteFamil
     const byPos = rows.filter(({ line }) => samePosition(line.code, query))
     if (byPos.length > 0) return byPos
   }
-  return rows.filter(({ line }) => nameMatches(line.name, query) || nameMatches(line.code, query))
+  const named = withoutSize(query)
+  if (!named) return []
+  return rows.filter(({ line }) => nameMatches(line.name, named) || nameMatches(line.code, named))
 }
 
 const findFamilies = (document: QuoteDocument, query: string): QuoteFamily[] =>

@@ -64,10 +64,11 @@ export const QUOTE_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'duplicate_line',
-    description: 'Copy one row on the quote. New position number, same product, size, and commercial columns.',
+    description:
+      'Copy one row on the quote. New position number, same product, size, and commercial columns. "Duplicate the first one" uses lineName "pos 1". A size such as 1000×300 is not part of the name.',
     parameters: {
       type: 'object',
-      properties: { lineName: { type: 'string', description: 'Name or position code of the row to copy.' } },
+      properties: { lineName: { type: 'string', description: 'Product name or Pos. "pos 1" and "the first one" are the first row.' } },
       required: ['lineName'],
     },
   },
