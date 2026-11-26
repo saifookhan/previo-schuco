@@ -11,6 +11,10 @@ describe('nameMatches', () => {
   it('does not match a different depth', () => {
     expect(nameMatches('MyBox Revo Light profondità 80', 'profondita 150')).toBe(false)
   })
+
+  it('matches a clipped or mistyped family label', () => {
+    expect(nameMatches('ali - Cassonetto Coibentato MyBox Revo', 'ali - Cassonetto Coibentato MyBox Revost desc (copy)')).toBe(true)
+  })
 })
 
 describe('expandQuery', () => {

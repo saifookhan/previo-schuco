@@ -21,7 +21,8 @@ The model may call these. It never receives a company id or a user id. Prices an
 
 | Tool | Effect |
 |------|--------|
-| `search_catalog` | Families matching the user's words. Drafts and expired price lists are omitted unless the user asked to see them. At most eight rows, with version and validity. |
+| `catalog_summary` | How many current families and product lines there are, and how many are draft or expired. |
+| `search_catalog` | Families and product lines matching the user's words, including a partial or slightly misspelled name. Drafts and expired price lists are omitted unless the user asked to see them. At most eight rows, with version and validity. |
 | `describe_family` | Lines, option groups, and matrix bounds of one family. No matrix cells. |
 | `create_quote` | A new draft for a customer. |
 | `add_product` | A new catalog row. Width and height are required. Several matching lines are returned as choices and nothing is added. |

@@ -14,7 +14,7 @@ import {
 } from '@schuco/contracts'
 
 import type { TenantContext } from '../lib/tenant-db'
-import { getProductFamilyDetailWithLibrary, listProductFamilies } from './product-families-service'
+import { getProductFamilyDetailWithLibrary, listLinesForFamilies, listProductFamilies } from './product-families-service'
 import {
   QuoteConflictError,
   QuoteValidationError,
@@ -130,6 +130,8 @@ const dispatch = async (
   args: Record<string, unknown>,
 ): Promise<ToolResult> => {
   switch (name) {
+    case 'catalog_summary':
+      return catalogSummary(ctx)
     case 'search_catalog':
       return searchCatalog(ctx, str(args.query) ?? '', args.includeHidden === true)
     case 'describe_family':
@@ -151,36 +153,79 @@ const dispatch = async (
   }
 }
 
+const familyLine = (family: {
+  id: string
+  name: string
+  version: number
+  brand: string | null
+  isPublished: boolean
+  inLibrary: boolean
+  readyForInvoicing: boolean
+  priceValidFrom: string | null
+  priceValidTo: string | null
+}): string => {
+  const status = family.isPublished ? 'published' : 'draft'
+  const addable = isQuotable(family) ? 'can add' : 'cannot add'
+  return `- ${family.name} | id ${family.id} | v${family.version} | ${family.brand || 'no brand'} | ${status} | ${validityLabel(family)} | ${addable}`
+}
+
+const catalogSummary = async (ctx: TenantContext): Promise<ToolResult> => {
+  const families = await listProductFamilies(ctx, { includeOutOfLibrary: true })
+  const current = families.filter(isQuotable)
+  const hidden = families.filter((family) => !isQuotable(family))
+  const lines = await listLinesForFamilies(ctx, families.map((family) => family.id))
+  const currentIds = new Set(current.map((family) => family.id))
+  const currentLines = lines.filter((line) => currentIds.has(line.productFamilyId)).length
+  const names = current.slice(0, 12).map((family) => familyLine(family)).join('\n')
+  return reply(
+    `Current families: ${current.length}. Product lines in those families: ${currentLines}. Draft or expired families: ${hidden.length} (${lines.length - currentLines} lines), not addable unless the user asks to see them.\nCurrent families:\n${names || '—'}`,
+  )
+}
+
 const searchCatalog = async (ctx: TenantContext, query: string, includeHidden: boolean): Promise<ToolResult> => {
   const families = await listProductFamilies(ctx, { includeOutOfLibrary: true })
   const queries = expandQuery(query)
-  const hits = families.filter((family) => queries.some((term) => nameMatches(family.name, term) || (family.brand ? nameMatches(family.brand, term) : false)))
+  const matchesFamily = (family: (typeof families)[number]) =>
+    queries.some((term) => nameMatches(family.name, term) || (family.brand ? nameMatches(family.brand, term) : false))
+  const hits = families.filter(matchesFamily)
   const visible = includeHidden ? hits : hits.filter(isQuotable)
   const hiddenCount = hits.length - hits.filter(isQuotable).length
-  if (visible.length === 0) {
+  const wantsLines = visible.length === 0 || /\d/.test(query)
+  const pool = wantsLines ? (visible.length > 0 ? visible : includeHidden ? families : families.filter(isQuotable)).slice(0, 40) : []
+  const productLines = await listLinesForFamilies(ctx, pool.map((family) => family.id))
+  const byFamily = new Map(pool.map((family) => [family.id, family]))
+  const lineHits = productLines.filter((line) => queries.some((term) => nameMatches(line.name, term))).slice(0, 8)
+  const lineText = lineHits
+    .map((line) => {
+      const family = byFamily.get(line.productFamilyId)
+      return family ? `- ${line.name} | family ${family.name} | familyId ${family.id} | ${isQuotable(family) ? 'can add' : 'cannot add'}` : null
+    })
+    .filter(Boolean)
+    .join('\n')
+
+  if (visible.length === 0 && lineHits.length === 0) {
     return reply(
       hiddenCount > 0
-        ? `No current family matches "${query}". ${hiddenCount} draft or expired match(es) exist. Ask the user before calling search_catalog again with includeHidden true. Do not add those.`
-        : `No family matches "${query}".`,
+        ? `No current family or product matches "${query}". ${hiddenCount} draft or expired family match(es) exist. Ask the user before calling search_catalog again with includeHidden true. Do not add those.`
+        : `No family or product matches "${query}". Call catalog_summary if the user wants to know what exists.`,
       hiddenCount > 0 ? [{ label: 'Mostra anche bozze e listini scaduti', message: `Mostra anche bozze e listini scaduti per ${query}` }] : undefined,
     )
   }
   const shown = visible.slice(0, 8)
-  const lines = shown.map((family) => {
-    const status = family.isPublished ? 'published' : 'draft'
-    const addable = isQuotable(family) ? 'can add' : 'cannot add'
-    return `- ${family.name} | id ${family.id} | v${family.version} | ${family.brand || 'no brand'} | ${status} | ${validityLabel(family)} | ${addable}`
-  })
-  const more = visible.length > 8 ? `\n${visible.length - 8} more not shown. Ask the user to narrow the name.` : ''
-  const choice = shown.length > 1 ? '\nSeveral matches. Ask the user which one. Do not add yet.' : '\nOne match. You may use this id.'
+  const familyText = shown.map((family) => familyLine(family)).join('\n')
+  const more = visible.length > 8 ? `\n${visible.length - 8} more families not shown. Ask the user to narrow the name.` : ''
+  const choice = shown.length > 1 ? '\nSeveral families match. Ask the user which one. Do not add yet.' : shown.length === 1 ? '\nOne family match. You may use this id.' : ''
   const suggestions =
     shown.length > 1
       ? shown.map((family) => ({
           label: `v${family.version} · ${family.name} · ${validityLabel(family)}`,
           message: `Usa la famiglia "${family.name}" versione ${family.version}, id ${family.id}`,
         }))
-      : undefined
-  return reply(`${lines.join('\n')}${more}${choice}`, suggestions)
+      : lineHits.length > 1
+        ? lineHits.slice(0, 8).map((line) => ({ label: line.name, message: `Aggiungi "${line.name}"` }))
+        : undefined
+  const products = lineText ? `\nProduct lines:\n${lineText}` : ''
+  return reply(`${familyText}${more}${choice}${products}`.trim(), suggestions)
 }
 
 const describeFamily = async (ctx: TenantContext, familyId: string): Promise<ToolResult> => {

@@ -2,9 +2,15 @@ import type { ToolDefinition } from './types'
 
 export const QUOTE_TOOLS: ToolDefinition[] = [
   {
+    name: 'catalog_summary',
+    description:
+      'How many product families and product lines the user can quote, plus how many are draft or expired. Call this for "how many products", "what is in the catalog", or before saying you cannot find anything.',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
     name: 'search_catalog',
     description:
-      'Find product families by words from the user. By default only published families whose prices are valid today are returned. Results include version, brand, and validity so near-duplicate names can be told apart. Never pick one of several matches yourself.',
+      'Find product families and product lines by words from the user, including a partial or slightly misspelled name. By default only published families whose prices are valid today are returned. Results include version, brand, and validity so near-duplicate names can be told apart. Never pick one of several matches yourself. Call it again after the user says they published or changed a family.',
     parameters: {
       type: 'object',
       properties: {

@@ -34,4 +34,27 @@ describe('runQuoteAgent', () => {
       'Due famiglie. Quale vuoi?',
     )
   })
+
+  it('asks again when the model claims it has no tools', async () => {
+    const events: AgentEvent[] = []
+    const turns: ModelTurn[] = [
+      { content: "I'm sorry, but I currently don't have the tools to provide that information.", toolCalls: [] },
+      { content: null, toolCalls: [{ id: 'call-1', name: 'catalog_summary', arguments: '{}' }] },
+      { content: 'Hai 4 famiglie correnti e 22 prodotti.', toolCalls: [] },
+    ]
+
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'Quanti prodotti ci sono?' }],
+      complete: async () => turns.shift()!,
+      execute: async () => ({ content: '4 current families, 22 lines' }),
+      emit: (event) => {
+        events.push(event)
+      },
+    })
+
+    expect(events.some((event) => event.type === 'status' && event.tool === 'catalog_summary')).toBe(true)
+    expect(events.filter((event) => event.type === 'text').map((event) => (event.type === 'text' ? event.delta : '')).join('')).toBe(
+      'Hai 4 famiglie correnti e 22 prodotti.',
+    )
+  })
 })

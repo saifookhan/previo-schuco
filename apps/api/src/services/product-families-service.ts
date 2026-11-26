@@ -22,6 +22,7 @@ import {
   listProductFamilyVersions,
   lockProductFamilyVersions,
   listProductFamilyVersionsOfChains,
+  listProductLineNames,
   listVisibleProductFamilies,
   isFamilySharedWith,
   isProductFamilyInLibrary,
@@ -446,6 +447,10 @@ export const listProductFamilies = async (
   const families = await withTenantDb(ctx, (tx) => listVisibleProductFamilies(tx, ctx.effectiveCompanyId))
   return includeOutOfLibrary ? families : families.filter((family) => family.inLibrary)
 }
+
+/** Line names for families the caller can already see. One query, not one detail load per family. */
+export const listLinesForFamilies = (ctx: TenantContext, familyIds: string[]) =>
+  withTenantDb(ctx, (tx) => listProductLineNames(tx, familyIds))
 
 export const getProductFamilyDetail = (
   ctx: TenantContext,
