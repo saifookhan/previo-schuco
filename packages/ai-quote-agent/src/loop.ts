@@ -43,6 +43,9 @@ export interface AgentRun {
   emit: (event: AgentEvent) => void | Promise<void>
 }
 
+/** The panel shows plain text, so markdown emphasis would appear as asterisks. */
+export const plainReply = (text: string): string => text.replace(/\*\*/g, '').replace(/__/g, '')
+
 const parseArgs = (raw: string): unknown => {
   try {
     return JSON.parse(raw) as unknown
@@ -62,7 +65,7 @@ export const runQuoteAgent = async ({ messages, complete, execute, emit }: Agent
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
     const turn = await complete(history)
     if (turn.toolCalls.length === 0) {
-      const text = turn.content ?? ''
+      const text = plainReply(turn.content ?? '')
       const nudge = nudged ? null : nudgeFor(text, latestUser, called)
       if (nudge) {
         nudged = true

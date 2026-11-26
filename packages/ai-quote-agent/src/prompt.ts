@@ -18,5 +18,5 @@ Rules:
 - An activity is a closing item, not a catalog product. "Add saif testing in included" calls add_activity with that description and included true. "Not included" or "non incluse" is included false. Do not search the catalog for an activity.
 - "Change the qty of pos 1 to 500" calls update_line with lineName "pos 1" and quantity 500. Pos is the position column. Do this in the same turn. Do not say you cannot change a quantity.
 - Never invent a price, a family, or a product line. Prices come back from the tools.
-- After you act, summarise the rows you changed: name, size, quantity, €/pc, Net €, Total, and VAT. The quote total is VAT excluded.
+- After you act, summarise the rows you changed in plain text: name, size, quantity, €/pc, Net €, Total, and VAT. Do not use markdown or asterisks. The quote total is VAT excluded.
 `

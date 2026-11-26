@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { runQuoteAgent } from './loop'
+import { plainReply, runQuoteAgent } from './loop'
 import type { AgentEvent, ModelMessage, ModelTurn } from './types'
+
+describe('plainReply', () => {
+  it('removes the asterisks around a label', () => {
+    expect(plainReply('- **Name:** Cassonetto\n- **VAT:** 4%')).toBe('- Name: Cassonetto\n- VAT: 4%')
+  })
+})
 
 describe('runQuoteAgent', () => {
   it('runs a tool, then streams the final reply and its chips', async () => {
@@ -109,5 +115,20 @@ describe('runQuoteAgent', () => {
 
     expect(events.some((event) => event.type === 'status' && event.tool === 'update_line')).toBe(true)
     expect(events.filter((event) => event.type === 'text').map((event) => (event.type === 'text' ? event.delta : '')).join('')).toContain('500')
+  })
+
+  it('streams a summary without markdown asterisks', async () => {
+    const events: AgentEvent[] = []
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'change vat to 4% for first product' }],
+      complete: async () => ({ content: '- **Name:** Cassonetto\n- **VAT:** 4%', toolCalls: [] }),
+      execute: async () => ({ content: '' }),
+      emit: (event) => {
+        events.push(event)
+      },
+    })
+    const text = events.filter((event) => event.type === 'text').map((event) => (event.type === 'text' ? event.delta : '')).join('')
+    expect(text).toBe('- Name: Cassonetto\n- VAT: 4%')
+    expect(text.includes('**')).toBe(false)
   })
 })
