@@ -111,6 +111,17 @@ export const selectNameMatches = <T>(items: T[], nameOf: (item: T) => string, qu
   return items.filter((item) => nameMatches(nameOf(item), query))
 }
 
+/** Drop the command words so "aggiungi confezione 30" can match the catalog line. */
+export const catalogQuery = (text: string): string => {
+  const picked = quotedName(text)
+  const base = withoutSize(picked ?? text)
+  if (picked) return base
+  return base
+    .replace(/\b(aggiung\w*|add|product|products|prodotto|prodotti|una|riga|nuovo|new|famiglia|della|per|the|please|mm|quantit\w*|qty|inserisci|metti|set|change)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 /** The product name inside quotes, when the user clicked a chip such as Aggiungi "…". */
 export const quotedName = (query: string): string | null => {
   const name = query.match(/["“]([^"”]+)["”]/)?.[1]?.trim()

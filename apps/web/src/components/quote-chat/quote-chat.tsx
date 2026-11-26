@@ -1,9 +1,9 @@
 'use client'
 
 import { MessageSquare, X } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useAuth } from '@/hooks/use-auth'
 import type { QuoteDocument } from '@schuco/contracts'
@@ -13,9 +13,15 @@ interface ChatMessage {
   content: string
 }
 
+interface SuggestionAction {
+  tool: string
+  args: Record<string, unknown>
+}
+
 interface Suggestion {
   label: string
   message: string
+  action?: SuggestionAction
 }
 
 interface QuoteChatProps {
@@ -26,6 +32,9 @@ interface QuoteChatProps {
   /** Called with the quote the turn saved. The list page navigates; the editor reloads. */
   onQuote?: (quoteId: string) => void | Promise<void>
 }
+
+const WELCOME_ACTIONS = ['create', 'catalog', 'add', 'edit', 'arrange', 'extras', 'header', 'preview'] as const
+const EXAMPLE_KEYS = ['newQuote', 'count', 'example'] as const
 
 const TOOLS = [
   'catalog_summary',
@@ -39,6 +48,27 @@ const TOOLS = [
   'add_text_module',
   'add_activity',
   'update_line',
+  'get_quote',
+  'update_header',
+  'update_lines',
+  'set_line_options',
+  'remove_line',
+  'remove_family',
+  'move_family',
+  'update_family_block',
+  'switch_family_version',
+  'edit_text_module',
+  'remove_text_module',
+  'insert_text_template',
+  'remove_activity',
+  'set_payments',
+  'set_quote_status',
+  'save_new_version',
+  'restore_revision',
+  'update_print_settings',
+  'preview_pdf',
+  'duplicate_quote',
+  'cancel_action',
 ] as const
 
 /** Hands the open transcript to the quote page a chat action navigates to. A refresh drops it. */
@@ -47,6 +77,7 @@ let carriedChat: { quoteId: string; messages: ChatMessage[]; suggestions: Sugges
 /** Chat that creates and edits a quote. Messages stay in this panel until it closes. */
 export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteChatProps) => {
   const t = useTranslations('quoteChat')
+  const locale = useLocale()
   const { can } = useAuth()
   const router = useRouter()
   const restored = carriedChat?.quoteId === quoteId ? carriedChat : null
@@ -57,6 +88,9 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
   const [activity, setActivity] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [exampleIndex, setExampleIndex] = useState(0)
+  const [reduceMotion, setReduceMotion] = useState(false)
+  const examplePaused = useRef(false)
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -65,19 +99,33 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
     return () => window.clearTimeout(timer)
   }, [quoteId])
 
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const apply = () => setReduceMotion(media.matches)
+    apply()
+    media.addEventListener('change', apply)
+    return () => media.removeEventListener('change', apply)
+  }, [])
+
+  useEffect(() => {
+    if (!open || messages.length > 0 || reduceMotion) return
+    const timer = window.setInterval(() => {
+      if (examplePaused.current) return
+      setExampleIndex((current) => (current + 1) % EXAMPLE_KEYS.length)
+    }, 4000)
+    return () => window.clearInterval(timer)
+  }, [open, messages.length, reduceMotion])
+
   if (!can('quote.edit')) return null
 
-  const starters: Suggestion[] = [
-    { label: t('starters.newQuote'), message: t('starters.newQuote') },
-    { label: t('starters.count'), message: t('starters.count') },
-    { label: t('starters.example'), message: t('starters.example') },
-  ]
-  const chips = messages.length === 0 ? starters : suggestions
+  const exampleKey = EXAMPLE_KEYS[exampleIndex] ?? EXAMPLE_KEYS[0]
+  const examples = EXAMPLE_KEYS.map((key) => t(`starters.${key}`))
 
-  const send = async (text: string) => {
+  const send = async (text: string, action?: SuggestionAction) => {
     const content = text.trim()
     if (!content || busy) return
     const next = [...messages, { role: 'user' as const, content }]
+    const pendingChoices = suggestions
     setMessages(next)
     setDraft('')
     setSuggestions([])
@@ -90,7 +138,7 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
       const response = await fetch('/api/quote-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quoteId, document, baseRevision, messages: next }),
+        body: JSON.stringify({ quoteId, document, baseRevision, messages: next, locale, pendingChoices, action }),
       })
       if (!response.ok || !response.body) {
         setError(t('unavailable'))
@@ -142,6 +190,7 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
       }
     } catch {
       setError(t('unavailable'))
+      if (quoteId && onQuote) await onQuote(quoteId)
     } finally {
       setBusy(false)
       setActivity(null)
@@ -151,7 +200,7 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
   return (
     <div className="fixed bottom-24 right-6 z-40 flex flex-col items-end gap-3">
       {open ? (
-        <section className="flex h-[32rem] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+        <section className="flex h-[min(40rem,calc(100dvh-7.5rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
           <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <h2 className="text-sm font-semibold text-slate-900">{t('title')}</h2>
             <button type="button" onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-700" aria-label={t('close')}>
@@ -159,7 +208,16 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
             </button>
           </header>
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-            {messages.length === 0 ? <p className="text-sm text-slate-500">{t('empty')}</p> : null}
+            {messages.length === 0 ? (
+              <div className="mr-6 rounded-2xl bg-slate-100 px-3 py-2 text-sm text-slate-800">
+                <p>{t('welcome')}</p>
+                <ul className="mt-2 list-disc space-y-0.5 pl-4 leading-snug">
+                  {WELCOME_ACTIONS.map((action) => (
+                    <li key={action}>{t(`actions.${action}`)}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {messages.map((message, index) => (
               <p
                 key={`${message.role}-${index}`}
@@ -180,13 +238,60 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
             ) : null}
             {error ? <p className="text-sm text-red-600">{error}</p> : null}
           </div>
-          {chips.length > 0 && !busy ? (
+          {messages.length === 0 && !busy ? (
+            <div className="px-4 pb-3">
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">{t('starters.caption')}</p>
+              {reduceMotion ? (
+                <div className="flex flex-col gap-2">
+                  {examples.map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => void send(example)}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-left text-xs leading-snug text-slate-700 hover:border-slate-400"
+                    >
+                      {example}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <button
+                    key={exampleKey}
+                    type="button"
+                    onMouseEnter={() => {
+                      examplePaused.current = true
+                    }}
+                    onMouseLeave={() => {
+                      examplePaused.current = false
+                    }}
+                    onFocus={() => {
+                      examplePaused.current = true
+                    }}
+                    onBlur={() => {
+                      examplePaused.current = false
+                    }}
+                    onClick={() => void send(examples[exampleIndex] ?? examples[0] ?? '')}
+                    className="animate-quote-example min-h-14 w-full rounded-xl border border-slate-200 px-3 py-2 text-left text-xs leading-snug text-slate-700 hover:border-slate-400"
+                  >
+                    {examples[exampleIndex]}
+                  </button>
+                  <div className="mt-2 flex justify-center gap-1.5" aria-hidden>
+                    {EXAMPLE_KEYS.map((key, index) => (
+                      <span key={key} className={`h-1.5 w-1.5 rounded-full ${index === exampleIndex ? 'bg-slate-500' : 'bg-slate-200'}`} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : null}
+          {messages.length > 0 && suggestions.length > 0 && !busy ? (
             <div className="flex flex-wrap gap-2 px-4 pb-2">
-              {chips.map((chip) => (
+              {suggestions.map((chip) => (
                 <button
-                  key={chip.message}
+                  key={`${chip.label}-${chip.message}`}
                   type="button"
-                  onClick={() => void send(chip.message)}
+                  onClick={() => void send(chip.message, chip.action)}
                   className="max-w-full whitespace-normal rounded-full border border-slate-200 px-3 py-1 text-left text-xs leading-snug text-slate-700 hover:border-slate-400"
                 >
                   {chip.label}

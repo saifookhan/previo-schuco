@@ -1195,7 +1195,17 @@
     "send": "Senden",
     "working": "Wird ausgeführt…",
     "unavailable": "Der Assistent ist gerade nicht verfügbar.",
-    "empty": "Nennen Sie Kunde und Produkt. Ich verwende nur die aktuelle Preisliste.",
+    "welcome": "Ich kann ein Angebot aus diesem Chat erstellen und ändern. Sie können mich bitten:",
+    "actions": {
+      "create": "Ein neues Angebot für einen Kunden erstellen",
+      "catalog": "Sehen, wie viele Produkte im Katalog sind",
+      "add": "Ein Produkt mit Breite und Höhe in Millimetern hinzufügen",
+      "edit": "Menge, Maß, MwSt., Rabatt, Aufschlag, Stunden oder den Preis einer Zeile ändern",
+      "arrange": "Eine Zeile oder eine Familie duplizieren oder verschieben",
+      "extras": "Text, eine Leistung oder Zahlungsbedingungen hinzufügen",
+      "header": "Kunde, Baustelle, Datum oder eine interne Notiz ändern",
+      "preview": "Die Druckvorschau öffnen"
+    },
     "tools": {
       "catalog_summary": "Katalog wird gezählt",
       "search_catalog": "Suche im Katalog",
@@ -1207,12 +1217,34 @@
       "move_line": "Zeile wird verschoben",
       "add_text_module": "Textmodul wird hinzugefügt",
       "add_activity": "Leistung wird hinzugefügt",
-      "update_line": "Zeile wird aktualisiert"
+      "update_line": "Zeile wird aktualisiert",
+      "get_quote": "Angebot wird gelesen",
+      "update_header": "Kopf wird aktualisiert",
+      "update_lines": "Zeilen werden aktualisiert",
+      "set_line_options": "Optionen werden gesetzt",
+      "remove_line": "Zeile wird entfernt",
+      "remove_family": "Familie wird entfernt",
+      "move_family": "Familie wird verschoben",
+      "update_family_block": "Familie wird aktualisiert",
+      "switch_family_version": "Familienversion wird gewechselt",
+      "edit_text_module": "Textmodul wird bearbeitet",
+      "remove_text_module": "Textmodul wird entfernt",
+      "insert_text_template": "Gespeicherter Text wird eingefügt",
+      "remove_activity": "Leistung wird entfernt",
+      "set_payments": "Zahlungen werden aktualisiert",
+      "set_quote_status": "Status wird aktualisiert",
+      "save_new_version": "Neue Version wird gespeichert",
+      "restore_revision": "Revision wird wiederhergestellt",
+      "update_print_settings": "Druckeinstellungen werden aktualisiert",
+      "preview_pdf": "Vorschau wird geöffnet",
+      "duplicate_quote": "Angebot wird kopiert",
+      "cancel_action": "Wird abgebrochen"
     },
     "starters": {
-      "newQuote": "Nuovo preventivo per Studio Rossi",
-      "count": "Quanti prodotti ci sono in Cassonetto Coibentato MyBox Revo?",
-      "example": "Aggiungi una riga MyBox Revo Light profondità 150, 1200×1400 mm, quantità 1"
+      "caption": "Zum Beispiel",
+      "newQuote": "Neues Angebot für Studio Rossi",
+      "count": "Wie viele Produkte gibt es in Cassonetto Coibentato MyBox Revo?",
+      "example": "Zeile hinzufügen: MyBox Revo Light, Tiefe 150, 1200×1400 mm, Menge 1"
     }
   }
 }

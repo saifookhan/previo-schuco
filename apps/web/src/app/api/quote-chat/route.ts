@@ -23,7 +23,8 @@ export const POST = async (request: Request): Promise<Response> => {
     status: response.status,
     headers: {
       'Content-Type': response.headers.get('Content-Type') ?? 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
     },
   })
 }

@@ -1195,7 +1195,17 @@
     "send": "Send",
     "working": "Working…",
     "unavailable": "The assistant is not available right now.",
-    "empty": "Tell me the customer and the product. I only use the current catalog.",
+    "welcome": "I can create and change a quote from this chat. Ask me to:",
+    "actions": {
+      "create": "Create a new quote for a customer",
+      "catalog": "See how many products are in the catalog",
+      "add": "Add a product, with width and height in millimetres",
+      "edit": "Change quantity, size, VAT, discount, extra %, hours, or the price of a row",
+      "arrange": "Duplicate or move a row or a family",
+      "extras": "Add text, an activity, or payment terms",
+      "header": "Change the customer, the site, the date, or an internal note",
+      "preview": "Open the print preview"
+    },
     "tools": {
       "catalog_summary": "Counting the catalog",
       "search_catalog": "Looking through the catalog",
@@ -1207,12 +1217,34 @@
       "move_line": "Moving the row",
       "add_text_module": "Adding a text module",
       "add_activity": "Adding an activity",
-      "update_line": "Updating the row"
+      "update_line": "Updating the row",
+      "get_quote": "Reading the quote",
+      "update_header": "Updating the header",
+      "update_lines": "Updating the rows",
+      "set_line_options": "Setting the options",
+      "remove_line": "Removing the row",
+      "remove_family": "Removing the family",
+      "move_family": "Moving the family",
+      "update_family_block": "Updating the family",
+      "switch_family_version": "Switching the family version",
+      "edit_text_module": "Editing the text module",
+      "remove_text_module": "Removing the text module",
+      "insert_text_template": "Inserting the saved text",
+      "remove_activity": "Removing the activity",
+      "set_payments": "Updating the payments",
+      "set_quote_status": "Updating the status",
+      "save_new_version": "Saving a new version",
+      "restore_revision": "Restoring the revision",
+      "update_print_settings": "Updating the print settings",
+      "preview_pdf": "Opening the preview",
+      "duplicate_quote": "Copying the quote",
+      "cancel_action": "Cancelling"
     },
     "starters": {
-      "newQuote": "Nuovo preventivo per Studio Rossi",
-      "count": "Quanti prodotti ci sono in Cassonetto Coibentato MyBox Revo?",
-      "example": "Aggiungi una riga MyBox Revo Light profondità 150, 1200×1400 mm, quantità 1"
+      "caption": "For example",
+      "newQuote": "New quote for Studio Rossi",
+      "count": "How many products are in Cassonetto Coibentato MyBox Revo?",
+      "example": "Add a MyBox Revo Light row, depth 150, 1200×1400 mm, quantity 1"
     }
   }
 }

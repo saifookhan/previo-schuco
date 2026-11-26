@@ -256,6 +256,25 @@ describe('runQuoteAgent', () => {
     expect(events.filter((event) => event.type === 'text').map((event) => (event.type === 'text' ? event.delta : '')).join('')).toContain('riga')
   })
 
+  it('edits a named row instead of searching the catalog', async () => {
+    const executed: string[] = []
+    const turns: ModelTurn[] = [
+      { content: null, toolCalls: [{ id: 'call-1', name: 'search_catalog', arguments: '{"query":"Macchina VMC"}' }] },
+      { content: null, toolCalls: [{ id: 'call-2', name: 'update_line', arguments: '{"lineName":"Macchina VMC","vatRate":"10%"}' }] },
+      { content: 'IVA aggiornata.', toolCalls: [] },
+    ]
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'metti IVA 10% sulla riga Macchina VMC' }],
+      complete: async () => turns.shift()!,
+      execute: async (name) => {
+        executed.push(name)
+        return { content: 'updated', speak: 'IVA aggiornata.' }
+      },
+      emit: () => {},
+    })
+    expect(executed).toEqual(['update_line'])
+  })
+
   it('adds the picked line instead of asking which one again', async () => {
     const executed: string[] = []
     const turns: ModelTurn[] = [

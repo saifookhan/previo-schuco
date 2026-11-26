@@ -22,9 +22,16 @@ export interface ToolDefinition {
   parameters: Record<string, unknown>
 }
 
+/** A chip click runs this tool directly. The model is not asked again. */
+export interface SuggestionAction {
+  tool: string
+  args: Record<string, unknown>
+}
+
 export interface Suggestion {
   label: string
   message: string
+  action?: SuggestionAction
 }
 
 export type AgentEvent =
@@ -38,6 +45,8 @@ export type AgentEvent =
 export interface ToolOutcome {
   /** Shown back to the model. Keep it short. */
   content: string
-  /** Chips the user can click. The label is short; the message is sent as the next turn. */
+  /** Chips the user can click. The label is short; the action runs without the model. */
   suggestions?: Suggestion[]
+  /** User-facing reply. When set, it is streamed as-is and the model does not rephrase it. */
+  speak?: string
 }
