@@ -86,8 +86,25 @@ body {
   pointer-events: none;
 }
 
+/* An empty-chat example fades in as the next one takes its place. */
+@keyframes quote-example-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-quote-example {
+  animation: quote-example-in 0.45s ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-highlight {
+  .animate-highlight,
+  .animate-quote-example {
     animation: none;
   }
 }

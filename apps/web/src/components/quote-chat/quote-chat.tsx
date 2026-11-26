@@ -3,7 +3,7 @@
 import { MessageSquare, X } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useAuth } from '@/hooks/use-auth'
 import type { QuoteDocument } from '@schuco/contracts'
@@ -34,6 +34,7 @@ interface QuoteChatProps {
 }
 
 const WELCOME_ACTIONS = ['create', 'catalog', 'add', 'edit', 'arrange', 'extras', 'header', 'preview'] as const
+const EXAMPLE_KEYS = ['newQuote', 'count', 'example'] as const
 
 const TOOLS = [
   'catalog_summary',
@@ -87,6 +88,9 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
   const [activity, setActivity] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [exampleIndex, setExampleIndex] = useState(0)
+  const [reduceMotion, setReduceMotion] = useState(false)
+  const examplePaused = useRef(false)
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -95,14 +99,27 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
     return () => window.clearTimeout(timer)
   }, [quoteId])
 
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const apply = () => setReduceMotion(media.matches)
+    apply()
+    media.addEventListener('change', apply)
+    return () => media.removeEventListener('change', apply)
+  }, [])
+
+  useEffect(() => {
+    if (!open || messages.length > 0 || reduceMotion) return
+    const timer = window.setInterval(() => {
+      if (examplePaused.current) return
+      setExampleIndex((current) => (current + 1) % EXAMPLE_KEYS.length)
+    }, 4000)
+    return () => window.clearInterval(timer)
+  }, [open, messages.length, reduceMotion])
+
   if (!can('quote.edit')) return null
 
-  const starters: Suggestion[] = [
-    { label: t('starters.newQuoteLabel'), message: t('starters.newQuote') },
-    { label: t('starters.countLabel'), message: t('starters.count') },
-    { label: t('starters.exampleLabel'), message: t('starters.example') },
-  ]
-  const chips = messages.length === 0 ? starters : suggestions
+  const exampleKey = EXAMPLE_KEYS[exampleIndex] ?? EXAMPLE_KEYS[0]
+  const examples = EXAMPLE_KEYS.map((key) => t(`starters.${key}`))
 
   const send = async (text: string, action?: SuggestionAction) => {
     const content = text.trim()
@@ -221,9 +238,56 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
             ) : null}
             {error ? <p className="text-sm text-red-600">{error}</p> : null}
           </div>
-          {chips.length > 0 && !busy ? (
+          {messages.length === 0 && !busy ? (
+            <div className="px-4 pb-3">
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">{t('starters.caption')}</p>
+              {reduceMotion ? (
+                <div className="flex flex-col gap-2">
+                  {examples.map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => void send(example)}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-left text-xs leading-snug text-slate-700 hover:border-slate-400"
+                    >
+                      {example}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <button
+                    key={exampleKey}
+                    type="button"
+                    onMouseEnter={() => {
+                      examplePaused.current = true
+                    }}
+                    onMouseLeave={() => {
+                      examplePaused.current = false
+                    }}
+                    onFocus={() => {
+                      examplePaused.current = true
+                    }}
+                    onBlur={() => {
+                      examplePaused.current = false
+                    }}
+                    onClick={() => void send(examples[exampleIndex] ?? examples[0] ?? '')}
+                    className="animate-quote-example min-h-14 w-full rounded-xl border border-slate-200 px-3 py-2 text-left text-xs leading-snug text-slate-700 hover:border-slate-400"
+                  >
+                    {examples[exampleIndex]}
+                  </button>
+                  <div className="mt-2 flex justify-center gap-1.5" aria-hidden>
+                    {EXAMPLE_KEYS.map((key, index) => (
+                      <span key={key} className={`h-1.5 w-1.5 rounded-full ${index === exampleIndex ? 'bg-slate-500' : 'bg-slate-200'}`} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : null}
+          {messages.length > 0 && suggestions.length > 0 && !busy ? (
             <div className="flex flex-wrap gap-2 px-4 pb-2">
-              {chips.map((chip) => (
+              {suggestions.map((chip) => (
                 <button
                   key={`${chip.label}-${chip.message}`}
                   type="button"

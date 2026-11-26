@@ -1241,12 +1241,10 @@
       "cancel_action": "Wird abgebrochen"
     },
     "starters": {
-      "newQuoteLabel": "Neues Angebot",
-      "countLabel": "Produkte zählen",
-      "exampleLabel": "Zeile hinzufügen",
-      "newQuote": "Nuovo preventivo per Studio Rossi",
-      "count": "Quanti prodotti ci sono in Cassonetto Coibentato MyBox Revo?",
-      "example": "Aggiungi una riga MyBox Revo Light profondità 150, 1200×1400 mm, quantità 1"
+      "caption": "Zum Beispiel",
+      "newQuote": "Neues Angebot für Studio Rossi",
+      "count": "Wie viele Produkte gibt es in Cassonetto Coibentato MyBox Revo?",
+      "example": "Zeile hinzufügen: MyBox Revo Light, Tiefe 150, 1200×1400 mm, Menge 1"
     }
   }
 }
