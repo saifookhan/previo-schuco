@@ -1175,5 +1175,30 @@
       "partner_request_rejected": "<b>{company}</b> hat Ihre Verbindungsanfrage abgelehnt.",
       "partner_connection_removed": "<b>{company}</b> hat die Verbindung mit Ihrem Unternehmen entfernt."
     }
+  },
+  "quoteChat": {
+    "title": "Angebotsassistent",
+    "open": "Angebotsassistent öffnen",
+    "close": "Schließen",
+    "placeholder": "Angebot erstellen oder ändern",
+    "send": "Senden",
+    "working": "Wird ausgeführt…",
+    "unavailable": "Der Assistent ist gerade nicht verfügbar.",
+    "empty": "Nennen Sie Kunde und Produkt. Ich verwende nur die aktuelle Preisliste.",
+    "tools": {
+      "search_catalog": "Suche im Katalog",
+      "describe_family": "Produktfamilie wird gelesen",
+      "create_quote": "Angebot wird erstellt",
+      "add_product": "Neue Zeile wird hinzugefügt",
+      "duplicate_line": "Zeile wird dupliziert",
+      "duplicate_family": "Familie wird dupliziert",
+      "move_line": "Zeile wird verschoben",
+      "update_line": "Zeile wird aktualisiert"
+    },
+    "starters": {
+      "newQuote": "Nuovo preventivo per Studio Rossi",
+      "count": "Quanti prodotti ci sono in Cassonetto Coibentato MyBox Revo?",
+      "example": "Aggiungi una riga MyBox Revo Light profondità 150, 1200×1400 mm, quantità 1"
+    }
   }
 }

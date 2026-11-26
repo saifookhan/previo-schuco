@@ -18,8 +18,9 @@ import { AlertTriangle, ArrowLeft, Info, Plus, RotateCcw } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { QuoteChat } from '@/components/quote-chat/quote-chat'
 import { useAuth } from '@/hooks/use-auth'
-import { Link } from '@/i18n/navigation'
+import { Link, useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
 import type { ProductFamilyDetail, ProductFamilySummary } from '@/types/product-family'
 
@@ -71,6 +72,7 @@ interface QuoteEditorProps {
  */
 export const QuoteEditor = ({ initialDetail, families, profile, initialTemplates }: QuoteEditorProps) => {
   const t = useTranslations('quoteEditor')
+  const router = useRouter()
   const { user, can } = useAuth()
   const canEdit = can('quote.edit')
   const sensors = useDragSensors()
@@ -576,6 +578,20 @@ export const QuoteEditor = ({ initialDetail, families, profile, initialTemplates
           versionId={version.id}
           revision={version.revision}
           onView={(revision) => void viewRevision(revision)}
+        />
+        <QuoteChat
+          quoteId={quote.id}
+          document={document}
+          baseRevision={version.revision}
+          onQuote={async (id) => {
+            if (id !== quote.id) {
+              router.push(`/app/quotes/${id}`)
+              return
+            }
+            const response = await fetch(`/api/sales-quotes/${id}`)
+            if (!response.ok) return
+            applyDetail((await response.json()) as SalesQuoteDetailResponse)
+          }}
         />
       </QuoteEditorProvider>
     </Tooltip.Provider>

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingRegion, LoadingRegionProvider } from '@/components/ui/loading-region'
 import { Link } from '@/i18n/navigation'
 import { fetchFromApiResult } from '@/lib/api/server-client'
+import { QuoteChat } from '@/components/quote-chat/quote-chat'
 import { QuoteNewButton } from '@/components/quote-new-button'
 import { EUR } from '@/lib/format'
 import type { QuoteSummary } from '@schuco/contracts'
@@ -92,6 +93,7 @@ const QuotesPage = async () => {
           </Card>
         </LoadingRegion>
       </LoadingRegionProvider>
+      <QuoteChat />
     </div>
   )
 }

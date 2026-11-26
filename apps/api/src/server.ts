@@ -23,6 +23,7 @@ import { products } from './routes/products'
 import { quotes } from './routes/quotes'
 import { roles } from './routes/roles'
 import { companyProfile } from './routes/company-profile'
+import { quoteChat } from './routes/quote-chat'
 import { salesQuotes } from './routes/sales-quotes'
 import { users } from './routes/users'
 
@@ -54,6 +55,7 @@ app.route('/api/products', products)
 app.route('/api/product-families', productFamilies)
 app.route('/api/quotes', quotes)
 app.route('/api/sales-quotes', salesQuotes)
+app.route('/api/quote-chat', quoteChat)
 app.route('/api/company', companyProfile)
 app.route('/api/calculate', calculate)
 app.route('/api/partners', partners)
