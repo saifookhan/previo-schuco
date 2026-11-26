@@ -153,4 +153,26 @@ describe('runQuoteAgent', () => {
     })
     expect(events.some((event) => event.type === 'status' && event.tool === 'duplicate_line')).toBe(true)
   })
+
+  it('asks again when the model refuses to reorder the first row', async () => {
+    const events: AgentEvent[] = []
+    const turns: ModelTurn[] = [
+      { content: "I'm sorry, but I currently don't have the tools needed to reorder and make the first product the second one.", toolCalls: [] },
+      { content: null, toolCalls: [{ id: 'call-1', name: 'move_line', arguments: '{"lineName":"pos 1","direction":"down"}' }] },
+      { content: 'Il primo prodotto ora è il secondo.', toolCalls: [] },
+    ]
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'can you reorder and make the first product as the second one?' }],
+      complete: async () => turns.shift()!,
+      execute: async (name, args) => {
+        expect(name).toBe('move_line')
+        expect(args).toEqual({ lineName: 'pos 1', direction: 'down' })
+        return { content: 'Moved pos 1 down' }
+      },
+      emit: (event) => {
+        events.push(event)
+      },
+    })
+    expect(events.some((event) => event.type === 'status' && event.tool === 'move_line')).toBe(true)
+  })
 })

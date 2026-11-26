@@ -10,6 +10,13 @@ const SIZE = /\d{2,5}\s*[x×]\s*\d{2,5}/
 
 /** One extra round when the model answers in prose instead of calling a tool it has. */
 const nudgeFor = (text: string, latestUser: string, called: ReadonlySet<string>): string | null => {
+  if (
+    /\b(first|prima|primo|erste)\b/i.test(latestUser) &&
+    /\b(second|secondo|zweite)\b/i.test(latestUser) &&
+    !called.has('move_line')
+  ) {
+    return 'The user wants the first product to become the second. Call move_line now with lineName "pos 1" and direction "down".'
+  }
   if (/\b(duplic\w*|kopier\w*|copy)\b/i.test(latestUser) && /\b(first|prima|primo|erste)\b/i.test(latestUser) && !called.has('duplicate_line')) {
     return 'The user asked to duplicate the first row. Call duplicate_line now with lineName "pos 1".'
   }

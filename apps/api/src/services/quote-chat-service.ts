@@ -51,10 +51,10 @@ const summarizeDocument = (document: QuoteDocument): string => {
   const rows = document.families
     .map((family) => {
       const lines = family.lines
-        .map((line) => {
+        .map((line, index) => {
           const net = lineNetUnitPrice(line)
           const total = lineTotal(line)
-          return `  ${line.code} ${line.name} ${line.widthMm ?? '—'}×${line.heightMm ?? '—'} qty ${line.quantity} €/pc ${line.unitPrice} extra ${line.extraMarkupPct}% disc ${line.discountPct}% net ${net.toFixed(2)} total ${total.toFixed(2)} VAT ${line.vatRate} h ${line.installationHours ?? '—'} [${line.id}]`
+          return `  ${index + 1}. pos ${line.code} ${line.name} ${line.widthMm ?? '—'}×${line.heightMm ?? '—'} qty ${line.quantity} €/pc ${line.unitPrice} extra ${line.extraMarkupPct}% disc ${line.discountPct}% net ${net.toFixed(2)} total ${total.toFixed(2)} VAT ${line.vatRate} h ${line.installationHours ?? '—'} [${line.id}]`
         })
         .join('\n')
       return `${family.name} [${family.id}]\n${lines || '  (no rows)'}`
@@ -462,7 +462,8 @@ const moveLine = async (
   const [moved] = family.lines.splice(index, 1)
   family.lines.splice(next, 0, moved!)
   const saved = await persist(ctx, actor, state, document)
-  return reply(`Moved ${line.name} ${direction}.\n${saved.content}`)
+  const order = family.lines.map((item, place) => `${place + 1}. ${item.name}`).join(', ')
+  return reply(`Moved ${line.name} ${direction}. Order is now ${order}.\n${saved.content}`)
 }
 
 const updateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {

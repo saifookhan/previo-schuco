@@ -83,11 +83,12 @@ export const QUOTE_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'move_line',
-    description: 'Move a row up or down within its family.',
+    description:
+      'Reorder one row within its family. "Make the first product the second" is lineName "pos 1" and direction "down": that swaps it with the next row. direction "up" moves it the other way.',
     parameters: {
       type: 'object',
       properties: {
-        lineName: { type: 'string' },
+        lineName: { type: 'string', description: 'Product name or Pos. "pos 1" and "the first one" are the first row.' },
         direction: { type: 'string', enum: ['up', 'down'] },
       },
       required: ['lineName', 'direction'],
