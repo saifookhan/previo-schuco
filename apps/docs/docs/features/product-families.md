@@ -21,7 +21,7 @@ Every environment already has one: **Demo Window W70** (see [Demo data](../demo-
 | Action | How | Notes |
 |---|---|---|
 | Import from Excel | **Import from Excel** on the list | Pick the file, check it, set price validity — see [Importing from Excel](#importing-from-excel) |
-| View | The family's name, or the icon at the left of the row (opens a new tab) | Clicking the rest of the row expands it. One row is open at a time. The name includes the version, for example Demo Window W70 V2. The expanded row has the switches, dates and delete on the left, and the versions on the right: the current version, and a link to the previous one that opens in a new tab |
+| View | The family's name, or the icon at the left of the row (opens a new tab) | Clicking the rest of the row expands it. One row is open at a time. A **V2** tag sits beside the name. The expanded row has the switches, dates and delete on the left, and the versions on the right: the current version, and a link to the previous one that opens in a new tab |
 | Edit pricing | **Edit** on a line, characteristic or matrix | Value, formula, discount, markup, installation hours |
 | Edit a matrix | Edit → add/remove rows and columns | Width × height grid |
 | Publish / unpublish | **Status (published)** switch in the expanded row (button on the family's page) | The row shows Published or Draft. Only published families can be shared |

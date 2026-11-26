@@ -21,7 +21,7 @@ Jede Umgebung hat bereits eine: **Demo Window W70** (siehe [Demo-Daten](../demo-
 | Aktion | Wie | Hinweise |
 |---|---|---|
 | Aus Excel importieren | **Aus Excel importieren** in der Liste | Datei wählen, prüfen, Preisgültigkeit festlegen — siehe [Aus Excel importieren](#aus-excel-importieren) |
-| Ansehen | Name der Familie, oder das Symbol links in der Zeile (öffnet einen neuen Tab) | Ein Klick auf den Rest der Zeile klappt sie auf. Es ist immer nur eine Zeile offen. Der Name enthält die Version, zum Beispiel Demo Window W70 V2. Die aufgeklappte Zeile zeigt links die Schalter, die Daten und Löschen, rechts die Versionen: die aktuelle und einen Link zur vorherigen, der einen neuen Tab öffnet |
+| Ansehen | Name der Familie, oder das Symbol links in der Zeile (öffnet einen neuen Tab) | Ein Klick auf den Rest der Zeile klappt sie auf. Es ist immer nur eine Zeile offen. Neben dem Namen steht eine Markierung **V2**. Die aufgeklappte Zeile zeigt links die Schalter, die Daten und Löschen, rechts die Versionen: die aktuelle und einen Link zur vorherigen, der einen neuen Tab öffnet |
 | Preise bearbeiten | **Bearbeiten** an einer Linie, einem Merkmal oder einer Tabelle | Wert, Formel, Rabatt, Aufschlag, Montagestunden |
 | Tabelle bearbeiten | Bearbeiten → Zeilen und Spalten hinzufügen/entfernen | Raster Breite × Höhe |
 | Veröffentlichen / zurückziehen | Schalter **Status (veröffentlicht)** in der aufgeklappten Zeile (Schaltfläche auf der Seite der Familie) | Die Zeile zeigt Veröffentlicht oder Entwurf. Nur veröffentlichte Familien können geteilt werden |

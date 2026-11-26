@@ -239,12 +239,18 @@ export const ProductFamilyTable = ({
                   </div>
                 </td>
                 <td className="min-w-[11rem] font-medium text-slate-900">
-                  <Link href={`/app/product-families/${family.id}`} className="hover:text-brand">
-                    {family.name}{' '}
-                    <span title={tVersion('versionBadge', { version: family.version })}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href={`/app/product-families/${family.id}`} className="hover:text-brand">
+                      {family.name}
+                    </Link>
+                    <Badge
+                      variant="muted"
+                      className="whitespace-nowrap"
+                      title={tVersion('versionBadge', { version: family.version })}
+                    >
                       {tVersion('short', { version: family.version })}
-                    </span>
-                  </Link>
+                    </Badge>
+                  </div>
                 </td>
                 {shared ? <td className="text-slate-600">{family.ownerCompanyName ?? '—'}</td> : null}
                 <td className="text-slate-600">{family.category ?? '—'}</td>
