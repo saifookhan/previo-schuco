@@ -21,17 +21,17 @@ Every environment already has one: **Demo Window W70** (see [Demo data](../demo-
 | Action | How | Notes |
 |---|---|---|
 | Import from Excel | **Import from Excel** on the list | Pick the file, check it, set price validity — see [Importing from Excel](#importing-from-excel) |
-| View | Click a family | Lines, characteristics, pricing matrices |
+| View | The family's name, or the icon at the left of the row (opens a new tab) | Clicking the rest of the row expands it. One row is open at a time. A **V2** tag sits beside the name. The expanded row has the switches, dates and delete on the left, and the versions on the right: the current version, and a link to the previous one that opens in a new tab |
 | Edit pricing | **Edit** on a line, characteristic or matrix | Value, formula, discount, markup, installation hours |
 | Edit a matrix | Edit → add/remove rows and columns | Width × height grid |
-| Publish / unpublish | Actions menu | Only published families can be shared |
+| Publish / unpublish | **Status (published)** switch in the expanded row (button on the family's page) | The row shows Published or Draft. Only published families can be shared |
 | New version | **New version** on the family's page | Same dialog as an import; the new version gets its own price validity and the old one keeps its dates |
-| Duplicate | Copy icon in the actions | A dialog asks for the copy's name, price validity and whether to publish it (starts from the original's dates, unpublished) |
-| Delete | Actions menu | |
-| Change price validity | The **Valid from / Valid to** fields in the list, or **Edit** next to the dates on the family's page | Owner (or super-admin) only |
-| Ready for invoicing | **Yes / No** in the list (or on the family's page) | Only families ready for invoicing are offered in the quote builder. Owner only |
-| With price list | **Yes / No** in the list (or on the family's page) | Whether there are prices behind the family — shown in the quote builder. Owner only |
-| In library | **Yes / No** in the list (or on the family's page) | Whether your company's quote builder offers the family — for your own families and for shared ones. Admins and managers |
+| Duplicate | Copy icon on the row | A dialog asks for the copy's name, price validity and whether to publish it (starts from the original's dates, unpublished) |
+| Delete | **Delete** inside the expanded row (button on the family's page) | |
+| Change price validity | **Valid from** and **Valid to** inside the expanded row, then **Save** (or **Edit** on the family's page) | Owner (or super-admin) only. The **Validity dates** column shows the dates as DD.MM.YYYY |
+| Ready for invoicing | Tag in the **Tags** column when it is on; switch in the expanded row (Yes/No on the family's page) | Only families ready for invoicing are offered in the quote builder. Owner only |
+| With price list | Tag in the **Tags** column when it is on; switch in the expanded row (Yes/No on the family's page) | Whether there are prices behind the family — shown in the quote builder. Owner only |
+| In library | Tag in the **Tags** column when it is on; switch in the expanded row (Yes/No on the family's page) | Whether your company's quote builder offers the family — for your own families and for shared ones. Admins and managers |
 
 ![Product family detail](/img/screens/product-family-detail.png)
 
@@ -56,10 +56,10 @@ File format: [Excel import format](../excel-format.md).
 
 A family's prices can be used on **new quote positions** only from *Valid from* to *Valid to* (both days included,
 Italian time). Outside those days the family isn't offered in the quote builder and the API refuses it. Positions
-already on quotes keep their prices and can still be edited. The list shows the dates with an **Upcoming** or
-**Expired** badge; families imported before this existed have no dates and are always usable.
-In the list, the owner changes the dates right in the row: the change is saved when you leave the field (or press
-Enter). *Valid from* can't be emptied; emptying *Valid to* means until further notice.
+already on quotes keep their prices and can still be edited. The list shows the two dates as one range, with an
+**Upcoming** or **Expired** badge; families imported before this existed have no dates and are always usable.
+In the list, the owner opens the row and edits **Valid from** and **Valid to** together, then saves. *Valid from*
+can't be emptied; emptying *Valid to* means until further notice.
 Two versions of a family can't share a day: dates that overlap another version (in the list, on the family's page or
 when uploading a new version) are refused with that version's number and dates, and nothing is saved. To start a new
 version, first give the current one a *Valid to* before the new version's *Valid from* (the upload dialog then starts
@@ -68,7 +68,7 @@ the new version the day after). A version without dates counts as valid every da
 ## Ready for invoicing
 
 Only families marked **Ready for invoicing** (and published, with prices valid today) are offered when adding a
-position to a quote; the API refuses the others. Change it with the **Yes / No** dropdown in the list or on the
+position to a quote; the API refuses the others. The **Tags** column shows it when it is on. Change it with the switch in the expanded row or the **Yes / No** dropdown on the
 family's page — only the owning company can. A new family starts **not ready**; a copy or a new version starts
 with the original's setting (change it in the dialog). Families that existed before this setting were marked ready. Positions already on quotes are not affected and can still be
 edited. Each change is recorded in the family's history.

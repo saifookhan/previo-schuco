@@ -1,18 +1,13 @@
-import { AlertTriangle, History, Package } from 'lucide-react'
+import { AlertTriangle, Package } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingRegion, LoadingRegionProvider } from '@/components/ui/loading-region'
 import { PendingLink } from '@/components/ui/pending-link'
-import { Link } from '@/i18n/navigation'
 import { fetchFromApi, fetchFromApiResult } from '@/lib/api/server-client'
 import { cn } from '@/lib/utils'
 import { ProductFamilyFiltersBar } from '@/components/product-family-filters'
-import { ProductFamilyFlagSelect } from '@/components/product-family-flag-select'
-import { PriceValidityDateInput } from '@/components/product-family-price-validity'
-import { ProductFamilyRowActions } from '@/components/product-family-row-actions'
-import { ProductFamilyShareButton } from '@/components/product-family-share-button'
+import { ProductFamilyTable } from '@/components/product-family-table'
 import { ProductFamilyUploadButton } from '@/components/product-family-upload-button'
 import type { ProductFamilySummary } from '@/types/product-family'
 import {
@@ -33,7 +28,6 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<Rec
   const params = await searchParams
   const tab = params.tab
   const t = await getTranslations('productFamilies')
-  const tVersion = await getTranslations('productFamilyVersion')
   const [result, me] = await Promise.all([
     fetchFromApiResult<{ families: ProductFamilySummary[] }>('/api/product-families'),
     fetchFromApi<MeResponse>('/api/me'),
@@ -129,136 +123,7 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<Rec
                   ) : null}
                 </div>
               ) : (
-                // Compact cells: the inline Yes/No and date fields make this a wide table; it scrolls
-                // sideways only in narrower windows.
-                <table className="w-full min-w-[1180px] text-sm [&_td]:px-3 [&_td]:py-3 [&_th]:px-3 [&_th]:py-3 [&_td:first-child]:pl-6 [&_th:first-child]:pl-6">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-left text-slate-500">
-                      <th className="font-medium">{t('name')}</th>
-                      {activeTab === 'shared' ? <th className="font-medium">{t('owner')}</th> : null}
-                      <th className="font-medium">{t('category')}</th>
-                      <th className="font-medium">{t('brand')}</th>
-                      {activeTab === 'shared' ? <th className="font-medium">{t('yourDiscount')}</th> : null}
-                      <th className="font-medium">{t('status')}</th>
-                      <th className="font-medium">{t('version')}</th>
-                      <th className="font-medium">{t('hasPriceList')}</th>
-                      <th className="font-medium">{t('validFrom')}</th>
-                      <th className="font-medium">{t('validTo')}</th>
-                      <th className="font-medium">{t('readyForInvoicing')}</th>
-                      <th className="font-medium">{t('inLibrary')}</th>
-                      <th className="font-medium">
-                        <span className="sr-only">{t('actions')}</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {families.map((family) => (
-                      <tr key={family.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                        <td className="min-w-[11rem] font-medium text-slate-900">
-                          <Link href={`/app/product-families/${family.id}`} className="hover:text-brand">
-                            {family.name}
-                          </Link>
-                          {family.technicalName ? (
-                            <span className="block text-xs font-normal text-slate-400">{family.technicalName}</span>
-                          ) : null}
-                        </td>
-                        {activeTab === 'shared' ? <td className="text-slate-600">{family.ownerCompanyName ?? '—'}</td> : null}
-                        <td className="text-slate-600">{family.category ?? '—'}</td>
-                        <td className="text-slate-600">{family.brand ?? '—'}</td>
-                        {activeTab === 'shared' ? (
-                          <td className="text-slate-600">{family.shareDiscountPct ? `${family.shareDiscountPct}%` : '—'}</td>
-                        ) : null}
-                        <td>
-                          <Badge variant={family.isPublished ? 'success' : 'muted'}>
-                            {family.isPublished ? t('published') : t('draft')}
-                          </Badge>
-                        </td>
-                        <td>
-                          <Badge variant="muted" className="whitespace-nowrap">
-                            {tVersion('versionBadge', { version: family.version })}
-                          </Badge>
-                          {family.supersedesId ? (
-                            <Link
-                              href={`/app/product-families/${family.supersedesId}`}
-                              className="mt-1 flex items-center gap-1 text-xs text-slate-400 hover:text-brand"
-                              title={tVersion('viewPreviousVersion')}
-                            >
-                              <History className="h-3 w-3" />
-                              {tVersion('viewPreviousVersion')}
-                            </Link>
-                          ) : null}
-                        </td>
-                        <td>
-                          <ProductFamilyFlagSelect
-                            flag="hasPriceList"
-                            familyId={family.id}
-                            familyName={family.name}
-                            value={family.hasPriceList}
-                            canEdit={activeTab === 'own'}
-                          />
-                        </td>
-                        <td>
-                          <PriceValidityDateInput
-                            familyId={family.id}
-                            familyName={family.name}
-                            field="priceValidFrom"
-                            validity={{ priceValidFrom: family.priceValidFrom, priceValidTo: family.priceValidTo }}
-                            today={today}
-                            canEdit={activeTab === 'own'}
-                          />
-                        </td>
-                        <td>
-                          <PriceValidityDateInput
-                            familyId={family.id}
-                            familyName={family.name}
-                            field="priceValidTo"
-                            validity={{ priceValidFrom: family.priceValidFrom, priceValidTo: family.priceValidTo }}
-                            today={today}
-                            canEdit={activeTab === 'own'}
-                          />
-                        </td>
-                        <td>
-                          <ProductFamilyFlagSelect
-                            flag="readyForInvoicing"
-                            familyId={family.id}
-                            familyName={family.name}
-                            value={family.readyForInvoicing}
-                            canEdit={activeTab === 'own'}
-                          />
-                        </td>
-                        <td>
-                          {/* The caller's company library: changed on both tabs, own families and shared ones. */}
-                          <ProductFamilyFlagSelect
-                            flag="inLibrary"
-                            familyId={family.id}
-                            familyName={family.name}
-                            value={family.inLibrary ?? true}
-                            canEdit
-                          />
-                        </td>
-                        <td>
-                          <div className="flex items-center justify-end gap-2">
-                            <ProductFamilyShareButton
-                              familyId={family.id}
-                              familyName={family.name}
-                              isPublished={family.isPublished}
-                              iconOnly
-                            />
-                            {activeTab === 'own' ? (
-                              <ProductFamilyRowActions
-                                familyId={family.id}
-                                familyName={family.name}
-                                isPublished={family.isPublished}
-                                readyForInvoicing={family.readyForInvoicing}
-                                validity={family}
-                              />
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <ProductFamilyTable families={families} tab={activeTab} today={today} />
               )}
             </CardContent>
           </LoadingRegion>

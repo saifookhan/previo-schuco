@@ -285,12 +285,21 @@
     "hasPriceList": "Mit Preisliste",
     "validFrom": "Gültig ab",
     "validTo": "Gültig bis",
+    "validity": "Gültigkeitsdaten",
+    "tags": "Tags",
+    "publishedStatus": "Status (veröffentlicht)",
+    "versions": "Versionen",
     "inLibrary": "In Bibliothek",
-    "actions": "Aktionen"
+    "actions": "Aktionen",
+    "expand": "Details zu {name} anzeigen",
+    "collapse": "Details zu {name} ausblenden",
+    "openInNewTab": "{name} in einem neuen Tab öffnen"
   },
   "productFamilyActions": {
     "publish": "Veröffentlichen",
     "unpublish": "Veröffentlichung aufheben",
+    "publishedOf": "Veröffentlicht: {name}",
+    "publishFailed": "Veröffentlichung von {name} konnte nicht geändert werden",
     "duplicate": "Duplizieren",
     "delete": "Löschen",
     "cancel": "Abbrechen",
@@ -326,6 +335,8 @@
   },
   "productFamilyVersion": {
     "versionBadge": "Version {version}",
+    "short": "V{version}",
+    "current": "Aktuell: Version {version}",
     "supersedes": "Ersetzt eine frühere Version",
     "supersededBy": "Es gibt eine neuere Version",
     "viewPreviousVersion": "Vorherige Version ansehen",

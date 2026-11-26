@@ -21,17 +21,17 @@ Jede Umgebung hat bereits eine: **Demo Window W70** (siehe [Demo-Daten](../demo-
 | Aktion | Wie | Hinweise |
 |---|---|---|
 | Aus Excel importieren | **Aus Excel importieren** in der Liste | Datei wählen, prüfen, Preisgültigkeit festlegen — siehe [Aus Excel importieren](#aus-excel-importieren) |
-| Ansehen | Familie anklicken | Linien, Merkmale, Preistabellen |
+| Ansehen | Name der Familie, oder das Symbol links in der Zeile (öffnet einen neuen Tab) | Ein Klick auf den Rest der Zeile klappt sie auf. Es ist immer nur eine Zeile offen. Neben dem Namen steht eine Markierung **V2**. Die aufgeklappte Zeile zeigt links die Schalter, die Daten und Löschen, rechts die Versionen: die aktuelle und einen Link zur vorherigen, der einen neuen Tab öffnet |
 | Preise bearbeiten | **Bearbeiten** an einer Linie, einem Merkmal oder einer Tabelle | Wert, Formel, Rabatt, Aufschlag, Montagestunden |
 | Tabelle bearbeiten | Bearbeiten → Zeilen und Spalten hinzufügen/entfernen | Raster Breite × Höhe |
-| Veröffentlichen / zurückziehen | Aktionsmenü | Nur veröffentlichte Familien können geteilt werden |
+| Veröffentlichen / zurückziehen | Schalter **Status (veröffentlicht)** in der aufgeklappten Zeile (Schaltfläche auf der Seite der Familie) | Die Zeile zeigt Veröffentlicht oder Entwurf. Nur veröffentlichte Familien können geteilt werden |
 | Neue Version | **Neue Version** auf der Seite der Familie | Derselbe Dialog wie beim Import; die neue Version bekommt eine eigene Preisgültigkeit, die alte behält ihre Daten |
-| Duplizieren | Kopier-Symbol in den Aktionen | Ein Dialog fragt nach Name, Preisgültigkeit und Veröffentlichung der Kopie (startet mit den Daten des Originals, unveröffentlicht) |
-| Löschen | Aktionsmenü | |
-| Preisgültigkeit ändern | Die Felder **Gültig ab / Gültig bis** in der Liste, oder **Bearbeiten** neben den Daten auf der Seite der Familie | Nur Eigentümer (oder Super-Admin) |
-| Bereit zur Fakturierung | **Ja / Nein** in der Liste (oder auf der Seite der Familie) | Nur Familien, die bereit zur Fakturierung sind, werden im Angebot angeboten. Nur Eigentümer |
-| Mit Preisliste | **Ja / Nein** in der Liste (oder auf der Seite der Familie) | Ob hinter der Familie Preise stehen — wird im Angebot angezeigt. Nur Eigentümer |
-| In Bibliothek | **Ja / Nein** in der Liste (oder auf der Seite der Familie) | Ob das Angebot Ihres Unternehmens die Familie anbietet — für eigene und geteilte Familien. Administratoren und Manager |
+| Duplizieren | Kopier-Symbol in der Zeile | Ein Dialog fragt nach Name, Preisgültigkeit und Veröffentlichung der Kopie (startet mit den Daten des Originals, unveröffentlicht) |
+| Löschen | **Löschen** in der aufgeklappten Zeile (Schaltfläche auf der Seite der Familie) | |
+| Preisgültigkeit ändern | **Gültig ab** und **Gültig bis** in der aufgeklappten Zeile, dann **Speichern** (oder **Bearbeiten** auf der Seite der Familie) | Nur Eigentümer (oder Super-Admin). Die Spalte **Gültigkeitsdaten** zeigt die Daten als TT.MM.JJJJ |
+| Bereit zur Fakturierung | Markierung in der Spalte **Tags**, wenn gesetzt; Schalter in der aufgeklappten Zeile (Ja/Nein auf der Seite der Familie) | Nur Familien, die bereit zur Fakturierung sind, werden im Angebot angeboten. Nur Eigentümer |
+| Mit Preisliste | Markierung in der Spalte **Tags**, wenn gesetzt; Schalter in der aufgeklappten Zeile (Ja/Nein auf der Seite der Familie) | Ob hinter der Familie Preise stehen — wird im Angebot angezeigt. Nur Eigentümer |
+| In Bibliothek | Markierung in der Spalte **Tags**, wenn gesetzt; Schalter in der aufgeklappten Zeile (Ja/Nein auf der Seite der Familie) | Ob das Angebot Ihres Unternehmens die Familie anbietet — für eigene und geteilte Familien. Administratoren und Manager |
 
 ![Produktfamilie im Detail](/img/screens/product-family-detail.png)
 
@@ -57,10 +57,10 @@ Dateiformat: [Excel-Importformat](../excel-format.md).
 Die Preise einer Familie können in **neuen Angebotspositionen** nur von *Gültig ab* bis *Gültig bis* verwendet werden
 (beide Tage eingeschlossen, italienische Zeit). Außerhalb dieser Tage wird die Familie im Angebot nicht angeboten und
 die API lehnt sie ab. Positionen, die schon in Angeboten stehen, behalten ihre Preise und bleiben bearbeitbar. Die Liste
-zeigt die Daten mit dem Badge **Demnächst** oder **Abgelaufen**; vor dieser Funktion importierte Familien haben keine
+zeigt beide Daten als einen Zeitraum, mit dem Badge **Demnächst** oder **Abgelaufen**; vor dieser Funktion importierte Familien haben keine
 Daten und sind immer verwendbar.
-In der Liste ändert der Eigentümer die Daten direkt in der Zeile: gespeichert wird beim Verlassen des Feldes (oder mit
-Enter). *Gültig ab* kann nicht geleert werden; ein leeres *Gültig bis* bedeutet bis auf Weiteres.
+In der Liste klappt der Eigentümer die Zeile auf, ändert **Gültig ab** und **Gültig bis** gemeinsam und speichert.
+*Gültig ab* kann nicht geleert werden; ein leeres *Gültig bis* bedeutet bis auf Weiteres.
 Zwei Versionen einer Familie dürfen keinen Tag gemeinsam haben: Daten, die sich mit einer anderen Version überschneiden
 (in der Liste, auf der Seite der Familie oder beim Hochladen einer neuen Version), werden mit Nummer und Daten dieser
 Version abgelehnt, und nichts wird gespeichert. Für eine neue Version geben Sie der aktuellen zuerst ein *Gültig bis*
@@ -70,8 +70,8 @@ gilt an jedem Tag.
 ## Bereit zur Fakturierung
 
 Nur Familien mit **Bereit zur Fakturierung** (und veröffentlicht, mit heute gültigen Preisen) werden beim Hinzufügen
-einer Position zu einem Angebot angeboten; die API lehnt die anderen ab. Geändert wird es mit dem Auswahlfeld
-**Ja / Nein** in der Liste oder auf der Seite der Familie — nur vom Eigentümer-Unternehmen. Eine neue Familie startet als **nicht bereit**; eine Kopie oder
+einer Position zu einem Angebot angeboten; die API lehnt die anderen ab. Die Spalte **Tags** zeigt es, wenn es gesetzt ist. Geändert wird es mit dem Schalter
+in der aufgeklappten Zeile oder dem Auswahlfeld **Ja / Nein** auf der Seite der Familie — nur vom Eigentümer-Unternehmen. Eine neue Familie startet als **nicht bereit**; eine Kopie oder
 neue Version übernimmt die Einstellung des Originals (im Dialog änderbar). Familien, die vor dieser Einstellung existierten, wurden als bereit
 markiert. Positionen, die schon in Angeboten sind, bleiben unverändert und bearbeitbar. Jede Änderung steht im Verlauf
 der Familie.

@@ -27,7 +27,7 @@ Ein kompletter Durchlauf der wichtigsten Abläufe. Mit den [Demo-Anmeldungen](./
 - [ ] Die Demo-Familie mit Fabbrikka zu 5 % teilen (wird Fabbrikka nicht angeboten, zuerst unter *Partner* verbinden).
 - [ ] Unter *Produktfamilien* jeden Filter und die Sortierung ausprobieren — Liste und „x von y“ aktualisieren sich; die URL in einem neuen Tab öffnen zeigt dieselben Filter; **Zurück** macht den letzten Filter rückgängig.
 - [ ] **Bereit zur Fakturierung** einer Familie auf **Nein** setzen — das Angebot bietet sie nicht mehr an, eine bestehende Position bleibt bearbeitbar; zurück auf **Ja** und sie wird wieder angeboten. Eine neu importierte Familie startet mit **Nein**, wenn im Dialog nicht angekreuzt.
-- [ ] In der Liste **Gültig bis** einer Familie auf gestern setzen und das Feld verlassen — sie zeigt **Abgelaufen** und das Angebot bietet sie nicht mehr an; **Gültig ab** leeren — ein Fehler erscheint und das Datum kommt zurück.
+- [ ] In der Liste die Zeile einer Familie aufklappen, **Gültig bis** auf gestern setzen und **Speichern** — die Zeile zeigt **Abgelaufen** und das Angebot bietet sie nicht mehr an; **Gültig ab** leeren — ein Fehler erscheint und **Speichern** bleibt deaktiviert.
 - [ ] **Mit Preisliste** auf **Nein** setzen — das Angebot zeigt die Familie als *(ohne Preisliste)* mit Hinweis, und sie kann trotzdem hinzugefügt werden.
 - [ ] Als `admin@suppli-demo.it` bei einer Familie **In Bibliothek** auf **Nein** setzen — das Angebot bietet sie nicht mehr an; als Vertriebsbenutzer desselben Unternehmens anmelden — die Familie ist nicht in der Liste; das Unternehmen, das sie geteilt hat (oder Eigentümer ist), sieht sie weiter in seiner eigenen Bibliothek.
 
