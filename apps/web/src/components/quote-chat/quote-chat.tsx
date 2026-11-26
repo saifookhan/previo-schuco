@@ -1,7 +1,7 @@
 'use client'
 
 import { MessageSquare, X } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import { useEffect, useState } from 'react'
 
@@ -13,9 +13,15 @@ interface ChatMessage {
   content: string
 }
 
+interface SuggestionAction {
+  tool: string
+  args: Record<string, unknown>
+}
+
 interface Suggestion {
   label: string
   message: string
+  action?: SuggestionAction
 }
 
 interface QuoteChatProps {
@@ -39,6 +45,27 @@ const TOOLS = [
   'add_text_module',
   'add_activity',
   'update_line',
+  'get_quote',
+  'update_header',
+  'update_lines',
+  'set_line_options',
+  'remove_line',
+  'remove_family',
+  'move_family',
+  'update_family_block',
+  'switch_family_version',
+  'edit_text_module',
+  'remove_text_module',
+  'insert_text_template',
+  'remove_activity',
+  'set_payments',
+  'set_quote_status',
+  'save_new_version',
+  'restore_revision',
+  'update_print_settings',
+  'preview_pdf',
+  'duplicate_quote',
+  'cancel_action',
 ] as const
 
 /** Hands the open transcript to the quote page a chat action navigates to. A refresh drops it. */
@@ -47,6 +74,7 @@ let carriedChat: { quoteId: string; messages: ChatMessage[]; suggestions: Sugges
 /** Chat that creates and edits a quote. Messages stay in this panel until it closes. */
 export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteChatProps) => {
   const t = useTranslations('quoteChat')
+  const locale = useLocale()
   const { can } = useAuth()
   const router = useRouter()
   const restored = carriedChat?.quoteId === quoteId ? carriedChat : null
@@ -74,10 +102,11 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
   ]
   const chips = messages.length === 0 ? starters : suggestions
 
-  const send = async (text: string) => {
+  const send = async (text: string, action?: SuggestionAction) => {
     const content = text.trim()
     if (!content || busy) return
     const next = [...messages, { role: 'user' as const, content }]
+    const pendingChoices = suggestions
     setMessages(next)
     setDraft('')
     setSuggestions([])
@@ -90,7 +119,7 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
       const response = await fetch('/api/quote-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quoteId, document, baseRevision, messages: next }),
+        body: JSON.stringify({ quoteId, document, baseRevision, messages: next, locale, pendingChoices, action }),
       })
       if (!response.ok || !response.body) {
         setError(t('unavailable'))
@@ -142,6 +171,7 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
       }
     } catch {
       setError(t('unavailable'))
+      if (quoteId && onQuote) await onQuote(quoteId)
     } finally {
       setBusy(false)
       setActivity(null)
@@ -184,9 +214,9 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
             <div className="flex flex-wrap gap-2 px-4 pb-2">
               {chips.map((chip) => (
                 <button
-                  key={chip.message}
+                  key={`${chip.label}-${chip.message}`}
                   type="button"
-                  onClick={() => void send(chip.message)}
+                  onClick={() => void send(chip.message, chip.action)}
                   className="max-w-full whitespace-normal rounded-full border border-slate-200 px-3 py-1 text-left text-xs leading-snug text-slate-700 hover:border-slate-400"
                 >
                   {chip.label}

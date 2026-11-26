@@ -1,13 +1,25 @@
 import {
+  catalogQuery,
   expandQuery,
   foldName,
+  isEditRequest,
+  isNewQuoteRequest,
+  isRemoving,
+  isUuid,
+  issueConfirmToken,
+  mentionedId,
   nameMatches,
+  phrases,
   placeActivity,
   positionQuery,
   quotedName,
   samePosition,
+  sizesIn,
   selectNameMatches,
+  userGaveSize,
+  verifyConfirmToken,
   withoutSize,
+  type ChatLocale,
   type Suggestion,
 } from '@schuco/ai-quote-agent'
 import {
@@ -31,10 +43,13 @@ import {
   QuoteValidationError,
   createQuote,
   getQuote,
+  getQuoteRevisionDetail,
   priceQuoteLines,
   saveQuoteVersion,
+  setQuoteVersionStatusById,
   type QuoteActor,
 } from './quotes-service'
+import { listTextTemplates } from './company-profile-service'
 
 const VAT_RATES = ['22%', '10%', '4%', 'Es.'] as const
 
@@ -83,31 +98,84 @@ const summarizeDocument = (document: QuoteDocument): string => {
 
 const findLines = (document: QuoteDocument, query: string): { family: QuoteFamily; line: QuoteLine }[] => {
   const rows = document.families.flatMap((family) => family.lines.map((line) => ({ family, line })))
-  const byId = rows.filter(({ line }) => line.id === query)
+  const embeddedId = query.match(/\bl-[0-9a-f-]{8,}/i)?.[0]
+  const byId = rows.filter(({ line }) => line.id === query || line.id === embeddedId)
   if (byId.length > 0) return byId
+  const scoped = query.match(/famigl\w*\s+(\d+)\s+pos(?:izione)?\s+(\d+)/i)
+  if (scoped) {
+    const family = document.families[Number(scoped[1]) - 1]
+    const line = family?.lines.find((item) => samePosition(item.code, scoped[2] ?? ''))
+    return family && line ? [{ family, line }] : []
+  }
+  const globalIndex = query.match(/^(?:riga|row|zeile)\s+(\d+)$/i)
+  if (globalIndex) {
+    const hit = rows[Number(globalIndex[1]) - 1]
+    return hit ? [hit] : []
+  }
   if (positionQuery(query)) {
     const byPos = rows.filter(({ line }) => samePosition(line.code, query))
     if (byPos.length > 0) return byPos
   }
-  const named = withoutSize(query)
+  const named = withoutSize(quotedName(query) ?? query)
   if (!named) return []
   return rows.filter(({ line }) => nameMatches(line.name, named) || nameMatches(line.code, named))
 }
 
-const findFamilies = (document: QuoteDocument, query: string): QuoteFamily[] =>
-  document.families.filter((family) => nameMatches(family.name, query) || family.id === query)
+const findFamilies = (document: QuoteDocument, query: string): QuoteFamily[] => {
+  const index = query.match(/famigl\w*\s+(\d+)/i)
+  if (index && !/pos/i.test(query)) {
+    const family = document.families[Number(index[1]) - 1]
+    return family ? [family] : []
+  }
+  return document.families.filter((family) => nameMatches(family.name, query) || family.id === query)
+}
+
+const rowChoices = (tool: string, hits: { family: QuoteFamily; line: QuoteLine }[], extra: Record<string, unknown> = {}): Suggestion[] => {
+  const seen = new Set<string>()
+  return hits.slice(0, 8).flatMap(({ family, line }) => {
+    const message = `${tool} id ${line.id}`
+    if (seen.has(message)) return []
+    seen.add(message)
+    return [
+      {
+        label: `${family.name} · pos ${line.code} · ${line.name}`.slice(0, 90),
+        message,
+        action: { tool, args: { ...extra, lineName: line.id, familyName: family.id } },
+      },
+    ]
+  })
+}
+
+const matrixBounds = (detail: { matrices: { id: string; widths: unknown; heights: unknown }[] }, matrixId?: string | null): string => {
+  const chosen = matrixId ? detail.matrices.filter((matrix) => matrix.id === matrixId) : detail.matrices
+  const parts = chosen
+    .map((matrix) => {
+      const widths = Array.isArray(matrix.widths) ? matrix.widths.filter((item): item is number => typeof item === 'number') : []
+      const heights = Array.isArray(matrix.heights) ? matrix.heights.filter((item): item is number => typeof item === 'number') : []
+      if (!widths.length || !heights.length) return null
+      return `width ${Math.min(...widths)}–${Math.max(...widths)} mm, height ${Math.min(...heights)}–${Math.max(...heights)} mm`
+    })
+    .filter(Boolean)
+  return parts.join('; ') || 'no matrix on this line'
+}
 
 interface ToolResult {
   content: string
   suggestions?: Suggestion[]
+  speak?: string
 }
 
-const reply = (content: string, suggestions?: Suggestion[]): ToolResult => ({ content, suggestions })
+const reply = (content: string, suggestions?: Suggestion[], speak?: string): ToolResult => ({ content, suggestions, speak })
 
 interface ChatState {
   detail: SalesQuoteDetailResponse | null
   loaded: boolean
+  userTexts: string[]
+  locale: ChatLocale
 }
+
+const latestUser = (state: ChatState): string => state.userTexts.at(-1) ?? ''
+const say = (state: ChatState) => phrases[state.locale]
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
@@ -161,7 +229,49 @@ const dispatch = async (
     case 'catalog_summary':
       return catalogSummary(ctx)
     case 'search_catalog':
-      return searchCatalog(ctx, str(args.query) ?? '', args.includeHidden === true)
+      return searchCatalog(ctx, state, str(args.query) ?? '', args.includeHidden === true)
+    case 'get_quote':
+      return getQuoteTool(state)
+    case 'update_header':
+      return updateHeader(ctx, actor, state, args)
+    case 'update_lines':
+      return updateLines(ctx, actor, state, args)
+    case 'set_line_options':
+      return setLineOptions(ctx, actor, state, args)
+    case 'remove_line':
+      return removeLine(ctx, actor, state, args)
+    case 'remove_family':
+      return removeFamily(ctx, actor, state, args)
+    case 'move_family':
+      return moveFamily(ctx, actor, state, str(args.familyName) ?? '', str(args.direction) === 'down' ? 'down' : 'up')
+    case 'update_family_block':
+      return updateFamilyBlock(ctx, actor, state, args)
+    case 'switch_family_version':
+      return switchFamilyVersion(ctx, actor, state, args)
+    case 'edit_text_module':
+      return editTextModule(ctx, actor, state, args)
+    case 'remove_text_module':
+      return removeTextModule(ctx, actor, state, args)
+    case 'insert_text_template':
+      return insertTextTemplate(ctx, actor, state, args)
+    case 'remove_activity':
+      return removeActivity(ctx, actor, state, args)
+    case 'set_payments':
+      return setPayments(ctx, actor, state, args)
+    case 'set_quote_status':
+      return setStatus(ctx, actor, state, args)
+    case 'save_new_version':
+      return saveNewVersion(ctx, actor, state)
+    case 'restore_revision':
+      return restoreRevision(ctx, actor, state, args)
+    case 'update_print_settings':
+      return updatePrintSettings(ctx, actor, state, args)
+    case 'preview_pdf':
+      return previewPdf(state)
+    case 'duplicate_quote':
+      return duplicateQuote(ctx, actor, state, args)
+    case 'cancel_action':
+      return reply(say(state).cancelled, undefined, say(state).cancelled)
     case 'describe_family':
       return describeFamily(ctx, str(args.familyId) ?? '')
     case 'create_quote':
@@ -214,7 +324,11 @@ const catalogSummary = async (ctx: TenantContext): Promise<ToolResult> => {
   )
 }
 
-const searchCatalog = async (ctx: TenantContext, query: string, includeHidden: boolean): Promise<ToolResult> => {
+const searchCatalog = async (ctx: TenantContext, state: ChatState, query: string, includeHidden: boolean): Promise<ToolResult> => {
+  if (state.detail && isEditRequest(latestUser(state))) {
+    const onQuote = findLines(state.detail.version.document, query).length > 0 || findLines(state.detail.version.document, latestUser(state)).length > 0
+    if (onQuote) return reply(say(state).onQuote)
+  }
   const families = await listProductFamilies(ctx, { includeOutOfLibrary: true })
   const queries = expandQuery(query)
   const matchesFamily = (family: (typeof families)[number]) =>
@@ -252,15 +366,14 @@ const searchCatalog = async (ctx: TenantContext, query: string, includeHidden: b
   const familyText = shown.map((family) => familyLine(family)).join('\n')
   const more = visible.length > 8 ? `\n${visible.length - 8} more families not shown. Ask the user to narrow the name.` : ''
   const choice = shown.length > 1 ? '\nSeveral families match. Ask the user which one. Do not add yet.' : shown.length === 1 ? '\nOne family match. You may use this id.' : ''
-  const lineChoices = lineFamilyChoices(lineHits, pool)
+  const typedSize = sizesIn(state.userTexts.join('\n')).at(-1)
+  const lineChoices = lineStepChoices(lineHits, pool, state, typedSize)
+  const addable = shown.filter(isQuotable)
   const suggestions =
-    shown.length > 1
-      ? shown.map((family) => ({
-          label: `v${family.version} · ${family.name} · ${validityLabel(family)}`,
-          message: `Usa la famiglia "${family.name}" versione ${family.version}, id ${family.id}`,
-        }))
-      : lineChoices.length > 1
-        ? lineChoices
+    lineChoices.length > 1
+      ? lineChoices
+      : addable.length > 1
+        ? addable.map((family) => familyChoice(family, state))
         : undefined
   const products = lineText ? `\nProduct lines:\n${lineText}` : ''
   const sameLine =
@@ -268,25 +381,58 @@ const searchCatalog = async (ctx: TenantContext, query: string, includeHidden: b
       ? '\nThis line is in several families. Each choice names the family and its id. Do not add until the user picks one.'
       : ''
   const moreLines = allLineHits.length > 8 ? `\n${allLineHits.length - 8} more product lines not shown.` : ''
-  return reply(`${familyText}${more}${choice}${products}${moreLines}${sameLine}`.trim(), suggestions)
+  const hiddenNote = hiddenCount > 0 ? `\n${hiddenCount} draft or expired match(es) are listed above and are not addable.` : ''
+  const question = lineChoices.length > 1 && lineChoices.some((item) => /profondit/i.test(item.label)) ? say(state).whichDepth : say(state).whichFamily
+  const speak = suggestions && suggestions.length > 1 ? `${question}\n${suggestions.map((item) => item.label).join('\n')}` : undefined
+  return reply(`${familyText}${more}${choice}${products}${moreLines}${sameLine}${hiddenNote}`.trim(), suggestions, speak)
 }
 
-const lineFamilyChoices = (
+const familyChoice = (
+  family: { id: string; name: string; version: number; isPublished: boolean; priceValidFrom: string | null; priceValidTo: string | null },
+  state: ChatState,
+): Suggestion => {
+  const p = say(state)
+  const status = !family.isPublished ? p.draft : priceValidityStatus(family, priceValidityToday()) !== 'current' ? p.expired : validityLabel(family)
+  return {
+    label: `v${family.version} · ${family.name} · ${status}`.slice(0, 90),
+    message: `Usa la famiglia "${family.name}" versione ${family.version}, id ${family.id}`,
+    action: { tool: 'describe_family', args: { familyId: family.id } },
+  }
+}
+
+/** Distinct line names first. The family is the second step, and only for that exact line. */
+const lineStepChoices = (
   hits: { name: string; productFamilyId: string }[],
-  families: { id: string; name: string }[],
+  families: { id: string; name: string; version: number; isPublished: boolean; priceValidFrom: string | null; priceValidTo: string | null; inLibrary: boolean; readyForInvoicing: boolean }[],
+  state: ChatState,
   size?: { widthMm: number; heightMm: number; quantity?: number },
 ): Suggestion[] => {
+  const addableFamilies = new Map(families.filter(isQuotable).map((family) => [family.id, family]))
+  const usable = hits.filter((line) => addableFamilies.has(line.productFamilyId))
+  const names = [...new Set(usable.map((line) => line.name.trim()))]
+  const sizeText = size ? `, ${size.widthMm}×${size.heightMm} mm` : ''
+  const quantity = size?.quantity
+  if (names.length > 1) {
+    return names.slice(0, 8).map((name) => ({
+      label: name,
+      message: `Aggiungi "${name}"${sizeText}`,
+      action: { tool: 'add_product', args: { lineName: name, ...(size ? { widthMm: size.widthMm, heightMm: size.heightMm, quantity } : {}) } },
+    }))
+  }
   const seen = new Set<string>()
   const choices: Suggestion[] = []
-  for (const line of hits) {
+  for (const line of usable) {
     if (seen.has(line.productFamilyId)) continue
     seen.add(line.productFamilyId)
-    const family = families.find((item) => item.id === line.productFamilyId)
+    const family = addableFamilies.get(line.productFamilyId)
     if (!family) continue
-    const sizeText = size ? `, ${size.widthMm}×${size.heightMm} mm, quantità ${size.quantity ?? 1}` : ''
     choices.push({
-      label: `${line.name} · ${family.name}`,
-      message: `Aggiungi "${line.name}" della famiglia "${family.name}", id ${family.id}${sizeText}`,
+      label: `${line.name.trim()} · v${family.version} · ${family.name}`.slice(0, 90),
+      message: `Aggiungi "${line.name.trim()}" della famiglia "${family.name}", id ${family.id}${sizeText}`,
+      action: {
+        tool: 'add_product',
+        args: { lineName: line.name.trim(), familyId: family.id, ...(size ? { widthMm: size.widthMm, heightMm: size.heightMm, quantity } : {}) },
+      },
     })
     if (choices.length === 8) break
   }
@@ -294,6 +440,7 @@ const lineFamilyChoices = (
 }
 
 const describeFamily = async (ctx: TenantContext, familyId: string): Promise<ToolResult> => {
+  if (!isUuid(familyId)) return reply('That is not a catalog family id.')
   const detail = await getProductFamilyDetailWithLibrary(ctx, familyId)
   if (!detail) return reply('Family not found.')
   const lines = detail.lines
@@ -330,6 +477,7 @@ const addTextModule = async (
   state: ChatState,
   args: Record<string, unknown>,
 ): Promise<ToolResult> => {
+  if (isRemoving(latestUser(state))) return reply('The user asked to remove a text module. Call remove_text_module.')
   const text = typeof args.text === 'string' ? args.text.trim() : ''
   if (text.length > 10_000) return reply('That text is too long.')
   const place = str(args.place) === 'closing' ? 'closing' : 'intro'
@@ -353,6 +501,7 @@ const addActivity = async (
   state: ChatState,
   args: Record<string, unknown>,
 ): Promise<ToolResult> => {
+  if (isRemoving(latestUser(state))) return reply('The user asked to remove an activity. Call remove_activity. Do not move it to Not included.')
   const description = str(args.description)
   if (!description) return reply('Activity description is required.')
   if (description.length > 500) return reply('Activity description is too long (500 characters).')
@@ -381,15 +530,29 @@ const requireQuote = (state: ChatState): SalesQuoteDetailResponse => {
   return state.detail
 }
 
-const persist = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, document: QuoteDocument): Promise<ToolResult> => {
+const persist = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  state: ChatState,
+  document: QuoteDocument,
+  mode?: 'update' | 'newVersion',
+): Promise<ToolResult> => {
   const current = requireQuote(state)
   const saved = await saveQuoteVersion(ctx, actor, current.quote.id, current.version.id, {
     document,
-    mode: current.version.status === 'draft' ? 'update' : 'newVersion',
+    mode: mode ?? (current.version.status === 'draft' ? 'update' : 'newVersion'),
     baseRevision: current.version.revision,
   })
   state.detail = saved
   return reply(summarizeDocument(saved.version.document))
+}
+
+const changedSpeak = (state: ChatState, verb: string, lines: QuoteLine[]): string => {
+  const total = state.detail ? quoteTotal(state.detail.version.document) : 0
+  const rows = lines
+    .map((line) => `${line.name} ${line.widthMm ?? '—'}×${line.heightMm ?? '—'} qty ${line.quantity} €/pc ${line.unitPrice} VAT ${line.vatRate}`)
+    .join('; ')
+  return `${verb}${rows ? `: ${rows}` : ''}. ${say(state).total} ${total.toFixed(2)}`
 }
 
 const createDraft = async (
@@ -398,6 +561,10 @@ const createDraft = async (
   state: ChatState,
   args: Record<string, unknown>,
 ): Promise<ToolResult> => {
+  if (state.detail && !isNewQuoteRequest(latestUser(state))) {
+    const text = `${say(state).onQuote} Use update_header for the customer, address, date, or notes.`
+    return reply(text, undefined, text)
+  }
   const customerName = str(args.customerName)
   if (!customerName) return reply('Customer name is required.')
   const created = await createQuote(ctx, actor, {
@@ -416,23 +583,35 @@ const addProduct = async (
 ): Promise<ToolResult> => {
   const current = requireQuote(state)
   let familyId = str(args.familyId)
-  const lineName = str(args.lineName)
+  const requestedName = str(args.lineName)
   const widthMm = num(args.widthMm)
   const heightMm = num(args.heightMm)
-  if (!lineName) return reply('lineName is required.')
-  if (!widthMm || !heightMm) return reply('Width and height in millimetres are required before adding a catalog row.')
+  if (!requestedName) return reply('lineName is required.')
+  if (!widthMm || !heightMm) return reply(say(state).needSize, undefined, say(state).needSize)
+  if (!userGaveSize(state.userTexts, widthMm, heightMm)) return reply(say(state).needSize, undefined, say(state).needSize)
+  const saidName = state.userTexts.some((text) => foldName(text).includes(foldName(requestedName)))
+  const lineName = saidName ? requestedName : catalogQuery(latestUser(state)) || requestedName
+  if (familyId && !mentionedId(state.userTexts, familyId)) familyId = undefined
+  if (familyId && !isUuid(familyId)) {
+    const block = current.version.document.families.find((item) => item.id === familyId)
+    familyId = block?.productFamilyId ?? undefined
+  }
+  if (familyId && !isUuid(familyId)) return reply('That is not a catalog family id.')
+  const families = (await listProductFamilies(ctx, { includeOutOfLibrary: true })).filter(isQuotable)
+  const lines = await listLinesForFamilies(ctx, families.map((family) => family.id))
+  const hits = selectNameMatches(lines, (line) => line.name, lineName)
+  const names = [...new Set(hits.map((line) => line.name.trim()))]
+  if (!familyId && names.length !== 1) {
+    const choices = lineStepChoices(hits, families, state, { widthMm, heightMm, quantity: num(args.quantity) })
+    if (choices.length === 0) return reply(`No current line matches "${lineName}".`)
+    const question = names.some((name) => /profondit/i.test(name)) ? say(state).whichDepth : names.length > 1 ? say(state).which : say(state).whichFamily
+    return reply(`${question}\n${choices.map((choice) => choice.label).join('\n')}`, choices, `${question}\n${choices.map((choice) => choice.label).join('\n')}`)
+  }
   if (!familyId) {
-    const families = (await listProductFamilies(ctx, { includeOutOfLibrary: true })).filter(isQuotable)
-    const lines = await listLinesForFamilies(ctx, families.map((family) => family.id))
-    const hits = selectNameMatches(lines, (line) => line.name, lineName)
     const familyIds = [...new Set(hits.map((line) => line.productFamilyId))]
-    if (familyIds.length === 0) return reply(`No current line matches "${lineName}".`)
-    if (familyIds.length > 1) {
-      const choices = lineFamilyChoices(hits, families, { widthMm, heightMm, quantity: num(args.quantity) })
-      return reply(
-        `Several families contain "${lineName}". Ask which family. Do not add yet.\n${choices.map((choice) => `- ${choice.label}`).join('\n')}`,
-        choices,
-      )
+    if (familyIds.length !== 1) {
+      const choices = lineStepChoices(hits, families, state, { widthMm, heightMm, quantity: num(args.quantity) })
+      return reply(`${say(state).whichFamily}\n${choices.map((choice) => choice.label).join('\n')}`, choices, `${say(state).whichFamily}\n${choices.map((choice) => choice.label).join('\n')}`)
     }
     familyId = familyIds[0]
   }
@@ -446,10 +625,13 @@ const addProduct = async (
   const lineHits = selectNameMatches(detail.lines, (line) => line.name, lineName)
   if (lineHits.length === 0) return reply(`No line named "${lineName}" in ${detail.family.name}. Lines: ${detail.lines.map((line) => line.name).join(' | ')}`)
   if (lineHits.length > 1) {
-    return reply(
-      `Several lines match "${lineName}". Ask the user which full name:\n${lineHits.map((line) => `- ${line.name}`).join('\n')}`,
-      lineHits.map((line) => ({ label: line.name, message: `Aggiungi "${line.name}", ${widthMm}×${heightMm} mm` })),
-    )
+    const choices = lineHits.slice(0, 8).map((line) => ({
+      label: line.name.trim(),
+      message: `Aggiungi "${line.name.trim()}", ${widthMm}×${heightMm} mm`,
+      action: { tool: 'add_product', args: { familyId, lineName: line.name.trim(), widthMm, heightMm, quantity: num(args.quantity) } },
+    }))
+    const question = lineHits.some((line) => /profondit/i.test(line.name)) ? say(state).whichDepth : say(state).which
+    return reply(`${question}\n${choices.map((choice) => choice.label).join('\n')}`, choices, `${question}\n${choices.map((choice) => choice.label).join('\n')}`)
   }
   const catalogLine = lineHits[0]!
   const quantity = Math.max(1, Math.round(num(args.quantity) ?? 1))
@@ -493,9 +675,14 @@ const addProduct = async (
   })
   const price = priced.find((item) => item.key === row.id)
   if (price && price.ok) row.unitPrice = price.unitPrice
-  if (price && !price.ok) return reply(`Could not price ${catalogLine.name} at ${widthMm}×${heightMm} mm: ${price.error}`)
+  if (price && !price.ok) {
+    const bounds = matrixBounds(detail, catalogLine.pricingMatrixId)
+    const text = `Could not price ${catalogLine.name} at ${widthMm}×${heightMm} mm: ${price.error}. Bounds: ${bounds}`
+    return reply(text, undefined, text)
+  }
   const saved = await persist(ctx, actor, state, document)
-  return reply(`Added a new row.\n${saved.content}`)
+  const text = changedSpeak(state, say(state).added, [row])
+  return reply(`${text}\n${saved.content}`, undefined, `${text} · ${detail.family.name}`)
 }
 
 const duplicateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, query: string): Promise<ToolResult> => {
@@ -504,10 +691,8 @@ const duplicateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatS
   const hits = findLines(document, query)
   if (hits.length === 0) return reply(`No row matches "${query}".`)
   if (hits.length > 1) {
-    return reply(
-      `Several rows match. Ask which one:\n${hits.map(({ line }) => `- ${line.code} ${line.name}`).join('\n')}`,
-      hits.map(({ line }) => ({ label: `${line.code} ${line.name}`, message: `Duplica la riga ${line.code} ${line.name}` })),
-    )
+    const choices = rowChoices('duplicate_line', hits)
+    return reply(`${say(state).whichRow}\n${choices.map((choice) => choice.label).join('\n')}`, choices, `${say(state).whichRow}\n${choices.map((choice) => choice.label).join('\n')}`)
   }
   const { family, line } = hits[0]!
   family.lines.push({ ...structuredClone(line), id: localId('l'), code: nextCode(family) })
@@ -546,7 +731,11 @@ const moveLine = async (
   const current = requireQuote(state)
   const document = structuredClone(current.version.document)
   const hits = findLines(document, query)
-  if (hits.length !== 1) return reply(hits.length === 0 ? `No row matches "${query}".` : `Several rows match "${query}". Ask which one.`)
+  if (hits.length !== 1) {
+    if (hits.length === 0) return reply(`No row matches "${query}".`)
+    const choices = rowChoices('move_line', hits, { direction })
+    return reply(`${say(state).whichRow}\n${choices.map((choice) => choice.label).join('\n')}`, choices, `${say(state).whichRow}\n${choices.map((choice) => choice.label).join('\n')}`)
+  }
   const { family, line } = hits[0]!
   const index = family.lines.findIndex((item) => item.id === line.id)
   const next = index + (direction === 'up' ? -1 : 1)
@@ -558,15 +747,38 @@ const moveLine = async (
   return reply(`Moved ${line.name} ${direction}. Order is now ${order}.\n${saved.content}`)
 }
 
+const withoutToken = (args: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(args).filter(([key]) => key !== 'confirmToken'))
+
+/** Returns the confirm chips when the token is missing or wrong. Returns null when the action may proceed. */
+const confirmOrAsk = (state: ChatState, tool: string, args: Record<string, unknown>, summary: string): ToolResult | null => {
+  const current = requireQuote(state)
+  const secret = process.env.AUTH_SECRET ?? ''
+  const claims = { quoteId: current.quote.id, revision: current.version.revision, tool, args: withoutToken(args) }
+  const token = str(args.confirmToken)
+  if (token && secret && verifyConfirmToken(secret, token, claims).ok) return null
+  if (!secret) return reply('Confirmation is not configured.')
+  const issued = issueConfirmToken(secret, claims)
+  const p = say(state)
+  const choices: Suggestion[] = [
+    { label: p.confirm, message: p.confirm, action: { tool, args: { ...withoutToken(args), confirmToken: issued } } },
+    { label: p.cancel, message: p.cancel, action: { tool: 'cancel_action', args: {} } },
+  ]
+  return reply(`${summary}\n${p.confirmAsk}`, choices, `${summary}\n${p.confirmAsk}`)
+}
+
 const updateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
   const current = requireQuote(state)
   const query = str(args.lineName) ?? ''
   const document = structuredClone(current.version.document)
   const hits = findLines(document, query)
   if (hits.length !== 1) {
-    return reply(hits.length === 0 ? `No row matches "${query}".` : `Several rows match. Ask which one:\n${hits.map(({ line }) => `- ${line.code} ${line.name}`).join('\n')}`)
+    if (hits.length === 0) return reply(`No row matches "${query}".`)
+    const choices = rowChoices('update_line', hits, withoutToken(args))
+    return reply(`${say(state).whichRow}\n${choices.map((choice) => choice.label).join('\n')}`, choices, `${say(state).whichRow}\n${choices.map((choice) => choice.label).join('\n')}`)
   }
   const { line } = hits[0]!
+  const before = JSON.stringify(line)
   const width = num(args.widthMm)
   const height = num(args.heightMm)
   if (width) line.widthMm = width
@@ -576,6 +788,16 @@ const updateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatStat
   const quantity = num(args.quantity)
   const hours = num(args.installationHours)
   const unitPrice = num(args.unitPrice)
+  const nextName = str(args.name)
+  if (nextName) line.name = nextName.slice(0, 300)
+  if (typeof args.isAlternative === 'boolean') line.isAlternative = args.isAlternative
+  if (typeof args.locked === 'boolean') line.locked = args.locked
+  if (unitPrice !== undefined && unitPrice <= 0) return reply('A manual €/pc must be greater than zero.')
+  const discountStated = discount === undefined || state.userTexts.some((text) => new RegExp(`\\b${discount}\\b`).test(text))
+  if ((unitPrice !== undefined && unitPrice > 0) || !discountStated) {
+    const pending = confirmOrAsk(state, 'update_line', { ...args, lineName: line.id }, `${say(state).confirmAsk} ${line.name}`)
+    if (pending) return pending
+  }
   if (extra !== undefined) line.extraMarkupPct = extra
   if (discount !== undefined) line.discountPct = Math.min(100, Math.max(0, discount))
   if (quantity !== undefined) {
@@ -589,7 +811,7 @@ const updateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatStat
     if (!VAT_RATES.includes(vat as VatRate)) return reply(`VAT must be one of ${VAT_RATES.join(', ')}.`)
     line.vatRate = vat as VatRate
   }
-  if (unitPrice !== undefined) {
+  if (unitPrice !== undefined && unitPrice > 0) {
     line.priceMode = 'manual'
     line.unitPrice = unitPrice
   } else if (line.priceMode === 'catalog' && line.productLineId && (width || height)) {
@@ -612,11 +834,425 @@ const updateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatStat
       if (price && price.ok) line.unitPrice = price.unitPrice
     }
   }
+  if (JSON.stringify(line) === before) return reply(say(state).nothing, undefined, say(state).nothing)
   const manualNote = unitPrice !== undefined ? 'This row is now a manual €/pc and will not follow the catalog. ' : ''
   const saved = await persist(ctx, actor, state, document)
-  return reply(`${manualNote}Updated ${line.name}.\n${saved.content}`)
+  const text = `${manualNote}${changedSpeak(state, say(state).updated, [line])}`
+  return reply(`${text}\n${saved.content}`, undefined, text)
+}
+
+const getQuoteTool = (state: ChatState): ToolResult => {
+  const current = requireQuote(state)
+  const document = current.version.document
+  const payments = document.closing
+    .filter((block) => block.type === 'payments')
+    .flatMap((block) => (block.type === 'payments' ? block.rows : []))
+    .map((row) => `${row.description} ${row.pct}%`)
+    .join(', ')
+  const text = `Quote ${current.quote.reference} for ${document.header.customerName}. Status ${current.version.status}. Date ${document.header.quoteDate}. Site ${document.header.projectLocation ?? '—'}. Notes ${document.header.notes || '—'}. Payments ${payments || '—'}.\n${summarizeDocument(document)}`
+  return reply(text, undefined, text)
+}
+
+const updateHeader = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const before = JSON.stringify(document.header)
+  const customerName = str(args.customerName)
+  const fiscal = str(args.customerFiscalCode)
+  const address = str(args.customerAddress)
+  const city = str(args.customerCity)
+  const site = str(args.projectLocation)
+  const notes = typeof args.notes === 'string' ? args.notes : undefined
+  const date = str(args.quoteDate)
+  if (customerName) document.header.customerName = customerName.slice(0, 300)
+  if (fiscal) document.header.customerFiscalCode = fiscal.slice(0, 100)
+  if (address) document.header.customerAddress = address.slice(0, 500)
+  if (city) document.header.customerCity = city.slice(0, 200)
+  if (site) document.header.projectLocation = site.slice(0, 500)
+  if (notes !== undefined) document.header.notes = notes.slice(0, 5000)
+  if (date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return reply('quoteDate must be an ISO date, for example 2026-12-01.')
+    document.header.quoteDate = date
+  }
+  if (JSON.stringify(document.header) === before) return reply(say(state).nothing, undefined, say(state).nothing)
+  const saved = await persist(ctx, actor, state, document)
+  const text = `${document.header.customerName}, ${document.header.projectLocation ?? '—'}, ${document.header.quoteDate}. ${say(state).total} ${quoteTotal(saved ? state.detail!.version.document : document).toFixed(2)}`
+  return reply(`${text}\n${saved.content}`, undefined, text)
+}
+
+const scopedLines = (document: QuoteDocument, scope: string): { family: QuoteFamily; line: QuoteLine }[] => {
+  const rows = document.families.flatMap((family) => family.lines.map((line) => ({ family, line })))
+  if (scope === 'all' || scope === 'tutte' || scope === 'tutti') return rows
+  const ids = scope.split(/[,\s]+/).filter((item) => item.startsWith('l-'))
+  if (ids.length > 0) return rows.filter(({ line }) => ids.includes(line.id))
+  const families = findFamilies(document, scope)
+  if (families.length > 0) return families.flatMap((family) => family.lines.map((line) => ({ family, line })))
+  return findLines(document, scope)
+}
+
+const updateLines = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const hits = scopedLines(document, str(args.scope) ?? 'all')
+  if (hits.length === 0) return reply('No rows match that scope.')
+  const discount = num(args.discountPct)
+  const stated = discount === undefined || state.userTexts.some((text) => new RegExp(`\\b${discount}\\b`).test(text))
+  if (hits.length > 1 || !stated) {
+    const pending = confirmOrAsk(state, 'update_lines', args, `${hits.length} rows`)
+    if (pending) return pending
+  }
+  const vat = str(args.vatRate)
+  if (vat && !VAT_RATES.includes(vat as VatRate)) return reply(`VAT must be one of ${VAT_RATES.join(', ')}.`)
+  const extra = num(args.extraPct)
+  const hours = num(args.installationHours)
+  for (const { line } of hits) {
+    if (vat) line.vatRate = vat as VatRate
+    if (extra !== undefined) line.extraMarkupPct = extra
+    if (discount !== undefined) line.discountPct = Math.min(100, Math.max(0, discount))
+    if (hours !== undefined) line.installationHours = hours
+  }
+  const saved = await persist(ctx, actor, state, document)
+  const text = changedSpeak(state, say(state).updated, hits.map(({ line }) => line))
+  return reply(`${text}\n${saved.content}`, undefined, text)
+}
+
+const setLineOptions = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const hits = findLines(document, str(args.lineName) ?? latestUser(state))
+  if (hits.length !== 1) {
+    const choices = rowChoices('set_line_options', hits, withoutToken(args))
+    if (hits.length === 0) return reply('No row matches.')
+    return reply(`${say(state).whichRow}`, choices, say(state).whichRow)
+  }
+  const { family, line } = hits[0]!
+  if (!family.productFamilyId || !line.productLineId) return reply('That row is not from the catalog.')
+  const detail = await getProductFamilyDetailWithLibrary(ctx, family.productFamilyId)
+  if (!detail) return reply('Family not found.')
+  const requested = Array.isArray(args.options) ? args.options : []
+  for (const item of requested) {
+    const record = asRecord(item)
+    const groupName = str(record.group) ?? ''
+    const optionName = str(record.option) ?? ''
+    const groups = detail.characteristics.filter((entry) => !entry.parentId && nameMatches(entry.name, groupName))
+    if (groups.length !== 1) return reply(groups.length === 0 ? `No option group matches "${groupName}".` : `Several groups match "${groupName}".`)
+    const group = groups[0]!
+    const options = detail.characteristics.filter((entry) => entry.parentId === group.id && nameMatches(entry.name, optionName))
+    if (options.length !== 1) return reply(options.length === 0 ? `No option matches "${optionName}".` : `Several options match "${optionName}".`)
+    const option = options[0]!
+    line.options = line.options.filter((currentOption) => currentOption.characteristicId !== group.id)
+    line.options.push({ characteristicId: group.id, subCharacteristicId: option.id, name: group.name, value: option.name })
+  }
+  const saved = await persist(ctx, actor, state, document)
+  const text = changedSpeak(state, say(state).updated, [line])
+  return reply(`${text}\n${saved.content}`, undefined, text)
+}
+
+const removeLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const hits = findLines(document, str(args.lineName) ?? latestUser(state))
+  if (hits.length !== 1) {
+    if (hits.length === 0) return reply('No row matches.')
+    const choices = rowChoices('remove_line', hits)
+    return reply(say(state).whichRow, choices, say(state).whichRow)
+  }
+  const { family, line } = hits[0]!
+  const pending = confirmOrAsk(state, 'remove_line', { lineName: line.id }, `Remove ${line.name}`)
+  if (pending) return pending
+  family.lines = family.lines.filter((item) => item.id !== line.id)
+  const saved = await persist(ctx, actor, state, document)
+  const text = `${say(state).updated}: ${line.name} removed. ${say(state).total} ${quoteTotal(state.detail!.version.document).toFixed(2)}`
+  return reply(`${text}\n${saved.content}`, undefined, text)
+}
+
+const familyChoices = (tool: string, hits: QuoteFamily[], extra: Record<string, unknown> = {}): Suggestion[] =>
+  hits.slice(0, 8).map((family) => ({
+    label: family.name.slice(0, 90),
+    message: `${tool} id ${family.id}`,
+    action: { tool, args: { ...extra, familyName: family.id } },
+  }))
+
+const removeFamily = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const hits = findFamilies(document, str(args.familyName) ?? latestUser(state))
+  if (hits.length !== 1) {
+    if (hits.length === 0) return reply('No family on the quote matches.')
+    const choices = familyChoices('remove_family', hits)
+    return reply(say(state).whichFamily, choices, say(state).whichFamily)
+  }
+  const family = hits[0]!
+  const pending = confirmOrAsk(state, 'remove_family', { familyName: family.id }, `Remove ${family.name}`)
+  if (pending) return pending
+  document.families = document.families.filter((item) => item.id !== family.id)
+  const saved = await persist(ctx, actor, state, document)
+  const text = `${family.name} removed. ${say(state).total} ${quoteTotal(state.detail!.version.document).toFixed(2)}`
+  return reply(`${text}\n${saved.content}`, undefined, text)
+}
+
+const moveFamily = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, query: string, direction: 'up' | 'down'): Promise<ToolResult> => {
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const hits = findFamilies(document, query)
+  if (hits.length !== 1) {
+    if (hits.length === 0) return reply('No family on the quote matches.')
+    const choices = familyChoices('move_family', hits, { direction })
+    return reply(say(state).whichFamily, choices, say(state).whichFamily)
+  }
+  const index = document.families.findIndex((item) => item.id === hits[0]!.id)
+  const next = index + (direction === 'up' ? -1 : 1)
+  if (next < 0 || next >= document.families.length) return reply(`That family is already at the ${direction === 'up' ? 'top' : 'bottom'}.`)
+  const [moved] = document.families.splice(index, 1)
+  document.families.splice(next, 0, moved!)
+  const saved = await persist(ctx, actor, state, document)
+  const text = document.families.map((item, place) => `${place + 1}. ${item.name}`).join(', ')
+  return reply(text, undefined, text)
+}
+
+const updateFamilyBlock = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const hits = findFamilies(document, str(args.familyName) ?? '')
+  if (hits.length !== 1) {
+    if (hits.length === 0) return reply('No family on the quote matches.')
+    const choices = familyChoices('update_family_block', hits, withoutToken(args))
+    return reply(say(state).whichFamily, choices, say(state).whichFamily)
+  }
+  const family = hits[0]!
+  const before = JSON.stringify(family)
+  const name = str(args.name)
+  const description = typeof args.description === 'string' ? args.description : undefined
+  const notes = typeof args.notes === 'string' ? args.notes : undefined
+  if (name) family.name = name.slice(0, 300)
+  if (description !== undefined) family.description = description.slice(0, 10_000)
+  if (notes !== undefined) family.notes = notes.slice(0, 10_000)
+  if (typeof args.isAlternative === 'boolean') family.isAlternative = args.isAlternative
+  if (JSON.stringify(family) === before) return reply(say(state).nothing, undefined, say(state).nothing)
+  const saved = await persist(ctx, actor, state, document)
+  return reply(`${family.name}\n${saved.content}`, undefined, family.name)
+}
+
+const switchFamilyVersion = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const hits = findFamilies(document, str(args.familyName) ?? latestUser(state))
+  if (hits.length !== 1) {
+    if (hits.length === 0) return reply('No family on the quote matches.')
+    const choices = familyChoices('switch_family_version', hits)
+    return reply(say(state).whichFamily, choices, say(state).whichFamily)
+  }
+  const family = hits[0]!
+  const status = current.familyStatus.find((item) => item.productFamilyId === family.productFamilyId)
+  if (!status || status.status === 'current' || !status.replacement) {
+    const text = status ? `${family.name} is ${status.status}. No replacement to switch to.` : `${family.name} has no catalog status.`
+    return reply(text, undefined, text)
+  }
+  const pending = confirmOrAsk(state, 'switch_family_version', { familyName: family.id }, `Switch ${family.name} to ${status.replacement.name} v${status.replacement.version}`)
+  if (pending) return pending
+  family.productFamilyId = status.replacement.id
+  family.name = status.replacement.name
+  const saved = await persist(ctx, actor, state, document)
+  return reply(`${family.name}\n${saved.content}`, undefined, family.name)
+}
+
+const editTextModule = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const text = typeof args.text === 'string' ? args.text.trim() : ''
+  const place = str(args.place) === 'closing' ? 'closing' : 'intro'
+  const index = Math.max(1, Math.round(num(args.index) ?? 1)) - 1
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  if (place === 'intro') {
+    const module = document.intro[index]
+    if (!module) return reply('No text module at that position.')
+    module.html = paragraphHtml(text)
+  } else {
+    const module = document.closing.filter((block) => block.type === 'text')[index]
+    if (!module) return reply('No text module at that position.')
+    module.html = paragraphHtml(text)
+  }
+  const saved = await persist(ctx, actor, state, document)
+  return reply(`Updated the text module.\n${saved.content}`, undefined, text)
+}
+
+const removeTextModule = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const place = str(args.place) === 'closing' ? 'closing' : 'intro'
+  const index = Math.max(1, Math.round(num(args.index) ?? 1))
+  const pending = confirmOrAsk(state, 'remove_text_module', { place, index }, `Remove ${place} module ${index}`)
+  if (pending) return pending
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  if (place === 'intro') document.intro.splice(index - 1, 1)
+  else {
+    const blocks = document.closing.filter((block) => block.type === 'text')
+    const target = blocks[index - 1]
+    if (!target) return reply('No closing text module at that position.')
+    document.closing = document.closing.filter((block) => block.id !== target.id)
+  }
+  const saved = await persist(ctx, actor, state, document)
+  return reply(`Removed the text module.\n${saved.content}`, undefined, say(state).updated)
+}
+
+const insertTextTemplate = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const name = str(args.templateName)
+  if (!name) return reply('templateName is required.')
+  const templates = await listTextTemplates(ctx)
+  const hits = selectNameMatches(templates, (template) => template.name, name)
+  if (hits.length === 0) return reply(`No saved text matches "${name}".`)
+  if (hits.length > 1) {
+    const choices = hits.slice(0, 8).map((template) => ({
+      label: template.name,
+      message: `Inserisci il testo salvato "${template.name}"`,
+      action: { tool: 'insert_text_template', args: { templateName: template.name, place: str(args.place) } },
+    }))
+    return reply(say(state).which, choices, say(state).which)
+  }
+  const place = str(args.place) === 'closing' ? 'closing' : 'intro'
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  if (place === 'closing') document.closing.push({ id: localId('c'), type: 'text', html: hits[0]!.html })
+  else document.intro.push({ id: localId('m'), html: hits[0]!.html })
+  const saved = await persist(ctx, actor, state, document)
+  return reply(`Inserted the saved text "${hits[0]!.name}".\n${saved.content}`, undefined, hits[0]!.name)
+}
+
+const activityRows = (document: QuoteDocument) => {
+  const block = document.closing.find((item) => item.type === 'activities')
+  return block?.type === 'activities' ? block.rows : []
+}
+
+const removeActivity = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const description = str(args.description) ?? latestUser(state)
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const rows = activityRows(document)
+  const hits = rows.filter((row) => nameMatches(row.description, description))
+  if (hits.length !== 1) return reply(hits.length === 0 ? 'No activity matches.' : 'Several activities match. Name one of them.')
+  const pending = confirmOrAsk(state, 'remove_activity', { description: hits[0]!.description }, `Remove ${hits[0]!.description}`)
+  if (pending) return pending
+  const block = document.closing.find((item) => item.type === 'activities')
+  if (block?.type === 'activities') block.rows = block.rows.filter((row) => row.id !== hits[0]!.id)
+  const saved = await persist(ctx, actor, state, document)
+  return reply(`Removed activity "${hits[0]!.description}".\n${saved.content}`, undefined, hits[0]!.description)
+}
+
+const setPayments = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const requested = Array.isArray(args.rows) ? args.rows : []
+  const rows = requested.flatMap((item) => {
+    const record = asRecord(item)
+    const description = str(record.description)
+    const pct = num(record.pct)
+    if (!description || pct === undefined) return []
+    return [{ id: localId('pag'), description: description.slice(0, 500), pct }]
+  })
+  const sum = rows.reduce((total, row) => total + row.pct, 0)
+  if (Math.abs(sum - 100) > 0.01) return reply(`Payment percentages must sum to 100. They sum to ${sum}.`)
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const block = document.closing.find((item) => item.type === 'payments')
+  if (block?.type === 'payments') block.rows = rows
+  else document.closing.push({ id: localId('c'), type: 'payments', rows })
+  const saved = await persist(ctx, actor, state, document)
+  const text = rows.map((row) => `${row.description} ${row.pct}%`).join(', ')
+  return reply(`${text}\n${saved.content}`, undefined, text)
+}
+
+const setStatus = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const status = str(args.status)
+  if (status !== 'draft' && status !== 'sent' && status !== 'accepted' && status !== 'rejected') return reply('Status must be draft, sent, accepted, or rejected.')
+  const current = requireQuote(state)
+  const pending = confirmOrAsk(state, 'set_quote_status', { status }, `Mark the quote ${status}`)
+  if (pending) return pending
+  const saved = await setQuoteVersionStatusById(ctx, actor, current.quote.id, current.version.id, status)
+  state.detail = saved
+  const text = `${saved.quote.reference} is ${saved.version.status}.`
+  return reply(text, undefined, text)
+}
+
+const saveNewVersion = async (ctx: TenantContext, actor: QuoteActor, state: ChatState): Promise<ToolResult> => {
+  const current = requireQuote(state)
+  const saved = await persist(ctx, actor, state, structuredClone(current.version.document), 'newVersion')
+  const text = `New version ${state.detail?.version.version}.`
+  return reply(`${text}\n${saved.content}`, undefined, text)
+}
+
+const restoreRevision = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const revisionNumber = num(args.revisionNumber)
+  if (!revisionNumber) return reply('revisionNumber is required.')
+  const current = requireQuote(state)
+  const pending = confirmOrAsk(state, 'restore_revision', { revisionNumber }, `Restore revision ${revisionNumber}`)
+  if (pending) return pending
+  const revision = await getQuoteRevisionDetail(ctx, current.quote.id, current.version.id, revisionNumber)
+  if (!revision) return reply('That revision was not found.')
+  const saved = await persist(ctx, actor, state, revision.document)
+  return reply(`Restored revision ${revisionNumber}.\n${saved.content}`, undefined, `Restored revision ${revisionNumber}.`)
+}
+
+const PRINT_FLAGS = [
+  'showDiscount',
+  'showExtraMarkup',
+  'showTotal',
+  'showPayments',
+  'showActivities',
+  'showImages',
+  'showFamilyDescription',
+  'showLineCharacteristics',
+  'showFamilySummary',
+  'showCategorySummary',
+  'showSalesContact',
+] as const
+
+const updatePrintSettings = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  let changed = false
+  for (const flag of PRINT_FLAGS) {
+    if (typeof args[flag] === 'boolean') {
+      document.printSettings[flag] = args[flag]
+      changed = true
+    }
+  }
+  if (!changed) return reply(say(state).nothing, undefined, say(state).nothing)
+  const saved = await persist(ctx, actor, state, document)
+  return reply(`Print settings updated.\n${saved.content}`, undefined, 'Print settings updated.')
+}
+
+const previewPdf = (state: ChatState): ToolResult => {
+  const current = requireQuote(state)
+  const link = `/print/quotes/${current.quote.id}?version=${current.version.version}`
+  return reply(link, undefined, link)
+}
+
+const duplicateQuote = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const customerName = str(args.customerName)
+  if (!customerName) return reply('Customer name is required.')
+  const source = requireQuote(state)
+  const created = await createQuote(ctx, actor, {
+    reference: customerName.slice(0, 100),
+    header: { ...source.version.document.header, customerName },
+  })
+  state.detail = created
+  const document = structuredClone(source.version.document)
+  document.header = { ...document.header, customerName }
+  const saved = await persist(ctx, actor, state, document)
+  const text = `Copied the quote for ${customerName}. id ${state.detail?.quote.id}.`
+  return reply(`${text}\n${saved.content}`, undefined, text)
 }
 
 export const quoteIdOf = (state: ChatState): string | null => state.detail?.quote.id ?? null
 
-export const createChatState = (): ChatState => ({ detail: null, loaded: false })
+export const createChatState = (input?: { userTexts?: string[]; locale?: ChatLocale }): ChatState => ({
+  detail: null,
+  loaded: false,
+  userTexts: input?.userTexts ?? [],
+  locale: input?.locale ?? 'it',
+})
+
+/** System context for one turn: the reply language and the open quote, so an edit is not a catalog search. */
+export const quotePreamble = async (ctx: TenantContext, quoteId: string | undefined, locale: ChatLocale): Promise<string> => {
+  const language = `Reply in ${locale === 'it' ? 'Italian' : locale === 'de' ? 'German' : 'English'}.`
+  if (!quoteId) return language
+  const loaded = await getQuote(ctx, quoteId)
+  if (!loaded) return language
+  return `${language}\nOpen quote:\n${summarizeDocument(loaded.version.document)}`
+}
