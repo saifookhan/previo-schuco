@@ -255,4 +255,32 @@ describe('runQuoteAgent', () => {
     expect(events.some((event) => event.type === 'status' && event.tool === 'add_product')).toBe(true)
     expect(events.filter((event) => event.type === 'text').map((event) => (event.type === 'text' ? event.delta : '')).join('')).toContain('riga')
   })
+
+  it('adds the picked line instead of asking which one again', async () => {
+    const executed: string[] = []
+    const turns: ModelTurn[] = [
+      { content: 'Which Confezione 30 Filtri Flow F7/G4 COMPACT?', toolCalls: [] },
+      {
+        content: null,
+        toolCalls: [
+          {
+            id: 'call-1',
+            name: 'add_product',
+            arguments: '{"lineName":"Confezione 30 Filtri Flow F7/G4 COMPACT","widthMm":2000,"heightMm":2000}',
+          },
+        ],
+      },
+      { content: 'Ho aggiunto Confezione 30.', toolCalls: [] },
+    ]
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'Aggiungi "Confezione 30 Filtri Flow F7/G4 COMPACT "' }],
+      complete: async () => turns.shift()!,
+      execute: async (name) => {
+        executed.push(name)
+        return { content: 'added' }
+      },
+      emit: () => {},
+    })
+    expect(executed).toEqual(['add_product'])
+  })
 })

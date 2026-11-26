@@ -34,6 +34,9 @@ const nudgeFor = (text: string, latestUser: string, called: ReadonlySet<string>)
   if (FAMILY_ID.test(latestUser) && /\b(aggiung\w*|della famiglia)\b/i.test(latestUser) && !called.has('add_product')) {
     return 'The user chose one family. Call add_product now with that familyId and the line name. Use the width, height, and quantity already given. Do not search again.'
   }
+  if (/\b(aggiung\w*|add)\s+["“]/i.test(latestUser) && !called.has('add_product')) {
+    return 'The user picked one product line. Call add_product with that exact line name and the width and height from the conversation. Do not call search_catalog and do not ask the same question again.'
+  }
   if (
     /\b(qty|q\.?ty|quantit|pezzi|stück|stueck|anzahl)\b/i.test(latestUser) &&
     /\d/.test(latestUser) &&

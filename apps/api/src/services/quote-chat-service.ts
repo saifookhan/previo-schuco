@@ -1,4 +1,15 @@
-import { expandQuery, foldName, nameMatches, placeActivity, positionQuery, samePosition, withoutSize, type Suggestion } from '@schuco/ai-quote-agent'
+import {
+  expandQuery,
+  foldName,
+  nameMatches,
+  placeActivity,
+  positionQuery,
+  quotedName,
+  samePosition,
+  selectNameMatches,
+  withoutSize,
+  type Suggestion,
+} from '@schuco/ai-quote-agent'
 import {
   lineNetUnitPrice,
   lineTotal,
@@ -211,11 +222,15 @@ const searchCatalog = async (ctx: TenantContext, query: string, includeHidden: b
   const hits = families.filter(matchesFamily)
   const visible = includeHidden ? hits : hits.filter(isQuotable)
   const hiddenCount = hits.length - hits.filter(isQuotable).length
-  const wantsLines = visible.length === 0 || /\d/.test(query)
-  const pool = wantsLines ? (visible.length > 0 ? visible : includeHidden ? families : families.filter(isQuotable)).slice(0, 40) : []
+  const pickedLine = quotedName(query)
+  const requestedFamilyId = query.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0]
+  const wantsLines = Boolean(pickedLine) || Boolean(requestedFamilyId) || visible.length === 0 || /\d/.test(query)
+  const scoped = requestedFamilyId ? families.filter((family) => family.id === requestedFamilyId) : visible.length > 0 && !pickedLine ? visible : includeHidden ? families : families.filter(isQuotable)
+  const pool = scoped.slice(0, 40)
   const productLines = await listLinesForFamilies(ctx, pool.map((family) => family.id))
   const byFamily = new Map(pool.map((family) => [family.id, family]))
-  const allLineHits = productLines.filter((line) => queries.some((term) => nameMatches(line.name, term)))
+  const lineQuery = withoutSize(pickedLine ?? query)
+  const allLineHits = selectNameMatches(productLines, (line) => line.name, lineQuery)
   const lineHits = allLineHits.slice(0, 8)
   const lineText = lineHits
     .map((line) => {
@@ -409,7 +424,7 @@ const addProduct = async (
   if (!familyId) {
     const families = (await listProductFamilies(ctx, { includeOutOfLibrary: true })).filter(isQuotable)
     const lines = await listLinesForFamilies(ctx, families.map((family) => family.id))
-    const hits = lines.filter((line) => nameMatches(line.name, lineName))
+    const hits = selectNameMatches(lines, (line) => line.name, lineName)
     const familyIds = [...new Set(hits.map((line) => line.productFamilyId))]
     if (familyIds.length === 0) return reply(`No current line matches "${lineName}".`)
     if (familyIds.length > 1) {
@@ -428,7 +443,7 @@ const addProduct = async (
   if (!isQuotable({ ...detail.family, inLibrary: detail.inLibrary })) {
     return reply(`${detail.family.name} v${detail.family.version} is not a current published family. Do not add it.`)
   }
-  const lineHits = detail.lines.filter((line) => nameMatches(line.name, lineName))
+  const lineHits = selectNameMatches(detail.lines, (line) => line.name, lineName)
   if (lineHits.length === 0) return reply(`No line named "${lineName}" in ${detail.family.name}. Lines: ${detail.lines.map((line) => line.name).join(' | ')}`)
   if (lineHits.length > 1) {
     return reply(
