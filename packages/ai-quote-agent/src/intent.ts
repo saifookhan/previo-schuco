@@ -113,6 +113,19 @@ export const phrases = {
     confirmInvalid: 'La conferma non è valida. Nessuna modifica.',
     noSwitch: 'Nessuna famiglia scaduta da aggiornare.',
     hiddenNone: 'Nessuna bozza o listino scaduto corrisponde.',
+    invalidSize: 'La misura non è valida. Servono larghezza e altezza in millimetri interi, maggiori di zero.',
+    needBoth: 'Manca una dimensione. Indica larghezza e altezza in mm.',
+    paymentsSum: 'Le percentuali non fanno 100. Completa i pagamenti: non invento il resto.',
+    badTransition: 'Da bozza si può solo passare a inviato. Accettato e rifiutato arrivano dopo l’invio.',
+    conflict: 'Il preventivo è stato salvato altrove. Ho ricaricato i dati: ripeti la modifica.',
+    restored: 'Annullata l’ultima modifica. Ripristinata la revisione',
+    noPrevious: 'Non c’è una revisione precedente da ripristinare.',
+    nonsense: 'Non salvo un testo così lungo o ripetuto. Scrivi il testo da mettere nel preventivo.',
+    refuse: 'Non posso ignorare le regole del preventivo, né cancellarlo senza conferma.',
+    quantity: 'La quantità deve essere un numero intero compreso tra 1 e 1.000.000.',
+    printUpdated: 'Impostazioni di stampa aggiornate.',
+    copied: 'Preventivo copiato per',
+    restoreRevision: 'Ripristina la revisione',
   },
   en: {
     which: 'Which one?',
@@ -138,6 +151,19 @@ export const phrases = {
     confirmInvalid: 'That confirmation is not valid. Nothing was changed.',
     noSwitch: 'There is no expired family to update.',
     hiddenNone: 'No draft or expired price list matches.',
+    invalidSize: 'That size is not valid. Width and height must be whole millimetres greater than zero.',
+    needBoth: 'One dimension is missing. Give both width and height in mm.',
+    paymentsSum: 'Those percentages do not add up to 100. Complete the payments. I will not fill in the rest.',
+    badTransition: 'A draft can only be marked sent. Accepted and rejected come after it is sent.',
+    conflict: 'The quote was saved somewhere else. I reloaded it: please retry the edit.',
+    restored: 'Undid the last edit. Restored revision',
+    noPrevious: 'There is no previous revision to restore.',
+    nonsense: 'I will not save a long or repeated block. Send the text you want on the quote.',
+    refuse: 'I cannot ignore the quote rules or delete the quote without confirmation.',
+    quantity: 'Quantity must be a whole number from 1 to 1,000,000.',
+    printUpdated: 'Print settings updated.',
+    copied: 'Quote copied for',
+    restoreRevision: 'Restore revision',
   },
   de: {
     which: 'Welche?',
@@ -163,6 +189,19 @@ export const phrases = {
     confirmInvalid: 'Die Bestätigung ist ungültig. Nichts wurde geändert.',
     noSwitch: 'Keine abgelaufene Familie zum Aktualisieren.',
     hiddenNone: 'Kein Entwurf und keine abgelaufene Preisliste passt.',
+    invalidSize: 'Das Maß ist ungültig. Breite und Höhe müssen ganze Millimeter größer als null sein.',
+    needBoth: 'Eine Seite fehlt. Gib Breite und Höhe in mm an.',
+    paymentsSum: 'Die Prozente ergeben nicht 100. Ergänze die Zahlungen. Den Rest erfinde ich nicht.',
+    badTransition: 'Ein Entwurf kann nur als gesendet markiert werden. Angenommen und abgelehnt geht erst danach.',
+    conflict: 'Das Angebot wurde anderswo gespeichert. Ich habe es neu geladen: bitte die Änderung wiederholen.',
+    restored: 'Letzte Änderung rückgängig. Revision wiederhergestellt',
+    noPrevious: 'Es gibt keine vorherige Revision zum Wiederherstellen.',
+    nonsense: 'So einen langen oder wiederholten Text speichere ich nicht. Schreib den Text für das Angebot.',
+    refuse: 'Ich kann die Angebotsregeln nicht ignorieren und das Angebot nicht ohne Bestätigung löschen.',
+    quantity: 'Die Menge muss eine ganze Zahl zwischen 1 und 1.000.000 sein.',
+    printUpdated: 'Druckeinstellungen aktualisiert.',
+    copied: 'Angebot kopiert für',
+    restoreRevision: 'Revision wiederherstellen',
   },
 } as const
 
@@ -226,6 +265,9 @@ export const namedTarget = (text: string): string | null => {
   return cleaned.length >= 3 ? cleaned : null
 }
 
+const CONFIRM_WORD = /^(?:conferma|confirm|bestätigen|bestaetigen)$/i
+const CANCEL_WORD = /^(?:annulla|cancel|abbrechen)$/i
+
 export const resolveDirectAction = (input: {
   latestUser: string
   pendingChoices?: Suggestion[]
@@ -235,12 +277,82 @@ export const resolveDirectAction = (input: {
   const choices = input.pendingChoices ?? []
   const index = choiceIndex(input.latestUser, choices.length)
   if (index !== null) return choices[index]?.action ?? null
+  const word = input.latestUser.trim()
+  if (CONFIRM_WORD.test(word)) return choices.find((choice) => choice.action?.args && 'confirmToken' in choice.action.args)?.action ?? null
+  if (CANCEL_WORD.test(word)) return { tool: 'cancel_action', args: {} }
   const size = sizeOnly(input.latestUser)
   if (!size) return null
   const adds = choices.filter((choice) => choice.action?.tool === 'add_product')
   const pending = adds.length === 1 ? adds[0]?.action : null
   if (!pending) return null
   return { tool: 'add_product', args: { ...pending.args, widthMm: size.widthMm, heightMm: size.heightMm } }
+}
+
+const LOOSE_SIZE = /(-?\d+(?:[.,]\d+)?)\s*(?:mm|cm|m)?\s*(?:[x×*]|\b(?:per|by)\b)\s*(-?\d+(?:[.,]\d+)?)/i
+
+/** A pair that must not be written: decimals, zero, or a negative side. A lone number is only half a size. */
+export const sizeIssue = (text: string): 'invalid' | 'partial' | null => {
+  const loose = text.match(LOOSE_SIZE)
+  if (loose) {
+    const width = Number(loose[1]?.replace(',', '.'))
+    const height = Number(loose[2]?.replace(',', '.'))
+    const whole = Number.isInteger(width) && Number.isInteger(height)
+    const inRange = width >= 1 && height >= 1 && width <= 99_999 && height <= 99_999
+    return whole && inRange ? null : 'invalid'
+  }
+  if (sizesIn(text).length > 0) return null
+  const onlyNumber = /^\s*\d{2,5}(?:\s*mm)?\s*$/i.test(text.trim())
+  const sizeTalk = /\b(misur\w*|size|larghezza|altezza|width|height|breite|höhe|mm)\b/i.test(text)
+  const numbers = text.match(/\d+(?:[.,]\d+)?/g) ?? []
+  if ((onlyNumber || sizeTalk) && numbers.length === 1) return 'partial'
+  return null
+}
+
+/** Percentages the user typed, such as 30% and 30%. */
+export const statedPercents = (text: string): number[] =>
+  [...text.matchAll(/(\d+(?:[.,]\d+)?)\s*%/g)].map((match) => Number(match[1]?.replace(',', '.') ?? ''))
+
+export const percentsSumTo100 = (values: readonly number[]): boolean =>
+  Math.abs(values.reduce((sum, value) => sum + value, 0) - 100) <= 0.01
+
+/** A long block, or the same short phrase repeated, is not a text module. */
+export const isNonsenseDump = (text: string): boolean => {
+  const folded = text.trim().toLowerCase().replace(/\s+/g, ' ')
+  if (folded.length >= 2_000) return true
+  const words = folded.split(' ').filter(Boolean)
+  if (words.length < 8) return false
+  const counts = new Map<string, number>()
+  for (let index = 0; index <= words.length - 4; index += 1) {
+    const key = words.slice(index, index + 4).join(' ')
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return [...counts.values()].some((count) => count >= 3)
+}
+
+/** The user told the assistant to drop its rules or to wipe the quote without a confirm. */
+export const isPromptInjection = (text: string): boolean =>
+  /ignora\s+(?:le\s+|tutte\s+le\s+)?istruzioni|ignore\s+(?:all\s+|the\s+)?(?:previous|prior|above)\s+instructions|disregard\s+(?:your\s+|the\s+)?(?:previous\s+|prior\s+)?instructions|ignorier\w*\s+(?:die\s+)?(?:vorherigen\s+)?anweisungen|(?:cancella|elimina|delete|lösch\w*)\s+tutto[\s\S]{0,80}senza\s+chiedere/i.test(
+    text,
+  )
+
+/** Undo the last saved edit, as opposed to cancelling a confirm chip. */
+export const wantsUndo = (text: string): boolean =>
+  /annulla l['’]ultima modifica|undo the last|letzte\s+(?:änderung|aenderung)\s+rückgängig/i.test(text)
+
+/** The save just before the current one, not revision 1. */
+export const wantsPreviousRevision = (text: string): boolean =>
+  wantsUndo(text) || /revisione precedente|previous revision|vorherige\s+revision|torna alla revisione/i.test(text)
+
+const STATUS_WORD = {
+  it: { draft: 'bozza', sent: 'inviato', accepted: 'accettato', rejected: 'rifiutato' },
+  en: { draft: 'draft', sent: 'sent', accepted: 'accepted', rejected: 'rejected' },
+  de: { draft: 'Entwurf', sent: 'gesendet', accepted: 'angenommen', rejected: 'abgelehnt' },
+} as const
+
+export const statusWord = (locale: ChatLocale, status: string): string => {
+  const words = STATUS_WORD[locale]
+  if (status === 'draft' || status === 'sent' || status === 'accepted' || status === 'rejected') return words[status]
+  return status
 }
 
 export const hasSize = (text: string): boolean => sizesIn(text).length > 0

@@ -1,28 +1,34 @@
 import {
   catalogQuery,
   choiceIndex,
+  decideConfirm,
   expandQuery,
   foldName,
   isEditRequest,
   isNewQuoteRequest,
+  isNonsenseDump,
   isRemoving,
   isUuid,
   issueConfirmToken,
   mentionedId,
   nameMatches,
   namedTarget,
+  percentsSumTo100,
   phrases,
   placeActivity,
   positionQuery,
   quotedName,
-  removeTokenAllows,
   samePosition,
   sizeForTurn,
+  sizeIssue,
   sizeOnly,
   sizesIn,
+  statedPercents,
+  statusWord,
   selectNameMatches,
-  verifyConfirmToken,
   wantsHiddenCatalog,
+  wantsPreviousRevision,
+  wantsUndo,
   withoutSize,
   type ChatLocale,
   type Suggestion,
@@ -256,7 +262,15 @@ export const runQuoteChatTools = async (
   try {
     return await dispatch(ctx, actor, state, executeName, asRecord(args))
   } catch (error) {
-    if (error instanceof QuoteValidationError || error instanceof QuoteConflictError) return reply(error.message)
+    if (error instanceof QuoteConflictError) {
+      if (quoteId) {
+        const fresh = await getQuote(ctx, quoteId)
+        if (fresh) state.detail = fresh
+      }
+      const text = say(state).conflict
+      return reply(text, undefined, text)
+    }
+    if (error instanceof QuoteValidationError) return reply(error.message, undefined, error.message)
     throw error
   }
 }
@@ -538,6 +552,10 @@ const addTextModule = async (
 ): Promise<ToolResult> => {
   if (isRemoving(latestUser(state))) return reply('The user asked to remove a text module. Call remove_text_module.')
   const text = typeof args.text === 'string' ? args.text.trim() : ''
+  if (!text || isNonsenseDump(text) || isNonsenseDump(latestUser(state))) {
+    const refusal = say(state).nonsense
+    return reply(refusal, undefined, refusal)
+  }
   if (text.length > 10_000) return reply('That text is too long.')
   const place = str(args.place) === 'closing' ? 'closing' : 'intro'
   const current = requireQuote(state)
@@ -648,6 +666,7 @@ const addProduct = async (
   const saidName = choosing || state.userTexts.some((text) => foldName(text).includes(foldName(requestedName)))
   const lineName = saidName ? requestedName : catalogQuery(latestUser(state)) || requestedName
   if (familyId && !choosing && !mentionedId(state.userTexts, familyId)) familyId = undefined
+  if (sizeIssue(latestUser(state)) === 'invalid') return reply(say(state).invalidSize, undefined, say(state).invalidSize)
   const resolved = sizeForTurn(state.userTexts, args.widthMm, args.heightMm)
   if (!resolved) {
     const chip: Suggestion[] | undefined = lineName
@@ -824,22 +843,22 @@ const moveLine = async (
 const withoutToken = (args: Record<string, unknown>): Record<string, unknown> =>
   Object.fromEntries(Object.entries(args).filter(([key]) => key !== 'confirmToken'))
 
-/** Returns the confirm chips when the token is missing. A bad token is reported and not replaced. Returns null when the action may proceed. */
+/** Returns the confirm chips when the token is missing. A bad or already used token is reported and not replaced. Returns null when the action may proceed. */
 const confirmOrAsk = (state: ChatState, tool: string, args: Record<string, unknown>, summary: string): ToolResult | null => {
   const current = requireQuote(state)
   const secret = process.env.AUTH_SECRET ?? ''
   const payload = withoutToken(args)
-  const claims = { quoteId: current.quote.id, revision: current.version.revision, tool, args: payload }
-  const token = str(args.confirmToken)
-  if (!secret) return reply('Confirmation is not configured.')
-  if (token) {
-    if (verifyConfirmToken(secret, token, claims).ok) return null
-    const lineName = str(payload.lineName)
-    if (tool === 'remove_line' && lineName && removeTokenAllows(secret, token, { quoteId: current.quote.id, lineName })) return null
-    const text = say(state).confirmInvalid
+  const decision = decideConfirm({
+    secret,
+    token: str(args.confirmToken),
+    expected: { quoteId: current.quote.id, tool, args: payload },
+  })
+  if (decision === 'proceed') return null
+  if (decision === 'invalid') {
+    const text = secret ? say(state).confirmInvalid : 'Confirmation is not configured.'
     return reply(text, undefined, text)
   }
-  const issued = issueConfirmToken(secret, claims)
+  const issued = issueConfirmToken(secret, { quoteId: current.quote.id, revision: current.version.revision, tool, args: payload })
   const p = say(state)
   const choices: Suggestion[] = [
     { label: p.confirm, message: p.confirm, action: { tool, args: { ...payload, confirmToken: issued } } },
@@ -881,6 +900,13 @@ const updateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatStat
   const { line } = hits[0]!
   const before = JSON.stringify(line)
   const latest = latestUser(state)
+  const issue = sizeIssue(latest)
+  if (issue === 'invalid') return reply(say(state).invalidSize, undefined, say(state).invalidSize)
+  if (issue === 'partial') return reply(say(state).needBoth, undefined, say(state).needBoth)
+  const quantity = num(args.quantity)
+  if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 1 || quantity > 1_000_000)) {
+    return reply(say(state).quantity, undefined, say(state).quantity)
+  }
   const typedSize = sizesIn(latest).length > 0 ? sizeForTurn([latest], args.widthMm, args.heightMm) : undefined
   const sizeChanged = Boolean(typedSize)
   if (typedSize) {
@@ -889,14 +915,16 @@ const updateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatStat
   }
   const extra = num(args.extraPct)
   const discount = num(args.discountPct)
-  const quantity = num(args.quantity)
   const hours = num(args.installationHours)
   const unitPrice = num(args.unitPrice)
   const nextName = str(args.name)
   if (nextName) line.name = nextName.slice(0, 300)
   if (typeof args.isAlternative === 'boolean') line.isAlternative = args.isAlternative
   if (typeof args.locked === 'boolean') line.locked = args.locked
-  if (unitPrice !== undefined && unitPrice <= 0) return reply('A manual €/pc must be greater than zero.')
+  if (unitPrice !== undefined && unitPrice <= 0) {
+    const text = 'A manual €/pc must be greater than zero.'
+    return reply(text, undefined, text)
+  }
   const discountStated = discount === undefined || state.userTexts.some((text) => new RegExp(`\\b${discount}\\b`).test(text))
   if ((unitPrice !== undefined && unitPrice > 0) || !discountStated) {
     const pending = confirmOrAsk(state, 'update_line', { ...args, lineName: line.id }, `${say(state).confirmAsk} ${line.name}`)
@@ -904,11 +932,7 @@ const updateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatStat
   }
   if (extra !== undefined) line.extraMarkupPct = extra
   if (discount !== undefined) line.discountPct = Math.min(100, Math.max(0, discount))
-  if (quantity !== undefined) {
-    const pieces = Math.round(quantity)
-    if (pieces < 1 || pieces > 1_000_000) return reply('Quantity must be a whole number from 1 to 1000000.')
-    line.quantity = pieces
-  }
+  if (quantity !== undefined) line.quantity = quantity
   if (hours !== undefined) line.installationHours = hours
   const vat = str(args.vatRate)
   if (vat) {
@@ -1277,7 +1301,12 @@ const setPayments = async (ctx: TenantContext, actor: QuoteActor, state: ChatSta
     return [{ id: localId('pag'), description: description.slice(0, 500), pct }]
   })
   const sum = rows.reduce((total, row) => total + row.pct, 0)
-  if (Math.abs(sum - 100) > 0.01) return reply(`Payment percentages must sum to 100. They sum to ${sum}.`)
+  const stated = statedPercents(latestUser(state))
+  const statedShort = stated.length >= 2 && !percentsSumTo100(stated)
+  if (statedShort || !percentsSumTo100(rows.map((row) => row.pct))) {
+    const text = say(state).paymentsSum
+    return reply(text, undefined, text)
+  }
   const current = requireQuote(state)
   const document = structuredClone(current.version.document)
   const block = document.closing.find((item) => item.type === 'payments')
@@ -1288,15 +1317,26 @@ const setPayments = async (ctx: TenantContext, actor: QuoteActor, state: ChatSta
   return reply(`${text}\n${saved.content}`, undefined, text)
 }
 
+const NEXT_STATUS: Record<string, readonly string[]> = {
+  draft: ['sent'],
+  sent: ['accepted', 'rejected'],
+  accepted: ['rejected'],
+  rejected: ['accepted'],
+}
+
 const setStatus = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
   const status = str(args.status)
   if (status !== 'draft' && status !== 'sent' && status !== 'accepted' && status !== 'rejected') return reply('Status must be draft, sent, accepted, or rejected.')
   const current = requireQuote(state)
-  const pending = confirmOrAsk(state, 'set_quote_status', { status }, `Mark the quote ${status}`)
+  if (!NEXT_STATUS[current.version.status]?.includes(status)) {
+    const text = say(state).badTransition
+    return reply(text, undefined, text)
+  }
+  const pending = confirmOrAsk(state, 'set_quote_status', { status }, `${say(state).confirmAsk} ${statusWord(state.locale, status)}`)
   if (pending) return pending
   const saved = await setQuoteVersionStatusById(ctx, actor, current.quote.id, current.version.id, status)
   state.detail = saved
-  const text = `${saved.quote.reference} is ${saved.version.status}.`
+  const text = `${saved.quote.reference}: ${statusWord(state.locale, saved.version.status)}.`
   return reply(text, undefined, text)
 }
 
@@ -1308,15 +1348,27 @@ const saveNewVersion = async (ctx: TenantContext, actor: QuoteActor, state: Chat
 }
 
 const restoreRevision = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
-  const revisionNumber = num(args.revisionNumber)
-  if (!revisionNumber) return reply('revisionNumber is required.')
   const current = requireQuote(state)
-  const pending = confirmOrAsk(state, 'restore_revision', { revisionNumber }, `Restore revision ${revisionNumber}`)
-  if (pending) return pending
+  const askedPrevious = wantsPreviousRevision(latestUser(state))
+  const requested = num(args.revisionNumber)
+  const revisionNumber = askedPrevious || !requested ? current.version.revision - 1 : requested
+  if (!revisionNumber || revisionNumber < 1 || revisionNumber >= current.version.revision) {
+    const text = say(state).noPrevious
+    return reply(text, undefined, text)
+  }
+  const undo = wantsUndo(latestUser(state))
+  if (!undo) {
+    const pending = confirmOrAsk(state, 'restore_revision', { revisionNumber }, `${say(state).restoreRevision} ${revisionNumber}`)
+    if (pending) return pending
+  }
   const revision = await getQuoteRevisionDetail(ctx, current.quote.id, current.version.id, revisionNumber)
-  if (!revision) return reply('That revision was not found.')
+  if (!revision) {
+    const text = say(state).noPrevious
+    return reply(text, undefined, text)
+  }
   const saved = await persist(ctx, actor, state, revision.document)
-  return reply(`Restored revision ${revisionNumber}.\n${saved.content}`, undefined, `Restored revision ${revisionNumber}.`)
+  const text = `${say(state).restored} ${revisionNumber}.`
+  return reply(`${text}\n${saved.content}`, undefined, text)
 }
 
 const PRINT_FLAGS = [
@@ -1345,7 +1397,7 @@ const updatePrintSettings = async (ctx: TenantContext, actor: QuoteActor, state:
   }
   if (!changed) return reply(say(state).nothing, undefined, say(state).nothing)
   const saved = await persist(ctx, actor, state, document)
-  return reply(`Print settings updated.\n${saved.content}`, undefined, 'Print settings updated.')
+  return reply(`${say(state).printUpdated}\n${saved.content}`, undefined, say(state).printUpdated)
 }
 
 const previewPdf = (state: ChatState): ToolResult => {
@@ -1366,7 +1418,7 @@ const duplicateQuote = async (ctx: TenantContext, actor: QuoteActor, state: Chat
   const document = structuredClone(source.version.document)
   document.header = { ...document.header, customerName }
   const saved = await persist(ctx, actor, state, document)
-  const text = `Copied the quote for ${customerName}. id ${state.detail?.quote.id}.`
+  const text = `${say(state).copied} ${customerName}. id ${state.detail?.quote.id}.`
   return reply(`${text}\n${saved.content}`, undefined, text)
 }
 

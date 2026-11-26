@@ -1,4 +1,4 @@
-import { hasSize, isEditRequest, isNewQuoteRequest, isNewRowRequest, isRemoving } from './intent'
+import { hasSize, isEditRequest, isNewQuoteRequest, isNewRowRequest, isRemoving, wantsPreviousRevision, wantsUndo } from './intent'
 import { SYSTEM_PROMPT, TOOL_NAMES } from './prompt'
 import { QUOTE_TOOLS } from './tools'
 import type { AgentEvent, ModelMessage, ModelTurn, Suggestion, ToolCall, ToolOutcome } from './types'
@@ -86,6 +86,9 @@ const nudgeFor = (text: string, latestUser: string, called: ReadonlySet<string>)
   if (/\bpdf\b|anteprima di stampa|print preview/i.test(latestUser) && !called.has('preview_pdf')) {
     return 'The user asked for the PDF. Call preview_pdf.'
   }
+  if (wantsPreviousRevision(latestUser) && !called.has('restore_revision')) {
+    return 'The user wants the immediately previous save, not revision 1. Call restore_revision and omit revisionNumber.'
+  }
   if (/\b(inviato|accepted|accettat\w*|rifiutat\w*|rejected|mark(?:ed)? as sent)\b/i.test(latestUser) && !called.has('set_quote_status')) {
     return 'The user asked to change the quote status. Call set_quote_status.'
   }
@@ -169,6 +172,9 @@ const streamText = async (emit: AgentRun['emit'], text: string): Promise<void> =
 }
 
 const blockedCall = (name: string, latestUser: string, pending: Suggestion[]): string | null => {
+  if (wantsUndo(latestUser) && name === 'update_line') {
+    return 'The user asked to undo the last edit. Call restore_revision and omit revisionNumber. Do not change a row.'
+  }
   if (name === 'update_line' && addingNewRow(latestUser)) {
     return 'The user asked to add a new row. Call add_product with the line name, width, height, and quantity. Do not change an existing row.'
   }

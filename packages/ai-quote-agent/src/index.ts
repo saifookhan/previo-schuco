@@ -1,7 +1,7 @@
 export { placeActivity } from './activities'
 export type { ActivityAction, ActivityPlacement } from './activities'
 export { completeWithCloudflare } from './cloudflare'
-export { issueConfirmToken, readConfirmToken, removeTokenAllows, verifyConfirmToken } from './confirm'
+export { decideConfirm, issueConfirmToken, readConfirmToken, removeTokenAllows, verifyConfirmToken } from './confirm'
 export type { ConfirmClaims } from './confirm'
 export {
   choiceIndex,
@@ -10,19 +10,27 @@ export {
   isEditRequest,
   isNewQuoteRequest,
   isNewRowRequest,
+  isNonsenseDump,
+  isPromptInjection,
   isRemoving,
   isUuid,
   languageName,
   mentionedId,
   namedTarget,
+  percentsSumTo100,
   phrases,
   resolveDirectAction,
   sizeForTurn,
+  sizeIssue,
   sizeOnly,
   sizesIn,
+  statedPercents,
+  statusWord,
   stripSizes,
   userGaveSize,
   wantsHiddenCatalog,
+  wantsPreviousRevision,
+  wantsUndo,
 } from './intent'
 export type { ChatLocale } from './intent'
 export { plainReply, runQuoteAgent, toolCallsFromText } from './loop'
