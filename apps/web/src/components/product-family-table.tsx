@@ -2,7 +2,7 @@
 
 import { ChevronRight, ExternalLink, History } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { Fragment, useState, type MouseEvent } from 'react'
+import { Fragment, useState, type MouseEvent, type ReactNode } from 'react'
 
 import { ProductFamilyFlagSelect } from '@/components/product-family-flag-select'
 import { PriceValidityBadge, PriceValidityFields, usePriceValidityLabel } from '@/components/product-family-price-validity'
@@ -26,40 +26,97 @@ const ValidityCell = ({ validity, today }: { validity: PriceValidity; today: str
   )
 }
 
-/** Technical name, previous version, the two dates, and delete — one open row at a time. */
+/** A label beside the switch that changes one setting. */
+const Setting = ({ label, children }: { label: string; children: ReactNode }) => (
+  <div className="flex items-center gap-2">
+    <span className="text-sm text-slate-600">{label}</span>
+    {children}
+  </div>
+)
+
+/** Yes or No, shown on the row. The switch that changes it sits in the expanded row. */
+const FlagTag = ({ value }: { value: boolean }) => {
+  const t = useTranslations('productFamilyFlags')
+  return <Badge variant={value ? 'success' : 'muted'}>{value ? t('yes') : t('no')}</Badge>
+}
+
+/** Technical name, the settings, the two dates, and delete — one open row at a time. */
 const ExpandedFamily = ({ family, tab }: { family: ProductFamilySummary; tab: 'own' | 'shared' }) => {
+  const t = useTranslations('productFamilies')
+  const tFlags = useTranslations('productFamilyFlags')
   const tVersion = useTranslations('productFamilyVersion')
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-      <div className="min-w-0 space-y-3">
-        {family.technicalName ? <p className="text-sm text-slate-500">{family.technicalName}</p> : null}
-        {family.supersedesId ? (
-          <Link
-            href={`/app/product-families/${family.supersedesId}`}
-            className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand"
-          >
-            <History className="h-3.5 w-3.5" />
-            {tVersion('viewPreviousVersion')}
-          </Link>
-        ) : null}
-        <PriceValidityFields
-          familyId={family.id}
-          familyName={family.name}
-          validity={{ priceValidFrom: family.priceValidFrom, priceValidTo: family.priceValidTo }}
-          canEdit={tab === 'own'}
-        />
+    <div className="space-y-4">
+      {family.technicalName ? <p className="text-sm text-slate-500">{family.technicalName}</p> : null}
+      {family.supersedesId ? (
+        <Link
+          href={`/app/product-families/${family.supersedesId}`}
+          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand"
+        >
+          <History className="h-3.5 w-3.5" />
+          {tVersion('viewPreviousVersion')}
+        </Link>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <Setting label={t('publishedStatus')}>
+          <ProductFamilyPublishSwitch
+            familyId={family.id}
+            familyName={family.name}
+            isPublished={family.isPublished}
+            canEdit={tab === 'own'}
+          />
+        </Setting>
+        <Setting label={tFlags('hasPriceList.title')}>
+          <ProductFamilyFlagSelect
+            flag="hasPriceList"
+            appearance="switch"
+            familyId={family.id}
+            familyName={family.name}
+            value={family.hasPriceList}
+            canEdit={tab === 'own'}
+          />
+        </Setting>
+        <Setting label={tFlags('readyForInvoicing.title')}>
+          <ProductFamilyFlagSelect
+            flag="readyForInvoicing"
+            appearance="switch"
+            familyId={family.id}
+            familyName={family.name}
+            value={family.readyForInvoicing}
+            canEdit={tab === 'own'}
+          />
+        </Setting>
+        {/* The caller's company library: changed on both tabs, own families and shared ones. */}
+        <Setting label={tFlags('inLibrary.title')}>
+          <ProductFamilyFlagSelect
+            flag="inLibrary"
+            appearance="switch"
+            familyId={family.id}
+            familyName={family.name}
+            value={family.inLibrary ?? true}
+            canEdit
+          />
+        </Setting>
       </div>
+      <PriceValidityFields
+        familyId={family.id}
+        familyName={family.name}
+        validity={{ priceValidFrom: family.priceValidFrom, priceValidTo: family.priceValidTo }}
+        canEdit={tab === 'own'}
+      />
       {tab === 'own' ? (
-        <ProductFamilyRowActions
-          familyId={family.id}
-          familyName={family.name}
-          isPublished={family.isPublished}
-          readyForInvoicing={family.readyForInvoicing}
-          validity={family}
-          showPublish={false}
-          showDuplicate={false}
-          labeledDelete
-        />
+        <div className="flex justify-start">
+          <ProductFamilyRowActions
+            familyId={family.id}
+            familyName={family.name}
+            isPublished={family.isPublished}
+            readyForInvoicing={family.readyForInvoicing}
+            validity={family}
+            showPublish={false}
+            showDuplicate={false}
+            labeledDelete
+          />
+        </div>
       ) : null}
     </div>
   )
@@ -67,7 +124,7 @@ const ExpandedFamily = ({ family, tab }: { family: ProductFamilySummary; tab: 'o
 
 /**
  * Product families list. Click a row to open it (one at a time); the name, the new-tab icon,
- * switches, share and duplicate keep their own actions. The open row stays open across a save,
+ * share and duplicate keep their own actions. The open row stays open across a save,
  * because this state lives here and a refresh only replaces the family data.
  */
 export const ProductFamilyTable = ({
@@ -111,9 +168,7 @@ export const ProductFamilyTable = ({
           <th className="font-medium">{t('hasPriceList')}</th>
           <th className="font-medium">{t('readyForInvoicing')}</th>
           <th className="font-medium">{t('inLibrary')}</th>
-          <th>
-            <span className="sr-only">{t('actions')}</span>
-          </th>
+          <th className="text-right font-medium">{t('actions')}</th>
         </tr>
       </thead>
       <tbody>
@@ -162,12 +217,9 @@ export const ProductFamilyTable = ({
                 <td className="text-slate-600">{family.brand ?? '—'}</td>
                 {shared ? <td className="text-slate-600">{family.shareDiscountPct ? `${family.shareDiscountPct}%` : '—'}</td> : null}
                 <td>
-                  <ProductFamilyPublishSwitch
-                    familyId={family.id}
-                    familyName={family.name}
-                    isPublished={family.isPublished}
-                    canEdit={tab === 'own'}
-                  />
+                  <Badge variant={family.isPublished ? 'success' : 'muted'}>
+                    {family.isPublished ? t('published') : t('draft')}
+                  </Badge>
                 </td>
                 <td>
                   <Badge variant="muted" className="whitespace-nowrap">
@@ -178,35 +230,13 @@ export const ProductFamilyTable = ({
                   <ValidityCell validity={validity} today={today} />
                 </td>
                 <td>
-                  <ProductFamilyFlagSelect
-                    flag="hasPriceList"
-                    appearance="switch"
-                    familyId={family.id}
-                    familyName={family.name}
-                    value={family.hasPriceList}
-                    canEdit={tab === 'own'}
-                  />
+                  <FlagTag value={family.hasPriceList} />
                 </td>
                 <td>
-                  <ProductFamilyFlagSelect
-                    flag="readyForInvoicing"
-                    appearance="switch"
-                    familyId={family.id}
-                    familyName={family.name}
-                    value={family.readyForInvoicing}
-                    canEdit={tab === 'own'}
-                  />
+                  <FlagTag value={family.readyForInvoicing} />
                 </td>
                 <td>
-                  {/* The caller's company library: changed on both tabs, own families and shared ones. */}
-                  <ProductFamilyFlagSelect
-                    flag="inLibrary"
-                    appearance="switch"
-                    familyId={family.id}
-                    familyName={family.name}
-                    value={family.inLibrary ?? true}
-                    canEdit
-                  />
+                  <FlagTag value={family.inLibrary ?? true} />
                 </td>
                 <td>
                   <div className="flex items-center justify-end gap-2">
