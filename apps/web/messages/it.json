@@ -1195,7 +1195,17 @@
     "send": "Invia",
     "working": "In corso…",
     "unavailable": "L’assistente non è disponibile in questo momento.",
-    "empty": "Dimmi il cliente e il prodotto. Uso solo il listino corrente.",
+    "welcome": "Posso creare e modificare un preventivo da questa chat. Puoi chiedermi di:",
+    "actions": {
+      "create": "Creare un nuovo preventivo per un cliente",
+      "catalog": "Vedere quanti prodotti ci sono nel catalogo",
+      "add": "Aggiungere un prodotto, con larghezza e altezza in millimetri",
+      "edit": "Cambiare quantità, misura, IVA, sconto, ricarico, ore di posa o il prezzo di una riga",
+      "arrange": "Duplicare o spostare una riga o una famiglia",
+      "extras": "Aggiungere un testo, un'attività o le condizioni di pagamento",
+      "header": "Cambiare cliente, cantiere, data o una nota interna",
+      "preview": "Aprire l'anteprima di stampa"
+    },
     "tools": {
       "catalog_summary": "Conto il catalogo",
       "search_catalog": "Cerco nel catalogo",
@@ -1231,6 +1241,9 @@
       "cancel_action": "Annullamento"
     },
     "starters": {
+      "newQuoteLabel": "Nuovo preventivo",
+      "countLabel": "Conta i prodotti",
+      "exampleLabel": "Aggiungi una riga",
       "newQuote": "Nuovo preventivo per Studio Rossi",
       "count": "Quanti prodotti ci sono in Cassonetto Coibentato MyBox Revo?",
       "example": "Aggiungi una riga MyBox Revo Light profondità 150, 1200×1400 mm, quantità 1"

@@ -33,6 +33,8 @@ interface QuoteChatProps {
   onQuote?: (quoteId: string) => void | Promise<void>
 }
 
+const WELCOME_ACTIONS = ['create', 'catalog', 'add', 'edit', 'arrange', 'extras', 'header', 'preview'] as const
+
 const TOOLS = [
   'catalog_summary',
   'search_catalog',
@@ -96,9 +98,9 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
   if (!can('quote.edit')) return null
 
   const starters: Suggestion[] = [
-    { label: t('starters.newQuote'), message: t('starters.newQuote') },
-    { label: t('starters.count'), message: t('starters.count') },
-    { label: t('starters.example'), message: t('starters.example') },
+    { label: t('starters.newQuoteLabel'), message: t('starters.newQuote') },
+    { label: t('starters.countLabel'), message: t('starters.count') },
+    { label: t('starters.exampleLabel'), message: t('starters.example') },
   ]
   const chips = messages.length === 0 ? starters : suggestions
 
@@ -181,7 +183,7 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
   return (
     <div className="fixed bottom-24 right-6 z-40 flex flex-col items-end gap-3">
       {open ? (
-        <section className="flex h-[32rem] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+        <section className="flex h-[min(40rem,calc(100dvh-7.5rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
           <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <h2 className="text-sm font-semibold text-slate-900">{t('title')}</h2>
             <button type="button" onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-700" aria-label={t('close')}>
@@ -189,7 +191,16 @@ export const QuoteChat = ({ quoteId, document, baseRevision, onQuote }: QuoteCha
             </button>
           </header>
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-            {messages.length === 0 ? <p className="text-sm text-slate-500">{t('empty')}</p> : null}
+            {messages.length === 0 ? (
+              <div className="mr-6 rounded-2xl bg-slate-100 px-3 py-2 text-sm text-slate-800">
+                <p>{t('welcome')}</p>
+                <ul className="mt-2 list-disc space-y-0.5 pl-4 leading-snug">
+                  {WELCOME_ACTIONS.map((action) => (
+                    <li key={action}>{t(`actions.${action}`)}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {messages.map((message, index) => (
               <p
                 key={`${message.role}-${index}`}
