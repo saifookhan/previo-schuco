@@ -3,7 +3,7 @@
 import * as Dialog from '@radix-ui/react-dialog'
 import { Copy, Loader2, Trash2, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
@@ -11,8 +11,10 @@ import {
   useProductFamilyDetailsError,
   type ProductFamilyDetails,
 } from '@/components/product-family-details-fields'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useLoadingTransition } from '@/components/ui/loading-region'
+import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
@@ -28,6 +30,12 @@ interface ProductFamilyRowActionsProps {
   validity: { priceValidFrom: string | null; priceValidTo: string | null }
   /** Where to navigate after a successful delete. Omit to just refresh in place (list page); pass the list route from the detail page, since staying put would 404. */
   redirectAfterDeleteHref?: string
+  /** The family page shows every action. The list keeps duplicate on the row and delete in the expanded row. */
+  showPublish?: boolean
+  showDuplicate?: boolean
+  showDelete?: boolean
+  /** Delete with its name, for the expanded row. The family page keeps the icon. */
+  labeledDelete?: boolean
 }
 
 /**
@@ -41,6 +49,10 @@ export const ProductFamilyRowActions = ({
   readyForInvoicing,
   validity,
   redirectAfterDeleteHref,
+  showPublish = true,
+  showDuplicate = true,
+  showDelete = true,
+  labeledDelete = false,
 }: ProductFamilyRowActionsProps) => {
   const t = useTranslations('productFamilyActions')
   const router = useRouter()
@@ -151,39 +163,46 @@ export const ProductFamilyRowActions = ({
   return (
     <>
       <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busyAction !== null}
-          onClick={() => void togglePublish()}
-        >
-          {busyAction === 'publish' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-          {isPublished ? t('unpublish') : t('publish')}
-        </Button>
-        <Button
-          type="button"
-          variant="icon"
-          size="icon"
-          disabled={busyAction !== null}
-          aria-label={t('duplicate')}
-          title={t('duplicate')}
-          onClick={openCopyDialog}
-        >
-          <Copy className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="icon"
-          size="icon"
-          disabled={busyAction !== null}
-          aria-label={t('delete')}
-          title={t('delete')}
-          className="hover:border-red-300 hover:bg-red-50 hover:text-red-600"
-          onClick={() => setConfirmingDelete(true)}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+        {showPublish ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={busyAction !== null}
+            onClick={() => void togglePublish()}
+          >
+            {busyAction === 'publish' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            {isPublished ? t('unpublish') : t('publish')}
+          </Button>
+        ) : null}
+        {showDuplicate ? (
+          <Button
+            type="button"
+            variant="icon"
+            size="icon"
+            disabled={busyAction !== null}
+            aria-label={t('duplicate')}
+            title={t('duplicate')}
+            onClick={openCopyDialog}
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </Button>
+        ) : null}
+        {showDelete ? (
+          <Button
+            type="button"
+            variant={labeledDelete ? 'outline' : 'icon'}
+            size={labeledDelete ? 'sm' : 'icon'}
+            disabled={busyAction !== null}
+            aria-label={t('delete')}
+            title={t('delete')}
+            className="hover:border-red-300 hover:bg-red-50 hover:text-red-600"
+            onClick={() => setConfirmingDelete(true)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {labeledDelete ? t('delete') : null}
+          </Button>
+        ) : null}
       </div>
 
       <Dialog.Root
@@ -254,5 +273,67 @@ export const ProductFamilyRowActions = ({
         onCancel={() => setConfirmingDelete(false)}
       />
     </>
+  )
+}
+
+/**
+ * Published / draft on the families list: a switch for whoever may change it, the badge otherwise.
+ * Saves through the same request as the button on the family page.
+ */
+export const ProductFamilyPublishSwitch = ({
+  familyId,
+  familyName,
+  isPublished,
+  canEdit,
+}: {
+  familyId: string
+  familyName: string
+  isPublished: boolean
+  /** False for a family shared by another company — only the owner publishes it. */
+  canEdit: boolean
+}) => {
+  const t = useTranslations('productFamilyActions')
+  const tList = useTranslations('productFamilies')
+  const router = useRouter()
+  const { startTransition } = useLoadingTransition()
+  const { can } = useAuth()
+  const [value, setValue] = useState(isPublished)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => setValue(isPublished), [isPublished])
+
+  if (!canEdit || !can('catalog.edit')) {
+    return <Badge variant={isPublished ? 'success' : 'muted'}>{isPublished ? tList('published') : tList('draft')}</Badge>
+  }
+
+  const change = async (next: boolean) => {
+    setValue(next)
+    setSaving(true)
+    try {
+      const response = await fetch(`/api/product-families/${familyId}/publish`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublished: next }),
+      })
+      if (!response.ok) {
+        setValue(!next)
+        showToast(t('publishFailed', { name: familyName }), 'error')
+        return
+      }
+      startTransition(() => router.refresh())
+    } catch {
+      setValue(!next)
+      showToast(t('publishFailed', { name: familyName }), 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Switch
+      checked={value}
+      disabled={saving}
+      label={t('publishedOf', { name: familyName })}
+      onCheckedChange={(next) => void change(next)}
+    />
   )
 }

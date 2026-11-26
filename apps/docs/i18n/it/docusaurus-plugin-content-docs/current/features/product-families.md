@@ -21,17 +21,17 @@ Ogni ambiente ne ha già una: **Demo Window W70** (vedi [Dati demo](../demo-data
 | Azione | Come | Note |
 |---|---|---|
 | Importa da Excel | **Importa da Excel** nell'elenco | Scegli il file, controllalo, imposta la validità dei prezzi — vedi [Importare da Excel](#importare-da-excel) |
-| Visualizza | Clicca una famiglia | Linee, caratteristiche, tabelle prezzi |
+| Visualizza | Il nome della famiglia, o l'icona a sinistra della riga (apre una nuova scheda) | Un clic sul resto della riga la espande. È aperta una sola riga alla volta |
 | Modifica prezzi | **Modifica** su una linea, caratteristica o tabella | Valore, formula, sconto, markup, ore di posa |
 | Modifica una tabella | Modifica → aggiungi/rimuovi righe e colonne | Griglia larghezza × altezza |
-| Pubblica / ritira | Menu azioni | Solo le famiglie pubblicate si possono condividere |
+| Pubblica / ritira | Interruttore **Pubblicato** nella riga (pulsante nella pagina della famiglia) | Solo le famiglie pubblicate si possono condividere |
 | Nuova versione | **Nuova versione** nella pagina della famiglia | Stessa finestra dell'importazione; la nuova versione ha la sua validità prezzi e quella vecchia mantiene le sue date |
-| Duplica | Icona copia nelle azioni | Una finestra chiede nome, validità prezzi e pubblicazione della copia (parte dalle date dell'originale, non pubblicata) |
-| Elimina | Menu azioni | |
-| Cambia validità prezzi | I campi **Data inizio / fine validità** nell'elenco, o **Modifica** accanto alle date nella pagina della famiglia | Solo il proprietario (o il super-admin) |
-| Pronta per la fatturazione | **Sì / No** nell'elenco (o nella pagina della famiglia) | Solo le famiglie pronte per la fatturazione sono proposte nel preventivo. Solo il proprietario |
-| Con listino | **Sì / No** nell'elenco (o nella pagina della famiglia) | Se dietro la famiglia ci sono dei prezzi — mostrato nel preventivo. Solo il proprietario |
-| In libreria | **Sì / No** nell'elenco (o nella pagina della famiglia) | Se il preventivo della tua azienda propone la famiglia — per le tue famiglie e per quelle condivise. Amministratori e responsabili |
+| Duplica | Icona copia nella riga | Una finestra chiede nome, validità prezzi e pubblicazione della copia (parte dalle date dell'originale, non pubblicata) |
+| Elimina | **Elimina** nella riga espansa (pulsante nella pagina della famiglia) | |
+| Cambia validità prezzi | **Valido dal** e **Valido fino al** nella riga espansa, poi **Salva** (o **Modifica** nella pagina della famiglia) | Solo il proprietario (o il super-admin). La riga mostra le due date come un intervallo |
+| Pronta per la fatturazione | Interruttore nella riga (Sì / No nella pagina della famiglia) | Solo le famiglie pronte per la fatturazione sono proposte nel preventivo. Solo il proprietario |
+| Con listino | Interruttore nella riga (Sì / No nella pagina della famiglia) | Se dietro la famiglia ci sono dei prezzi — mostrato nel preventivo. Solo il proprietario |
+| In libreria | Interruttore nella riga (Sì / No nella pagina della famiglia) | Se il preventivo della tua azienda propone la famiglia — per le tue famiglie e per quelle condivise. Amministratori e responsabili |
 
 ![Dettaglio famiglia di prodotto](/img/screens/product-family-detail.png)
 
@@ -56,10 +56,10 @@ Formato del file: [Formato di importazione Excel](../excel-format.md).
 
 I prezzi di una famiglia si possono usare nelle **nuove posizioni dei preventivi** solo da *Valido dal* a *Valido fino
 al* (giorni inclusi, ora italiana). Fuori da questi giorni la famiglia non è proposta nel preventivo e l'API la
-rifiuta. Le posizioni già nei preventivi mantengono i loro prezzi e restano modificabili. L'elenco mostra le date con
-il badge **Futura** o **Scaduta**; le famiglie importate prima di questa funzione non hanno date e sono sempre usabili.
-Nell'elenco il proprietario cambia le date direttamente nella riga: la modifica si salva quando esci dal campo (o con
-Invio). La *Data inizio validità* non si può svuotare; svuotare la *Data fine validità* significa fino a nuovo avviso.
+rifiuta. Le posizioni già nei preventivi mantengono i loro prezzi e restano modificabili. L'elenco mostra le due date
+come un intervallo, con il badge **Futura** o **Scaduta**; le famiglie importate prima di questa funzione non hanno date e sono sempre usabili.
+Nell'elenco il proprietario apre la riga, modifica **Valido dal** e **Valido fino al** insieme e salva. La *Data inizio
+validità* non si può svuotare; svuotare la *Data fine validità* significa fino a nuovo avviso.
 Due versioni di una famiglia non possono avere un giorno in comune: date che si sovrappongono a un'altra versione
 (nell'elenco, nella pagina della famiglia o caricando una nuova versione) vengono rifiutate indicando numero e date di
 quella versione, e non si salva nulla. Per iniziare una nuova versione, dai prima a quella attuale una *Data fine
@@ -69,8 +69,8 @@ giorno dopo). Una versione senza date conta come valida ogni giorno.
 ## Pronta per la fatturazione
 
 Solo le famiglie segnate **Pronta per la fatturazione** (e pubblicate, con prezzi validi oggi) sono proposte quando
-si aggiunge una posizione a un preventivo; l'API rifiuta le altre. Si cambia con il menu **Sì / No** nell'elenco o
-nella pagina della famiglia — solo l'azienda proprietaria può farlo. Una famiglia nuova parte **non pronta**; una copia o una nuova
+si aggiunge una posizione a un preventivo; l'API rifiuta le altre. Si cambia con l'interruttore nell'elenco o
+con il menu **Sì / No** nella pagina della famiglia — solo l'azienda proprietaria può farlo. Una famiglia nuova parte **non pronta**; una copia o una nuova
 versione parte dall'impostazione dell'originale (modificabile nella finestra). Quelle esistenti prima di questa impostazione sono state segnate pronte. Le posizioni già nei
 preventivi non cambiano e restano modificabili. Ogni modifica compare nella cronologia della famiglia.
 

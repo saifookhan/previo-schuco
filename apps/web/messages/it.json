@@ -285,12 +285,18 @@
     "hasPriceList": "Con listino",
     "validFrom": "Data inizio validità",
     "validTo": "Data fine validità",
+    "validity": "Validità",
     "inLibrary": "In libreria",
-    "actions": "Azioni"
+    "actions": "Azioni",
+    "expand": "Mostra i dettagli di {name}",
+    "collapse": "Nascondi i dettagli di {name}",
+    "openInNewTab": "Apri {name} in una nuova scheda"
   },
   "productFamilyActions": {
     "publish": "Pubblica",
     "unpublish": "Rimuovi pubblicazione",
+    "publishedOf": "Pubblicato: {name}",
+    "publishFailed": "Impossibile cambiare la pubblicazione di {name}",
     "duplicate": "Duplica",
     "delete": "Elimina",
     "cancel": "Annulla",

@@ -3,7 +3,7 @@
 import * as Dialog from '@radix-ui/react-dialog'
 import { CalendarRange, Loader2, Pencil } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -174,31 +174,19 @@ export const ProductFamilyPriceValidity = ({
 }
 
 /**
- * Dates just saved from the table, per family, until the refreshed page brings them back — the
- * two date cells of a row save both dates, so the second must not send the first's old value.
+ * Both validity dates, edited together in the expanded list row. One save sends both, so the
+ * two fields can't overwrite each other. "Valid from" can't be emptied; emptying "Valid to"
+ * means until further notice. Someone who may not edit the family sees the dates as text.
  */
-const savedDates = new Map<string, PriceValidity>()
-/** The save in progress per family, which the next one waits for. */
-const saveQueue = new Map<string, Promise<void>>()
-
-/**
- * "Valid from" or "Valid to" as a date field right in the families table, for the family's owner.
- * Saves when the field is left (or on Enter) — not on every change, since typing a year fires
- * one for each digit. "Valid from" can't be emptied; emptying "Valid to" means until further notice.
- */
-export const PriceValidityDateInput = ({
+export const PriceValidityFields = ({
   familyId,
   familyName,
-  field,
   validity,
-  today,
   canEdit,
 }: {
   familyId: string
   familyName: string
-  field: 'priceValidFrom' | 'priceValidTo'
   validity: PriceValidity
-  today: string
   /** False for families shared by another company — only the owner changes the dates. */
   canEdit: boolean
 }) => {
@@ -208,102 +196,106 @@ export const PriceValidityDateInput = ({
   const { can } = useAuth()
   const router = useRouter()
   const { startTransition } = useLoadingTransition()
-  const saved = validity[field] ?? ''
-  const [value, setValue] = useState(saved)
+  const [from, setFrom] = useState(validity.priceValidFrom ?? '')
+  const [to, setTo] = useState(validity.priceValidTo ?? '')
   const [saving, setSaving] = useState(false)
-  // Enter saves, then disabling the field blurs it — this keeps that from saving twice.
-  const inFlight = useRef(false)
-  // What the server has, including a save the refreshed page hasn't brought back yet.
-  const committed = useRef(saved)
+  const [error, setError] = useState<string | null>(null)
   useEffect(() => {
-    committed.current = saved
-    setValue(saved)
-  }, [saved])
-  // Fresh dates from the server replace what was saved meanwhile.
-  useEffect(() => {
-    savedDates.delete(familyId)
-  }, [familyId, validity.priceValidFrom, validity.priceValidTo])
+    setFrom(validity.priceValidFrom ?? '')
+    setTo(validity.priceValidTo ?? '')
+    setError(null)
+  }, [validity.priceValidFrom, validity.priceValidTo])
 
-  const save = async (next: string) => {
-    if (next === committed.current || inFlight.current) return
-    inFlight.current = true
+  const day = (value: string | null) => (value ? format.dateTime(asDay(value), { dateStyle: 'medium', timeZone: 'UTC' }) : '—')
+  const dateError = !from ? t('validFromRequired') : to && to < from ? t('validToBeforeFrom') : null
+  // A family with no dates opens quietly. The message appears once the dates are changed, or when they already contradict each other.
+  const changed = from !== (validity.priceValidFrom ?? '') || to !== (validity.priceValidTo ?? '')
+  const showDateError = dateError !== null && (changed || Boolean(from && to && to < from))
+  const editable = canEdit && can('catalog.edit')
+
+  const save = async () => {
+    if (dateError) return
     setSaving(true)
-    // One save at a time per family, so each sends the dates the previous one left.
-    const previous = saveQueue.get(familyId) ?? Promise.resolve()
-    const run = previous.then(() => send(next))
-    saveQueue.set(familyId, run)
-    try {
-      await run
-    } finally {
-      if (saveQueue.get(familyId) === run) saveQueue.delete(familyId)
-      inFlight.current = false
-      setSaving(false)
-    }
-  }
-
-  const send = async (next: string) => {
-    const current = savedDates.get(familyId) ?? validity
-    const dates: PriceValidity = { priceValidFrom: current.priceValidFrom, priceValidTo: current.priceValidTo, [field]: next || null }
-    const problem = !dates.priceValidFrom
-      ? t('validFromRequired')
-      : dates.priceValidTo && dates.priceValidTo < dates.priceValidFrom
-        ? t('validToBeforeFrom')
-        : null
-    if (problem) {
-      setValue(committed.current)
-      showToast(`${familyName}: ${problem}`, 'error')
-      return
-    }
+    setError(null)
     try {
       const response = await fetch(`/api/product-families/${familyId}/price-validity`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dates),
+        body: JSON.stringify({ priceValidFrom: from, priceValidTo: to || null }),
       })
+      const data = (await response.json().catch(() => ({}))) as { error?: string }
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { error?: string }
-        setValue(committed.current)
-        showToast(`${familyName}: ${saveError(data, t('saveFailed'))}`, 'error')
+        setError(saveError(data, t('saveFailed')))
         return
       }
-      committed.current = next
-      savedDates.set(familyId, dates)
+      showToast(t('saved'))
       startTransition(() => router.refresh())
     } catch {
-      setValue(committed.current)
-      showToast(t('saveFailedUnreachable'), 'error')
+      setError(t('saveFailedUnreachable'))
+    } finally {
+      setSaving(false)
     }
   }
 
-
-  // The status sits under "Valid to", so it shows once per row.
-  const badge = field === 'priceValidTo' ? <PriceValidityBadge validity={validity} today={today} /> : null
-
-  if (!canEdit || !can('catalog.edit')) {
+  if (!editable) {
     return (
-      <div className="space-y-1 text-slate-600">
-        <p className="whitespace-nowrap">{saved ? format.dateTime(asDay(saved), { dateStyle: 'medium', timeZone: 'UTC' }) : '—'}</p>
-        {badge}
+      <div className="flex flex-wrap gap-6 text-sm text-slate-600">
+        <div>
+          <p className="text-xs text-slate-500">{t('validFrom')}</p>
+          <p>{day(validity.priceValidFrom)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">{t('validTo')}</p>
+          <p>{day(validity.priceValidTo)}</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-1">
-      <Input
-        type="date"
-        aria-label={t(field === 'priceValidFrom' ? 'validFromOf' : 'validToOf', { name: familyName })}
-        className="h-8 w-[8.5rem] px-1.5 text-sm"
-        required={field === 'priceValidFrom'}
-        min={field === 'priceValidTo' ? validity.priceValidFrom || undefined : undefined}
-        max={field === 'priceValidFrom' ? validity.priceValidTo || undefined : undefined}
-        value={value}
-        disabled={saving}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={() => void save(value)}
-        onKeyDown={(e) => (e.key === 'Enter' ? void save(value) : undefined)}
-      />
-      {badge}
-    </div>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        void save()
+      }}
+      className="space-y-2"
+    >
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <Label htmlFor={`validity-from-${familyId}`}>{t('validFrom')}</Label>
+          <Input
+            id={`validity-from-${familyId}`}
+            type="date"
+            required
+            aria-label={t('validFromOf', { name: familyName })}
+            className="h-8 w-[10.5rem]"
+            max={to || undefined}
+            value={from}
+            disabled={saving}
+            onChange={(e) => setFrom(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`validity-to-${familyId}`}>{t('validTo')}</Label>
+          <Input
+            id={`validity-to-${familyId}`}
+            type="date"
+            aria-label={t('validToOf', { name: familyName })}
+            className="h-8 w-[10.5rem]"
+            min={from || undefined}
+            value={to}
+            disabled={saving}
+            onChange={(e) => setTo(e.target.value)}
+          />
+        </div>
+        <Button type="submit" size="sm" disabled={saving || dateError !== null}>
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+          {saving ? t('saving') : t('save')}
+        </Button>
+      </div>
+      <p className="text-xs text-slate-500">{t('validToHint')}</p>
+      {showDateError ? <p className="text-xs text-red-600">{dateError}</p> : null}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+    </form>
   )
 }

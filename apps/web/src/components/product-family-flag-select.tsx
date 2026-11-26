@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { useLoadingTransition } from '@/components/ui/loading-region'
+import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from '@/i18n/navigation'
 import { showToast } from '@/lib/toast'
@@ -23,8 +24,8 @@ const FLAGS: Record<ProductFamilyFlag, { path: string; permission: Permission }>
 }
 
 /**
- * A family's Yes/No setting ("Con listino", "Ready for invoicing", "In libreria"): a select for
- * whoever may change it, a badge for everyone else. Saves on change.
+ * A family's Yes/No setting ("Con listino", "Ready for invoicing", "In libreria"): a select or
+ * switch for whoever may change it, a badge for everyone else. Saves on change.
  */
 export const ProductFamilyFlagSelect = ({
   flag,
@@ -32,6 +33,7 @@ export const ProductFamilyFlagSelect = ({
   familyName,
   value: saved,
   canEdit,
+  appearance = 'select',
 }: {
   flag: ProductFamilyFlag
   familyId: string
@@ -39,6 +41,8 @@ export const ProductFamilyFlagSelect = ({
   value: boolean
   /** False when the family's settings aren't the caller's to change, e.g. one shared by another company. */
   canEdit: boolean
+  /** The list uses a switch. The family page keeps the select. */
+  appearance?: 'select' | 'switch'
 }) => {
   const t = useTranslations('productFamilyFlags')
   const router = useRouter()
@@ -76,6 +80,17 @@ export const ProductFamilyFlagSelect = ({
     } finally {
       setSaving(false)
     }
+  }
+
+  if (appearance === 'switch') {
+    return (
+      <Switch
+        checked={value}
+        disabled={saving}
+        label={t(`${flag}.label`, { name: familyName })}
+        onCheckedChange={(next) => void change(next)}
+      />
+    )
   }
 
   return (
