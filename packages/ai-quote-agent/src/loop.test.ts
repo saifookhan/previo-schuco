@@ -197,4 +197,90 @@ describe('runQuoteAgent', () => {
     })
     expect(events.some((event) => event.type === 'status' && event.tool === 'add_text_module')).toBe(true)
   })
+
+  it('adds a sized row instead of changing the first quantity', async () => {
+    const executed: string[] = []
+    const turns: ModelTurn[] = [
+      { content: null, toolCalls: [{ id: 'call-1', name: 'update_line', arguments: '{"lineName":"pos 1","quantity":500}' }] },
+      {
+        content: null,
+        toolCalls: [{ id: 'call-2', name: 'add_product', arguments: '{"lineName":"profondità 150","widthMm":1200,"heightMm":1400,"quantity":1}' }],
+      },
+      { content: 'Ho aggiunto la riga.', toolCalls: [] },
+    ]
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'Aggiungi una riga MyBox Revo Light profondità 150, 1200×1400 mm, quantità 1' }],
+      complete: async () => turns.shift()!,
+      execute: async (name) => {
+        executed.push(name)
+        return { content: 'added' }
+      },
+      emit: () => {},
+    })
+    expect(executed).toEqual(['add_product'])
+  })
+
+  it('uses the chosen family instead of asking for the same line again', async () => {
+    const events: AgentEvent[] = []
+    const turns: ModelTurn[] = [
+      { content: 'Which Cassonetto MyBox Revo Light profondità 80 do you want to add?', toolCalls: [] },
+      {
+        content: null,
+        toolCalls: [
+          {
+            id: 'call-1',
+            name: 'add_product',
+            arguments: '{"familyId":"13243902-2aae-498e-9d5a-f769c2edc88a","lineName":"Cassonetto MyBox Revo Light profondità 80","widthMm":1200,"heightMm":1400,"quantity":1}',
+          },
+        ],
+      },
+      { content: 'Ho aggiunto la riga.', toolCalls: [] },
+    ]
+    await runQuoteAgent({
+      messages: [
+        {
+          role: 'user',
+          content: 'Aggiungi "Cassonetto MyBox Revo Light profondità 80" della famiglia "ali - Cassonetto Coibentato MyBox Revo", id 13243902-2aae-498e-9d5a-f769c2edc88a',
+        },
+      ],
+      complete: async () => turns.shift()!,
+      execute: async (name) => {
+        expect(name).toBe('add_product')
+        return { content: 'added' }
+      },
+      emit: (event) => {
+        events.push(event)
+      },
+    })
+    expect(events.some((event) => event.type === 'status' && event.tool === 'add_product')).toBe(true)
+    expect(events.filter((event) => event.type === 'text').map((event) => (event.type === 'text' ? event.delta : '')).join('')).toContain('riga')
+  })
+
+  it('adds the picked line instead of asking which one again', async () => {
+    const executed: string[] = []
+    const turns: ModelTurn[] = [
+      { content: 'Which Confezione 30 Filtri Flow F7/G4 COMPACT?', toolCalls: [] },
+      {
+        content: null,
+        toolCalls: [
+          {
+            id: 'call-1',
+            name: 'add_product',
+            arguments: '{"lineName":"Confezione 30 Filtri Flow F7/G4 COMPACT","widthMm":2000,"heightMm":2000}',
+          },
+        ],
+      },
+      { content: 'Ho aggiunto Confezione 30.', toolCalls: [] },
+    ]
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'Aggiungi "Confezione 30 Filtri Flow F7/G4 COMPACT "' }],
+      complete: async () => turns.shift()!,
+      execute: async (name) => {
+        executed.push(name)
+        return { content: 'added' }
+      },
+      emit: () => {},
+    })
+    expect(executed).toEqual(['add_product'])
+  })
 })

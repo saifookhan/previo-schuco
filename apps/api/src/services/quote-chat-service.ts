@@ -1,4 +1,15 @@
-import { expandQuery, foldName, nameMatches, placeActivity, positionQuery, samePosition, withoutSize, type Suggestion } from '@schuco/ai-quote-agent'
+import {
+  expandQuery,
+  foldName,
+  nameMatches,
+  placeActivity,
+  positionQuery,
+  quotedName,
+  samePosition,
+  selectNameMatches,
+  withoutSize,
+  type Suggestion,
+} from '@schuco/ai-quote-agent'
 import {
   lineNetUnitPrice,
   lineTotal,
@@ -211,11 +222,16 @@ const searchCatalog = async (ctx: TenantContext, query: string, includeHidden: b
   const hits = families.filter(matchesFamily)
   const visible = includeHidden ? hits : hits.filter(isQuotable)
   const hiddenCount = hits.length - hits.filter(isQuotable).length
-  const wantsLines = visible.length === 0 || /\d/.test(query)
-  const pool = wantsLines ? (visible.length > 0 ? visible : includeHidden ? families : families.filter(isQuotable)).slice(0, 40) : []
+  const pickedLine = quotedName(query)
+  const requestedFamilyId = query.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0]
+  const wantsLines = Boolean(pickedLine) || Boolean(requestedFamilyId) || visible.length === 0 || /\d/.test(query)
+  const scoped = requestedFamilyId ? families.filter((family) => family.id === requestedFamilyId) : visible.length > 0 && !pickedLine ? visible : includeHidden ? families : families.filter(isQuotable)
+  const pool = scoped.slice(0, 40)
   const productLines = await listLinesForFamilies(ctx, pool.map((family) => family.id))
   const byFamily = new Map(pool.map((family) => [family.id, family]))
-  const lineHits = productLines.filter((line) => queries.some((term) => nameMatches(line.name, term))).slice(0, 8)
+  const lineQuery = withoutSize(pickedLine ?? query)
+  const allLineHits = selectNameMatches(productLines, (line) => line.name, lineQuery)
+  const lineHits = allLineHits.slice(0, 8)
   const lineText = lineHits
     .map((line) => {
       const family = byFamily.get(line.productFamilyId)
@@ -236,17 +252,45 @@ const searchCatalog = async (ctx: TenantContext, query: string, includeHidden: b
   const familyText = shown.map((family) => familyLine(family)).join('\n')
   const more = visible.length > 8 ? `\n${visible.length - 8} more families not shown. Ask the user to narrow the name.` : ''
   const choice = shown.length > 1 ? '\nSeveral families match. Ask the user which one. Do not add yet.' : shown.length === 1 ? '\nOne family match. You may use this id.' : ''
+  const lineChoices = lineFamilyChoices(lineHits, pool)
   const suggestions =
     shown.length > 1
       ? shown.map((family) => ({
           label: `v${family.version} · ${family.name} · ${validityLabel(family)}`,
           message: `Usa la famiglia "${family.name}" versione ${family.version}, id ${family.id}`,
         }))
-      : lineHits.length > 1
-        ? lineHits.slice(0, 8).map((line) => ({ label: line.name, message: `Aggiungi "${line.name}"` }))
+      : lineChoices.length > 1
+        ? lineChoices
         : undefined
   const products = lineText ? `\nProduct lines:\n${lineText}` : ''
-  return reply(`${familyText}${more}${choice}${products}`.trim(), suggestions)
+  const sameLine =
+    new Set(lineHits.map((line) => line.productFamilyId)).size > 1
+      ? '\nThis line is in several families. Each choice names the family and its id. Do not add until the user picks one.'
+      : ''
+  const moreLines = allLineHits.length > 8 ? `\n${allLineHits.length - 8} more product lines not shown.` : ''
+  return reply(`${familyText}${more}${choice}${products}${moreLines}${sameLine}`.trim(), suggestions)
+}
+
+const lineFamilyChoices = (
+  hits: { name: string; productFamilyId: string }[],
+  families: { id: string; name: string }[],
+  size?: { widthMm: number; heightMm: number; quantity?: number },
+): Suggestion[] => {
+  const seen = new Set<string>()
+  const choices: Suggestion[] = []
+  for (const line of hits) {
+    if (seen.has(line.productFamilyId)) continue
+    seen.add(line.productFamilyId)
+    const family = families.find((item) => item.id === line.productFamilyId)
+    if (!family) continue
+    const sizeText = size ? `, ${size.widthMm}×${size.heightMm} mm, quantità ${size.quantity ?? 1}` : ''
+    choices.push({
+      label: `${line.name} · ${family.name}`,
+      message: `Aggiungi "${line.name}" della famiglia "${family.name}", id ${family.id}${sizeText}`,
+    })
+    if (choices.length === 8) break
+  }
+  return choices
 }
 
 const describeFamily = async (ctx: TenantContext, familyId: string): Promise<ToolResult> => {
@@ -371,19 +415,35 @@ const addProduct = async (
   args: Record<string, unknown>,
 ): Promise<ToolResult> => {
   const current = requireQuote(state)
-  const familyId = str(args.familyId)
+  let familyId = str(args.familyId)
   const lineName = str(args.lineName)
   const widthMm = num(args.widthMm)
   const heightMm = num(args.heightMm)
-  if (!familyId || !lineName) return reply('familyId and lineName are required.')
+  if (!lineName) return reply('lineName is required.')
   if (!widthMm || !heightMm) return reply('Width and height in millimetres are required before adding a catalog row.')
+  if (!familyId) {
+    const families = (await listProductFamilies(ctx, { includeOutOfLibrary: true })).filter(isQuotable)
+    const lines = await listLinesForFamilies(ctx, families.map((family) => family.id))
+    const hits = selectNameMatches(lines, (line) => line.name, lineName)
+    const familyIds = [...new Set(hits.map((line) => line.productFamilyId))]
+    if (familyIds.length === 0) return reply(`No current line matches "${lineName}".`)
+    if (familyIds.length > 1) {
+      const choices = lineFamilyChoices(hits, families, { widthMm, heightMm, quantity: num(args.quantity) })
+      return reply(
+        `Several families contain "${lineName}". Ask which family. Do not add yet.\n${choices.map((choice) => `- ${choice.label}`).join('\n')}`,
+        choices,
+      )
+    }
+    familyId = familyIds[0]
+  }
+  if (!familyId) return reply('familyId is required.')
 
   const detail = await getProductFamilyDetailWithLibrary(ctx, familyId)
   if (!detail) return reply('Family not found.')
   if (!isQuotable({ ...detail.family, inLibrary: detail.inLibrary })) {
     return reply(`${detail.family.name} v${detail.family.version} is not a current published family. Do not add it.`)
   }
-  const lineHits = detail.lines.filter((line) => nameMatches(line.name, lineName))
+  const lineHits = selectNameMatches(detail.lines, (line) => line.name, lineName)
   if (lineHits.length === 0) return reply(`No line named "${lineName}" in ${detail.family.name}. Lines: ${detail.lines.map((line) => line.name).join(' | ')}`)
   if (lineHits.length > 1) {
     return reply(

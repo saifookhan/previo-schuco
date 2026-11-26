@@ -7,6 +7,11 @@ const TEXT_CHUNK = 24
 const REFUSAL =
   /don'?t have (?:the |any )?(?:tools|capability|ability|access)|do not have (?:the |any )?(?:tools|capability|ability|access)|non ho (?:gli strumenti|la capacit|la possibilit|accesso)|cannot assist|can'?t assist|non posso (?:farlo|modificar|cambiar)/i
 const SIZE = /\d{2,5}\s*[x×]\s*\d{2,5}/
+const FAMILY_ID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i
+
+/** "Aggiungi una riga … 1200×1400, quantità 1" is a new row, not a change to an existing quantity. */
+const addingNewRow = (message: string): boolean =>
+  /\b(aggiung\w*\s+una\s+riga|nuova\s+riga|add(?:\s+a)?(?:\s+new)?\s+row|neue\s+zeile)\b/i.test(message) && SIZE.test(message)
 
 /** One extra round when the model answers in prose instead of calling a tool it has. */
 const nudgeFor = (text: string, latestUser: string, called: ReadonlySet<string>): string | null => {
@@ -23,7 +28,21 @@ const nudgeFor = (text: string, latestUser: string, called: ReadonlySet<string>)
   if (/\b(duplic\w*|kopier\w*|copy)\b/i.test(latestUser) && /\b(first|prima|primo|erste)\b/i.test(latestUser) && !called.has('duplicate_line')) {
     return 'The user asked to duplicate the first row. Call duplicate_line now with lineName "pos 1".'
   }
-  if (/\b(qty|q\.?ty|quantit|pezzi|stück|stueck|anzahl)\b/i.test(latestUser) && /\d/.test(latestUser) && !called.has('update_line')) {
+  if (addingNewRow(latestUser) && !called.has('add_product')) {
+    return 'The user asked to add a new catalog row, including a quantity for that new row. Call add_product with the line name, width, height, and quantity. Do not call update_line.'
+  }
+  if (FAMILY_ID.test(latestUser) && /\b(aggiung\w*|della famiglia)\b/i.test(latestUser) && !called.has('add_product')) {
+    return 'The user chose one family. Call add_product now with that familyId and the line name. Use the width, height, and quantity already given. Do not search again.'
+  }
+  if (/\b(aggiung\w*|add)\s+["“]/i.test(latestUser) && !called.has('add_product')) {
+    return 'The user picked one product line. Call add_product with that exact line name and the width and height from the conversation. Do not call search_catalog and do not ask the same question again.'
+  }
+  if (
+    /\b(qty|q\.?ty|quantit|pezzi|stück|stueck|anzahl)\b/i.test(latestUser) &&
+    /\d/.test(latestUser) &&
+    !addingNewRow(latestUser) &&
+    !called.has('update_line')
+  ) {
     return 'The user asked to change a quantity. Call update_line now. lineName is the Pos, for example "pos 1", or the product name. quantity is the number they gave.'
   }
   if (REFUSAL.test(text)) {
@@ -96,6 +115,14 @@ export const runQuoteAgent = async ({ messages, complete, execute, emit }: Agent
     history.push({ role: 'assistant', content: turn.content, toolCalls: turn.toolCalls })
     pendingSuggestions = []
     for (const call of turn.toolCalls) {
+      if (call.name === 'update_line' && addingNewRow(latestUser)) {
+        history.push({
+          role: 'tool',
+          content: 'The user asked to add a new row. Call add_product with the line name, width, height, and quantity. Do not change an existing row.',
+          toolCallId: call.id,
+        })
+        continue
+      }
       called.add(call.name)
       await emit({ type: 'status', tool: call.name })
       const outcome = await execute(call.name, parseArgs(call.arguments))

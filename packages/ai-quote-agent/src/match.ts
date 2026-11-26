@@ -98,3 +98,21 @@ export const nameMatches = (name: string, query: string): boolean => {
   const tokens = queryTokens(query)
   return tokens.length > 0 && tokens.every((token) => tokenMatches(foldedName, token))
 }
+
+/**
+ * An exact name wins. "Confezione 30 … COMPACT" must not also return "… COMPACT HR",
+ * which contains the same words. A short query such as "confezione" still returns every match.
+ */
+export const selectNameMatches = <T>(items: T[], nameOf: (item: T) => string, query: string): T[] => {
+  const foldedQuery = foldName(query)
+  if (!foldedQuery) return items
+  const exact = items.filter((item) => foldName(nameOf(item)) === foldedQuery)
+  if (exact.length > 0) return exact
+  return items.filter((item) => nameMatches(nameOf(item), query))
+}
+
+/** The product name inside quotes, when the user clicked a chip such as Aggiungi "…". */
+export const quotedName = (query: string): string | null => {
+  const name = query.match(/["“]([^"”]+)["”]/)?.[1]?.trim()
+  return name || null
+}

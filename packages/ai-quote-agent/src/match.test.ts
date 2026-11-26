@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { expandQuery, nameMatches, samePosition, withoutSize } from './match'
+import { expandQuery, nameMatches, quotedName, samePosition, selectNameMatches, withoutSize } from './match'
 
 describe('nameMatches', () => {
   it('ignores case and accents', () => {
@@ -25,6 +25,26 @@ describe('samePosition', () => {
     expect(samePosition('10', 'pos 1')).toBe(false)
     expect(samePosition('1', 'the first one')).toBe(true)
     expect(samePosition('1', 'prima riga')).toBe(true)
+  })
+})
+
+describe('selectNameMatches', () => {
+  const lines = ['Confezione 30 Filtri Flow F7/G4 COMPACT', 'Confezione 30 Filtri Flow F7/G4 COMPACT HR', 'Confezione 10 Filtri']
+
+  it('keeps only the exact line after the user picks it', () => {
+    expect(selectNameMatches(lines, (line) => line, 'Confezione 30 Filtri Flow F7/G4 COMPACT ')).toEqual([
+      'Confezione 30 Filtri Flow F7/G4 COMPACT',
+    ])
+  })
+
+  it('still lists every confezione when the name is incomplete', () => {
+    expect(selectNameMatches(lines, (line) => line, 'confizione')).toEqual(lines)
+  })
+})
+
+describe('quotedName', () => {
+  it('reads the product from a chip click', () => {
+    expect(quotedName('Aggiungi "Confezione 30 Filtri Flow F7/G4 COMPACT "')).toBe('Confezione 30 Filtri Flow F7/G4 COMPACT')
   })
 })
 

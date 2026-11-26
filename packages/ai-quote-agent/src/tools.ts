@@ -49,7 +49,7 @@ export const QUOTE_TOOLS: ToolDefinition[] = [
   {
     name: 'add_product',
     description:
-      'Add a catalog product as a new row. If that family is not on the quote yet, it is added as a new family block with this row. Width and height in millimetres are required. If several families or lines match the names, this does not add anything and returns the choices.',
+      'Add a catalog product as a new row. If that family is not on the quote yet, it is added as a new family block with this row. Width and height in millimetres are required. quantity is the pieces on this new row, not a change to an existing row. If the same line is in several families, pass the familyId the user picked. If several families or lines match and no familyId is given, this does not add anything and returns the choices.',
     parameters: {
       type: 'object',
       properties: {
