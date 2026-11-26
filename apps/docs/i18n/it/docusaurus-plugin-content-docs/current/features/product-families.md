@@ -28,10 +28,10 @@ Ogni ambiente ne ha già una: **Demo Window W70** (vedi [Dati demo](../demo-data
 | Nuova versione | **Nuova versione** nella pagina della famiglia | Stessa finestra dell'importazione; la nuova versione ha la sua validità prezzi e quella vecchia mantiene le sue date |
 | Duplica | Icona copia nella riga | Una finestra chiede nome, validità prezzi e pubblicazione della copia (parte dalle date dell'originale, non pubblicata) |
 | Elimina | **Elimina** nella riga espansa (pulsante nella pagina della famiglia) | |
-| Cambia validità prezzi | **Valido dal** e **Valido fino al** nella riga espansa, poi **Salva** (o **Modifica** nella pagina della famiglia) | Solo il proprietario (o il super-admin). La colonna **Date di validità** mostra le due date come un intervallo |
-| Pronta per la fatturazione | Etichetta Sì/No nella riga; interruttore nella riga espansa (Sì/No nella pagina della famiglia) | Solo le famiglie pronte per la fatturazione sono proposte nel preventivo. Solo il proprietario |
-| Con listino | Etichetta Sì/No nella riga; interruttore nella riga espansa (Sì/No nella pagina della famiglia) | Se dietro la famiglia ci sono dei prezzi — mostrato nel preventivo. Solo il proprietario |
-| In libreria | Etichetta Sì/No nella riga; interruttore nella riga espansa (Sì/No nella pagina della famiglia) | Se il preventivo della tua azienda propone la famiglia — per le tue famiglie e per quelle condivise. Amministratori e responsabili |
+| Cambia validità prezzi | **Valido dal** e **Valido fino al** nella riga espansa, poi **Salva** (o **Modifica** nella pagina della famiglia) | Solo il proprietario (o il super-admin). La colonna **Date di validità** mostra le date come GG.MM.AAAA |
+| Pronta per la fatturazione | Etichetta nella colonna **Tag** quando è attiva; interruttore nella riga espansa (Sì/No nella pagina della famiglia) | Solo le famiglie pronte per la fatturazione sono proposte nel preventivo. Solo il proprietario |
+| Con listino | Etichetta nella colonna **Tag** quando è attiva; interruttore nella riga espansa (Sì/No nella pagina della famiglia) | Se dietro la famiglia ci sono dei prezzi — mostrato nel preventivo. Solo il proprietario |
+| In libreria | Etichetta nella colonna **Tag** quando è attiva; interruttore nella riga espansa (Sì/No nella pagina della famiglia) | Se il preventivo della tua azienda propone la famiglia — per le tue famiglie e per quelle condivise. Amministratori e responsabili |
 
 ![Dettaglio famiglia di prodotto](/img/screens/product-family-detail.png)
 
@@ -69,7 +69,7 @@ giorno dopo). Una versione senza date conta come valida ogni giorno.
 ## Pronta per la fatturazione
 
 Solo le famiglie segnate **Pronta per la fatturazione** (e pubblicate, con prezzi validi oggi) sono proposte quando
-si aggiunge una posizione a un preventivo; l'API rifiuta le altre. La riga mostra Sì o No. Si cambia con l'interruttore nella riga espansa o
+si aggiunge una posizione a un preventivo; l'API rifiuta le altre. La colonna **Tag** lo mostra quando è attivo. Si cambia con l'interruttore nella riga espansa o
 con il menu **Sì / No** nella pagina della famiglia — solo l'azienda proprietaria può farlo. Una famiglia nuova parte **non pronta**; una copia o una nuova
 versione parte dall'impostazione dell'originale (modificabile nella finestra). Quelle esistenti prima di questa impostazione sono state segnate pronte. Le posizioni già nei
 preventivi non cambiano e restano modificabili. Ogni modifica compare nella cronologia della famiglia.

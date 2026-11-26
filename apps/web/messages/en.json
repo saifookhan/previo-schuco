@@ -286,6 +286,7 @@
     "validFrom": "Valid from",
     "validTo": "Valid to",
     "validity": "Validity dates",
+    "tags": "Tags",
     "publishedStatus": "Status (published)",
     "inLibrary": "In library",
     "actions": "Actions",

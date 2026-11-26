@@ -28,10 +28,10 @@ Jede Umgebung hat bereits eine: **Demo Window W70** (siehe [Demo-Daten](../demo-
 | Neue Version | **Neue Version** auf der Seite der Familie | Derselbe Dialog wie beim Import; die neue Version bekommt eine eigene Preisgültigkeit, die alte behält ihre Daten |
 | Duplizieren | Kopier-Symbol in der Zeile | Ein Dialog fragt nach Name, Preisgültigkeit und Veröffentlichung der Kopie (startet mit den Daten des Originals, unveröffentlicht) |
 | Löschen | **Löschen** in der aufgeklappten Zeile (Schaltfläche auf der Seite der Familie) | |
-| Preisgültigkeit ändern | **Gültig ab** und **Gültig bis** in der aufgeklappten Zeile, dann **Speichern** (oder **Bearbeiten** auf der Seite der Familie) | Nur Eigentümer (oder Super-Admin). Die Spalte **Gültigkeitsdaten** zeigt beide Daten als einen Zeitraum |
-| Bereit zur Fakturierung | Ja/Nein-Markierung in der Zeile; Schalter in der aufgeklappten Zeile (Ja/Nein auf der Seite der Familie) | Nur Familien, die bereit zur Fakturierung sind, werden im Angebot angeboten. Nur Eigentümer |
-| Mit Preisliste | Ja/Nein-Markierung in der Zeile; Schalter in der aufgeklappten Zeile (Ja/Nein auf der Seite der Familie) | Ob hinter der Familie Preise stehen — wird im Angebot angezeigt. Nur Eigentümer |
-| In Bibliothek | Ja/Nein-Markierung in der Zeile; Schalter in der aufgeklappten Zeile (Ja/Nein auf der Seite der Familie) | Ob das Angebot Ihres Unternehmens die Familie anbietet — für eigene und geteilte Familien. Administratoren und Manager |
+| Preisgültigkeit ändern | **Gültig ab** und **Gültig bis** in der aufgeklappten Zeile, dann **Speichern** (oder **Bearbeiten** auf der Seite der Familie) | Nur Eigentümer (oder Super-Admin). Die Spalte **Gültigkeitsdaten** zeigt die Daten als TT.MM.JJJJ |
+| Bereit zur Fakturierung | Markierung in der Spalte **Tags**, wenn gesetzt; Schalter in der aufgeklappten Zeile (Ja/Nein auf der Seite der Familie) | Nur Familien, die bereit zur Fakturierung sind, werden im Angebot angeboten. Nur Eigentümer |
+| Mit Preisliste | Markierung in der Spalte **Tags**, wenn gesetzt; Schalter in der aufgeklappten Zeile (Ja/Nein auf der Seite der Familie) | Ob hinter der Familie Preise stehen — wird im Angebot angezeigt. Nur Eigentümer |
+| In Bibliothek | Markierung in der Spalte **Tags**, wenn gesetzt; Schalter in der aufgeklappten Zeile (Ja/Nein auf der Seite der Familie) | Ob das Angebot Ihres Unternehmens die Familie anbietet — für eigene und geteilte Familien. Administratoren und Manager |
 
 ![Produktfamilie im Detail](/img/screens/product-family-detail.png)
 
@@ -70,7 +70,7 @@ gilt an jedem Tag.
 ## Bereit zur Fakturierung
 
 Nur Familien mit **Bereit zur Fakturierung** (und veröffentlicht, mit heute gültigen Preisen) werden beim Hinzufügen
-einer Position zu einem Angebot angeboten; die API lehnt die anderen ab. Die Zeile zeigt Ja oder Nein. Geändert wird es mit dem Schalter
+einer Position zu einem Angebot angeboten; die API lehnt die anderen ab. Die Spalte **Tags** zeigt es, wenn es gesetzt ist. Geändert wird es mit dem Schalter
 in der aufgeklappten Zeile oder dem Auswahlfeld **Ja / Nein** auf der Seite der Familie — nur vom Eigentümer-Unternehmen. Eine neue Familie startet als **nicht bereit**; eine Kopie oder
 neue Version übernimmt die Einstellung des Originals (im Dialog änderbar). Familien, die vor dieser Einstellung existierten, wurden als bereit
 markiert. Positionen, die schon in Angeboten sind, bleiben unverändert und bearbeitbar. Jede Änderung steht im Verlauf

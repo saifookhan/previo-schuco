@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Fragment, useState, type MouseEvent, type ReactNode } from 'react'
 
 import { ProductFamilyFlagSelect } from '@/components/product-family-flag-select'
-import { PriceValidityBadge, PriceValidityFields, usePriceValidityLabel } from '@/components/product-family-price-validity'
+import { PriceValidityBadge, PriceValidityFields } from '@/components/product-family-price-validity'
 import { ProductFamilyPublishSwitch, ProductFamilyRowActions } from '@/components/product-family-row-actions'
 import { ProductFamilyShareButton } from '@/components/product-family-share-button'
 import { Badge } from '@/components/ui/badge'
@@ -14,13 +14,20 @@ import { cn } from '@/lib/utils'
 import type { ProductFamilySummary } from '@/types/product-family'
 import type { PriceValidity } from '@schuco/contracts'
 
-/** The two dates as one range, with Upcoming / Expired when the prices aren't current. */
+/** `YYYY-MM-DD` as `DD.MM.YYYY`, the shape the list shows instead of a sentence. */
+const formatDay = (value: string) => {
+  const [year, month, day] = value.split('-')
+  return year && month && day ? `${day}.${month}.${year}` : value
+}
+
+/** The two dates as `01.01.2026 – 31.12.2026`, with Upcoming / Expired when the prices aren't current. */
 const ValidityCell = ({ validity, today }: { validity: PriceValidity; today: string }) => {
-  const t = useTranslations('priceValidity')
-  const label = usePriceValidityLabel()
+  const from = validity.priceValidFrom ? formatDay(validity.priceValidFrom) : null
+  const to = validity.priceValidTo ? formatDay(validity.priceValidTo) : null
+  const text = from && to ? `${from} – ${to}` : (from ?? to)
   return (
     <div className="space-y-1">
-      <p className="whitespace-nowrap text-slate-600">{label(validity) ?? t('notSet')}</p>
+      <p className="whitespace-nowrap text-slate-600">{text ?? '—'}</p>
       <PriceValidityBadge validity={validity} today={today} />
     </div>
   )
@@ -34,10 +41,24 @@ const Setting = ({ label, children }: { label: string; children: ReactNode }) =>
   </div>
 )
 
-/** Yes or No, shown on the row. The switch that changes it sits in the expanded row. */
-const FlagTag = ({ value }: { value: boolean }) => {
-  const t = useTranslations('productFamilyFlags')
-  return <Badge variant={value ? 'success' : 'muted'}>{value ? t('yes') : t('no')}</Badge>
+/** The flags that are on, as named tags. The switches that change them sit in the expanded row. */
+const TagsCell = ({ family }: { family: ProductFamilySummary }) => {
+  const t = useTranslations('productFamilies')
+  const tags = [
+    family.hasPriceList ? t('hasPriceList') : null,
+    family.readyForInvoicing ? t('readyForInvoicing') : null,
+    (family.inLibrary ?? true) ? t('inLibrary') : null,
+  ].filter((tag) => tag !== null)
+  if (tags.length === 0) return <span className="text-slate-400">—</span>
+  return (
+    <div className="flex max-w-xs flex-wrap gap-1">
+      {tags.map((tag) => (
+        <Badge key={tag} variant="muted" className="whitespace-nowrap">
+          {tag}
+        </Badge>
+      ))}
+    </div>
+  )
 }
 
 /** Technical name, the settings, the two dates, and delete — one open row at a time. */
@@ -141,7 +162,7 @@ export const ProductFamilyTable = ({
   const tVersion = useTranslations('productFamilyVersion')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const shared = tab === 'shared'
-  const columnCount = shared ? 13 : 11
+  const columnCount = shared ? 11 : 9
 
   const toggle = (id: string) => setExpandedId((current) => (current === id ? null : id))
 
@@ -165,9 +186,7 @@ export const ProductFamilyTable = ({
           <th className="font-medium">{t('status')}</th>
           <th className="font-medium">{t('version')}</th>
           <th className="font-medium">{t('validity')}</th>
-          <th className="font-medium">{t('hasPriceList')}</th>
-          <th className="font-medium">{t('readyForInvoicing')}</th>
-          <th className="font-medium">{t('inLibrary')}</th>
+          <th className="font-medium">{t('tags')}</th>
           <th className="text-right font-medium">{t('actions')}</th>
         </tr>
       </thead>
@@ -230,13 +249,7 @@ export const ProductFamilyTable = ({
                   <ValidityCell validity={validity} today={today} />
                 </td>
                 <td>
-                  <FlagTag value={family.hasPriceList} />
-                </td>
-                <td>
-                  <FlagTag value={family.readyForInvoicing} />
-                </td>
-                <td>
-                  <FlagTag value={family.inLibrary ?? true} />
+                  <TagsCell family={family} />
                 </td>
                 <td>
                   <div className="flex items-center justify-end gap-2">

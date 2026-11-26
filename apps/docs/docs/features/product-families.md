@@ -28,10 +28,10 @@ Every environment already has one: **Demo Window W70** (see [Demo data](../demo-
 | New version | **New version** on the family's page | Same dialog as an import; the new version gets its own price validity and the old one keeps its dates |
 | Duplicate | Copy icon on the row | A dialog asks for the copy's name, price validity and whether to publish it (starts from the original's dates, unpublished) |
 | Delete | **Delete** inside the expanded row (button on the family's page) | |
-| Change price validity | **Valid from** and **Valid to** inside the expanded row, then **Save** (or **Edit** on the family's page) | Owner (or super-admin) only. The **Validity dates** column shows both dates as one range |
-| Ready for invoicing | Yes/No tag on the row; switch in the expanded row (Yes/No on the family's page) | Only families ready for invoicing are offered in the quote builder. Owner only |
-| With price list | Yes/No tag on the row; switch in the expanded row (Yes/No on the family's page) | Whether there are prices behind the family — shown in the quote builder. Owner only |
-| In library | Yes/No tag on the row; switch in the expanded row (Yes/No on the family's page) | Whether your company's quote builder offers the family — for your own families and for shared ones. Admins and managers |
+| Change price validity | **Valid from** and **Valid to** inside the expanded row, then **Save** (or **Edit** on the family's page) | Owner (or super-admin) only. The **Validity dates** column shows the dates as DD.MM.YYYY |
+| Ready for invoicing | Tag in the **Tags** column when it is on; switch in the expanded row (Yes/No on the family's page) | Only families ready for invoicing are offered in the quote builder. Owner only |
+| With price list | Tag in the **Tags** column when it is on; switch in the expanded row (Yes/No on the family's page) | Whether there are prices behind the family — shown in the quote builder. Owner only |
+| In library | Tag in the **Tags** column when it is on; switch in the expanded row (Yes/No on the family's page) | Whether your company's quote builder offers the family — for your own families and for shared ones. Admins and managers |
 
 ![Product family detail](/img/screens/product-family-detail.png)
 
@@ -68,7 +68,7 @@ the new version the day after). A version without dates counts as valid every da
 ## Ready for invoicing
 
 Only families marked **Ready for invoicing** (and published, with prices valid today) are offered when adding a
-position to a quote; the API refuses the others. The row shows Yes or No. Change it with the switch in the expanded row or the **Yes / No** dropdown on the
+position to a quote; the API refuses the others. The **Tags** column shows it when it is on. Change it with the switch in the expanded row or the **Yes / No** dropdown on the
 family's page — only the owning company can. A new family starts **not ready**; a copy or a new version starts
 with the original's setting (change it in the dialog). Families that existed before this setting were marked ready. Positions already on quotes are not affected and can still be
 edited. Each change is recorded in the family's history.
