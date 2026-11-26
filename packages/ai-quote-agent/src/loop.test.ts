@@ -82,4 +82,32 @@ describe('runQuoteAgent', () => {
     expect(events.some((event) => event.type === 'status' && event.tool === 'add_activity')).toBe(true)
     expect(events.filter((event) => event.type === 'text').map((event) => (event.type === 'text' ? event.delta : '')).join('')).toContain('saif testing')
   })
+
+  it('asks again when the model refuses to change a quantity', async () => {
+    const events: AgentEvent[] = []
+    const turns: ModelTurn[] = [
+      {
+        content: "I'm sorry, but I currently don't have the ability to make that change for you, as I don't have access to the necessary tools.",
+        toolCalls: [],
+      },
+      { content: null, toolCalls: [{ id: 'call-1', name: 'update_line', arguments: '{"lineName":"pos 1","quantity":500}' }] },
+      { content: 'Pos 1 ora ha quantità 500.', toolCalls: [] },
+    ]
+
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'change the qty for pos 1 to 500' }],
+      complete: async () => turns.shift()!,
+      execute: async (name, args) => {
+        expect(name).toBe('update_line')
+        expect(args).toEqual({ lineName: 'pos 1', quantity: 500 })
+        return { content: 'Updated pos 1 quantity 500' }
+      },
+      emit: (event) => {
+        events.push(event)
+      },
+    })
+
+    expect(events.some((event) => event.type === 'status' && event.tool === 'update_line')).toBe(true)
+    expect(events.filter((event) => event.type === 'text').map((event) => (event.type === 'text' ? event.delta : '')).join('')).toContain('500')
+  })
 })

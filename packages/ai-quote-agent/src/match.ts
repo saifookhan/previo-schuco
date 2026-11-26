@@ -67,6 +67,23 @@ const tokenMatches = (foldedName: string, token: string): boolean => {
   })
 }
 
+/** "pos 1", "posizione 1", and "1" are the Pos column, not a product name. */
+export const positionQuery = (query: string): string | null => {
+  const folded = foldName(query)
+  const labeled = folded.match(/^(?:pos(?:ition|izione)?|riga|zeile|row)\s*(\d+)$/)
+  const digits = labeled?.[1] ?? (/^\d+$/.test(folded) ? folded : null)
+  if (!digits) return null
+  return digits.replace(/^0+/, '') || '0'
+}
+
+const positionDigits = (code: string): string => code.replace(/\D/g, '').replace(/^0+/, '') || '0'
+
+/** True when the query names this row's Pos, such as "pos 1" for code "1" or "P01". */
+export const samePosition = (code: string, query: string): boolean => {
+  const wanted = positionQuery(query)
+  return wanted !== null && positionDigits(code) === wanted
+}
+
 /** True when the meaningful words of the query appear in the name. "Revost" still matches "Revo". */
 export const nameMatches = (name: string, query: string): boolean => {
   const foldedName = foldName(name)

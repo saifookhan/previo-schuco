@@ -4,11 +4,15 @@ import type { AgentEvent, ModelMessage, ModelTurn, ToolOutcome } from './types'
 
 const MAX_ROUNDS = 8
 const TEXT_CHUNK = 24
-const REFUSAL = /don'?t have the tools|do not have the tools|don'?t have the capability|non ho gli strumenti|non ho la capacit|cannot assist|can'?t assist/i
+const REFUSAL =
+  /don'?t have (?:the |any )?(?:tools|capability|ability|access)|do not have (?:the |any )?(?:tools|capability|ability|access)|non ho (?:gli strumenti|la capacit|la possibilit|accesso)|cannot assist|can'?t assist|non posso (?:farlo|modificar|cambiar)/i
 const SIZE = /\d{2,5}\s*[x×]\s*\d{2,5}/
 
 /** One extra round when the model answers in prose instead of calling a tool it has. */
 const nudgeFor = (text: string, latestUser: string, called: ReadonlySet<string>): string | null => {
+  if (/\b(qty|q\.?ty|quantit|pezzi|stück|stueck|anzahl)\b/i.test(latestUser) && /\d/.test(latestUser) && !called.has('update_line')) {
+    return 'The user asked to change a quantity. Call update_line now. lineName is the Pos, for example "pos 1", or the product name. quantity is the number they gave.'
+  }
   if (REFUSAL.test(text)) {
     return 'You do have tools, including add_activity for Included and Not included. Call the tool that matches the request. Do not say you lack tools.'
   }

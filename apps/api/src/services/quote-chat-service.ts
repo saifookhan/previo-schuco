@@ -1,4 +1,4 @@
-import { expandQuery, foldName, nameMatches, placeActivity, type Suggestion } from '@schuco/ai-quote-agent'
+import { expandQuery, foldName, nameMatches, placeActivity, positionQuery, samePosition, type Suggestion } from '@schuco/ai-quote-agent'
 import {
   lineNetUnitPrice,
   lineTotal,
@@ -68,12 +68,16 @@ const summarizeDocument = (document: QuoteDocument): string => {
   return `${rows || '(no products)'}\nActivities:\n${activities || '  (none)'}\nQuote total ex VAT ${quoteTotal(document).toFixed(2)}`
 }
 
-const findLines = (document: QuoteDocument, query: string): { family: QuoteFamily; line: QuoteLine }[] =>
-  document.families.flatMap((family) =>
-    family.lines
-      .filter((line) => nameMatches(line.name, query) || nameMatches(line.code, query) || line.id === query)
-      .map((line) => ({ family, line })),
-  )
+const findLines = (document: QuoteDocument, query: string): { family: QuoteFamily; line: QuoteLine }[] => {
+  const rows = document.families.flatMap((family) => family.lines.map((line) => ({ family, line })))
+  const byId = rows.filter(({ line }) => line.id === query)
+  if (byId.length > 0) return byId
+  if (positionQuery(query)) {
+    const byPos = rows.filter(({ line }) => samePosition(line.code, query))
+    if (byPos.length > 0) return byPos
+  }
+  return rows.filter(({ line }) => nameMatches(line.name, query) || nameMatches(line.code, query))
+}
 
 const findFamilies = (document: QuoteDocument, query: string): QuoteFamily[] =>
   document.families.filter((family) => nameMatches(family.name, query) || family.id === query)
@@ -94,7 +98,11 @@ const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
 
 const str = (value: unknown): string | undefined => (typeof value === 'string' && value.trim() ? value.trim() : undefined)
-const num = (value: unknown): number | undefined => (typeof value === 'number' && Number.isFinite(value) ? value : undefined)
+const num = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value)
+  return undefined
+}
 
 export const runQuoteChatTools = async (
   ctx: TenantContext,
@@ -475,7 +483,11 @@ const updateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatStat
   const unitPrice = num(args.unitPrice)
   if (extra !== undefined) line.extraMarkupPct = extra
   if (discount !== undefined) line.discountPct = Math.min(100, Math.max(0, discount))
-  if (quantity !== undefined) line.quantity = Math.max(1, Math.round(quantity))
+  if (quantity !== undefined) {
+    const pieces = Math.round(quantity)
+    if (pieces < 1 || pieces > 1_000_000) return reply('Quantity must be a whole number from 1 to 1000000.')
+    line.quantity = pieces
+  }
   if (hours !== undefined) line.installationHours = hours
   const vat = str(args.vatRate)
   if (vat) {

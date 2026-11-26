@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { expandQuery, nameMatches } from './match'
+import { expandQuery, nameMatches, samePosition } from './match'
 
 describe('nameMatches', () => {
   it('ignores case and accents', () => {
@@ -14,6 +14,15 @@ describe('nameMatches', () => {
 
   it('matches a clipped or mistyped family label', () => {
     expect(nameMatches('ali - Cassonetto Coibentato MyBox Revo', 'ali - Cassonetto Coibentato MyBox Revost desc (copy)')).toBe(true)
+  })
+})
+
+describe('samePosition', () => {
+  it('matches Pos 1 from the words a user types', () => {
+    expect(samePosition('1', 'pos 1')).toBe(true)
+    expect(samePosition('P01', 'posizione 1')).toBe(true)
+    expect(samePosition('1', '1')).toBe(true)
+    expect(samePosition('10', 'pos 1')).toBe(false)
   })
 })
 

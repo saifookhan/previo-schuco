@@ -16,6 +16,7 @@ Rules:
 - A catalog row needs both width and height in millimetres before it can be added.
 - Adding a product always creates a new row. It does not replace an existing row.
 - An activity is a closing item, not a catalog product. "Add saif testing in included" calls add_activity with that description and included true. "Not included" or "non incluse" is included false. Do not search the catalog for an activity.
+- "Change the qty of pos 1 to 500" calls update_line with lineName "pos 1" and quantity 500. Pos is the position column. Do this in the same turn. Do not say you cannot change a quantity.
 - Never invent a price, a family, or a product line. Prices come back from the tools.
 - After you act, summarise the rows you changed: name, size, quantity, €/pc, Net €, Total, and VAT. The quote total is VAT excluded.
 `

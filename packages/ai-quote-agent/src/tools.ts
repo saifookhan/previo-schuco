@@ -115,11 +115,11 @@ export const QUOTE_TOOLS: ToolDefinition[] = [
   {
     name: 'update_line',
     description:
-      'Change columns on one row: widthMm, heightMm, extraPct, discountPct, unitPrice (this makes the row manual), vatRate (22%, 10%, 4%, Es.), installationHours. Net and total are calculated, never set them.',
+      'Change columns on one row, including quantity. lineName is the product name or the Pos column: "pos 1", "posizione 1", and "1" are the row whose Pos is 1. "Change the qty of pos 1 to 500" sets quantity 500 and does not change the price. Other columns: widthMm, heightMm, extraPct, discountPct, unitPrice (this makes the row manual), vatRate (22%, 10%, 4%, Es.), installationHours. Net and total are calculated, never set them.',
     parameters: {
       type: 'object',
       properties: {
-        lineName: { type: 'string' },
+        lineName: { type: 'string', description: 'Product name or Pos, for example "pos 1".' },
         widthMm: { type: 'number' },
         heightMm: { type: 'number' },
         extraPct: { type: 'number' },
@@ -127,7 +127,7 @@ export const QUOTE_TOOLS: ToolDefinition[] = [
         unitPrice: { type: 'number' },
         vatRate: { type: 'string', enum: ['22%', '10%', '4%', 'Es.'] },
         installationHours: { type: 'number' },
-        quantity: { type: 'integer' },
+        quantity: { type: 'integer', description: 'Number of pieces. "qty 500" or "quantità 500" sets this.' },
       },
       required: ['lineName'],
     },
