@@ -28,6 +28,7 @@ interface QuoteChatProps {
 }
 
 const TOOLS = [
+  'catalog_summary',
   'search_catalog',
   'describe_family',
   'create_quote',
@@ -35,6 +36,7 @@ const TOOLS = [
   'duplicate_line',
   'duplicate_family',
   'move_line',
+  'add_activity',
   'update_line',
 ] as const
 

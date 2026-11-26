@@ -1186,6 +1186,7 @@
     "unavailable": "L’assistente non è disponibile in questo momento.",
     "empty": "Dimmi il cliente e il prodotto. Uso solo il listino corrente.",
     "tools": {
+      "catalog_summary": "Conto il catalogo",
       "search_catalog": "Cerco nel catalogo",
       "describe_family": "Leggo la famiglia prodotto",
       "create_quote": "Creo il preventivo",
@@ -1193,6 +1194,7 @@
       "duplicate_line": "Duplico la riga",
       "duplicate_family": "Duplico la famiglia",
       "move_line": "Sposto la riga",
+      "add_activity": "Aggiungo un'attività",
       "update_line": "Aggiorno la riga"
     },
     "starters": {

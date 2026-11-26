@@ -10,7 +10,14 @@ const SIZE = /\d{2,5}\s*[x×]\s*\d{2,5}/
 /** One extra round when the model answers in prose instead of calling a tool it has. */
 const nudgeFor = (text: string, latestUser: string, called: ReadonlySet<string>): string | null => {
   if (REFUSAL.test(text)) {
-    return 'You do have tools. Call catalog_summary, search_catalog, describe_family, or add_product now. Do not say you lack tools.'
+    return 'You do have tools, including add_activity for Included and Not included. Call the tool that matches the request. Do not say you lack tools.'
+  }
+  if (
+    /\b(add|aggiung\w*|hinzuf\w*|inseris\w*|metti)\b/i.test(latestUser) &&
+    /activit|attivit|acitivit|leistung/i.test(latestUser) &&
+    !called.has('add_activity')
+  ) {
+    return 'The user asked to add an activity. Call add_activity now with the description and included true for Included or false for Not included. Do not search the catalog.'
   }
   if (SIZE.test(latestUser) && !called.has('add_product')) {
     return 'The user gave a width and a height in millimetres. Call add_product now with those sizes and the family and line already discussed.'

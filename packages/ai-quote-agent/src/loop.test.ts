@@ -57,4 +57,29 @@ describe('runQuoteAgent', () => {
       'Hai 4 famiglie correnti e 22 prodotti.',
     )
   })
+
+  it('asks again when the model refuses to add an activity', async () => {
+    const events: AgentEvent[] = []
+    const turns: ModelTurn[] = [
+      { content: "I'm sorry, but I currently don't have the tools needed to assist with adding activities.", toolCalls: [] },
+      { content: null, toolCalls: [{ id: 'call-1', name: 'add_activity', arguments: '{"description":"saif testing","included":true}' }] },
+      { content: 'Ho aggiunto "saif testing" tra le incluse.', toolCalls: [] },
+    ]
+
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'add acitivities: saif testing in included' }],
+      complete: async () => turns.shift()!,
+      execute: async (name, args) => {
+        expect(name).toBe('add_activity')
+        expect(args).toEqual({ description: 'saif testing', included: true })
+        return { content: 'Added activity "saif testing" (included, printed).' }
+      },
+      emit: (event) => {
+        events.push(event)
+      },
+    })
+
+    expect(events.some((event) => event.type === 'status' && event.tool === 'add_activity')).toBe(true)
+    expect(events.filter((event) => event.type === 'text').map((event) => (event.type === 'text' ? event.delta : '')).join('')).toContain('saif testing')
+  })
 })

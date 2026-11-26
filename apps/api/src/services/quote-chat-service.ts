@@ -1,4 +1,4 @@
-import { expandQuery, nameMatches, type Suggestion } from '@schuco/ai-quote-agent'
+import { expandQuery, foldName, nameMatches, placeActivity, type Suggestion } from '@schuco/ai-quote-agent'
 import {
   lineNetUnitPrice,
   lineTotal,
@@ -60,7 +60,12 @@ const summarizeDocument = (document: QuoteDocument): string => {
       return `${family.name} [${family.id}]\n${lines || '  (no rows)'}`
     })
     .join('\n')
-  return `${rows}\nQuote total ex VAT ${quoteTotal(document).toFixed(2)}`
+  const activities = document.closing
+    .filter((block) => block.type === 'activities')
+    .flatMap((block) => block.rows)
+    .map((row) => `  ${row.description} | ${row.included ? 'included' : 'not included'} | ${row.enabled ? 'printed' : 'not printed'}`)
+    .join('\n')
+  return `${rows || '(no products)'}\nActivities:\n${activities || '  (none)'}\nQuote total ex VAT ${quoteTotal(document).toFixed(2)}`
 }
 
 const findLines = (document: QuoteDocument, query: string): { family: QuoteFamily; line: QuoteLine }[] =>
@@ -146,6 +151,8 @@ const dispatch = async (
       return duplicateFamily(ctx, actor, state, str(args.familyName) ?? '')
     case 'move_line':
       return moveLine(ctx, actor, state, str(args.lineName) ?? '', str(args.direction) === 'down' ? 'down' : 'up')
+    case 'add_activity':
+      return addActivity(ctx, actor, state, args)
     case 'update_line':
       return updateLine(ctx, actor, state, args)
     default:
@@ -252,6 +259,35 @@ const describeFamily = async (ctx: TenantContext, familyId: string): Promise<Too
   return reply(
     `${detail.family.name} v${detail.family.version} | ${isQuotable({ ...detail.family, inLibrary: detail.inLibrary }) ? 'can add' : 'cannot add'}\nLines:\n${lines}\nOptions:\n${groups || '—'}\nMatrix bounds: ${bounds.join('; ') || 'none'}`,
   )
+}
+
+const addActivity = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  state: ChatState,
+  args: Record<string, unknown>,
+): Promise<ToolResult> => {
+  const description = str(args.description)
+  if (!description) return reply('Activity description is required.')
+  if (description.length > 500) return reply('Activity description is too long (500 characters).')
+  const included = typeof args.included === 'boolean' ? args.included : true
+  const enabled = typeof args.printed === 'boolean' ? args.printed : true
+  const current = requireQuote(state)
+  const document = structuredClone(current.version.document)
+  const block = document.closing.find((item) => item.type === 'activities')
+  const rows = block?.type === 'activities' ? block.rows : []
+  const placed = placeActivity(rows, { id: localId('att'), description, included, enabled })
+  const zone = included ? 'included' : 'not included'
+  const print = enabled ? 'printed' : 'not printed'
+  if (placed.action === 'unchanged') {
+    const existing = placed.rows.find((row) => foldName(row.description) === foldName(description))
+    return reply(`"${existing?.description ?? description}" is already ${zone} and ${print}.`)
+  }
+  if (block?.type === 'activities') block.rows = placed.rows
+  else document.closing.push({ id: localId('c'), type: 'activities', rows: placed.rows })
+  const saved = await persist(ctx, actor, state, document)
+  const verb = placed.action === 'added' ? 'Added' : 'Moved'
+  return reply(`${verb} activity "${description}" (${zone}, ${print}).\n${saved.content}`)
 }
 
 const requireQuote = (state: ChatState): SalesQuoteDetailResponse => {

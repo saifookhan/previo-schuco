@@ -1,3 +1,5 @@
+export { placeActivity } from './activities'
+export type { ActivityAction, ActivityPlacement } from './activities'
 export { completeWithCloudflare } from './cloudflare'
 export { runQuoteAgent } from './loop'
 export { expandQuery, foldName, nameMatches } from './match'

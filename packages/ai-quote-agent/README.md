@@ -29,6 +29,7 @@ The model may call these. It never receives a company id or a user id. Prices an
 | `duplicate_line` | A copy of one row, with the next position number. |
 | `duplicate_family` | A copy of one family block and its rows. |
 | `move_line` | Move a row up or down inside its family. |
+| `add_activity` | One closing activity in Included or Not included. The same description is not added twice; a later call moves it. |
 | `update_line` | Width, height, extra %, discount, €/pc, VAT (`22%`, `10%`, `4%`, `Es.`), installation hours, quantity. Net € and the total are not inputs. |
 
 ## Exports

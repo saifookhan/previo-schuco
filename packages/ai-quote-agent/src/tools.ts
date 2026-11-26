@@ -93,6 +93,26 @@ export const QUOTE_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'add_activity',
+    description:
+      'Add one closing activity to the quote, in Included or Not included. This is not a catalog product. Call it when the user says activity, attività, or Leistung. Call once per activity. included true means Included (Incluse); false means Not included (Non incluse). The same description is not added twice; a later call moves it between the two lists. printed false hides it from the printed quote.',
+    parameters: {
+      type: 'object',
+      properties: {
+        description: { type: 'string', description: 'The activity text, for example saif testing.' },
+        included: {
+          type: 'boolean',
+          description: 'True for Included, false for Not included. Default true.',
+        },
+        printed: {
+          type: 'boolean',
+          description: 'True when the activity is printed on the quote. Default true.',
+        },
+      },
+      required: ['description'],
+    },
+  },
+  {
     name: 'update_line',
     description:
       'Change columns on one row: widthMm, heightMm, extraPct, discountPct, unitPrice (this makes the row manual), vatRate (22%, 10%, 4%, Es.), installationHours. Net and total are calculated, never set them.',

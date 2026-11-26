@@ -1186,6 +1186,7 @@
     "unavailable": "Der Assistent ist gerade nicht verfügbar.",
     "empty": "Nennen Sie Kunde und Produkt. Ich verwende nur die aktuelle Preisliste.",
     "tools": {
+      "catalog_summary": "Katalog wird gezählt",
       "search_catalog": "Suche im Katalog",
       "describe_family": "Produktfamilie wird gelesen",
       "create_quote": "Angebot wird erstellt",
@@ -1193,6 +1194,7 @@
       "duplicate_line": "Zeile wird dupliziert",
       "duplicate_family": "Familie wird dupliziert",
       "move_line": "Zeile wird verschoben",
+      "add_activity": "Leistung wird hinzugefügt",
       "update_line": "Zeile wird aktualisiert"
     },
     "starters": {
