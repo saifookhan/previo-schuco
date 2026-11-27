@@ -590,6 +590,30 @@ export const buildOpenApiDocument = (options: OpenApiOptions): OpenApiDocument =
           },
         },
       },
+      '/api/dashboard': {
+        get: {
+          tags: ['Quotes'],
+          summary: "Sales dashboard for the caller's company",
+          description:
+            'KPI, funnel, attention, follow-up, win rate and price-list health (quote.view). ' +
+            'period=week|month|year (default week, Thursday–Wednesday, Europe/Rome). ' +
+            'Quotes whose customer or reference starts with TEST are omitted unless includeTest=1. ' +
+            'A sales associate sees only quotes they created; a company admin, sales manager or super-admin sees the company and may pass salespersonId. ' +
+            'Totals are IVA excluded.',
+          operationId: 'getDashboard',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'period', in: 'query', required: false, schema: { type: 'string', enum: ['week', 'month', 'year'] } },
+            { name: 'includeTest', in: 'query', required: false, schema: { type: 'string', enum: ['1', 'true'] } },
+            { name: 'salespersonId', in: 'query', required: false, schema: { type: 'string', format: 'uuid' } },
+          ],
+          responses: {
+            '200': { description: 'Dashboard for the requested period' },
+            '400': { description: 'Invalid period or salespersonId', content: { 'application/json': { schema: ref('ErrorResponse') } } },
+            ...errorResponses(),
+          },
+        },
+      },
       '/api/sales-quotes': {
         get: {
           tags: ['Quotes'],

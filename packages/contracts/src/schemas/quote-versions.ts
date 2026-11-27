@@ -43,6 +43,10 @@ export const quoteSummarySchema = z.object({
   variants: z.array(quoteVariantRefSchema),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
+  /** Latest version's `sent_at`, when that version has been sent. */
+  sentAt: z.string().datetime().nullable(),
+  /** User who created the quote, when the row still points at one. */
+  createdByUserId: z.string().uuid().nullable(),
 })
 export type QuoteSummary = z.infer<typeof quoteSummarySchema>
 

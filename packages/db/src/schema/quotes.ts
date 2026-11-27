@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { boolean, index, integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 import { companies } from './companies'
@@ -71,12 +72,12 @@ export const quoteVersions = pgTable(
     sentAt: timestamp('sent_at', { withTimezone: true }),
   },
   (table) => ({
-    // Loading a quote's versions, and one version by number.
     quoteVersionIdx: uniqueIndex('quote_versions_quote_id_version_alternative_idx').on(
       table.quoteId,
       table.version,
       table.alternative,
     ),
+    oneFinalIdx: uniqueIndex('quote_versions_one_final_idx').on(table.quoteId).where(sql`${table.isFinal}`),
   }),
 )
 

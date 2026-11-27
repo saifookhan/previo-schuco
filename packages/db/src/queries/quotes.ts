@@ -1,4 +1,4 @@
-import { aliasedTable, and, asc, desc, eq, ilike, inArray, isNull, or, type SQL } from 'drizzle-orm'
+import { aliasedTable, and, asc, desc, eq, getTableColumns, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm'
 
 import type { DbLike } from '../client'
 import { quoteRevisions, quoteTextTemplates, quoteVersions, quotes, users } from '../schema'
@@ -63,6 +63,35 @@ export const setQuoteArchivedAt = async (db: DbLike, quoteId: string, archivedAt
     .returning({ id: quotes.id })
   return rows.length > 0
 }
+
+/**
+ * The quotes list, with the latest version's `sent_at`. Same company filter and
+ * newest-first order as {@link listQuotes}.
+ */
+export const listQuoteSummaries = (
+  db: DbLike,
+  companyId: string,
+): Promise<Array<QuoteRow & { sentAt: Date | null }>> =>
+  db
+    .select({
+      ...getTableColumns(quotes),
+      sentAt: quoteVersions.sentAt,
+    })
+    .from(quotes)
+    .leftJoin(
+      quoteVersions,
+      and(
+        eq(quoteVersions.quoteId, quotes.id),
+        eq(quoteVersions.version, quotes.latestVersion),
+        // Several alternatives can share the latest version. The list keeps one row: the highest A.
+        sql`${quoteVersions.alternative} = (
+          SELECT MAX(qv.alternative) FROM quote_versions qv
+          WHERE qv.quote_id = ${quotes.id} AND qv.version = ${quotes.latestVersion}
+        )`,
+      ),
+    )
+    .where(eq(quotes.supplierCompanyId, companyId))
+    .orderBy(desc(quotes.createdAt))
 
 /** One quote (RLS-scoped), or null. */
 export const getQuoteRow = async (db: DbLike, quoteId: string): Promise<QuoteRow | null> => {

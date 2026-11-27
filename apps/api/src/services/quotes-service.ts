@@ -18,10 +18,10 @@ import {
   listBusinessUnitsWithUsers,
   listProductFamilyVersionsOfChains,
   listQuoteRevisions,
+  listQuotes,
   listQuoteVersionRows,
   listQuoteVariantsForQuotes,
   listQuoteVersions,
-  listQuotes,
   listSalesContacts,
   lockQuote,
   quoteExists,
@@ -409,6 +409,8 @@ const toSummary = (quote: QuoteRow, variants: QuoteVariantListRow[]): QuoteSumma
   variants: variants.map(toVariantRef),
   createdAt: quote.createdAt.toISOString(),
   updatedAt: quote.updatedAt.toISOString(),
+  sentAt: null,
+  createdByUserId: quote.createdByUserId,
 })
 
 const toVersion = (row: QuoteVersionWithUsers): QuoteVersion => ({
