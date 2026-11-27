@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { proxyJson } from '@/lib/api/proxy-patch'
 import { authConfig } from '@/lib/auth/config'
 import { buildAuthHeaders } from '@/lib/api/server-client'
 
@@ -38,4 +39,10 @@ export const DELETE = async (
 
   const data = await response.json().catch(() => ({ error: 'Invalid response from API' }))
   return NextResponse.json(data, { status: response.status })
+}
+
+/** Proxies an edit of the family's text fields. */
+export const PATCH = async (request: Request, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse> => {
+  const { id } = await params
+  return proxyJson(request, `/api/product-families/${encodeURIComponent(id)}`, 'PATCH')
 }

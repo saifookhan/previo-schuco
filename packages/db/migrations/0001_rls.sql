@@ -278,6 +278,9 @@ CREATE POLICY product_family_images_select ON product_family_images
 DROP POLICY IF EXISTS product_family_images_insert ON product_family_images;
 CREATE POLICY product_family_images_insert ON product_family_images
   FOR INSERT WITH CHECK (app_owns_product_family(product_family_id));
+DROP POLICY IF EXISTS product_family_images_update ON product_family_images;
+CREATE POLICY product_family_images_update ON product_family_images
+  FOR UPDATE USING (app_owns_product_family(product_family_id)) WITH CHECK (app_owns_product_family(product_family_id));
 DROP POLICY IF EXISTS product_family_images_delete ON product_family_images;
 CREATE POLICY product_family_images_delete ON product_family_images
   FOR DELETE USING (app_owns_product_family(product_family_id));

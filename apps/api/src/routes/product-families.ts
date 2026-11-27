@@ -1,13 +1,20 @@
 import { readFile } from 'node:fs/promises'
 
 import {
+  createCharacteristicRequestSchema,
+  createProductFamilyRequestSchema,
+  createProductLineRequestSchema,
   duplicateProductFamilyRequestSchema,
   setArchivedRequestSchema,
   setFavoriteRequestSchema,
   familySharesResponseSchema,
   priceValidityRequestSchema,
   productFamilyImportFieldsSchema,
+  updateCharacteristicRequestSchema,
   updateFamilySharesRequestSchema,
+  updateProductFamilyDetailsSchema,
+  updateProductFamilyImageRequestSchema,
+  updateProductLineRequestSchema,
   type PriceValidityOverlapResponse,
   type ProductFamilyImportFields,
 } from '@schuco/contracts'
@@ -26,9 +33,16 @@ import {
   PriceValidityOverlapError,
   ProductFamilyForbiddenError,
   ProductFamilyHistoryForbiddenError,
+  addProductFamilyImage,
   compareProductFamilyVersions,
+  createCharacteristic,
   createNewVersionFromExcel,
+  createProductFamily,
+  createProductLine,
+  deleteCharacteristic,
   deleteProductFamily,
+  deleteProductFamilyImage,
+  deleteProductLine,
   duplicateProductFamily,
   getProductFamilyDetail,
   getProductFamilyDetailWithLibrary,
@@ -47,6 +61,8 @@ import {
   setProductFamilyReadyForInvoicingStatus,
   updateCharacteristic,
   updatePricingMatrix,
+  updateProductFamilyDetails,
+  updateProductFamilyImage,
   updateProductLine,
   type ProductFamilyActor,
 } from '../services/product-families-service'
@@ -260,6 +276,20 @@ productFamilies.get('/', requireAuth, requirePermission('catalog.view'), async (
   return c.json({ families })
 })
 
+/** Creates an empty product family (no lines yet) for the caller's company. Needs catalog.edit. */
+productFamilies.post('/', requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const parsed = createProductFamilyRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body', details: parsed.error.issues }, 400)
+  }
+  try {
+    const family = await createProductFamily(editContext(c), actorFrom(c), parsed.data)
+    return c.json({ family }, 201)
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
+})
+
 /** Full detail (lines, characteristics, matrices, relations, images) for one family. */
 productFamilies.get('/:id', rejectNonUuidParams, requireAuth, requirePermission('catalog.view'), async (c) => {
   const id = c.req.param('id') ?? ''
@@ -282,6 +312,20 @@ productFamilies.get('/:id', rejectNonUuidParams, requireAuth, requirePermission(
     canViewHistory: ownsFamily,
     canManage: ownsFamily,
   })
+})
+
+/** Edits a family's text fields. Price validity and the flags have their own routes. */
+productFamilies.patch('/:id', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const parsed = updateProductFamilyDetailsSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body', details: parsed.error.issues }, 400)
+  }
+  try {
+    const family = await updateProductFamilyDetails(editContext(c), actorFrom(c), c.req.param('id') ?? '', parsed.data)
+    return c.json({ family })
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
 })
 
 /** The family's version graph (its versions, the copies made from them, the family it was copied from) as far as the caller can see it; `?steps=true` adds the change counts along each edge, `?graph=false` leaves out the copies. */
@@ -403,6 +447,48 @@ productFamilies.get('/:id/images/:imageId', rejectNonUuidParams, requireAuth, re
     'Content-Type': CONTENT_TYPE_BY_EXTENSION[extension] ?? 'application/octet-stream',
     'Cache-Control': 'private, max-age=3600',
   })
+})
+
+/** Uploads an image (PNG, JPEG, GIF, WebP or BMP, at most 8 MB). Optional `title` text field. */
+productFamilies.post('/:id/images', rejectNonUuidParams, rejectUnlessMultipart, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const body = await parseMultipartBody(c)
+  if (body instanceof Response) return body
+  const file = body.file
+  if (!(file instanceof File)) return c.json(MISSING_FILE, 400)
+  try {
+    const image = await addProductFamilyImage(editContext(c), actorFrom(c), c.req.param('id') ?? '', {
+      buffer: Buffer.from(await file.arrayBuffer()),
+      originalName: file.name,
+      title: typeof body.title === 'string' ? body.title : null,
+    })
+    return c.json({ image }, 201)
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
+})
+
+/** Sets or clears an image title. */
+productFamilies.patch('/:id/images/:imageId', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const parsed = updateProductFamilyImageRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body', details: parsed.error.issues }, 400)
+  }
+  try {
+    const image = await updateProductFamilyImage(editContext(c), actorFrom(c), c.req.param('id') ?? '', c.req.param('imageId') ?? '', parsed.data)
+    return c.json({ image })
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
+})
+
+/** Removes an image. The file is kept when a copy of the family still uses it. */
+productFamilies.delete('/:id/images/:imageId', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  try {
+    await deleteProductFamilyImage(editContext(c), actorFrom(c), c.req.param('id') ?? '', c.req.param('imageId') ?? '')
+    return c.json({ ok: true })
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
 })
 
 /** Deep-copies a family ("Duplicate") under the name, price validity and publish choice from the copy dialog. */
@@ -609,33 +695,93 @@ productFamilies.patch('/:id/matrices/:matrixId', rejectNonUuidParams, requireAut
   }
 })
 
-/** Edits a product line's pricing fields (value, formula, discount, markup, installation hours). */
+/** Adds a product line. */
+productFamilies.post('/:id/lines', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const parsed = createProductLineRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body', details: parsed.error.issues }, 400)
+  }
+  try {
+    const line = await createProductLine(editContext(c), actorFrom(c), c.req.param('id') ?? '', parsed.data)
+    return c.json({ line }, 201)
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
+})
+
+/** Edits a product line: name, units, economics, which characteristics apply, and its price. */
 productFamilies.patch('/:id/lines/:lineId', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id') ?? ''
   const lineId = c.req.param('lineId')
   if (!id || !lineId) {
     return c.json({ error: 'Missing id' }, 400)
   }
-  const body = await c.req.json().catch(() => null)
+  const parsed = updateProductLineRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body', details: parsed.error.issues }, 400)
+  }
   try {
-    const line = await updateProductLine(editContext(c), actorFrom(c), id, lineId, body)
+    const line = await updateProductLine(editContext(c), actorFrom(c), id, lineId, parsed.data)
     return c.json({ line })
   } catch (error) {
     return editErrorResponse(c, error)
   }
 })
 
-/** Edits a sub-characteristic's price (value / formula). */
+/** Deletes a product line. */
+productFamilies.delete('/:id/lines/:lineId', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const id = c.req.param('id') ?? ''
+  const lineId = c.req.param('lineId')
+  if (!id || !lineId) return c.json({ error: 'Missing id' }, 400)
+  try {
+    await deleteProductLine(editContext(c), actorFrom(c), id, lineId)
+    return c.json({ ok: true })
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
+})
+
+/** Adds a main characteristic, or an option when `parentId` is set. */
+productFamilies.post('/:id/characteristics', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const parsed = createCharacteristicRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body', details: parsed.error.issues }, 400)
+  }
+  try {
+    const characteristic = await createCharacteristic(editContext(c), actorFrom(c), c.req.param('id') ?? '', parsed.data)
+    return c.json({ characteristic }, 201)
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
+})
+
+/** Edits a characteristic's name, or an option's name, economics and price. */
 productFamilies.patch('/:id/characteristics/:characteristicId', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
   const id = c.req.param('id') ?? ''
   const characteristicId = c.req.param('characteristicId')
   if (!id || !characteristicId) {
     return c.json({ error: 'Missing id' }, 400)
   }
-  const body = await c.req.json().catch(() => null)
+  const parsed = updateCharacteristicRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body', details: parsed.error.issues }, 400)
+  }
   try {
-    const characteristic = await updateCharacteristic(editContext(c), actorFrom(c), id, characteristicId, body)
+    const characteristic = await updateCharacteristic(editContext(c), actorFrom(c), id, characteristicId, parsed.data)
     return c.json({ characteristic })
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
+})
+
+/** Deletes a characteristic. A main characteristic takes its options with it. */
+productFamilies.delete('/:id/characteristics/:characteristicId', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const id = c.req.param('id') ?? ''
+  const characteristicId = c.req.param('characteristicId')
+  if (!id || !characteristicId) return c.json({ error: 'Missing id' }, 400)
+  try {
+    await deleteCharacteristic(editContext(c), actorFrom(c), id, characteristicId)
+    return c.json({ ok: true })
   } catch (error) {
     return editErrorResponse(c, error)
   }

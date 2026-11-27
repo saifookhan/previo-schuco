@@ -19,6 +19,13 @@ import {
   PriceValidityOverlapError,
   importProductFamilyFromExcel,
   ExcelImportError,
+  addProductFamilyImage,
+  createCharacteristic,
+  createProductFamily,
+  createProductLine,
+  deleteCharacteristic,
+  deleteProductFamilyImage,
+  deleteProductLine,
   listProductFamilies,
   previewProductFamilyImport,
   setProductFamilyHasPriceListStatus,
@@ -27,6 +34,8 @@ import {
   setProductFamilyPublishedStatus,
   updateCharacteristic,
   updatePricingMatrix,
+  updateProductFamilyDetails,
+  updateProductFamilyImage,
   updateProductLine,
 } from '../src/services/product-families-service'
 import {
@@ -705,5 +714,271 @@ describe('upload dialog: preview, then save with the confirmed fields', () => {
     await expect(
       setProductFamilyPriceValidityDates(stranger, actor, family.id, { priceValidFrom: '2026-01-01', priceValidTo: null }),
     ).rejects.toThrow(ProductFamilyNotFoundError)
+  })
+})
+
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+)
+
+describe('manual catalog edits', () => {
+  const ctx = () => ({ effectiveCompanyId: supplierCompanyId, isSuperAdmin: false })
+  const draft = (name = 'Hand built') =>
+    createProductFamily(ctx(), actor, {
+      name,
+      priceValidFrom: '2026-06-01',
+      priceValidTo: null,
+      publish: false,
+      readyForInvoicing: false,
+    })
+
+  afterEach(() => {
+    delete process.env.PRODUCT_FAMILY_EDIT_POLICY
+  })
+
+  it('creates an empty family without Excel and patches its text', async () => {
+    const family = await createProductFamily(ctx(), actor, {
+      name: 'Hand built',
+      technicalName: 'HB-1',
+      category: 'Windows',
+      brand: 'Schüco',
+      distributor: 'PREVIO',
+      description1: 'First',
+      description2: '',
+      note: 'A note',
+      priceValidFrom: '2026-06-01',
+      priceValidTo: null,
+      publish: false,
+      readyForInvoicing: false,
+    })
+    expect(family).toMatchObject({
+      name: 'Hand built',
+      technicalName: 'HB-1',
+      category: 'Windows',
+      brand: 'Schüco',
+      distributor: 'PREVIO',
+      description1: 'First',
+      description2: null,
+      note: 'A note',
+      hasPriceList: true,
+      isPublished: false,
+      sourceExcelPath: null,
+      version: 1,
+    })
+
+    const detail = (await getProductFamilyDetail(ctx(), family.id))!
+    expect(detail.lines).toEqual([])
+    expect(detail.characteristics).toEqual([])
+    expect(detail.images).toEqual([])
+
+    const updated = await updateProductFamilyDetails(ctx(), actor, family.id, { name: 'Hand built 2', note: null })
+    expect(updated).toMatchObject({ name: 'Hand built 2', note: null, technicalName: 'HB-1' })
+
+    const entries = await withSystemTransaction(db, (tx) =>
+      tx.select().from(auditLog).where(and(eq(auditLog.resourceType, 'product_family'), eq(auditLog.resourceId, family.id))),
+    )
+    expect(entries.map((entry) => entry.action).sort()).toEqual(['product_family.create', 'product_family.update'])
+    expect(entries.find((entry) => entry.action === 'product_family.update')!.metadata).toMatchObject({
+      name: 'Hand built 2',
+      changed: ['name', 'note'],
+    })
+
+    const same = await updateProductFamilyDetails(ctx(), actor, family.id, { name: 'Hand built 2', category: 'Doors' })
+    expect(same.category).toBe('Doors')
+    const afterSame = await withSystemTransaction(db, (tx) =>
+      tx.select().from(auditLog).where(and(eq(auditLog.resourceType, 'product_family'), eq(auditLog.resourceId, family.id))),
+    )
+    const detailEdits = afterSame.filter((entry) => entry.action === 'product_family.update')
+    expect(detailEdits).toHaveLength(2)
+    expect(detailEdits.map((entry) => entry.metadata)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ changed: ['category'] })]),
+    )
+
+    await expect(updateProductFamilyDetails(ctx(), actor, family.id, {})).rejects.toThrow(ProductFamilyValidationError)
+  })
+
+  it('creates, updates and deletes a line and an option, and switches a line between formula and table', async () => {
+    const family = await draft()
+    const glass = await createCharacteristic(ctx(), actor, family.id, { name: 'Glass' })
+    expect(glass.parentId).toBeNull()
+
+    const line = await createProductLine(ctx(), actor, family.id, {
+      name: 'Frame',
+      description: 'Outer',
+      unitName: 'Piece',
+      unitSymbol: 'Pz',
+      minValue: 10,
+      discountPct: 5,
+      markupPct: 110,
+      installationHoursPerUnit: 1.5,
+      price: { kind: 'formula', formula: 'valore', value: 20 },
+      characteristicIds: [glass.id],
+    })
+    expect(line).toMatchObject({ name: 'Frame', unitSymbol: 'Pz', pricingMatrixId: null, formula: 'valore' })
+    expect(Number(line.value)).toBe(20)
+    expect(Number(line.discountPct)).toBe(5)
+    expect(Number(line.minValue)).toBe(10)
+
+    // A characteristic added after the line is linked to every current line.
+    const colour = await createCharacteristic(ctx(), actor, family.id, { name: 'Colour' })
+    let detail = (await getProductFamilyDetail(ctx(), family.id))!
+    expect(detail.relations).toEqual(
+      expect.arrayContaining([
+        { productLineId: line.id, characteristicId: glass.id },
+        { productLineId: line.id, characteristicId: colour.id },
+      ]),
+    )
+
+    const table = await updateProductLine(ctx(), actor, family.id, line.id, {
+      price: { kind: 'matrix', widths: [800, 1000], heights: [900], matrix: [[42, 44]] },
+    })
+    expect(table.pricingMatrixId).toBeTruthy()
+    expect(table.formula).toBe('valore')
+    expect(Number(table.value)).toBe(0)
+    detail = (await getProductFamilyDetail(ctx(), family.id))!
+    expect(detail.matrices).toHaveLength(1)
+
+    // A formula/value patch without `price` keeps the table.
+    const kept = await updateProductLine(ctx(), actor, family.id, line.id, { formula: '(B/1000) * valore', value: 1 })
+    expect(kept.pricingMatrixId).toBe(table.pricingMatrixId)
+    expect(kept.formula).toBe('(B/1000) * valore')
+
+    const back = await updateProductLine(ctx(), actor, family.id, line.id, {
+      price: { kind: 'formula', formula: '(B/1000) * valore', value: 8 },
+      characteristicIds: [glass.id],
+    })
+    expect(back.pricingMatrixId).toBeNull()
+    expect(Number(back.value)).toBe(8)
+    detail = (await getProductFamilyDetail(ctx(), family.id))!
+    expect(detail.matrices).toEqual([])
+    expect(detail.relations).toEqual([{ productLineId: line.id, characteristicId: glass.id }])
+
+    const option = await createCharacteristic(ctx(), actor, family.id, {
+      parentId: glass.id,
+      name: 'Clear',
+      minValue: 1,
+      discountPct: 10,
+      markupPct: 120,
+      installationHoursPerUnit: 0.5,
+      price: { kind: 'formula', formula: 'valore * 2', value: 3 },
+    })
+    expect(option.parentId).toBe(glass.id)
+    expect(Number(option.value)).toBe(3)
+    expect(Number(option.discountPct)).toBe(10)
+    expect(Number(option.markupPct)).toBe(120)
+    expect(Number(option.installationHoursPerUnit)).toBe(0.5)
+
+    const renamed = await updateCharacteristic(ctx(), actor, family.id, option.id, { name: 'Extra clear', minValue: null })
+    expect(renamed.name).toBe('Extra clear')
+    expect(renamed.minValue).toBeNull()
+
+    const optionTable = await updateCharacteristic(ctx(), actor, family.id, option.id, {
+      price: { kind: 'matrix', widths: [600], heights: [700], matrix: [[9]] },
+    })
+    expect(optionTable.pricingMatrixId).toBeTruthy()
+    expect(optionTable.formula).toBeNull()
+    expect(optionTable.value).toBeNull()
+
+    await expect(
+      createProductLine(ctx(), actor, family.id, {
+        name: 'Frame',
+        unitName: 'Piece',
+        unitSymbol: 'Pz',
+        price: { kind: 'formula', formula: 'valore', value: 1 },
+      }),
+    ).rejects.toThrow(/already exists/)
+    await expect(
+      createCharacteristic(ctx(), actor, family.id, {
+        parentId: glass.id,
+        name: 'Extra clear',
+        price: { kind: 'formula', formula: 'valore', value: 1 },
+      }),
+    ).rejects.toThrow(/already exists/)
+    await expect(createCharacteristic(ctx(), actor, family.id, { name: 'Glass', value: 1 })).rejects.toThrow(
+      /no price of its own/,
+    )
+
+    await deleteCharacteristic(ctx(), actor, family.id, option.id)
+    await deleteProductLine(ctx(), actor, family.id, line.id)
+    detail = (await getProductFamilyDetail(ctx(), family.id))!
+    expect(detail.lines).toEqual([])
+    expect(detail.matrices).toEqual([])
+    expect(detail.characteristics.map((row) => row.id).sort()).toEqual([glass.id, colour.id].sort())
+
+    const entries = await withSystemTransaction(db, (tx) =>
+      tx.select().from(auditLog).where(and(eq(auditLog.resourceType, 'product_family'), eq(auditLog.resourceId, family.id))),
+    )
+    expect(entries.map((entry) => entry.action)).toEqual(
+      expect.arrayContaining([
+        'product_family.line_create',
+        'product_family.line_update',
+        'product_family.line_delete',
+        'product_family.characteristic_create',
+        'product_family.characteristic_update',
+        'product_family.characteristic_delete',
+      ]),
+    )
+  })
+
+  it('rejects a duplicate name, a locked family, and a company that does not own it', async () => {
+    const family = await createProductFamily(ctx(), actor, {
+      name: 'Locked draft',
+      priceValidFrom: '2026-06-01',
+      priceValidTo: null,
+      publish: true,
+      readyForInvoicing: false,
+    })
+    process.env.PRODUCT_FAMILY_EDIT_POLICY = 'draft-only'
+    await expect(updateProductFamilyDetails(ctx(), actor, family.id, { note: 'nope' })).rejects.toThrow(
+      ProductFamilyLockedError,
+    )
+    await expect(
+      createProductLine(ctx(), actor, family.id, {
+        name: 'Frame',
+        unitName: 'Piece',
+        unitSymbol: 'Pz',
+        price: { kind: 'formula', formula: 'valore', value: 1 },
+      }),
+    ).rejects.toThrow(ProductFamilyLockedError)
+    expect((await getProductFamilyDetail(ctx(), family.id))!.lines).toEqual([])
+
+    delete process.env.PRODUCT_FAMILY_EDIT_POLICY
+    const stranger = { effectiveCompanyId: '00000000-0000-4000-8000-000000000099', isSuperAdmin: false }
+    await expect(updateProductFamilyDetails(stranger, actor, family.id, { note: 'nope' })).rejects.toThrow(
+      ProductFamilyNotFoundError,
+    )
+    await expect(
+      createProductLine(stranger, actor, family.id, {
+        name: 'Frame',
+        unitName: 'Piece',
+        unitSymbol: 'Pz',
+        price: { kind: 'formula', formula: 'valore', value: 1 },
+      }),
+    ).rejects.toThrow(ProductFamilyNotFoundError)
+    await expect(
+      addProductFamilyImage(stranger, actor, family.id, { buffer: ONE_PIXEL_PNG, originalName: 'dot.png', title: 'Front' }),
+    ).rejects.toThrow(ProductFamilyNotFoundError)
+  })
+
+  it('uploads, retitles and deletes an image', async () => {
+    const family = await draft('With a picture')
+    const image = await addProductFamilyImage(ctx(), actor, family.id, {
+      buffer: ONE_PIXEL_PNG,
+      originalName: 'dot.png',
+      title: 'Front',
+    })
+    expect(image.title).toBe('Front')
+    expect((await getProductFamilyDetail(ctx(), family.id))!.images).toHaveLength(1)
+
+    const renamed = await updateProductFamilyImage(ctx(), actor, family.id, image.id, { title: '' })
+    expect(renamed.title).toBeNull()
+
+    await deleteProductFamilyImage(ctx(), actor, family.id, image.id)
+    expect((await getProductFamilyDetail(ctx(), family.id))!.images).toEqual([])
+
+    await expect(
+      addProductFamilyImage(ctx(), actor, family.id, { buffer: ONE_PIXEL_PNG, originalName: 'notes.txt' }),
+    ).rejects.toThrow(/PNG/)
   })
 })

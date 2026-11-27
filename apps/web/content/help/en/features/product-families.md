@@ -21,8 +21,9 @@ Every environment already has one: **Demo Window W70** (see [Demo data](../demo-
 | Action | How | Notes |
 |---|---|---|
 | Import from Excel | **Import from Excel** on the list | Pick the file, check it, set price validity — see [Importing from Excel](#importing-from-excel) |
+| Create by hand | **Create family** on the list | An empty draft. Name and *Valid from* are required. Add lines and characteristics on the family page — see [Editing by hand](#editing-by-hand) |
 | View | The family's name, or the icon at the left of the row (opens a new tab) | Clicking the rest of the row expands it. One row is open at a time. A **V2** tag sits beside the name. The expanded row has the switches, dates and delete on the left, and the versions on the right: the current version, and a link to the previous one that opens in a new tab |
-| Edit pricing | **Edit** on a line, characteristic or matrix | Value, formula, discount, markup, installation hours |
+| Edit pricing | **Edit** on a line or option, or on a price table | Name, units, value, formula or a width × height table, discount, markup, installation hours, and which characteristics apply |
 | Edit a matrix | Edit → add/remove rows and columns | Width × height grid |
 | Publish / unpublish | **Status (published)** switch in the expanded row (button on the family's page) | The row shows Published or Draft. Only published families can be shared |
 | New version | **New version** on the family's page | Same dialog as an import; the new version gets its own price validity and the old one keeps its dates |
@@ -150,6 +151,16 @@ Above the list, for the tab you're on:
 
 Filters are part of the page address, so you can bookmark or share a filtered list, and **Back** undoes the last change.
 
-## Not built yet
+## Editing by hand
 
-Editing which characteristics apply to which lines without re-importing the Excel file.
+A manufacturer with `catalog.edit` can build a family without Excel, and change every catalog field on the family page. The change stays on the current version. A published family can be edited unless the environment is set to drafts only.
+
+**Edit details** on the family page changes the name, technical name, category, brand, distributor, both descriptions and the note. Price validity, publish, ready for invoicing, with price list and in library keep their own controls. The version number, where the family was copied from, and the Excel file path stay as they are.
+
+On **Product lines**: **Add product line**, and **Edit** or **Delete** on each row. One dialog holds the name, description, unit name and symbol, minimum purchase price, discount, markup, installation hours, and the price. The price type is one of the Excel types (it fills the formula) or **Custom formula**. **Tabella BxH** opens the width × height grid. Checkboxes choose which characteristics apply to that line.
+
+On **Characteristics**: **Add characteristic** (it applies to every current line; change that on each line), rename or delete a characteristic (deleting removes its options), and **Add option** on a characteristic. An option has the same price and economics as a line.
+
+**Images**: **Upload image** (PNG, JPEG, GIF, WebP or BMP, up to 8 MB), an optional title, and **Remove**. A family created by hand starts with none.
+
+New lines and characteristics are added at the end. Each change is listed in the family's history.
