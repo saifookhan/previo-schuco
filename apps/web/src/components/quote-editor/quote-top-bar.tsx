@@ -2,9 +2,10 @@
 
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import * as Popover from '@radix-ui/react-popover'
-import type { BusinessUnit, QuoteHeader, QuotePrintSettings, QuoteStatus, QuoteVersionRef, SalesContact } from '@schuco/contracts'
-import { Check, ChevronDown, Eye, FileDown, History, Loader2, Pencil, Save, SlidersHorizontal } from 'lucide-react'
+import { quoteVariantCode, type BusinessUnit, type QuoteHeader, type QuotePrintSettings, type QuoteStatus, type QuoteVersionRef, type SalesContact } from '@schuco/contracts'
+import { Check, ChevronDown, Eye, FileDown, History, LayoutGrid, Loader2, Pencil, Save, SlidersHorizontal, Star } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { useEffect, useState } from 'react'
 
 import { EUR } from '@/lib/format'
 
@@ -94,6 +95,9 @@ export interface QuoteTopBarProps {
   currentUserId: string | null
   versions: QuoteVersionRef[]
   version: number
+  alternative: number
+  label: string | null
+  isFinal: boolean
   status: QuoteStatus
   readOnly: boolean
   canEdit: boolean
@@ -106,8 +110,13 @@ export interface QuoteTopBarProps {
   onPreview: () => void
   onSave: () => void
   onOpenHistory: () => void
-  onSelectVersion: (version: number) => void
+  onSelectVariant: (version: number, alternative: number) => void
   onSetStatus: (status: QuoteStatus) => void
+  onNewAlternative: () => void
+  onOpenMatrix: () => void
+  onDuplicate: () => void
+  onMarkFinal: () => void
+  onSetLabel: (label: string) => void
 }
 
 /** The sticky bar: the quote's reference, customer and project on the left; the total and actions on the right. */
@@ -115,6 +124,10 @@ export const QuoteTopBar = (props: QuoteTopBarProps) => {
   const t = useTranslations('quoteEditor')
   const ts = useTranslations('quotes.statusValue')
   const { header, printSettings, salesContacts, businessUnits } = props
+  const code = quoteVariantCode(props.version, props.alternative)
+  const [label, setLabel] = useState(props.label ?? '')
+  useEffect(() => setLabel(props.label ?? ''), [props.label])
+  const otherStatuses: QuoteStatus[] = (['draft', 'invoiced', 'accepted'] as const).filter((status) => status !== props.status)
 
   const selectedContact = salesContacts.find((contact) => contact.id === printSettings.salesContactUserId)
   const availableUnits = selectedContact ? businessUnits.filter((unit) => selectedContact.businessUnitIds.includes(unit.id)) : businessUnits
@@ -133,9 +146,6 @@ export const QuoteTopBar = (props: QuoteTopBarProps) => {
     if (key === 'showDiscount' && props.discountRequired) return
     props.onPrintSettingsChange({ ...printSettings, [key]: !printSettings[key] })
   }
-  const nextStatuses: QuoteStatus[] =
-    props.status === 'draft' ? ['sent'] : props.status === 'sent' ? ['accepted', 'rejected'] : props.status === 'accepted' ? ['rejected'] : ['accepted']
-
   return (
     <div className="sticky top-0 z-30 w-full border-b bg-white/90 shadow-md backdrop-blur-md">
       <div className="mx-auto flex h-20 max-w-[1200px] items-center justify-between gap-4 px-4 md:px-6">
@@ -149,33 +159,66 @@ export const QuoteTopBar = (props: QuoteTopBarProps) => {
                 className="flex flex-shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
                 aria-label={t('versions')}
               >
-                {t('versionShort', { version: props.version })} · {ts(props.status)}
+                {props.isFinal ? <Star className="h-3 w-3 fill-amber-400 text-amber-500" /> : null}
+                {code}
+                {props.label ? ` · ${props.label}` : ''} · {ts(props.status)}
                 <ChevronDown className="h-3 w-3" />
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
-              <DropdownMenu.Content align="start" sideOffset={6} className="z-50 min-w-[220px] rounded-lg border border-slate-200 bg-white py-1.5 shadow-lg">
+              <DropdownMenu.Content align="start" sideOffset={6} className="z-50 min-w-[260px] rounded-lg border border-slate-200 bg-white py-1.5 shadow-lg">
                 <SectionLabel label={t('versions')} />
-                {[...props.versions].reverse().map((v) => (
+                {[...props.versions].reverse().map((variant) => (
                   <DropdownMenu.Item
-                    key={v.id}
-                    onSelect={() => props.onSelectVersion(v.version)}
+                    key={variant.id}
+                    onSelect={() => props.onSelectVariant(variant.version, variant.alternative)}
                     className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-[13px] text-slate-700 outline-none focus:bg-slate-50"
                   >
-                    <RadioDot selected={v.version === props.version} />
-                    <span className="flex-1">{t('versionShort', { version: v.version })}</span>
-                    <span className="text-[11px] text-slate-400">{ts(v.status)}</span>
-                    <span className="font-mono text-[11px] tabular-nums text-slate-500">{EUR.format(Number(v.totalPrice))}</span>
+                    <RadioDot selected={variant.version === props.version && variant.alternative === props.alternative} />
+                    <span className="flex flex-1 items-center gap-1">
+                      {variant.isFinal ? <Star className="h-3 w-3 fill-amber-400 text-amber-500" /> : null}
+                      {quoteVariantCode(variant.version, variant.alternative)}
+                      {variant.label ? <span className="truncate text-slate-400">{variant.label}</span> : null}
+                    </span>
+                    <span className="text-[11px] text-slate-400">{ts(variant.status)}</span>
+                    <span className="font-mono text-[11px] tabular-nums text-slate-500">{EUR.format(Number(variant.totalPrice))}</span>
                   </DropdownMenu.Item>
                 ))}
                 {props.canEdit && !props.readOnly ? (
                   <>
                     <div className="my-1 h-px bg-slate-100" />
+                    <label className="block px-3 py-1.5">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-slate-400">{t('variantLabel')}</span>
+                      <input
+                        value={label}
+                        maxLength={120}
+                        placeholder={t('variantLabelPlaceholder')}
+                        onChange={(event) => setLabel(event.target.value)}
+                        onBlur={() => {
+                          const next = label.trim()
+                          if (next !== (props.label ?? '')) props.onSetLabel(next)
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        className="w-full rounded-md border border-slate-200 px-2 py-1 text-[13px] outline-none focus:border-brand"
+                      />
+                    </label>
+                    <DropdownMenu.Item onSelect={props.onNewAlternative} className="cursor-pointer px-3 py-1.5 text-[13px] text-slate-700 outline-none focus:bg-slate-50">
+                      {t('newAlternative', { code })}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={props.onDuplicate} className="cursor-pointer px-3 py-1.5 text-[13px] text-slate-700 outline-none focus:bg-slate-50">
+                      {t('duplicateThis', { code })}
+                    </DropdownMenu.Item>
+                    {props.isFinal ? null : (
+                      <DropdownMenu.Item onSelect={props.onMarkFinal} className="cursor-pointer px-3 py-1.5 text-[13px] text-slate-700 outline-none focus:bg-slate-50">
+                        {t('markFinal', { code })}
+                      </DropdownMenu.Item>
+                    )}
+                    <div className="my-1 h-px bg-slate-100" />
                     <SectionLabel label={t('markAs')} />
-                    {nextStatuses.map((status) => (
+                    {otherStatuses.map((status) => (
                       <DropdownMenu.Item
                         key={status}
-                        disabled={props.dirty || (status === 'sent' && props.blockedReason !== null)}
+                        disabled={props.dirty || ((status === 'invoiced' || status === 'accepted') && props.blockedReason !== null)}
                         onSelect={() => props.onSetStatus(status)}
                         className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-[13px] text-slate-700 outline-none focus:bg-slate-50 data-[disabled]:cursor-not-allowed data-[disabled]:text-slate-300"
                       >
@@ -330,6 +373,15 @@ export const QuoteTopBar = (props: QuoteTopBarProps) => {
               aria-label={t('exportFile')}
             >
               <FileDown size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={props.onOpenMatrix}
+              className="hidden rounded-md border border-slate-300 bg-white p-2 text-slate-600 transition-colors hover:border-slate-400 hover:bg-slate-50 md:block"
+              title={t('matrix')}
+              aria-label={t('matrix')}
+            >
+              <LayoutGrid size={16} />
             </button>
             <button
               type="button"

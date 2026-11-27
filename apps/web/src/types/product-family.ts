@@ -18,6 +18,8 @@ export interface ProductFamilySummary {
   priceValidFrom: string | null
   /** `YYYY-MM-DD`, inclusive; null = until further notice. */
   priceValidTo: string | null
+  /** Set when a company admin archives the family. Null or absent means it is on the list. */
+  archivedAt?: string | null
   createdAt: string
   updatedAt: string
   /** List endpoint only: the owning company's name, when the caller may read it. */

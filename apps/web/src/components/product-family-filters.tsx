@@ -222,6 +222,15 @@ export const ProductFamilyFiltersBar = ({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 pr-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 accent-brand"
+              checked={filters.archived}
+              onChange={(event) => set('archived', event.target.checked)}
+            />
+            {t('archived')}
+          </label>
           <Button type="button" variant="ghost" size="sm" className="gap-1.5" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>
             <SlidersHorizontal className="h-3.5 w-3.5" />
             {t('moreFilters')}

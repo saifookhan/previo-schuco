@@ -33,6 +33,8 @@ export interface ProductFamilyFilters {
   discount: '' | 'with' | 'without'
   /** Hide versions a newer version in the list replaces. */
   latestOnly: boolean
+  /** Include families a company admin has archived. Off by default. */
+  archived: boolean
   /** `YYYY-MM-DD`, inclusive, on the last-updated day in Italian time (like price validity). */
   updatedFrom: string
   updatedTo: string
@@ -52,6 +54,7 @@ export const EMPTY_PRODUCT_FAMILY_FILTERS: ProductFamilyFilters = {
   owner: '',
   discount: '',
   latestOnly: false,
+  archived: false,
   updatedFrom: '',
   updatedTo: '',
   sort: 'created',
@@ -103,6 +106,7 @@ export const parseProductFamilyFilters = (
   owner: tab === 'shared' ? one(params.owner) : '',
   discount: tab === 'shared' ? oneOf(one(params.discount), ['with', 'without'] as const) : '',
   latestOnly: one(params.latestOnly) === '1',
+  archived: one(params.archived) === '1',
   updatedFrom: day(one(params.updatedFrom)),
   updatedTo: day(one(params.updatedTo)),
   sort: oneOf(one(params.sort), PRODUCT_FAMILY_SORTS) || EMPTY_PRODUCT_FAMILY_FILTERS.sort,

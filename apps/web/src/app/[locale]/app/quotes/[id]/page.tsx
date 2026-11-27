@@ -15,15 +15,18 @@ import {
 
 interface QuoteDetailPageProps {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ version?: string }>
+  searchParams: Promise<{ version?: string; alternative?: string }>
 }
 
-/** The quote builder for one version of the quote (`?version=N`, the latest by default). */
+/** The quote builder for one variant (`?version=N&alternative=M`, the latest version's first alternative by default). */
 const QuoteDetailPage = async ({ params, searchParams }: QuoteDetailPageProps) => {
   const { id } = await params
-  const { version } = await searchParams
+  const { version, alternative } = await searchParams
   const t = await getTranslations('quotes')
-  const versionQuery = version && /^\d+$/.test(version) ? `?version=${version}` : ''
+  const query = new URLSearchParams()
+  if (version && /^\d+$/.test(version)) query.set('version', version)
+  if (alternative && /^\d+$/.test(alternative)) query.set('alternative', alternative)
+  const versionQuery = query.size > 0 ? `?${query.toString()}` : ''
   const [quoteResult, familiesResult, profileResult, templatesResult] = await Promise.all([
     fetchFromApiResult<SalesQuoteDetailResponse>(`/api/sales-quotes/${id}${versionQuery}`),
     fetchFromApiResult<{ families: ProductFamilySummary[] }>('/api/product-families'),

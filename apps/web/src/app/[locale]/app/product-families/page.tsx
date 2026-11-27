@@ -27,9 +27,13 @@ import {
 const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) => {
   const params = await searchParams
   const tab = params.tab
+  const activeTab = tab === 'shared' ? 'shared' : 'own'
+  const filters = parseProductFamilyFilters(params, activeTab)
   const t = await getTranslations('productFamilies')
   const [result, me] = await Promise.all([
-    fetchFromApiResult<{ families: ProductFamilySummary[] }>('/api/product-families'),
+    fetchFromApiResult<{ families: ProductFamilySummary[] }>(
+      filters.archived ? '/api/product-families?includeArchived=1' : '/api/product-families',
+    ),
     fetchFromApi<MeResponse>('/api/me'),
   ])
   const myCompanyId = me?.user?.company.id
@@ -37,10 +41,8 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<Rec
   const allFamilies = myCompanyId ? (result.data?.families ?? []) : []
   const ownFamilies = allFamilies.filter((f) => f.supplierCompanyId === myCompanyId)
   const sharedFamilies = allFamilies.filter((f) => f.supplierCompanyId !== myCompanyId)
-  const activeTab = tab === 'shared' ? 'shared' : 'own'
   const today = priceValidityToday()
   const tabFamilies = activeTab === 'shared' ? sharedFamilies : ownFamilies
-  const filters = parseProductFamilyFilters(params, activeTab)
   const families = filterProductFamilies(tabFamilies, filters, today)
   const filtered = activeProductFamilyFilterCount(filters) > 0
   const loadFailed = result.status === 'error' || !myCompanyId
@@ -87,19 +89,17 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<Rec
           ))}
         </div>
 
-        {tabFamilies.length > 0 ? (
-          <ProductFamilyFiltersBar
-            // Remount per tab so "More filters" and the search box start from that tab's URL.
-            key={activeTab}
-            filters={filters}
-            tab={activeTab}
-            categories={distinctProductFamilyValues(tabFamilies, 'category')}
-            brands={distinctProductFamilyValues(tabFamilies, 'brand')}
-            owners={activeTab === 'shared' ? distinctProductFamilyValues(tabFamilies, 'ownerCompanyName') : []}
-            shown={families.length}
-            total={tabFamilies.length}
-          />
-        ) : null}
+        <ProductFamilyFiltersBar
+          // Remount per tab so "More filters" and the search box start from that tab's URL.
+          key={activeTab}
+          filters={filters}
+          tab={activeTab}
+          categories={distinctProductFamilyValues(tabFamilies, 'category')}
+          brands={distinctProductFamilyValues(tabFamilies, 'brand')}
+          owners={activeTab === 'shared' ? distinctProductFamilyValues(tabFamilies, 'ownerCompanyName') : []}
+          shown={families.length}
+          total={tabFamilies.length}
+        />
 
         <Card>
           <LoadingRegion>
