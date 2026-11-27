@@ -5,6 +5,8 @@ import {
   getProductFamilyEditPolicy,
   isProductFamilyEditable,
   validateCharacteristicPatch,
+  validateCreateCharacteristic,
+  validateCreateProductLine,
   validateFormula,
   validateLinePatch,
   validateMatrixInput,
@@ -107,6 +109,54 @@ describe('validateLinePatch / validateCharacteristicPatch', () => {
 
   it('lets a characteristic clear a field with null (e.g. when it prices via a matrix)', () => {
     expect(validateCharacteristicPatch({ value: null, formula: null })).toEqual({ value: null, formula: null })
+  })
+
+  it('accepts a line name, units, minimum and a price mode, and ignores formula when price is set', () => {
+    expect(
+      validateLinePatch({
+        name: ' Frame ',
+        unitName: 'Piece',
+        unitSymbol: 'Pz',
+        minValue: null,
+        price: { kind: 'formula', formula: 'valore', value: 4 },
+        formula: 'not used',
+      }),
+    ).toEqual({
+      name: 'Frame',
+      unitName: 'Piece',
+      unitSymbol: 'Pz',
+      minValue: null,
+      price: { kind: 'formula', formula: 'valore', value: '4' },
+    })
+  })
+
+  it('requires name, units and a price when creating a line', () => {
+    expect(() => validateCreateProductLine({ name: 'Frame' })).toThrow(/unitName/)
+    expect(
+      validateCreateProductLine({
+        name: 'Frame',
+        unitName: 'Piece',
+        unitSymbol: 'Pz',
+        price: { kind: 'matrix', widths: [800], heights: [900], matrix: [[1]] },
+      }).price,
+    ).toEqual({ kind: 'matrix', widths: [800], heights: [900], matrix: [[1]] })
+  })
+
+  it('accepts option economics and rejects a price on a new main characteristic', () => {
+    expect(validateCharacteristicPatch({ name: 'Glass', discountPct: 10, installationHoursPerUnit: null })).toEqual({
+      name: 'Glass',
+      discountPct: '10',
+      installationHoursPerUnit: null,
+    })
+    expect(validateCreateCharacteristic({ name: 'Glass' })).toEqual({ kind: 'main', name: 'Glass' })
+    expect(() => validateCreateCharacteristic({ name: 'Glass', value: 1 })).toThrow(/no price of its own/)
+    const option = validateCreateCharacteristic({
+      parentId: '11111111-1111-4111-8111-111111111111',
+      name: 'Clear',
+      price: { kind: 'formula', formula: 'valore', value: 2 },
+    })
+    expect(option).toMatchObject({ kind: 'option', name: 'Clear' })
+    expect(() => validateCreateCharacteristic({ parentId: 'not-a-uuid', name: 'Clear' })).toThrow(/parentId/)
   })
 })
 

@@ -8,6 +8,7 @@ import { fetchFromApi, fetchFromApiResult } from '@/lib/api/server-client'
 import { cn } from '@/lib/utils'
 import { ProductFamilyFiltersBar } from '@/components/product-family-filters'
 import { ProductFamilyTable } from '@/components/product-family-table'
+import { ProductFamilyCreateButton } from '@/components/product-family-create-button'
 import { ProductFamilyUploadButton } from '@/components/product-family-upload-button'
 import type { ProductFamilySummary } from '@/types/product-family'
 import {
@@ -58,7 +59,10 @@ const ProductFamiliesPage = async ({ searchParams }: { searchParams: Promise<Rec
           <h1 className="text-2xl font-bold text-slate-900">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-500">{t('subtitle')}</p>
         </div>
-        <ProductFamilyUploadButton />
+        <div className="flex items-center gap-2">
+          <ProductFamilyCreateButton />
+          <ProductFamilyUploadButton />
+        </div>
       </div>
 
       {loadFailed ? (

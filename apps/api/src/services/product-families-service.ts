@@ -1,7 +1,29 @@
+import { unlink } from 'node:fs/promises'
+import { extname } from 'node:path'
+
 import {
+  characteristicNameTaken,
+  countProductFamilyImagesAtPath,
+  deleteCharacteristic as deleteCharacteristicQuery,
+  deletePricingMatrixIfUnused,
   deleteProductFamily as deleteProductFamilyQuery,
+  deleteProductFamilyImage as deleteProductFamilyImageQuery,
+  deleteProductLine as deleteProductLineQuery,
+  getCharacteristicInFamily,
   getProductFamilyById,
+  getProductFamilyImageInFamily,
+  getProductLineInFamily,
+  linkCharacteristicToAllLines,
+  listCharacteristicWithOptions,
+  listMainCharacteristicIds,
+  nextCharacteristicSortOrder,
+  nextProductFamilyImageSortOrder,
+  nextProductLineSortOrder,
+  productLineNameTaken,
+  replaceProductLineCharacteristics,
   touchProductFamily,
+  updateProductFamilyDetails as updateProductFamilyDetailsQuery,
+  updateProductFamilyImageTitle,
   listStoredFamilyChanges,
   listFamilyChangesInvolving,
   listFamilyPredecessors,
@@ -37,9 +59,12 @@ import {
   type CharacteristicRow,
   type PricingMatrixRow,
   type ProductFamilyDetail,
+  type ProductFamilyImageRow,
   type ProductFamilyListItem,
   type ProductFamilySummary,
   type ProductLineRow,
+  type UpdateCharacteristicInput,
+  type UpdateProductLineInput,
 } from '@schuco/db'
 import {
   FAMILY_DIFF_VERSION,
@@ -55,6 +80,9 @@ import {
   type PriceValidity,
   type PriceValidityOverlapResponse,
   type PriceValidityRequest,
+  createProductFamilyRequestSchema,
+  updateProductFamilyDetailsSchema,
+  updateProductFamilyImageRequestSchema,
   type ProductFamilyImportPreview,
   type ProductFamilyImportWarning,
   type RecordHistoryQuery,
@@ -68,10 +96,17 @@ import type { RawPricingMatrix } from '../lib/excel-import/types'
 import {
   ProductFamilyLockedError,
   ProductFamilyNotFoundError,
+  ProductFamilyValidationError,
+  characteristicPatchHasPrice,
   isProductFamilyEditable,
   validateCharacteristicPatch,
+  validateCreateCharacteristic,
+  validateCreateProductLine,
   validateLinePatch,
   validateMatrixInput,
+  type ValidatedCharacteristicPatch,
+  type ValidatedLinePatch,
+  type ValidatedPriceMode,
 } from '../lib/product-family-edit'
 import { saveLocalFile } from '../lib/local-storage'
 import { withTenantDb, type TenantContext } from '../lib/tenant-db'
@@ -1137,9 +1172,207 @@ export const updatePricingMatrix = async (
   )
 }
 
+type CatalogTx = Parameters<Parameters<typeof withTenantDb>[1]>[0]
+
+/** Rejects ids that are not main characteristics of this family. */
+const assertMainCharacteristics = async (tx: CatalogTx, familyId: string, characteristicIds: string[]): Promise<void> => {
+  const mains = new Set(await listMainCharacteristicIds(tx, familyId))
+  if (characteristicIds.some((id) => !mains.has(id))) {
+    throw new ProductFamilyValidationError('characteristicIds must be characteristics of this family')
+  }
+}
+
 /**
- * Edits a product line's pricing fields (value, formula, discount, markup,
- * installation hours) — only the fields present in `input` change.
+ * Writes a formula price or a price table onto a line or option.
+ * Returns the id of a table that was detached, so the caller can delete it once nothing uses it.
+ */
+const applyPriceMode = async (
+  tx: CatalogTx,
+  familyId: string,
+  currentMatrixId: string | null,
+  price: ValidatedPriceMode,
+  columns: { formula?: string | null; value?: string | null; pricingMatrixId?: string | null },
+  owner: 'line' | 'option',
+): Promise<string | null> => {
+  if (price.kind === 'formula') {
+    columns.formula = price.formula
+    columns.value = price.value
+    columns.pricingMatrixId = null
+    return currentMatrixId
+  }
+  const matrix = { widths: price.widths, heights: price.heights, matrix: price.matrix }
+  if (currentMatrixId) {
+    const updated = await updatePricingMatrixQuery(tx, familyId, currentMatrixId, matrix)
+    if (!updated) throw new ProductFamilyNotFoundError('Price table not found in this product family')
+    columns.pricingMatrixId = currentMatrixId
+  } else {
+    columns.pricingMatrixId = await insertPricingMatrix(tx, { productFamilyId: familyId, ...matrix })
+  }
+  columns.formula = owner === 'line' ? 'valore' : null
+  columns.value = owner === 'line' ? '0' : null
+  return null
+}
+
+const lineColumns = (patch: ValidatedLinePatch): UpdateProductLineInput => {
+  const columns: UpdateProductLineInput = {}
+  if (patch.name !== undefined) columns.name = patch.name
+  if (patch.description !== undefined) columns.description = patch.description
+  if (patch.unitName !== undefined) columns.unitName = patch.unitName
+  if (patch.unitSymbol !== undefined) columns.unitSymbol = patch.unitSymbol
+  if (patch.formula !== undefined) columns.formula = patch.formula
+  if (patch.value !== undefined) columns.value = patch.value
+  if (patch.minValue !== undefined) columns.minValue = patch.minValue
+  if (patch.discountPct !== undefined) columns.discountPct = patch.discountPct
+  if (patch.markupPct !== undefined) columns.markupPct = patch.markupPct
+  if (patch.installationHoursPerUnit !== undefined) columns.installationHoursPerUnit = patch.installationHoursPerUnit
+  return columns
+}
+
+const optionColumns = (patch: ValidatedCharacteristicPatch): UpdateCharacteristicInput => {
+  const columns: UpdateCharacteristicInput = {}
+  if (patch.name !== undefined) columns.name = patch.name
+  if (patch.formula !== undefined) columns.formula = patch.formula
+  if (patch.value !== undefined) columns.value = patch.value
+  if (patch.minValue !== undefined) columns.minValue = patch.minValue
+  if (patch.discountPct !== undefined) columns.discountPct = patch.discountPct
+  if (patch.markupPct !== undefined) columns.markupPct = patch.markupPct
+  if (patch.installationHoursPerUnit !== undefined) columns.installationHoursPerUnit = patch.installationHoursPerUnit
+  return columns
+}
+
+/**
+ * Same lock, touch, change-list refresh and audit as {@link editFamilyPricing}, for writes whose
+ * id (or name) is only known after the write — creating and deleting a line, characteristic or image.
+ */
+const editFamilyCatalog = async <T extends { id: string }>(
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  describe: (result: T) => { action: string; itemType: string; changed: string[]; name?: string | null; skip?: boolean },
+  apply: (tx: CatalogTx) => Promise<T | null>,
+): Promise<T> =>
+  withTenantDb(ctx, async (tx) => {
+    const family = await getProductFamilyById(tx, familyId)
+    if (!family) throw new ProductFamilyNotFoundError()
+    if (!isProductFamilyEditable(family)) throw new ProductFamilyLockedError()
+    const result = await apply(tx)
+    if (!result) throw new ProductFamilyNotFoundError('Item not found in this product family, or not editable')
+    const audit = describe(result)
+    if (audit.skip) return result
+    await touchProductFamily(tx, familyId)
+    await refreshFamilyChanges(tx, ctx, familyId)
+    await recordAuditEvent(tx, auditActor(actor), family.supplierCompanyId, {
+      action: audit.action,
+      resourceType: 'product_family',
+      resourceId: familyId,
+      metadata: {
+        productFamilyId: familyId,
+        itemType: audit.itemType,
+        itemId: result.id,
+        changed: audit.changed,
+        ...(audit.name ? { name: audit.name } : {}),
+      },
+    })
+    return result
+  })
+
+const duplicateLineName = (name: string) => new ProductFamilyValidationError(`A product line named "${name}" already exists`)
+const duplicateCharacteristicName = (name: string, option: boolean) =>
+  new ProductFamilyValidationError(option ? `An option named "${name}" already exists` : `A characteristic named "${name}" already exists`)
+
+/**
+ * Creates an empty product family (no lines, characteristics or images) for the caller's company.
+ * @throws {ProductFamilyValidationError} the body is missing a name or the dates are invalid
+ */
+export const createProductFamily = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  input: unknown,
+): Promise<ProductFamilySummary> => {
+  const parsed = createProductFamilyRequestSchema.safeParse(input)
+  if (!parsed.success) {
+    throw new ProductFamilyValidationError(parsed.error.issues[0]?.message ?? 'Invalid request body')
+  }
+  const data = parsed.data
+  return withTenantDb(ctx, async (tx) => {
+    const familyId = await insertProductFamily(tx, {
+      supplierCompanyId: ctx.effectiveCompanyId,
+      name: data.name,
+      technicalName: data.technicalName ?? null,
+      category: data.category ?? null,
+      brand: data.brand ?? null,
+      distributor: data.distributor ?? null,
+      description1: data.description1 ?? null,
+      description2: data.description2 ?? null,
+      note: data.note ?? null,
+      priceValidFrom: data.priceValidFrom,
+      priceValidTo: data.priceValidTo ?? null,
+      isPublished: data.publish,
+      readyForInvoicing: data.readyForInvoicing,
+      hasPriceList: true,
+    })
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: 'product_family.create',
+      resourceType: 'product_family',
+      resourceId: familyId,
+      metadata: {
+        name: data.name,
+        published: data.publish,
+        readyForInvoicing: data.readyForInvoicing,
+        priceValidFrom: data.priceValidFrom,
+        priceValidTo: data.priceValidTo ?? null,
+      },
+    })
+    const family = await getProductFamilyById(tx, familyId)
+    if (!family) throw new ProductFamilyNotFoundError()
+    return family
+  })
+}
+
+/**
+ * Edits a family's text fields (name, descriptions, brand, and the rest). Dates and flags stay on their own routes.
+ * @throws {ProductFamilyValidationError} nothing to change, or a field is out of range
+ * @throws {ProductFamilyLockedError} the family is locked by the edit policy
+ * @throws {ProductFamilyNotFoundError} no such family for this caller
+ */
+export const updateProductFamilyDetails = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  input: unknown,
+): Promise<ProductFamilySummary> => {
+  const parsed = updateProductFamilyDetailsSchema.safeParse(input)
+  if (!parsed.success) {
+    throw new ProductFamilyValidationError(parsed.error.issues[0]?.message ?? 'Invalid request body')
+  }
+  const data = Object.fromEntries(Object.entries(parsed.data).filter((entry) => entry[1] !== undefined))
+  const changed: string[] = []
+  return editFamilyCatalog(
+    ctx,
+    actor,
+    familyId,
+    (family) => ({
+      action: 'product_family.update',
+      itemType: 'family',
+      changed,
+      name: family.name,
+      skip: changed.length === 0,
+    }),
+    async (tx) => {
+      const current = await getProductFamilyById(tx, familyId)
+      if (!current) return null
+      const stored = current as unknown as Record<string, unknown>
+      const next = Object.fromEntries(Object.entries(data).filter(([key, value]) => stored[key] !== value))
+      changed.push(...Object.keys(next))
+      if (changed.length === 0) return current
+      return updateProductFamilyDetailsQuery(tx, familyId, next)
+    },
+  )
+}
+
+/**
+ * Edits a product line: its name, description, units, economics, which characteristics apply,
+ * and its price (formula or a price table). Only the fields present in `input` change.
  * @throws same as {@link updatePricingMatrix}
  */
 export const updateProductLine = async (
@@ -1155,13 +1388,98 @@ export const updateProductLine = async (
     actor,
     familyId,
     { action: 'product_family.line_update', itemType: 'line', itemId: lineId, changed: Object.keys(patch) },
-    (tx) => updateProductLineQuery(tx, familyId, lineId, patch),
+    async (tx) => {
+      const line = await getProductLineInFamily(tx, familyId, lineId)
+      if (!line) return null
+      if (patch.name && (await productLineNameTaken(tx, familyId, patch.name, lineId))) throw duplicateLineName(patch.name)
+      if (patch.characteristicIds) await assertMainCharacteristics(tx, familyId, patch.characteristicIds)
+      const columns = lineColumns(patch)
+      const droppedMatrixId = patch.price ? await applyPriceMode(tx, familyId, line.pricingMatrixId, patch.price, columns, 'line') : null
+      const updated = await updateProductLineQuery(tx, familyId, lineId, columns)
+      if (!updated) return null
+      if (patch.characteristicIds) await replaceProductLineCharacteristics(tx, lineId, patch.characteristicIds)
+      if (droppedMatrixId) await deletePricingMatrixIfUnused(tx, familyId, droppedMatrixId)
+      return updated
+    },
+  )
+}
+
+/** Adds a product line. `characteristicIds` are the main characteristics that apply; omit them for none. */
+export const createProductLine = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  input: unknown,
+): Promise<ProductLineRow> => {
+  const spec = validateCreateProductLine(input)
+  return editFamilyCatalog(
+    ctx,
+    actor,
+    familyId,
+    (line) => ({ action: 'product_family.line_create', itemType: 'line', changed: ['name'], name: line.name }),
+    async (tx) => {
+      if (await productLineNameTaken(tx, familyId, spec.name)) throw duplicateLineName(spec.name)
+      if (spec.characteristicIds) await assertMainCharacteristics(tx, familyId, spec.characteristicIds)
+      let pricingMatrixId: string | null = null
+      let formula = 'valore'
+      let value = '0'
+      if (spec.price.kind === 'matrix') {
+        pricingMatrixId = await insertPricingMatrix(tx, {
+          productFamilyId: familyId,
+          widths: spec.price.widths,
+          heights: spec.price.heights,
+          matrix: spec.price.matrix,
+        })
+      } else {
+        formula = spec.price.formula
+        value = spec.price.value
+      }
+      const lineId = await insertProductLine(tx, {
+        productFamilyId: familyId,
+        name: spec.name,
+        description: spec.description ?? null,
+        formula,
+        value,
+        pricingMatrixId,
+        minValue: spec.minValue ?? null,
+        unitName: spec.unitName,
+        unitSymbol: spec.unitSymbol,
+        discountPct: spec.discountPct ?? null,
+        markupPct: spec.markupPct ?? null,
+        installationHoursPerUnit: spec.installationHoursPerUnit ?? null,
+        sortOrder: await nextProductLineSortOrder(tx, familyId),
+      })
+      if (spec.characteristicIds) await replaceProductLineCharacteristics(tx, lineId, spec.characteristicIds)
+      return getProductLineInFamily(tx, familyId, lineId)
+    },
+  )
+}
+
+/** Deletes a product line and its price table when nothing else uses that table. */
+export const deleteProductLine = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  lineId: string,
+): Promise<void> => {
+  await editFamilyCatalog<ProductLineRow>(
+    ctx,
+    actor,
+    familyId,
+    (line) => ({ action: 'product_family.line_delete', itemType: 'line', changed: [], name: line.name }),
+    async (tx) => {
+      const deleted = await deleteProductLineQuery(tx, familyId, lineId)
+      if (!deleted) return null
+      if (deleted.pricingMatrixId) await deletePricingMatrixIfUnused(tx, familyId, deleted.pricingMatrixId)
+      return deleted
+    },
   )
 }
 
 /**
- * Edits a sub-characteristic's price (value / formula). Top-level
- * characteristics have no price, so they're reported as not found.
+ * Edits a characteristic. A main characteristic accepts a new name only — a price on one is
+ * reported as not found, same as before options and mains shared this route. An option accepts
+ * its name, economics and price (formula or a price table).
  * @throws same as {@link updatePricingMatrix}
  */
 export const updateCharacteristic = async (
@@ -1177,8 +1495,204 @@ export const updateCharacteristic = async (
     actor,
     familyId,
     { action: 'product_family.characteristic_update', itemType: 'characteristic', itemId: characteristicId, changed: Object.keys(patch) },
-    (tx) => updateCharacteristicQuery(tx, familyId, characteristicId, patch),
+    async (tx) => {
+      const row = await getCharacteristicInFamily(tx, familyId, characteristicId)
+      if (!row) return null
+      if (!row.parentId && characteristicPatchHasPrice(patch)) {
+        if (patch.name === undefined) return null
+        throw new ProductFamilyValidationError('A characteristic has no price of its own')
+      }
+      if (patch.name && (await characteristicNameTaken(tx, familyId, row.parentId, patch.name, row.id))) {
+        throw duplicateCharacteristicName(patch.name, row.parentId !== null)
+      }
+      const columns = optionColumns(patch)
+      const droppedMatrixId =
+        patch.price && row.parentId ? await applyPriceMode(tx, familyId, row.pricingMatrixId, patch.price, columns, 'option') : null
+      const updated = await updateCharacteristicQuery(tx, familyId, characteristicId, columns)
+      if (!updated) return null
+      if (droppedMatrixId) await deletePricingMatrixIfUnused(tx, familyId, droppedMatrixId)
+      return updated
+    },
   )
+}
+
+/**
+ * Adds a main characteristic (linked to every current product line) or an option under one.
+ * @throws {ProductFamilyValidationError} a duplicate name, a missing price on an option, or an unknown parent
+ */
+export const createCharacteristic = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  input: unknown,
+): Promise<CharacteristicRow> => {
+  const spec = validateCreateCharacteristic(input)
+  return editFamilyCatalog(
+    ctx,
+    actor,
+    familyId,
+    (row) => ({
+      action: 'product_family.characteristic_create',
+      itemType: spec.kind === 'main' ? 'characteristic' : 'option',
+      changed: ['name'],
+      name: row.name,
+    }),
+    async (tx) => {
+      if (spec.kind === 'main') {
+        if (await characteristicNameTaken(tx, familyId, null, spec.name)) throw duplicateCharacteristicName(spec.name, false)
+        const id = await insertCharacteristic(tx, {
+          productFamilyId: familyId,
+          parentId: null,
+          name: spec.name,
+          sortOrder: await nextCharacteristicSortOrder(tx, familyId, null),
+        })
+        await linkCharacteristicToAllLines(tx, familyId, id)
+        return getCharacteristicInFamily(tx, familyId, id)
+      }
+      const parent = await getCharacteristicInFamily(tx, familyId, spec.parentId)
+      if (!parent || parent.parentId) {
+        throw new ProductFamilyValidationError('parentId must be a characteristic of this family')
+      }
+      if (await characteristicNameTaken(tx, familyId, spec.parentId, spec.name)) throw duplicateCharacteristicName(spec.name, true)
+      let pricingMatrixId: string | null = null
+      let formula: string | null = null
+      let value: string | null = null
+      if (spec.price.kind === 'matrix') {
+        pricingMatrixId = await insertPricingMatrix(tx, {
+          productFamilyId: familyId,
+          widths: spec.price.widths,
+          heights: spec.price.heights,
+          matrix: spec.price.matrix,
+        })
+      } else {
+        formula = spec.price.formula
+        value = spec.price.value
+      }
+      const id = await insertCharacteristic(tx, {
+        productFamilyId: familyId,
+        parentId: spec.parentId,
+        name: spec.name,
+        formula,
+        value,
+        pricingMatrixId,
+        minValue: spec.minValue ?? null,
+        discountPct: spec.discountPct ?? null,
+        markupPct: spec.markupPct ?? null,
+        installationHoursPerUnit: spec.installationHoursPerUnit ?? null,
+        sortOrder: await nextCharacteristicSortOrder(tx, familyId, spec.parentId),
+      })
+      return getCharacteristicInFamily(tx, familyId, id)
+    },
+  )
+}
+
+/** Deletes a characteristic. Deleting a main characteristic also deletes its options. */
+export const deleteCharacteristic = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  characteristicId: string,
+): Promise<void> => {
+  await editFamilyCatalog<CharacteristicRow>(
+    ctx,
+    actor,
+    familyId,
+    (row) => ({ action: 'product_family.characteristic_delete', itemType: 'characteristic', changed: [], name: row.name }),
+    async (tx) => {
+      const tree = await listCharacteristicWithOptions(tx, familyId, characteristicId)
+      if (!tree) return null
+      const matrixIds = tree.flatMap((row) => (row.pricingMatrixId ? [row.pricingMatrixId] : []))
+      const deleted = await deleteCharacteristicQuery(tx, familyId, characteristicId)
+      if (!deleted) return null
+      for (const matrixId of matrixIds) await deletePricingMatrixIfUnused(tx, familyId, matrixId)
+      return tree[0]
+    },
+  )
+}
+
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'])
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
+/** Stores an uploaded image on the family. PNG, JPEG, GIF, WebP or BMP, at most 8 MB. */
+export const addProductFamilyImage = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  file: { buffer: Buffer; originalName: string; title?: string | null },
+): Promise<ProductFamilyImageRow> => {
+  const extension = extname(file.originalName).toLowerCase()
+  if (!IMAGE_EXTENSIONS.has(extension)) {
+    throw new ProductFamilyValidationError('Image must be a PNG, JPEG, GIF, WebP or BMP file')
+  }
+  if (file.buffer.length === 0 || file.buffer.length > MAX_IMAGE_BYTES) {
+    throw new ProductFamilyValidationError('Image must be under 8 MB')
+  }
+  const title = file.title?.trim() ? file.title.trim().slice(0, 200) : null
+  const localPath = await saveLocalFile('product-family-images', file.buffer, extension)
+  try {
+    return await editFamilyCatalog(
+      ctx,
+      actor,
+      familyId,
+      (image) => ({ action: 'product_family.image_create', itemType: 'image', changed: [], name: image.title }),
+      async (tx) => {
+        const id = await insertProductFamilyImage(tx, {
+          productFamilyId: familyId,
+          localPath,
+          title,
+          sortOrder: await nextProductFamilyImageSortOrder(tx, familyId),
+        })
+        return getProductFamilyImageInFamily(tx, familyId, id)
+      },
+    )
+  } catch (error) {
+    await unlink(localPath).catch(() => undefined)
+    throw error
+  }
+}
+
+/** Sets or clears an image's title. */
+export const updateProductFamilyImage = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  imageId: string,
+  input: unknown,
+): Promise<ProductFamilyImageRow> => {
+  const parsed = updateProductFamilyImageRequestSchema.safeParse(input)
+  if (!parsed.success) {
+    throw new ProductFamilyValidationError(parsed.error.issues[0]?.message ?? 'Invalid request body')
+  }
+  return editFamilyCatalog(
+    ctx,
+    actor,
+    familyId,
+    (image) => ({ action: 'product_family.image_update', itemType: 'image', changed: ['title'], name: image.title }),
+    (tx) => updateProductFamilyImageTitle(tx, familyId, imageId, parsed.data.title),
+  )
+}
+
+/** Removes an image. The file is deleted when no other family (a copy) still uses that path. */
+export const deleteProductFamilyImage = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  imageId: string,
+): Promise<void> => {
+  let pathToRemove: string | null = null
+  await editFamilyCatalog<ProductFamilyImageRow>(
+    ctx,
+    actor,
+    familyId,
+    (image) => ({ action: 'product_family.image_delete', itemType: 'image', changed: [], name: image.title }),
+    async (tx) => {
+      const deleted = await deleteProductFamilyImageQuery(tx, familyId, imageId)
+      if (!deleted) return null
+      if ((await countProductFamilyImagesAtPath(tx, deleted.localPath)) === 0) pathToRemove = deleted.localPath
+      return deleted
+    },
+  )
+  if (pathToRemove) await unlink(pathToRemove).catch(() => undefined)
 }
 
 /**

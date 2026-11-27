@@ -21,8 +21,9 @@ Jede Umgebung hat bereits eine: **Demo Window W70** (siehe [Demo-Daten](../demo-
 | Aktion | Wie | Hinweise |
 |---|---|---|
 | Aus Excel importieren | **Aus Excel importieren** in der Liste | Datei wählen, prüfen, Preisgültigkeit festlegen — siehe [Aus Excel importieren](#aus-excel-importieren) |
+| Von Hand anlegen | **Familie anlegen** in der Liste | Ein leerer Entwurf. Name und *Gültig ab* sind erforderlich. Linien und Merkmale kommen auf der Seite der Familie dazu — siehe [Von Hand bearbeiten](#von-hand-bearbeiten) |
 | Ansehen | Name der Familie, oder das Symbol links in der Zeile (öffnet einen neuen Tab) | Ein Klick auf den Rest der Zeile klappt sie auf. Es ist immer nur eine Zeile offen. Neben dem Namen steht eine Markierung **V2**. Die aufgeklappte Zeile zeigt links die Schalter, die Daten und Löschen, rechts die Versionen: die aktuelle und einen Link zur vorherigen, der einen neuen Tab öffnet |
-| Preise bearbeiten | **Bearbeiten** an einer Linie, einem Merkmal oder einer Tabelle | Wert, Formel, Rabatt, Aufschlag, Montagestunden |
+| Preise bearbeiten | **Bearbeiten** an einer Linie oder Option, oder an einer Preistabelle | Name, Einheiten, Wert, Formel oder Breite-×-Höhe-Tabelle, Rabatt, Aufschlag, Montagestunden und welche Merkmale gelten |
 | Tabelle bearbeiten | Bearbeiten → Zeilen und Spalten hinzufügen/entfernen | Raster Breite × Höhe |
 | Veröffentlichen / zurückziehen | Schalter **Status (veröffentlicht)** in der aufgeklappten Zeile (Schaltfläche auf der Seite der Familie) | Die Zeile zeigt Veröffentlicht oder Entwurf. Nur veröffentlichte Familien können geteilt werden |
 | Neue Version | **Neue Version** auf der Seite der Familie | Derselbe Dialog wie beim Import; die neue Version bekommt eine eigene Preisgültigkeit, die alte behält ihre Daten |
@@ -158,6 +159,16 @@ sehen ihn — nicht die Unternehmen, mit denen die Familie geteilt wurde.
 
 Die Filter sind Teil der Seitenadresse: Sie können sie speichern oder teilen, und **Zurück** macht die letzte Änderung rückgängig.
 
-## Noch nicht umgesetzt
+## Von Hand bearbeiten
 
-Festlegen, welche Merkmale für welche Linien gelten, ohne die Excel-Datei neu zu importieren.
+Ein Hersteller mit `catalog.edit` kann eine Familie ohne Excel aufbauen und jedes Katalogfeld auf der Seite der Familie ändern. Die Änderung bleibt auf der aktuellen Version. Eine veröffentlichte Familie lässt sich bearbeiten, außer die Umgebung ist auf Entwürfe beschränkt.
+
+**Details bearbeiten** auf der Seite der Familie ändert Name, technischen Namen, Kategorie, Marke, Händler, beide Beschreibungen und die Notiz. Preisgültigkeit, Veröffentlichung, bereit zur Fakturierung, mit Preisliste und in Bibliothek behalten ihre eigenen Schalter. Versionsnummer, woher die Familie kopiert wurde, und der Excel-Dateipfad bleiben, wie sie sind.
+
+Bei **Produktlinien**: **Produktlinie hinzufügen**, und **Bearbeiten** oder **Löschen** in jeder Zeile. Ein Dialog enthält Name, Beschreibung, Einheitenname und -symbol, Mindesteinkaufspreis, Rabatt, Aufschlag, Montagestunden und den Preis. Der Preistyp ist einer der Excel-Typen (er füllt die Formel) oder **Eigene Formel**. **Tabella BxH** öffnet das Breite-×-Höhe-Raster. Kontrollkästchen wählen, welche Merkmale für diese Linie gelten.
+
+Bei **Merkmalen**: **Merkmal hinzufügen** (es gilt für jede aktuelle Linie; das ändert man danach an jeder Linie), ein Merkmal umbenennen oder löschen (Löschen entfernt seine Optionen) und **Option hinzufügen** an einem Merkmal. Eine Option hat denselben Preis und dieselben Wirtschaftswerte wie eine Linie.
+
+**Bilder**: **Bild hochladen** (PNG, JPEG, GIF, WebP oder BMP, bis 8 MB), ein optionaler Titel und **Entfernen**. Eine von Hand angelegte Familie startet ohne Bilder.
+
+Neue Linien und Merkmale kommen ans Ende. Jede Änderung steht in der Historie der Familie.

@@ -1,16 +1,16 @@
 import { AlertTriangle, History } from 'lucide-react'
-import { getFormatter, getTranslations } from 'next-intl/server'
+import { getTranslations } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Link } from '@/i18n/navigation'
 import { fetchFromApiResult } from '@/lib/api/server-client'
+import { ProductFamilyCatalog } from '@/components/product-family-catalog'
+import { ProductFamilyDetailsEditor } from '@/components/product-family-details-editor'
 import { ProductFamilyFlagSelect } from '@/components/product-family-flag-select'
 import { ProductFamilyImageGallery } from '@/components/product-family-image-gallery'
-import { ProductFamilyMatrixPreview } from '@/components/product-family-matrix-preview'
 import { ProductFamilyPriceValidity } from '@/components/product-family-price-validity'
-import { ProductFamilyPricingEditor } from '@/components/product-family-pricing-editor'
 import { ProductFamilyRowActions } from '@/components/product-family-row-actions'
 import { ProductFamilyShareButton } from '@/components/product-family-share-button'
 import { ProductFamilyUploadButton } from '@/components/product-family-upload-button'
@@ -34,20 +34,6 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
   const tVersion = await getTranslations('productFamilyVersion')
   const tEdit = await getTranslations('productFamilyEdit')
   const tFlags = await getTranslations('productFamilyFlags')
-  const format = await getFormatter()
-  const euro = (value: string) => format.number(Number(value), { style: 'currency', currency: 'EUR' })
-  // A v2 option's own minimum, discount/markup and added installation hours, when set.
-  const optionTerms = (option: ProductFamilyDetail['characteristics'][number]) =>
-    [
-      option.minValue != null ? t('optionMin', { value: euro(option.minValue) }) : null,
-      // Not the no-op 0% / 100% most options carry.
-      option.discountPct != null && option.markupPct != null && (Number(option.discountPct) !== 0 || Number(option.markupPct) !== 100)
-        ? t('optionTerms', { discount: Number(option.discountPct), markup: Number(option.markupPct) })
-        : null,
-      Number(option.installationHoursPerUnit ?? 0) > 0 ? t('optionHours', { hours: Number(option.installationHoursPerUnit) }) : null,
-    ]
-      .filter(Boolean)
-      .join(' · ')
   const [result, versionsResult] = await Promise.all([
     fetchFromApiResult<ProductFamilyDetail>(`/api/product-families/${id}`),
     fetchFromApiResult<FamilyVersionsResponse>(`/api/product-families/${id}/versions`),
@@ -74,7 +60,6 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
   const lastValidTo = chain.every((v) => v.priceValidTo)
     ? chain.reduce<string | null>((last, v) => (last && last > v.priceValidTo! ? last : v.priceValidTo), null)
     : null
-  const matrixById = new Map(matrices.map((m) => [m.id, m]))
   const mainCharacteristics = characteristics.filter((c) => !c.parentId)
   const subCharacteristicsByParent = new Map<string, typeof characteristics>()
   for (const c of characteristics) {
@@ -82,17 +67,6 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
       subCharacteristicsByParent.set(c.parentId, [...(subCharacteristicsByParent.get(c.parentId) ?? []), c])
     }
   }
-  const characteristicNamesByLineId = new Map<string, string[]>()
-  for (const rel of relations) {
-    const name = mainCharacteristics.find((c) => c.id === rel.characteristicId)?.name
-    if (name) {
-      characteristicNamesByLineId.set(rel.productLineId, [
-        ...(characteristicNamesByLineId.get(rel.productLineId) ?? []),
-        name,
-      ])
-    }
-  }
-
   // Readable names for the ids history entries mention: lines, options ("Glass: Triple"), and price tables (named after their owner).
   const historyItemNames: Record<string, string> = {}
   for (const line of lines) {
@@ -121,6 +95,7 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
             </Badge>
             <Badge variant="muted">{tVersion('versionBadge', { version: family.version })}</Badge>
             {!editable ? <Badge variant="warning">{tEdit('lockedBadge')}</Badge> : null}
+            <ProductFamilyDetailsEditor familyId={family.id} family={family} canEdit={editable && canManage} />
           </div>
           <p className="mt-1 text-sm text-slate-500">
             {[
@@ -191,125 +166,16 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
         </Card>
       )}
 
-      <ProductFamilyImageGallery familyId={family.id} familyName={family.name} images={images} />
+      <ProductFamilyImageGallery familyId={family.id} familyName={family.name} images={images} canEdit={editable && canManage} />
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>{t('productLinesCount', { count: lines.length })}</CardTitle>
-        </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[880px] text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-left text-slate-500">
-                <th className="px-6 py-3 font-medium">{t('nameHeader')}</th>
-                <th className="px-6 py-3 font-medium">{t('pricingHeader')}</th>
-                <th className="px-6 py-3 font-medium">{t('unitHeader')}</th>
-                <th className="px-6 py-3 font-medium">{t('discountMarkupHeader')}</th>
-                <th className="px-6 py-3 font-medium">{t('characteristicsHeader')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line) => (
-                <tr key={line.id} className="border-b border-slate-50 align-top hover:bg-slate-50/50">
-                  <td className="px-6 py-4 font-medium text-slate-900">
-                    {line.name}
-                    {line.description ? (
-                      <p className="mt-0.5 text-xs font-normal text-slate-400">{line.description}</p>
-                    ) : null}
-                  </td>
-                  <td className="px-6 py-4 text-slate-600">
-                    {line.pricingMatrixId && matrixById.has(line.pricingMatrixId) ? (
-                      <ProductFamilyMatrixPreview
-                        familyId={family.id}
-                        matrix={matrixById.get(line.pricingMatrixId)!}
-                        label={t('pricingMatrix')}
-                        editable={editable}
-                      />
-                    ) : (
-                      <span className="font-mono text-xs">
-                        {line.formula} <span className="text-slate-400">(valore = {line.value})</span>
-                      </span>
-                    )}
-                    {line.minValue != null ? (
-                      <p className="mt-0.5 text-xs text-slate-400">{t('minValue', { value: euro(line.minValue) })}</p>
-                    ) : null}
-                    <ProductFamilyPricingEditor
-                      kind="line"
-                      familyId={family.id}
-                      itemId={line.id}
-                      itemName={line.name}
-                      editable={editable}
-                      initial={{
-                        value: line.value,
-                        formula: line.formula,
-                        discountPct: line.discountPct,
-                        markupPct: line.markupPct,
-                        installationHoursPerUnit: line.installationHoursPerUnit,
-                      }}
-                    />
-                  </td>
-                  <td className="px-6 py-4 text-slate-600">{line.unitName || line.unitSymbol || '—'}</td>
-                  <td className="px-6 py-4 text-slate-600">
-                    {Number(line.discountPct ?? 0)}% / {Number(line.markupPct ?? 100)}%
-                  </td>
-                  <td className="px-6 py-4 text-slate-600">
-                    {(characteristicNamesByLineId.get(line.id) ?? []).map((name) => (
-                      <Badge key={name} variant="muted" className="mr-1 mb-1">
-                        {name}
-                      </Badge>
-                    ))}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('characteristicsCount', { count: mainCharacteristics.length })}</CardTitle>
-        </CardHeader>
-        <CardContent className="divide-y divide-slate-50 p-0">
-          {mainCharacteristics.map((main) => (
-            <div key={main.id} className="px-6 py-4">
-              <p className="font-medium text-slate-900">{main.name}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {(subCharacteristicsByParent.get(main.id) ?? []).map((sub) => {
-                  const terms = optionTerms(sub)
-                  return (
-                    <span
-                      key={sub.id}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600"
-                      title={sub.pricingMatrixId ? undefined : `${sub.formula} (valore = ${sub.value})`}
-                    >
-                      {sub.name}
-                      {sub.pricingMatrixId && matrixById.has(sub.pricingMatrixId) ? (
-                        <ProductFamilyMatrixPreview
-                          familyId={family.id}
-                          matrix={matrixById.get(sub.pricingMatrixId)!}
-                          label={t('pricingMatrix')}
-                          editable={editable}
-                        />
-                      ) : (
-                        <ProductFamilyPricingEditor
-                          kind="characteristic"
-                          familyId={family.id}
-                          itemId={sub.id}
-                          itemName={sub.name}
-                          editable={editable}
-                          initial={{ value: sub.value, formula: sub.formula }}
-                        />
-                      )}
-                      {terms ? <span className="text-slate-400">· {terms}</span> : null}
-                    </span>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <ProductFamilyCatalog
+        familyId={family.id}
+        lines={lines}
+        characteristics={characteristics}
+        matrices={matrices}
+        relations={relations}
+        canEdit={editable && canManage}
+      />
 
       {/* Only once there is something to compare (another version, a copy, or an original); what the caller can't see is not listed. */}
       {versionsResult.status === 'ok' &&

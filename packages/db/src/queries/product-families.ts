@@ -661,8 +661,14 @@ export const updatePricingMatrix = async (
 }
 
 export interface UpdateProductLineInput {
+  name?: string
+  description?: string | null
+  unitName?: string
+  unitSymbol?: string
   formula?: string
   value?: string
+  pricingMatrixId?: string | null
+  minValue?: string | null
   discountPct?: string | null
   markupPct?: string | null
   installationHoursPerUnit?: string | null
@@ -684,14 +690,20 @@ export const updateProductLine = async (
 }
 
 export interface UpdateCharacteristicInput {
+  name?: string
   formula?: string | null
   value?: string | null
+  pricingMatrixId?: string | null
+  minValue?: string | null
+  discountPct?: string | null
+  markupPct?: string | null
+  installationHoursPerUnit?: string | null
 }
 
 /**
- * Updates a *sub*-characteristic's pricing fields. Top-level
- * characteristics (parentId null) carry no price of their own, so they're
- * excluded here — returns null for those, same as for a missing row.
+ * Updates one characteristic in the family — a main row (name) or an option
+ * (name and price). Returns null when the row isn't in that family.
+ * The service decides which fields a main characteristic may carry.
  */
 export const updateCharacteristic = async (
   db: DbLike,
@@ -702,13 +714,273 @@ export const updateCharacteristic = async (
   const [row] = await db
     .update(characteristics)
     .set({ ...input, updatedAt: new Date() })
-    .where(
-      and(
-        eq(characteristics.id, characteristicId),
-        eq(characteristics.productFamilyId, familyId),
-        isNotNull(characteristics.parentId),
-      ),
-    )
+    .where(and(eq(characteristics.id, characteristicId), eq(characteristics.productFamilyId, familyId)))
     .returning()
   return row ?? null
+}
+
+export interface UpdateProductFamilyDetailsInput {
+  name?: string
+  technicalName?: string | null
+  category?: string | null
+  brand?: string | null
+  distributor?: string | null
+  description1?: string | null
+  description2?: string | null
+  note?: string | null
+}
+
+/** Updates a family's text fields. Returns null when the row isn't writable under RLS. */
+export const updateProductFamilyDetails = async (
+  db: DbLike,
+  familyId: string,
+  input: UpdateProductFamilyDetailsInput,
+): Promise<ProductFamilySummary | null> => {
+  const [row] = await db
+    .update(productFamilies)
+    .set({ ...input, updatedAt: new Date() })
+    .where(eq(productFamilies.id, familyId))
+    .returning()
+  return row ?? null
+}
+
+const nextSort = (values: number[]): number => values.reduce((max, value) => Math.max(max, value), -1) + 1
+
+/** The next `sortOrder` for a new product line in the family. */
+export const nextProductLineSortOrder = async (db: DbLike, familyId: string): Promise<number> => {
+  const rows = await db
+    .select({ sortOrder: productLines.sortOrder })
+    .from(productLines)
+    .where(eq(productLines.productFamilyId, familyId))
+  return nextSort(rows.map((row) => row.sortOrder))
+}
+
+/** The next `sortOrder` for a new characteristic. Options are ordered under their parent; mains across the family. */
+export const nextCharacteristicSortOrder = async (
+  db: DbLike,
+  familyId: string,
+  parentId: string | null,
+): Promise<number> => {
+  const rows = await db
+    .select({ sortOrder: characteristics.sortOrder })
+    .from(characteristics)
+    .where(
+      and(
+        eq(characteristics.productFamilyId, familyId),
+        parentId ? eq(characteristics.parentId, parentId) : isNull(characteristics.parentId),
+      ),
+    )
+  return nextSort(rows.map((row) => row.sortOrder))
+}
+
+export const getProductLineInFamily = async (
+  db: DbLike,
+  familyId: string,
+  lineId: string,
+): Promise<ProductLineRow | null> => {
+  const [row] = await db
+    .select()
+    .from(productLines)
+    .where(and(eq(productLines.id, lineId), eq(productLines.productFamilyId, familyId)))
+  return row ?? null
+}
+
+export const getCharacteristicInFamily = async (
+  db: DbLike,
+  familyId: string,
+  characteristicId: string,
+): Promise<CharacteristicRow | null> => {
+  const [row] = await db
+    .select()
+    .from(characteristics)
+    .where(and(eq(characteristics.id, characteristicId), eq(characteristics.productFamilyId, familyId)))
+  return row ?? null
+}
+
+/** Another line in the family already uses this name (the row being edited is excluded). */
+export const productLineNameTaken = async (
+  db: DbLike,
+  familyId: string,
+  name: string,
+  exceptLineId?: string,
+): Promise<boolean> => {
+  const rows = await db
+    .select({ id: productLines.id })
+    .from(productLines)
+    .where(and(eq(productLines.productFamilyId, familyId), eq(productLines.name, name)))
+  return rows.some((row) => row.id !== exceptLineId)
+}
+
+/** Another characteristic with the same parent (null = mains) already uses this name. */
+export const characteristicNameTaken = async (
+  db: DbLike,
+  familyId: string,
+  parentId: string | null,
+  name: string,
+  exceptId?: string,
+): Promise<boolean> => {
+  const rows = await db
+    .select({ id: characteristics.id })
+    .from(characteristics)
+    .where(
+      and(
+        eq(characteristics.productFamilyId, familyId),
+        eq(characteristics.name, name),
+        parentId ? eq(characteristics.parentId, parentId) : isNull(characteristics.parentId),
+      ),
+    )
+  return rows.some((row) => row.id !== exceptId)
+}
+
+/** Ids of the family's main characteristics (parent null). */
+export const listMainCharacteristicIds = async (db: DbLike, familyId: string): Promise<string[]> => {
+  const rows = await db
+    .select({ id: characteristics.id })
+    .from(characteristics)
+    .where(and(eq(characteristics.productFamilyId, familyId), isNull(characteristics.parentId)))
+  return rows.map((row) => row.id)
+}
+
+/** Replaces which main characteristics apply to one product line. */
+export const replaceProductLineCharacteristics = async (
+  db: DbLike,
+  productLineId: string,
+  characteristicIds: string[],
+): Promise<void> => {
+  await db.delete(productLineCharacteristics).where(eq(productLineCharacteristics.productLineId, productLineId))
+  if (characteristicIds.length > 0) {
+    await db.insert(productLineCharacteristics).values(
+      characteristicIds.map((characteristicId) => ({ productLineId, characteristicId })),
+    )
+  }
+}
+
+/** Links one main characteristic to every product line currently in the family. */
+export const linkCharacteristicToAllLines = async (
+  db: DbLike,
+  familyId: string,
+  characteristicId: string,
+): Promise<void> => {
+  const lines = await db
+    .select({ id: productLines.id })
+    .from(productLines)
+    .where(eq(productLines.productFamilyId, familyId))
+  if (lines.length === 0) return
+  await db.insert(productLineCharacteristics).values(
+    lines.map((line) => ({ productLineId: line.id, characteristicId })),
+  )
+}
+
+/** Deletes a product line. Relations cascade. Returns the row so the caller can drop an unused price table. */
+export const deleteProductLine = async (
+  db: DbLike,
+  familyId: string,
+  lineId: string,
+): Promise<ProductLineRow | null> => {
+  const [row] = await db
+    .delete(productLines)
+    .where(and(eq(productLines.id, lineId), eq(productLines.productFamilyId, familyId)))
+    .returning()
+  return row ?? null
+}
+
+/** The characteristic and its options (when it is a main). Null when it isn't in the family. */
+export const listCharacteristicWithOptions = async (
+  db: DbLike,
+  familyId: string,
+  characteristicId: string,
+): Promise<CharacteristicRow[] | null> => {
+  const rows = await db.select().from(characteristics).where(eq(characteristics.productFamilyId, familyId))
+  const root = rows.find((row) => row.id === characteristicId)
+  if (!root) return null
+  return [root, ...rows.filter((row) => row.parentId === characteristicId)]
+}
+
+/** Deletes a characteristic. Options cascade when the row is a main. Returns false when it wasn't there. */
+export const deleteCharacteristic = async (
+  db: DbLike,
+  familyId: string,
+  characteristicId: string,
+): Promise<boolean> => {
+  const deleted = await db
+    .delete(characteristics)
+    .where(and(eq(characteristics.id, characteristicId), eq(characteristics.productFamilyId, familyId)))
+    .returning({ id: characteristics.id })
+  return deleted.length > 0
+}
+
+/** Deletes a price table when no line or option in the family still points at it. */
+export const deletePricingMatrixIfUnused = async (db: DbLike, familyId: string, matrixId: string): Promise<void> => {
+  const [line] = await db
+    .select({ id: productLines.id })
+    .from(productLines)
+    .where(and(eq(productLines.productFamilyId, familyId), eq(productLines.pricingMatrixId, matrixId)))
+    .limit(1)
+  if (line) return
+  const [option] = await db
+    .select({ id: characteristics.id })
+    .from(characteristics)
+    .where(and(eq(characteristics.productFamilyId, familyId), eq(characteristics.pricingMatrixId, matrixId)))
+    .limit(1)
+  if (option) return
+  await db
+    .delete(pricingMatrices)
+    .where(and(eq(pricingMatrices.id, matrixId), eq(pricingMatrices.productFamilyId, familyId)))
+}
+
+export type ProductFamilyImageRow = typeof productFamilyImages.$inferSelect
+
+export const getProductFamilyImageInFamily = async (
+  db: DbLike,
+  familyId: string,
+  imageId: string,
+): Promise<ProductFamilyImageRow | null> => {
+  const [row] = await db
+    .select()
+    .from(productFamilyImages)
+    .where(and(eq(productFamilyImages.id, imageId), eq(productFamilyImages.productFamilyId, familyId)))
+  return row ?? null
+}
+
+export const nextProductFamilyImageSortOrder = async (db: DbLike, familyId: string): Promise<number> => {
+  const rows = await db
+    .select({ sortOrder: productFamilyImages.sortOrder })
+    .from(productFamilyImages)
+    .where(eq(productFamilyImages.productFamilyId, familyId))
+  return nextSort(rows.map((row) => row.sortOrder))
+}
+
+export const updateProductFamilyImageTitle = async (
+  db: DbLike,
+  familyId: string,
+  imageId: string,
+  title: string | null,
+): Promise<ProductFamilyImageRow | null> => {
+  const [row] = await db
+    .update(productFamilyImages)
+    .set({ title })
+    .where(and(eq(productFamilyImages.id, imageId), eq(productFamilyImages.productFamilyId, familyId)))
+    .returning()
+  return row ?? null
+}
+
+export const deleteProductFamilyImage = async (
+  db: DbLike,
+  familyId: string,
+  imageId: string,
+): Promise<ProductFamilyImageRow | null> => {
+  const [row] = await db
+    .delete(productFamilyImages)
+    .where(and(eq(productFamilyImages.id, imageId), eq(productFamilyImages.productFamilyId, familyId)))
+    .returning()
+  return row ?? null
+}
+
+/** How many image rows (this company can see) still point at a stored file. */
+export const countProductFamilyImagesAtPath = async (db: DbLike, localPath: string): Promise<number> => {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(productFamilyImages)
+    .where(eq(productFamilyImages.localPath, localPath))
+  return Number(row?.count ?? 0)
 }

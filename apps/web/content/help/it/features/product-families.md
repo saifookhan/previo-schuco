@@ -21,8 +21,9 @@ Ogni ambiente ne ha già una: **Demo Window W70** (vedi [Dati demo](../demo-data
 | Azione | Come | Note |
 |---|---|---|
 | Importa da Excel | **Importa da Excel** nell'elenco | Scegli il file, controllalo, imposta la validità dei prezzi — vedi [Importare da Excel](#importare-da-excel) |
+| Crea a mano | **Crea famiglia** nell'elenco | Una bozza vuota. Nome e *Valido dal* sono obbligatori. Linee e caratteristiche si aggiungono nella pagina della famiglia — vedi [Modifica a mano](#modifica-a-mano) |
 | Visualizza | Il nome della famiglia, o l'icona a sinistra della riga (apre una nuova scheda) | Un clic sul resto della riga la espande. È aperta una sola riga alla volta. Accanto al nome c'è un'etichetta **V2**. La riga espansa ha a sinistra gli interruttori, le date ed Elimina, a destra le versioni: quella attuale e un link alla precedente che apre una nuova scheda |
-| Modifica prezzi | **Modifica** su una linea, caratteristica o tabella | Valore, formula, sconto, markup, ore di posa |
+| Modifica prezzi | **Modifica** su una linea o un'opzione, o su una tabella prezzi | Nome, unità, valore, formula o tabella larghezza × altezza, sconto, markup, ore di posa, e quali caratteristiche valgono |
 | Modifica una tabella | Modifica → aggiungi/rimuovi righe e colonne | Griglia larghezza × altezza |
 | Pubblica / ritira | Interruttore **Stato (pubblicato)** nella riga espansa (pulsante nella pagina della famiglia) | La riga mostra Pubblicato o Bozza. Solo le famiglie pubblicate si possono condividere |
 | Nuova versione | **Nuova versione** nella pagina della famiglia | Stessa finestra dell'importazione; la nuova versione ha la sua validità prezzi e quella vecchia mantiene le sue date |
@@ -153,6 +154,16 @@ Sopra l'elenco, per la scheda aperta:
 
 I filtri fanno parte dell'indirizzo della pagina: puoi salvarlo o condividerlo, e **Indietro** annulla l'ultima modifica.
 
-## Non ancora realizzato
+## Modifica a mano
 
-Modificare quali caratteristiche valgono per quali linee senza reimportare il file Excel.
+Un produttore con `catalog.edit` può costruire una famiglia senza Excel e cambiare ogni campo del catalogo nella pagina della famiglia. La modifica resta sulla versione attuale. Una famiglia pubblicata si può modificare, salvo che l'ambiente sia impostato solo sulle bozze.
+
+**Modifica dettagli** nella pagina della famiglia cambia nome, nome tecnico, categoria, marchio, distributore, le due descrizioni e la nota. Validità prezzi, pubblicazione, pronta per la fatturazione, con listino e in libreria restano sui loro controlli. Il numero di versione, da dove è stata copiata la famiglia e il percorso del file Excel restano come sono.
+
+Su **Linee di prodotto**: **Aggiungi linea di prodotto**, e **Modifica** o **Elimina** su ogni riga. Una finestra raccoglie nome, descrizione, nome e simbolo dell'unità, prezzo minimo di acquisto, sconto, markup, ore di posa e il prezzo. Il tipo di prezzo è uno di quelli Excel (compila la formula) oppure **Formula personalizzata**. **Tabella BxH** apre la griglia larghezza × altezza. Le caselle scelgono quali caratteristiche valgono per quella linea.
+
+Su **Caratteristiche**: **Aggiungi caratteristica** (vale per ogni linea attuale; si cambia poi su ogni linea), rinomina o elimina una caratteristica (eliminarla toglie le sue opzioni) e **Aggiungi opzione** su una caratteristica. Un'opzione ha lo stesso prezzo e gli stessi valori economici di una linea.
+
+**Immagini**: **Carica immagine** (PNG, JPEG, GIF, WebP o BMP, fino a 8 MB), un titolo facoltativo e **Rimuovi**. Una famiglia creata a mano parte senza immagini.
+
+Le linee e le caratteristiche nuove si aggiungono in fondo. Ogni modifica compare nella cronologia della famiglia.

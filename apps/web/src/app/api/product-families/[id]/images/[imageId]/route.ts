@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { proxyEmpty, proxyJson } from '@/lib/api/proxy-patch'
 import { authConfig } from '@/lib/auth/config'
 import { buildAuthHeaders } from '@/lib/api/server-client'
 
@@ -30,4 +31,22 @@ export const GET = async (
       'Cache-Control': 'private, max-age=3600',
     },
   })
+}
+
+/** Proxies an image title edit. */
+export const PATCH = async (
+  request: Request,
+  { params }: { params: Promise<{ id: string; imageId: string }> },
+): Promise<NextResponse> => {
+  const { id, imageId } = await params
+  return proxyJson(request, `/api/product-families/${id}/images/${imageId}`, 'PATCH')
+}
+
+/** Proxies deleting an image. */
+export const DELETE = async (
+  _request: Request,
+  { params }: { params: Promise<{ id: string; imageId: string }> },
+): Promise<NextResponse> => {
+  const { id, imageId } = await params
+  return proxyEmpty(`/api/product-families/${id}/images/${imageId}`, 'DELETE')
 }

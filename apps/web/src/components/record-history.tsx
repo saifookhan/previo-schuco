@@ -101,7 +101,7 @@ export const RecordHistory = ({
       reference: text(meta.reference) ?? 'none',
       fileName: text(meta.fileName) ?? 'none',
       version: typeof meta.version === 'number' ? meta.version : 0,
-      item: itemNames[itemId] ?? 'none',
+      item: text(meta.name) ?? itemNames[itemId] ?? 'none',
       fields: fieldList(meta.changed),
       count: typeof meta.shareCount === 'number' ? meta.shareCount : 0,
       reason: text(meta.reason) ?? 'none',
