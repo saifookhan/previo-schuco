@@ -187,6 +187,14 @@ export {
   type StoredFamilyChanges,
 } from './queries/product-families'
 export {
+  listDashboardFamilies,
+  listDashboardQuotes,
+  listDashboardStatusEvents,
+  type DashboardFamilyHealthRow,
+  type DashboardQuoteRow,
+  type DashboardStatusEventRow,
+} from './queries/dashboard'
+export {
   deleteQuoteTextTemplate,
   getQuoteRevision,
   getQuoteRow,
@@ -199,6 +207,7 @@ export {
   listQuoteRevisions,
   listQuoteTextTemplates,
   listQuoteVersions,
+  listQuoteSummaries,
   listQuotes,
   lockQuote,
   quoteExists,

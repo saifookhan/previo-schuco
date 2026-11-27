@@ -1,4 +1,4 @@
-import { aliasedTable, and, asc, desc, eq } from 'drizzle-orm'
+import { aliasedTable, and, asc, desc, eq, getTableColumns } from 'drizzle-orm'
 
 import type { DbLike } from '../client'
 import { quoteRevisions, quoteTextTemplates, quoteVersions, quotes, users } from '../schema'
@@ -29,6 +29,24 @@ export const insertQuote = async (db: DbLike, input: InsertQuoteInput): Promise<
  */
 export const listQuotes = (db: DbLike, companyId: string): Promise<QuoteRow[]> =>
   db.select().from(quotes).where(eq(quotes.supplierCompanyId, companyId)).orderBy(desc(quotes.createdAt))
+
+/**
+ * The quotes list, with the latest version's `sent_at`. Same company filter and
+ * newest-first order as {@link listQuotes}.
+ */
+export const listQuoteSummaries = (
+  db: DbLike,
+  companyId: string,
+): Promise<Array<QuoteRow & { sentAt: Date | null }>> =>
+  db
+    .select({
+      ...getTableColumns(quotes),
+      sentAt: quoteVersions.sentAt,
+    })
+    .from(quotes)
+    .leftJoin(quoteVersions, and(eq(quoteVersions.quoteId, quotes.id), eq(quoteVersions.version, quotes.latestVersion)))
+    .where(eq(quotes.supplierCompanyId, companyId))
+    .orderBy(desc(quotes.createdAt))
 
 /** One quote (RLS-scoped), or null. */
 export const getQuoteRow = async (db: DbLike, quoteId: string): Promise<QuoteRow | null> => {

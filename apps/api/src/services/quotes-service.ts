@@ -18,8 +18,8 @@ import {
   listBusinessUnitsWithUsers,
   listProductFamilyVersionsOfChains,
   listQuoteRevisions,
+  listQuoteSummaries,
   listQuoteVersions,
-  listQuotes,
   listSalesContacts,
   lockQuote,
   quoteExists,
@@ -365,7 +365,7 @@ export const priceQuoteLines = (ctx: TenantContext, input: PriceLinesRequest): P
 
 // ── Reading ───────────────────────────────────────────────────────────────────
 
-const toSummary = (quote: QuoteRow): QuoteSummary => ({
+const toSummary = (quote: QuoteRow, sentAt: Date | null): QuoteSummary => ({
   id: quote.id,
   reference: quote.reference,
   status: quote.status,
@@ -375,6 +375,8 @@ const toSummary = (quote: QuoteRow): QuoteSummary => ({
   latestVersion: quote.latestVersion,
   createdAt: quote.createdAt.toISOString(),
   updatedAt: quote.updatedAt.toISOString(),
+  sentAt: sentAt?.toISOString() ?? null,
+  createdByUserId: quote.createdByUserId,
 })
 
 const toVersion = (row: QuoteVersionWithUsers): QuoteVersion => ({
@@ -460,8 +462,10 @@ const loadDetail = async (
   const version = await getQuoteVersion(tx, quote.id, versionNumber)
   if (!version) return null
   const dto = toVersion(version)
+  const sentAt =
+    version.version === quote.latestVersion ? version.sentAt : ((await getQuoteVersion(tx, quote.id, quote.latestVersion))?.sentAt ?? null)
   return {
-    quote: toSummary(quote),
+    quote: toSummary(quote, sentAt),
     versions: (await listQuoteVersions(tx, quote.id)).map((v) => ({
       id: v.id,
       version: v.version,
@@ -475,7 +479,7 @@ const loadDetail = async (
 }
 
 export const listMyQuotes = (ctx: TenantContext): Promise<QuoteSummary[]> =>
-  withTenantDb(ctx, async (tx) => (await listQuotes(tx, ctx.effectiveCompanyId)).map(toSummary))
+  withTenantDb(ctx, async (tx) => (await listQuoteSummaries(tx, ctx.effectiveCompanyId)).map((row) => toSummary(row, row.sentAt)))
 
 /** A quote with one of its versions (the latest by default); null when the quote or the version doesn't exist or isn't visible. */
 export const getQuote = (ctx: TenantContext, quoteId: string, versionNumber?: number): Promise<SalesQuoteDetailResponse | null> =>
@@ -889,6 +893,7 @@ export const getQuotePrintData = (ctx: TenantContext, quoteId: string, versionNu
     const row = await getQuoteVersion(tx, quoteId, versionNumber ?? quote.latestVersion)
     if (!row) return null
     const version = toVersion(row)
+    const sentAt = row.version === quote.latestVersion ? row.sentAt : ((await getQuoteVersion(tx, quote.id, quote.latestVersion))?.sentAt ?? null)
     const profile = await getCompanyProfile(tx, quote.supplierCompanyId)
     const units = await listBusinessUnitsWithUsers(tx, quote.supplierCompanyId, { withLogos: false })
     const contacts = await listSalesContacts(tx, quote.supplierCompanyId)
@@ -897,7 +902,7 @@ export const getQuotePrintData = (ctx: TenantContext, quoteId: string, versionNu
     // Only the logo of the branch heading the pages.
     const logoDataUrl = unit ? await getBusinessUnitLogo(tx, quote.supplierCompanyId, unit.id) : null
     return {
-      quote: toSummary(quote),
+      quote: toSummary(quote, sentAt),
       version,
       company: {
         name: profile?.name ?? '',
