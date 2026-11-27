@@ -1,4 +1,4 @@
-import { hasSize, isEditRequest, isNewQuoteRequest, isNewRowRequest, isRemoving, wantsPreviousRevision, wantsUndo } from './intent'
+import { anotherProductQuery, hasSize, isEditRequest, isNewQuoteRequest, isNewRowRequest, isRemoving, wantsPreviousRevision, wantsUndo } from './intent'
 import { SYSTEM_PROMPT, TOOL_NAMES } from './prompt'
 import { QUOTE_TOOLS } from './tools'
 import type { AgentEvent, ModelMessage, ModelTurn, Suggestion, ToolCall, ToolOutcome } from './types'
@@ -15,6 +15,12 @@ const addingNewRow = (message: string): boolean => isNewRowRequest(message) && h
 
 /** One extra round when the model answers in prose instead of calling a tool it has. */
 const nudgeFor = (text: string, latestUser: string, called: ReadonlySet<string>): string | null => {
+  const another = anotherProductQuery(latestUser)
+  if (another && !called.has('search_catalog') && !called.has('add_product')) {
+    return hasSize(latestUser)
+      ? `The user asked to add another catalog product, "${another}", and gave a size. Call add_product. Do not call add_activity or update_line.`
+      : `The user asked to add another catalog product, "${another}", and did not give a size. Call search_catalog with query "${another}". Do not call add_activity or update_line.`
+  }
   if (isRemoving(latestUser) && !called.has('remove_line') && !called.has('remove_family') && !called.has('remove_activity') && !called.has('remove_text_module')) {
     return 'The user asked to remove something. Call remove_line, remove_family, remove_activity, or remove_text_module. Do not add a row, an activity, or a text module.'
   }
@@ -172,6 +178,13 @@ const streamText = async (emit: AgentRun['emit'], text: string): Promise<void> =
 }
 
 const blockedCall = (name: string, latestUser: string, pending: Suggestion[]): string | null => {
+  const another = anotherProductQuery(latestUser)
+  if (another && (name === 'add_activity' || name === 'update_line' || name === 'update_lines' || name === 'add_text_module')) {
+    return `The user asked for another catalog product: "${another}". Call search_catalog with that name. Do not add an activity and do not rename or edit a row.`
+  }
+  if (another && !hasSize(latestUser) && name === 'add_product') {
+    return `No size yet. Call search_catalog with "${another}". Do not add an activity and do not rename a row.`
+  }
   if (wantsUndo(latestUser) && name === 'update_line') {
     return 'The user asked to undo the last edit. Call restore_revision and omit revisionNumber. Do not change a row.'
   }

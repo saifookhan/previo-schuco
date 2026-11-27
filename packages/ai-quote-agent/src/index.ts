@@ -1,9 +1,12 @@
+export { catalogStepSuggestions, familyAddMessage, familyChipLabel, lineOnlyMessage, repeatedLineName } from './choices'
+export type { CatalogChoice, CatalogChoiceLine } from './choices'
 export { placeActivity } from './activities'
 export type { ActivityAction, ActivityPlacement } from './activities'
 export { completeWithCloudflare } from './cloudflare'
 export { decideConfirm, issueConfirmToken, readConfirmToken, removeTokenAllows, verifyConfirmToken } from './confirm'
 export type { ConfirmClaims } from './confirm'
 export {
+  anotherProductQuery,
   choiceIndex,
   detectLanguage,
   hasSize,
