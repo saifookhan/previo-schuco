@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
+import { catalogStepSuggestions } from './choices'
+import { anotherProductQuery } from './intent'
 import { plainReply, runQuoteAgent, toolCallsFromText } from './loop'
+import { catalogQuery, nameMatches } from './match'
 import type { AgentEvent, ModelMessage, ModelTurn } from './types'
 
 describe('plainReply', () => {
@@ -322,5 +325,111 @@ describe('runQuoteAgent', () => {
       emit: () => {},
     })
     expect(executed).toEqual(['add_product'])
+  })
+})
+
+describe('27 Nov transcript: Solo Kit, then confizione', () => {
+  const line = 'Confezione 30 Filtri Flow F7/G4 COMPACT'
+  const families = [
+    { familyName: 'Nord Filtri Compact', familyId: 'aaaaaaaa-1111-4111-8111-111111111111', version: 1 },
+    { familyName: 'Sud Filtri Compact', familyId: 'bbbbbbbb-2222-4222-8222-222222222222', version: 2 },
+    { familyName: 'Est Filtri Compact', familyId: 'cccccccc-3333-4333-8333-333333333333', version: 1 },
+    { familyName: 'Ovest Filtri Compact', familyId: 'dddddddd-4444-4444-8444-444444444444', version: 3 },
+    { familyName: 'Centro Filtri Compact', familyId: 'eeeeeeee-5555-4555-8555-555555555555', version: 1 },
+  ]
+  const sameLine = families.map((family) => ({ name: line, ...family }))
+
+  const rejectWrongTools = async (latest: string) => {
+    const executed: { name: string; args: unknown }[] = []
+    const turns: ModelTurn[] = [
+      { content: 'I don\'t have the capability to access or use those tools. I can certainly help guide you on how to use them.', toolCalls: [] },
+      { content: null, toolCalls: [{ id: 'activity', name: 'add_activity', arguments: '{"description":"confizione","included":true,"printed":true}' }] },
+      { content: null, toolCalls: [{ id: 'rename', name: 'update_line', arguments: '{"lineName":"Solo Kit tubazioni VMC e Plenum","name":"Confezione Kit tubazioni VMC e Plenum"}' }] },
+      { content: null, toolCalls: [{ id: 'add', name: 'add_product', arguments: '{"lineName":"confizione"}' }] },
+      { content: null, toolCalls: [{ id: 'search', name: 'search_catalog', arguments: '{"query":"confizione"}' }] },
+      { content: 'Quale Confezione?', toolCalls: [] },
+    ]
+    const shown: string[] = []
+    await runQuoteAgent({
+      messages: [
+        { role: 'user', content: 'would like to add solo kit 2000 x 5000' },
+        { role: 'assistant', content: 'Added Solo Kit tubazioni VMC e Plenum 2000×5000' },
+        { role: 'user', content: latest },
+      ],
+      complete: async () => turns.shift()!,
+      execute: async (name, args) => {
+        executed.push({ name, args })
+        return { content: 'Confezione lines' }
+      },
+      emit: (event) => {
+        if (event.type === 'text') shown.push(event.delta)
+      },
+    })
+    expect(executed.map((call) => call.name)).toEqual(['search_catalog'])
+    expect(executed[0]?.args).toEqual({ query: 'confizione' })
+    expect(shown.join('')).not.toMatch(/capability|activity|Confezione Kit/)
+  }
+
+  it('adds Solo Kit, then searches for Also confizione and anche confizione', async () => {
+    expect(anotherProductQuery('Also confizione')).toBe('confizione')
+    expect(anotherProductQuery('anche confizione')).toBe('confizione')
+    expect(anotherProductQuery('also add confizione')).toBe('confizione')
+    expect(catalogQuery('Also confizione')).toBe('confizione')
+    expect(nameMatches(line, 'confizione')).toBe(true)
+    expect(nameMatches('Confezione 10 Filtri FlowSMART', 'confizione')).toBe(true)
+
+    const added: string[] = []
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'would like to add solo kit 2000 x 5000' }],
+      complete: async () => ({ content: null, toolCalls: [{ id: 'add-kit', name: 'add_product', arguments: '{"lineName":"Solo Kit tubazioni VMC e Plenum","widthMm":2000,"heightMm":5000}' }] }),
+      execute: async (name) => {
+        added.push(name)
+        return { content: 'added', speak: 'Added Solo Kit tubazioni VMC e Plenum 2000×5000' }
+      },
+      emit: () => {},
+    })
+    expect(added).toEqual(['add_product'])
+
+    await rejectWrongTools('Also confizione')
+    await rejectWrongTools('anche confizione')
+
+    const sized: string[] = []
+    await runQuoteAgent({
+      messages: [{ role: 'user', content: 'add product confizione 2000 x 2000' }],
+      complete: async () => ({
+        content: null,
+        toolCalls: [{ id: 'sized', name: 'add_product', arguments: '{"lineName":"confizione","widthMm":2000,"heightMm":2000}' }],
+      }),
+      execute: async (name) => {
+        sized.push(name)
+        return { content: 'which line', speak: 'Quale Confezione?' }
+      },
+      emit: () => {},
+    })
+    expect(sized).toEqual(['add_product'])
+  })
+
+  it('does not repeat the line-only Confezione chip for five families', () => {
+    const resent = 'Aggiungi "Confezione 30 Filtri Flow F7/G4 COMPACT "'
+    const first = catalogStepSuggestions(sameLine, resent)
+    const again = catalogStepSuggestions(sameLine, resent)
+    expect(first.step).toBe('families')
+    expect(again.choices).toEqual(first.choices)
+    expect(new Set(first.choices.map((choice) => choice.label)).size).toBe(5)
+    first.choices.forEach((choice, index) => {
+      const family = families[index]!
+      expect(choice.label.startsWith(family.familyName)).toBe(true)
+      expect(choice.label).toContain(`v${family.version}`)
+      expect(choice.label).toContain(family.familyId.slice(0, 8))
+      expect(choice.label.startsWith(line)).toBe(false)
+      expect(choice.familyId).toBe(family.familyId)
+      expect(choice.message).toContain(`id ${family.familyId}`)
+      expect(choice.message).not.toBe(resent)
+      expect(choice.message).not.toBe(resent.trim())
+    })
+    const picked = first.choices[0]!
+    const afterFamilyClick = catalogStepSuggestions(sameLine, picked.message)
+    expect(afterFamilyClick.step).toBe('families')
+    expect(afterFamilyClick.choices.every((choice) => choice.message.includes('id '))).toBe(true)
   })
 })

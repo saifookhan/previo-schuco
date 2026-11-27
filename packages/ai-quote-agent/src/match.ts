@@ -118,7 +118,7 @@ export const catalogQuery = (text: string): string => {
   const base = withoutSize(picked ?? text)
   if (picked) return base
   return base
-    .replace(/\b(aggiung\w*|add|product|products|prodotto|prodotti|una|riga|nuovo|new|famiglia|della|per|the|please|mm|quantit\w*|qty|inserisci|metti|set|change)\b/gi, ' ')
+    .replace(/\b(aggiung\w*|add|also|anche|auch|product|products|prodotto|prodotti|una|riga|nuovo|new|famiglia|della|per|the|please|mm|quantit\w*|qty|inserisci|metti|set|change)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }

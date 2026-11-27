@@ -1,5 +1,7 @@
 import {
+  anotherProductQuery,
   catalogQuery,
+  catalogStepSuggestions,
   choiceIndex,
   decideConfirm,
   expandQuery,
@@ -455,7 +457,11 @@ const searchCatalog = async (ctx: TenantContext, state: ChatState, query: string
       : ''
   const moreLines = allLineHits.length > 8 ? `\n${allLineHits.length - 8} more product lines not shown.` : ''
   const hiddenNote = hiddenCount > 0 ? `\n${hiddenCount} draft or expired match(es) are listed above and are not addable.` : ''
-  const question = lineChoices.length > 1 && lineChoices.some((item) => /profondit/i.test(item.label)) ? say(state).whichDepth : say(state).whichFamily
+  const question = lineChoices.some((item) => /profondit/i.test(item.label))
+    ? say(state).whichDepth
+    : familyStep(lineChoices)
+      ? say(state).whichFamily
+      : say(state).which
   const speak = suggestions && suggestions.length > 1 ? `${question}\n${suggestions.map((item) => item.label).join('\n')}` : undefined
   return reply(`${familyText}${more}${choice}${products}${moreLines}${sameLine}${hiddenNote}`.trim(), suggestions, speak)
 }
@@ -481,36 +487,26 @@ const lineStepChoices = (
   size?: { widthMm: number; heightMm: number; quantity?: number },
 ): Suggestion[] => {
   const addableFamilies = new Map(families.filter(isQuotable).map((family) => [family.id, family]))
-  const usable = hits.filter((line) => addableFamilies.has(line.productFamilyId))
-  const names = [...new Set(usable.map((line) => line.name.trim()))]
-  const sizeText = size ? `, ${size.widthMm}×${size.heightMm} mm` : ''
-  const quantity = size?.quantity
-  if (names.length > 1) {
-    return names.slice(0, 8).map((name) => ({
-      label: name,
-      message: `Aggiungi "${name}"${sizeText}`,
-      action: { tool: 'add_product', args: { lineName: name, ...(size ? { widthMm: size.widthMm, heightMm: size.heightMm, quantity } : {}) } },
-    }))
-  }
-  const seen = new Set<string>()
-  const choices: Suggestion[] = []
-  for (const line of usable) {
-    if (seen.has(line.productFamilyId)) continue
-    seen.add(line.productFamilyId)
+  const usable = hits.flatMap((line) => {
     const family = addableFamilies.get(line.productFamilyId)
-    if (!family) continue
-    choices.push({
-      label: chipLabel(`v${family.version} · ${family.id.slice(0, 8)}`, `${line.name.trim()} · ${family.name}`),
-      message: `Aggiungi "${line.name.trim()}" della famiglia "${family.name}", id ${family.id}${sizeText}`,
-      action: {
-        tool: 'add_product',
-        args: { lineName: line.name.trim(), familyId: family.id, ...(size ? { widthMm: size.widthMm, heightMm: size.heightMm, quantity } : {}) },
+    return family ? [{ name: line.name, familyId: family.id, familyName: family.name, version: family.version }] : []
+  })
+  const stepped = catalogStepSuggestions(usable, latestUser(state), size)
+  return stepped.choices.map((choice) => ({
+    label: choice.label,
+    message: choice.message,
+    action: {
+      tool: 'add_product',
+      args: {
+        lineName: choice.lineName,
+        ...(choice.familyId ? { familyId: choice.familyId } : {}),
+        ...(size ? { widthMm: size.widthMm, heightMm: size.heightMm, quantity: size.quantity } : {}),
       },
-    })
-    if (choices.length === 8) break
-  }
-  return choices
+    },
+  }))
 }
+
+const familyStep = (choices: Suggestion[]): boolean => choices.length > 0 && choices.every((choice) => typeof choice.action?.args.familyId === 'string')
 
 const describeFamily = async (ctx: TenantContext, familyId: string): Promise<ToolResult> => {
   if (!isUuid(familyId)) return reply('That is not a catalog family id.')
@@ -578,6 +574,8 @@ const addActivity = async (
   state: ChatState,
   args: Record<string, unknown>,
 ): Promise<ToolResult> => {
+  const another = anotherProductQuery(latestUser(state))
+  if (another) return searchCatalog(ctx, state, another, false)
   if (isRemoving(latestUser(state))) return reply('The user asked to remove an activity. Call remove_activity. Do not move it to Not included.')
   const description = str(args.description)
   if (!description) return reply('Activity description is required.')
@@ -658,6 +656,8 @@ const addProduct = async (
   state: ChatState,
   args: Record<string, unknown>,
 ): Promise<ToolResult> => {
+  const another = anotherProductQuery(latestUser(state))
+  if (another && sizesIn(latestUser(state)).length === 0 && !quotedName(latestUser(state))) return searchCatalog(ctx, state, another, false)
   const current = requireQuote(state)
   const choosing = choiceIndex(latestUser(state), 32) !== null || sizeOnly(latestUser(state)) !== null
   let familyId = str(args.familyId)
@@ -697,7 +697,7 @@ const addProduct = async (
   if (!familyId && names.length !== 1) {
     const choices = lineStepChoices(hits, families, state, { widthMm, heightMm, quantity: num(args.quantity) })
     if (choices.length === 0) return reply(`No current line matches "${lineName}".`)
-    const question = names.some((name) => /profondit/i.test(name)) ? say(state).whichDepth : names.length > 1 ? say(state).which : say(state).whichFamily
+    const question = familyStep(choices) ? say(state).whichFamily : names.some((name) => /profondit/i.test(name)) ? say(state).whichDepth : say(state).which
     return reply(`${question}\n${choices.map((choice) => choice.label).join('\n')}`, choices, `${question}\n${choices.map((choice) => choice.label).join('\n')}`)
   }
   if (!familyId) {
@@ -886,6 +886,8 @@ const linesForEdit = (
 }
 
 const updateLine = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
+  const another = anotherProductQuery(latestUser(state))
+  if (another) return searchCatalog(ctx, state, another, false)
   const current = requireQuote(state)
   const query = str(args.lineName) ?? ''
   const document = structuredClone(current.version.document)

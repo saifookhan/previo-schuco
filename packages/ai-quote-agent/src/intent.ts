@@ -226,6 +226,16 @@ export const choiceIndex = (message: string, count: number): number | null => {
   return found.index
 }
 
+/** "Also confizione", "also add …", "anche confizione": another catalog product, not an activity or a rename. */
+const ANOTHER_PRODUCT = /^(?:also(?:\s+add)?|anche(?:\s+aggiung\w*)?|auch(?:\s+(?:noch|hinzuf\w*))?)\s+(.+)$/i
+
+export const anotherProductQuery = (text: string): string | null => {
+  const rest = text.trim().match(ANOTHER_PRODUCT)?.[1]?.trim()
+  if (!rest) return null
+  const product = stripSizes(rest).replace(/\b(mm|millimetri|millimeters?)\b/gi, ' ').replace(/\s+/g, ' ').trim()
+  return product.length >= 3 ? product : null
+}
+
 /** A message that is only a width × height, such as "2000x2000" or "1000 × 300 mm". */
 export const sizeOnly = (text: string): { widthMm: number; heightMm: number } | null => {
   const trimmed = text.trim()
