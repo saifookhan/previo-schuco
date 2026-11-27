@@ -55,7 +55,11 @@ An end-to-end run through the main flows. Use [Demo logins](./demo-logins.md) to
 - [ ] Mark a line and a family **ALT** — they leave the subtotal and the total.
 - [ ] Duplicate, drag, move with the arrows and delete lines and families; reorder the closing blocks, the categories and the payment rows; drag an activity between *Included* and *Not included*.
 - [ ] Add an intro text, save it as a saved text, and add it again from **Saved texts**.
-- [ ] **Save** → **Fix version 1**; then mark it **Sent**; edit again → only **Save as a new version** is offered → v2.
+- [ ] **Save** → fix `V1A1`; mark it **Invoiced**; edit again → only **Save as a new version** is offered, and only `V2A1` appears.
+- [ ] **New alternative** from `V1A1` creates `V1A2` and leaves `V1A1` as it was. In the **version matrix**, hover `V1A2` → `V2A2` only; hover the empty cell under `V1A1` → `V2A1`.
+- [ ] Name a variant, mark it **final**, and duplicate it: the new quote's only variant is `V1A1`. The dashboard's quote cards follow the final variant.
+- [ ] Mark `V1A2` and one product-family version as **favorites**. **Favorites** on each list shows only those. The other versions stay unfavorited, and the dashboard still follows the final variant, not the favorite.
+- [ ] As a company admin, **Archive** the quote — it leaves the list until **Archived** is ticked, and the direct link still opens it. A sales user sees it with the filter on and cannot archive it.
 - [ ] **Change history** lists each save with what changed; open an older one and **Restore** it.
 - [ ] **Preview** → A4 pages with branch logo, *Vostro referente* and the footer; **Print / Save PDF**; untick fields in **Print settings** and check they disappear (the discount column stays while a line has a discount).
 - [ ] Set the family's validity to the past: a draft moves to the newest valid version with a notice; without a newer version, Save and Preview are disabled with a link to upload one.

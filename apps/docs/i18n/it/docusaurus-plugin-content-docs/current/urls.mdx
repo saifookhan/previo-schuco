@@ -37,12 +37,13 @@ Gli URL non contengono la lingua — la lingua (italiano di default, inglese, te
 
 | Pagina | URL | Richiede |
 |---|---|---|
-| Dashboard | <AppLink path="/app/dashboard" /> | — |
+| Dashboard | <AppLink path="/app/dashboard" /> | Le card dei preventivi richiedono `quote.view`. Seguono la variante segnata come finale. Gli utenti attivi sono ancora un numero di esempio. |
 | Famiglie di prodotto (catalogo) | <AppLink path="/app/product-families" /> | `catalog.view` |
 | Dettaglio famiglia | `/app/product-families/<id>` | `catalog.view` |
 | Preventivi | <AppLink path="/app/quotes" /> | `quote.view` |
-| Dettaglio / composizione preventivo | `/app/quotes/<id>` | `quote.view` (`quote.edit` per modificare) |
-| Editor preventivo (prima replica demo) | <AppLink path="/app/invoice" /> | — |
+| Dettaglio / composizione preventivo | `/app/quotes/<id>?version=2&alternative=1` | `quote.view` (`quote.edit` per modificare). Senza `alternative` si apre la più bassa di quella versione. |
+
+`/app/invoice` e `/app/invoices` aprono i Preventivi. L'indirizzo dei preventivi può portare anche `q`, `status` (`draft`, `invoiced` o `accepted`), `archived=1` e `favorites=1`. L'indirizzo delle famiglie porta gli stessi tipi di filtro, compresi `archived=1` e `favorites=1`.
 
 ### Impostazioni
 

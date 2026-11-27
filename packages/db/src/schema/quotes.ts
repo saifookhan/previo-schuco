@@ -1,9 +1,9 @@
-import { index, integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 import { companies } from './companies'
 import { users } from './users'
 
-export const quoteStatusEnum = pgEnum('quote_status', ['draft', 'sent', 'accepted', 'rejected'])
+export const quoteStatusEnum = pgEnum('quote_status', ['draft', 'invoiced', 'accepted'])
 
 /**
  * A supplier's quote (preventivo) to an end customer. Its content lives in versions
@@ -26,6 +26,8 @@ export const quotes = pgTable(
     projectLocation: text('project_location'),
     totalPrice: numeric('total_price', { precision: 14, scale: 2 }).notNull().default('0'),
     latestVersion: integer('latest_version').notNull().default(1),
+    /** Set when a company admin archives the quote. Null means it shows on the list. */
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -35,10 +37,10 @@ export const quotes = pgTable(
 )
 
 /**
- * One version of a quote: the whole document (intro, families with their lines, closing, print
- * settings) as last saved. Only a draft is fixed in place; a sent, accepted or rejected version
- * stays as it was, and changes go into a new version. Prices are stored in the document as they
- * were saved, never recomputed from the live catalog on a read.
+ * One version and alternative of a quote (V1A2): the whole document as last saved. Only a draft
+ * is fixed in place; an invoiced or accepted variant stays as it was, and changes go into the
+ * next version of that same alternative. Prices are stored in the document as they were saved,
+ * never recomputed from the live catalog on a read.
  */
 export const quoteVersions = pgTable(
   'quote_versions',
@@ -48,6 +50,14 @@ export const quoteVersions = pgTable(
       .notNull()
       .references(() => quotes.id, { onDelete: 'cascade' }),
     version: integer('version').notNull(),
+    /** Alternative within the version: V1A1, V1A2, … Existing rows are alternative 1. */
+    alternative: integer('alternative').notNull().default(1),
+    /** Optional name ("Wood", "Aluminium"). The code V1A2 is always shown as well. */
+    label: text('label'),
+    /** The one variant the dashboard treats as the chosen offer. At most one per quote. */
+    isFinal: boolean('is_final').notNull().default(false),
+    /** A variant the company wants to come back to. Any number of a quote's variants can be favorites. */
+    isFavorite: boolean('is_favorite').notNull().default(false),
     status: quoteStatusEnum('status').notNull().default('draft'),
     /** A `QuoteDocument` (@schuco/contracts), validated by the API before it is stored. */
     document: jsonb('document').$type<Record<string, unknown>>().notNull(),
@@ -62,7 +72,11 @@ export const quoteVersions = pgTable(
   },
   (table) => ({
     // Loading a quote's versions, and one version by number.
-    quoteVersionIdx: uniqueIndex('quote_versions_quote_id_version_idx').on(table.quoteId, table.version),
+    quoteVersionIdx: uniqueIndex('quote_versions_quote_id_version_alternative_idx').on(
+      table.quoteId,
+      table.version,
+      table.alternative,
+    ),
   }),
 )
 
@@ -83,6 +97,8 @@ export const quoteRevisions = pgTable(
     changes: jsonb('changes').$type<unknown[]>().notNull().default([]),
     /** On a version's first revision: the version it was copied from, if any. */
     fromVersion: integer('from_version'),
+    /** And which alternative of that version, when the copy was an alternative or a version fork. */
+    fromAlternative: integer('from_alternative'),
     savedByUserId: uuid('saved_by_user_id').references(() => users.id, { onDelete: 'set null' }),
     savedAt: timestamp('saved_at', { withTimezone: true }).defaultNow().notNull(),
   },

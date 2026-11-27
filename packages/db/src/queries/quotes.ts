@@ -1,4 +1,4 @@
-import { aliasedTable, and, asc, desc, eq } from 'drizzle-orm'
+import { aliasedTable, and, asc, desc, eq, ilike, inArray, isNull, or, type SQL } from 'drizzle-orm'
 
 import type { DbLike } from '../client'
 import { quoteRevisions, quoteTextTemplates, quoteVersions, quotes, users } from '../schema'
@@ -20,6 +20,16 @@ export const insertQuote = async (db: DbLike, input: InsertQuoteInput): Promise<
   return row.id
 }
 
+export interface ListQuotesFilter {
+  /** Case-insensitive match on reference, customer or project. */
+  q?: string
+  status?: QuoteStatusValue
+  /** When false (the default), archived quotes are left out. */
+  includeArchived?: boolean
+}
+
+const likePattern = (value: string) => `%${value.replace(/[\\%_]/g, (char) => `\\${char}`)}%`
+
 /**
  * Lists quotes for `companyId`, most recent first. Explicit filter, not
  * RLS alone — `app_is_super_admin()` makes `quotes_tenant`'s
@@ -27,8 +37,32 @@ export const insertQuote = async (db: DbLike, input: InsertQuoteInput): Promise<
  * super-admin, including one acting as a specific tenant via
  * `X-Tenant-Id` (ADR 0006 / 0008; same reasoning as `listUsers`).
  */
-export const listQuotes = (db: DbLike, companyId: string): Promise<QuoteRow[]> =>
-  db.select().from(quotes).where(eq(quotes.supplierCompanyId, companyId)).orderBy(desc(quotes.createdAt))
+export const listQuotes = (db: DbLike, companyId: string, filter: ListQuotesFilter = {}): Promise<QuoteRow[]> => {
+  const conditions: SQL[] = [eq(quotes.supplierCompanyId, companyId)]
+  if (!filter.includeArchived) conditions.push(isNull(quotes.archivedAt))
+  if (filter.status) conditions.push(eq(quotes.status, filter.status))
+  const q = filter.q?.trim()
+  if (q) {
+    const pattern = likePattern(q)
+    const textMatch = or(ilike(quotes.reference, pattern), ilike(quotes.customerName, pattern), ilike(quotes.projectLocation, pattern))
+    if (textMatch) conditions.push(textMatch)
+  }
+  return db
+    .select()
+    .from(quotes)
+    .where(and(...conditions))
+    .orderBy(desc(quotes.createdAt))
+}
+
+/** Archives or restores a quote. Returns false when the row isn't visible. */
+export const setQuoteArchivedAt = async (db: DbLike, quoteId: string, archivedAt: Date | null): Promise<boolean> => {
+  const rows = await db
+    .update(quotes)
+    .set({ archivedAt, updatedAt: new Date() })
+    .where(eq(quotes.id, quoteId))
+    .returning({ id: quotes.id })
+  return rows.length > 0
+}
 
 /** One quote (RLS-scoped), or null. */
 export const getQuoteRow = async (db: DbLike, quoteId: string): Promise<QuoteRow | null> => {
@@ -68,35 +102,72 @@ export interface QuoteVersionWithUsers extends QuoteVersionRow {
 const createdByUser = aliasedTable(users, 'created_by_user')
 const updatedByUser = aliasedTable(users, 'updated_by_user')
 
-/** A quote's versions, oldest first (without their documents). */
-export const listQuoteVersions = (
-  db: DbLike,
-  quoteId: string,
-): Promise<Pick<QuoteVersionRow, 'id' | 'version' | 'status' | 'totalPrice' | 'updatedAt'>[]> =>
+export type QuoteVariantListRow = Pick<
+  QuoteVersionRow,
+  'id' | 'quoteId' | 'version' | 'alternative' | 'label' | 'isFinal' | 'isFavorite' | 'status' | 'totalPrice' | 'updatedAt'
+>
+
+/** A quote's versions and alternatives, oldest first (without their documents). */
+export const listQuoteVersions = (db: DbLike, quoteId: string): Promise<QuoteVariantListRow[]> =>
   db
     .select({
       id: quoteVersions.id,
+      quoteId: quoteVersions.quoteId,
       version: quoteVersions.version,
+      alternative: quoteVersions.alternative,
+      label: quoteVersions.label,
+      isFinal: quoteVersions.isFinal,
+      isFavorite: quoteVersions.isFavorite,
       status: quoteVersions.status,
       totalPrice: quoteVersions.totalPrice,
       updatedAt: quoteVersions.updatedAt,
     })
     .from(quoteVersions)
     .where(eq(quoteVersions.quoteId, quoteId))
-    .orderBy(asc(quoteVersions.version))
+    .orderBy(asc(quoteVersions.version), asc(quoteVersions.alternative))
 
-/** One version of a quote by number, with who created and last saved it; null if there is none. */
+/** The same rows for many quotes, for the quotes list. */
+export const listQuoteVariantsForQuotes = (db: DbLike, quoteIds: string[]): Promise<QuoteVariantListRow[]> =>
+  quoteIds.length === 0
+    ? Promise.resolve([])
+    : db
+        .select({
+          id: quoteVersions.id,
+          quoteId: quoteVersions.quoteId,
+          version: quoteVersions.version,
+          alternative: quoteVersions.alternative,
+          label: quoteVersions.label,
+          isFinal: quoteVersions.isFinal,
+          isFavorite: quoteVersions.isFavorite,
+          status: quoteVersions.status,
+          totalPrice: quoteVersions.totalPrice,
+          updatedAt: quoteVersions.updatedAt,
+        })
+        .from(quoteVersions)
+        .where(inArray(quoteVersions.quoteId, quoteIds))
+        .orderBy(asc(quoteVersions.version), asc(quoteVersions.alternative))
+
+/** Every version row of a quote, documents included, oldest alternative first within each version. */
+export const listQuoteVersionRows = (db: DbLike, quoteId: string): Promise<QuoteVersionRow[]> =>
+  db
+    .select()
+    .from(quoteVersions)
+    .where(eq(quoteVersions.quoteId, quoteId))
+    .orderBy(asc(quoteVersions.version), asc(quoteVersions.alternative))
+
+/** One variant of a quote (`V{version}A{alternative}`), with who created and last saved it; null if there is none. */
 export const getQuoteVersion = async (
   db: DbLike,
   quoteId: string,
   version: number,
+  alternative = 1,
 ): Promise<QuoteVersionWithUsers | null> => {
   const [row] = await db
     .select({ version: quoteVersions, createdByName: createdByUser.name, updatedByName: updatedByUser.name })
     .from(quoteVersions)
     .leftJoin(createdByUser, eq(createdByUser.id, quoteVersions.createdByUserId))
     .leftJoin(updatedByUser, eq(updatedByUser.id, quoteVersions.updatedByUserId))
-    .where(and(eq(quoteVersions.quoteId, quoteId), eq(quoteVersions.version, version)))
+    .where(and(eq(quoteVersions.quoteId, quoteId), eq(quoteVersions.version, version), eq(quoteVersions.alternative, alternative)))
   return row ? { ...row.version, createdByName: row.createdByName, updatedByName: row.updatedByName } : null
 }
 
@@ -112,6 +183,8 @@ export const getQuoteVersionById = async (db: DbLike, quoteId: string, versionId
 export interface InsertQuoteVersionInput {
   quoteId: string
   version: number
+  alternative?: number
+  label?: string | null
   status: QuoteStatusValue
   document: Record<string, unknown>
   totalPrice: string
@@ -121,7 +194,13 @@ export interface InsertQuoteVersionInput {
 export const insertQuoteVersion = async (db: DbLike, input: InsertQuoteVersionInput): Promise<QuoteVersionRow> => {
   const [row] = await db
     .insert(quoteVersions)
-    .values({ ...input, revision: 1, updatedByUserId: input.createdByUserId })
+    .values({
+      ...input,
+      alternative: input.alternative ?? 1,
+      label: input.label ?? null,
+      revision: 1,
+      updatedByUserId: input.createdByUserId,
+    })
     .returning()
   return row
 }
@@ -152,13 +231,34 @@ export const setQuoteVersionStatus = async (
     .where(eq(quoteVersions.id, versionId))
 }
 
+/** Renames a variant. Does not change the document or its revision. */
+export const setQuoteVersionLabel = async (db: DbLike, versionId: string, label: string | null): Promise<void> => {
+  await db.update(quoteVersions).set({ label, updatedAt: new Date() }).where(eq(quoteVersions.id, versionId))
+}
+
+/** Marks or clears a favorite on one variant. Other variants of the quote are left as they are. */
+export const setQuoteVersionFavorite = async (db: DbLike, versionId: string, favorite: boolean): Promise<void> => {
+  await db.update(quoteVersions).set({ isFavorite: favorite }).where(eq(quoteVersions.id, versionId))
+}
+
+/** Marks one variant as the quote's final offer and clears the flag on the others. */
+export const setQuoteVersionFinal = async (db: DbLike, quoteId: string, versionId: string): Promise<void> => {
+  await db.update(quoteVersions).set({ isFinal: false }).where(eq(quoteVersions.quoteId, quoteId))
+  await db
+    .update(quoteVersions)
+    .set({ isFinal: true, updatedAt: new Date() })
+    .where(and(eq(quoteVersions.quoteId, quoteId), eq(quoteVersions.id, versionId)))
+}
+
 export type QuoteRevisionRow = typeof quoteRevisions.$inferSelect
 
 export const insertQuoteRevision = async (
   db: DbLike,
-  input: Pick<QuoteRevisionRow, 'quoteVersionId' | 'revision' | 'document' | 'totalPrice' | 'changes' | 'fromVersion' | 'savedByUserId'>,
+  input: Pick<QuoteRevisionRow, 'quoteVersionId' | 'revision' | 'document' | 'totalPrice' | 'changes' | 'fromVersion' | 'savedByUserId'> & {
+    fromAlternative?: number | null
+  },
 ): Promise<void> => {
-  await db.insert(quoteRevisions).values(input)
+  await db.insert(quoteRevisions).values({ ...input, fromAlternative: input.fromAlternative ?? null })
 }
 
 export type QuoteRevisionListRow = Omit<QuoteRevisionRow, 'document'> & { savedByName: string | null }
@@ -173,6 +273,7 @@ export const listQuoteRevisions = async (db: DbLike, quoteVersionId: string): Pr
       totalPrice: quoteRevisions.totalPrice,
       changes: quoteRevisions.changes,
       fromVersion: quoteRevisions.fromVersion,
+      fromAlternative: quoteRevisions.fromAlternative,
       savedByUserId: quoteRevisions.savedByUserId,
       savedAt: quoteRevisions.savedAt,
       savedByName: users.name,

@@ -95,7 +95,7 @@ const nudgeFor = (text: string, latestUser: string, called: ReadonlySet<string>)
   if (wantsPreviousRevision(latestUser) && !called.has('restore_revision')) {
     return 'The user wants the immediately previous save, not revision 1. Call restore_revision and omit revisionNumber.'
   }
-  if (/\b(inviato|accepted|accettat\w*|rifiutat\w*|rejected|mark(?:ed)? as sent)\b/i.test(latestUser) && !called.has('set_quote_status')) {
+  if (/\b(fatturat\w*|invoiced|accepted|accettat\w*|mark(?:ed)? as (?:invoiced|accepted))\b/i.test(latestUser) && !called.has('set_quote_status')) {
     return 'The user asked to change the quote status. Call set_quote_status.'
   }
   if (hasSize(latestUser) && !isEditRequest(latestUser) && !called.has('add_product')) {

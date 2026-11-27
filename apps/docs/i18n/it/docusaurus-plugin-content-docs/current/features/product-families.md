@@ -27,7 +27,9 @@ Ogni ambiente ne ha già una: **Demo Window W70** (vedi [Dati demo](../demo-data
 | Pubblica / ritira | Interruttore **Stato (pubblicato)** nella riga espansa (pulsante nella pagina della famiglia) | La riga mostra Pubblicato o Bozza. Solo le famiglie pubblicate si possono condividere |
 | Nuova versione | **Nuova versione** nella pagina della famiglia | Stessa finestra dell'importazione; la nuova versione ha la sua validità prezzi e quella vecchia mantiene le sue date |
 | Duplica | Icona copia nella riga | Una finestra chiede nome, validità prezzi e pubblicazione della copia (parte dalle date dell'originale, non pubblicata) |
-| Elimina | **Elimina** nella riga espansa (pulsante nella pagina della famiglia) | |
+| Elimina | **Elimina** nella riga espansa (pulsante nella pagina della famiglia) | Rimuove quella versione |
+| Archivia | **Archivia** nella riga espansa, accanto a elimina | Amministratori di azienda e super admin. Nasconde solo quella versione; una più recente resta. L'elenco la mostra di nuovo quando **Archiviati** è spuntato. Una famiglia già su un preventivo può restare |
+| Preferito | La stella accanto al badge di versione | Il segno di questa azienda su quella versione (`V2` non segna `V1`). Una famiglia condivisa può essere preferita qui senza cambiare l'elenco del proprietario. **Preferiti** nel filtro mostra solo quelle versioni |
 | Cambia validità prezzi | **Valido dal** e **Valido fino al** nella riga espansa, poi **Salva** (o **Modifica** nella pagina della famiglia) | Solo il proprietario (o il super-admin). La colonna **Date di validità** mostra le date come GG.MM.AAAA |
 | Pronta per la fatturazione | Etichetta nella colonna **Tag** quando è attiva; interruttore nella riga espansa (Sì/No nella pagina della famiglia) | Solo le famiglie pronte per la fatturazione sono proposte nel preventivo. Solo il proprietario |
 | Con listino | Etichetta nella colonna **Tag** quando è attiva; interruttore nella riga espansa (Sì/No nella pagina della famiglia) | Se dietro la famiglia ci sono dei prezzi — mostrato nel preventivo. Solo il proprietario |
@@ -144,6 +146,8 @@ Sopra l'elenco, per la scheda aperta:
 - **Validità prezzi** — *Validi oggi* (quello che propone il preventivo; contano anche le famiglie senza date), *In arrivo*, *Scaduti*, *Senza date*.
 - **Pronta per la fatturazione** (in *Più filtri*) — Sì / No.
 - **Con listino** e **In libreria** (in *Più filtri*) — Sì / No.
+- **Preferiti** — spento di default. Spuntalo per vedere solo le versioni che questa azienda ha segnato con la stella.
+- **Archiviati** — spento di default. Spuntalo per vedere le versioni archiviate da un amministratore di azienda.
 - **Altri filtri** — *Prezzi validi il* un certo giorno, *Aggiornata dal / al*, *Solo ultime versioni* (nasconde le versioni sostituite da una più recente); in *Condivise con me* anche **Proprietario** e **Il tuo sconto** (con / senza).
 - **Ordina** — più recenti prima (predefinito), aggiornate di recente, nome, prezzi in scadenza prima.
 

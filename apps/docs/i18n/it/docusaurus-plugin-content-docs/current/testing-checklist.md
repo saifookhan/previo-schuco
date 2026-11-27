@@ -55,7 +55,11 @@ Un percorso completo dei flussi principali. Usa gli [Accessi demo](./demo-logins
 - [ ] Segna una linea e una famiglia **ALT** — escono dal subtotale e dal totale.
 - [ ] Duplica, trascina, sposta con le frecce ed elimina linee e famiglie; riordina i blocchi di chiusura, le categorie e le rate; trascina un'attività tra *Incluse* e *Non incluse*.
 - [ ] Aggiungi un testo d'intestazione, salvalo come testo salvato e aggiungilo di nuovo da **Testi salvati**.
-- [ ] **Salva** → **Correggi la versione 1**; poi segnala come **Inviato**; modifica di nuovo → c'è solo **Salva come nuova versione** → v2.
+- [ ] **Salva** → correggi `V1A1`; segnala come **Fatturato**; modifica di nuovo → c'è solo **Salva come nuova versione**, e compare solo `V2A1`.
+- [ ] **Nuova alternativa** da `V1A1` crea `V1A2` e lascia `V1A1` com'era. Nella **matrice versioni**, passa su `V1A2` → solo `V2A2`; passa sulla cella vuota sotto `V1A1` → `V2A1`.
+- [ ] Dai un nome a una variante, segnala **finale** e duplicala: l'unico variante del nuovo preventivo è `V1A1`. Le card preventivi della dashboard seguono la variante finale.
+- [ ] Segna `V1A2` e una versione di famiglia come **preferiti**. **Preferiti** in ogni elenco mostra solo quelli. Le altre versioni restano non preferite, e la dashboard segue ancora la variante finale.
+- [ ] Come amministratore di azienda, **Archivia** il preventivo — esce dall'elenco finché **Archiviati** è spuntato, e il link diretto lo apre ancora. Un utente vendite lo vede col filtro e non può archiviarlo.
 - [ ] **Cronologia modifiche** elenca ogni salvataggio con cosa è cambiato; aprine uno vecchio e **Ripristina**.
 - [ ] **Anteprima** → pagine A4 con logo dell'unità, *Vostro referente* e piè di pagina; **Stampa / Salva PDF**; togli campi nelle **Impostazioni di stampa** e verifica che spariscano (la colonna sconto resta se una riga ha uno sconto).
 - [ ] Porta la validità della famiglia nel passato: una bozza passa alla versione valida più recente con un avviso; senza versione più recente, Salva e Anteprima sono disattivati con un link per caricarla.

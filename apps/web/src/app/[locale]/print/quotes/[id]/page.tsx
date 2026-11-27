@@ -9,10 +9,16 @@ import type { CompanyProfileResponse, QuotePrintData } from '@schuco/contracts'
 
 interface QuotePrintPageProps {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ version?: string; unsaved?: string }>
+  searchParams: Promise<{ version?: string; alternative?: string; unsaved?: string }>
 }
 
-const versionQueryOf = (version: string | undefined) => (version && /^\d+$/.test(version) ? `?version=${version}` : '')
+const versionQueryOf = (version: string | undefined, alternative: string | undefined) => {
+  const query = new URLSearchParams()
+  if (version && /^\d+$/.test(version)) query.set('version', version)
+  if (alternative && /^\d+$/.test(alternative)) query.set('alternative', alternative)
+  const text = query.toString()
+  return text ? `?${text}` : ''
+}
 
 /** Fetched once per request for both the page and its title. */
 const loadPrintData = cache((id: string, versionQuery: string) => fetchFromApiResult<QuotePrintData>(`/api/sales-quotes/${id}/print${versionQuery}`))
@@ -20,10 +26,10 @@ const loadPrintData = cache((id: string, versionQuery: string) => fetchFromApiRe
 /** "Anteprima Preventivo": one version of the quote on A4 pages, printed or saved as PDF by the browser. */
 const QuotePrintPage = async ({ params, searchParams }: QuotePrintPageProps) => {
   const { id } = await params
-  const { version, unsaved } = await searchParams
+  const { version, alternative, unsaved } = await searchParams
   const t = await getTranslations('quotePrint')
   const [printResult, profileResult] = await Promise.all([
-    loadPrintData(id, versionQueryOf(version)),
+    loadPrintData(id, versionQueryOf(version, alternative)),
     unsaved === '1' ? fetchFromApiResult<CompanyProfileResponse>('/api/company/profile') : Promise.resolve(null),
   ])
 
@@ -53,9 +59,10 @@ const QuotePrintPage = async ({ params, searchParams }: QuotePrintPageProps) => 
 
 /** The title is the file name the browser suggests when saving as PDF. */
 export const generateMetadata = async ({ params, searchParams }: QuotePrintPageProps) => {
-  const [{ id }, { version }] = await Promise.all([params, searchParams])
-  const result = await loadPrintData(id, versionQueryOf(version))
-  return { title: result.data ? `${result.data.quote.reference} v${result.data.version.version} — ${result.data.version.document.header.customerName}` : undefined }
+  const [{ id }, { version, alternative }] = await Promise.all([params, searchParams])
+  const result = await loadPrintData(id, versionQueryOf(version, alternative))
+  const code = result.data ? `V${result.data.version.version}A${result.data.version.alternative}` : ''
+  return { title: result.data ? `${result.data.quote.reference} ${code} — ${result.data.version.document.header.customerName}` : undefined }
 }
 
 export default QuotePrintPage

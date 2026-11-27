@@ -6,8 +6,8 @@ import { CopyPlus, Loader2, PencilLine, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 /**
- * How to save: a draft can be fixed in place or saved as the next version; a version that was
- * sent (or accepted, rejected) is never changed, so its edits can only become the next version.
+ * How to save: a draft can be fixed in place or saved as the next version of this alternative
+ * only. An invoiced or accepted variant is never changed, so its edits become the next version.
  */
 export const QuoteSaveDialog = ({
   open,
@@ -20,7 +20,8 @@ export const QuoteSaveDialog = ({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  version: number
+  /** The open cell, e.g. V1A2. A new version copies only this alternative. */
+  version: string
   status: QuoteStatus
   saving: boolean
   error: string | null

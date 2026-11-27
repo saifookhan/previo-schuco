@@ -653,6 +653,21 @@ export const withRlsTransaction = async <T>(
  * @param db - Drizzle client (top-level, pooled)
  * @param fn - Work to run with the super-admin RLS bypass active
  */
+/** The user's primary role and any additional ones. Empty when the user isn't visible. */
+export const listUserRoleIds = async (db: DbLike, userId: string): Promise<string[]> => {
+  const [user] = await db.select({ roleId: users.roleId }).from(users).where(eq(users.id, userId))
+  if (!user) return []
+  const extra = await db
+    .select({ roleId: userAdditionalRoles.roleId })
+    .from(userAdditionalRoles)
+    .where(eq(userAdditionalRoles.userId, userId))
+  return [user.roleId, ...extra.map((row) => row.roleId)]
+}
+
+/** Company admins and super admins may archive quotes and product families. */
+export const userMayArchive = async (db: DbLike, userId: string): Promise<boolean> =>
+  (await listUserRoleIds(db, userId)).some((roleId) => roleId === 'company-admin' || roleId === 'super-admin')
+
 export const withSystemTransaction = async <T>(
   db: Db,
   fn: (tx: DbLike) => Promise<T>,
