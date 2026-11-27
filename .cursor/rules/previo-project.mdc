@@ -16,10 +16,9 @@ alwaysApply: true
 ## Layout
 
 ```
-apps/web, apps/api          → deployables
+apps/web, apps/api          → deployables (testing handbook is `/help` in the web app)
 packages/calculation, db      → shared libraries
 packages/contracts          → planned shared API schemas
-apps/docs                   → planned Docusaurus site
 docs/                       → project-context.md, architecture.md, deployment.md
 infra/terraform/            → AWS (dev/stage/prod)
 ```

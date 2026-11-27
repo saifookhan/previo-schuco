@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Building2, LayoutDashboard, LogOut, Menu, ScrollText, Users, X } from 'lucide-react'
+import { BookOpen, Building2, LayoutDashboard, LogOut, Menu, ScrollText, Users, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
@@ -116,6 +116,13 @@ export const AdminShell = ({ children }: AdminShellProps) => {
           >
             <LayoutDashboard className="h-4 w-4" />
             {t('backToApp')}
+          </Link>
+          <Link
+            href="/help"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+          >
+            <BookOpen className="h-4 w-4" />
+            {t('handbook')}
           </Link>
           <button
             type="button"

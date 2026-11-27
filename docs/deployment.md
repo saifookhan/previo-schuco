@@ -8,9 +8,8 @@ One server, one `docker compose --profile selfhost` stack:
 
 | Service | Image / build | Role |
 |---|---|---|
-| `caddy` | `caddy:2-alpine` | Public entry point: ports 80/443, automatic Let's Encrypt HTTPS, reverse-proxies to `web` (and optionally Mailpit and `docs`) |
-| `docs` | `apps/docs/Dockerfile` | Static testing docs (Docusaurus), reached only through `caddy` on `DOCS_DOMAIN` |
-| `web` | `apps/web/Dockerfile` | Next.js. The browser only ever talks to this service; its `/api/*` routes proxy to `api` over Docker's internal network |
+| `caddy` | `caddy:2-alpine` | Public entry point: ports 80/443, automatic Let's Encrypt HTTPS, reverse-proxies to `web` (and optionally Mailpit). `/docs` and `/openapi.json` go to `api` |
+| `web` | `apps/web/Dockerfile` | Next.js. The browser only ever talks to this service; its `/api/*` routes proxy to `api` over Docker's internal network. The public testing handbook is `/help` |
 | `api` | `apps/api/Dockerfile` | Hono API (auth, RBAC/permissions, quotes, catalog) |
 | `worker` | same image as `api` | BullMQ worker (background jobs) |
 | `migrate` | `apps/api/Dockerfile` (target `migrate`) | One-shot job on every `up`: Drizzle migrations → RLS policies/grants → app-role password → idempotent seed. Exits `0` when done |
@@ -63,9 +62,7 @@ Full step-by-step (Docker install, read-only deploy key, `.env`, first `up`, HTT
 | `ALLOW_DEV_LOGIN` | `false` for anything real customers use (it enables the password-less demo-user shortcut) |
 | `APP_DB_PASSWORD` | A real password for the restricted `previo_app` database role (the app never connects as the owner — [ADR 0007](adr/0007-application-db-role.md)) |
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Real outbound email. Without a key, mail goes to Mailpit (not delivered) |
-| `MAILPIT_UI_AUTH`, `MAILPIT_BIND`, `MAILPIT_DOMAIN` | Only if you expose Mailpit's UI — see the README |
-| `GIT_COMMIT` | Set by `deploy.yml`; shown in the docs footer. Not needed in `.env` |
-| `DOCS_DOMAIN` | Serves the testing docs (`apps/docs`, `docs` service) at `https://<DOCS_DOMAIN>`, publicly readable. App and Mailpit links inside the docs come from `DOMAIN` / `MAILPIT_DOMAIN` at build time |
+| `MAILPIT_UI_AUTH`, `MAILPIT_BIND`, `MAILPIT_DOMAIN` | Only if you expose Mailpit's UI — see the README. `MAILPIT_DOMAIN` is also what the handbook's Mailpit links use |
 
 `.env` is gitignored and lives only on the server. GitHub only holds the two deploy secrets above.
 
@@ -138,7 +135,7 @@ docker compose up -d              # Postgres, Redis, Mailpit, migrate, API, work
 pnpm dev                          # web only, on :3000
 ```
 
-- Web `:3000`, API `:3001`, Swagger UI `:3001/docs`, Mailpit `:8025`.
+- Web `:3000` (handbook at `/help`), API `:3001`, Swagger UI `:3001/docs`, Mailpit `:8025`.
 - Postgres is on host port `5434` and Redis on `6380` (to avoid clashing with local installs).
 - `pnpm dev` starts **web only**; the API and worker run in Docker. Do not also run the API on the host (port conflict).
 - Preset: `pnpm dev:local` runs web + api on the host against the Docker Postgres/Redis (the worker separately via `pnpm dev:worker`; stop the Docker `api` first to free port 3001). The `dev:hybrid` / `dev:remote` presets and `pnpm env:fetch` belonged to the retired AWS dev environment and no longer have anything to connect to — see [environments.md](./environments.md).

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  BookOpen,
   Building2,
   FileSpreadsheet,
   Handshake,
@@ -195,6 +196,13 @@ export const AppShell = ({ children }: AppShellProps) => {
         </nav>
 
         <div className="border-t border-slate-100 p-4">
+          <Link
+            href="/help"
+            className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+          >
+            <BookOpen className="h-4 w-4" />
+            {t('handbook')}
+          </Link>
           <button
             type="button"
             onClick={() => void signOut()}

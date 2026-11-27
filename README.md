@@ -4,7 +4,7 @@ Monorepo for the PREVIO quote/preventivo platform built with Next.js, Hono, Post
 
 See [docs/technical-overview.md](docs/technical-overview.md) for architecture diagrams and onboarding guide.  
 See [docs/project-context.md](docs/project-context.md) for domain model and roadmap.  
-See [docs/architecture.md](docs/architecture.md) for monorepo evolution, Changesets, Docusaurus, and service split.  
+See [docs/architecture.md](docs/architecture.md) for monorepo evolution, Changesets, and service split.  
 See [docs/adr/](docs/adr/) for the architecture decision records behind the multi-tenant, multi-environment design (RLS, tenant isolation, env composition, background jobs, audit logging, secrets, testing strategy).
 
 ## Stack
@@ -48,7 +48,7 @@ pnpm dev                          # Web on :3000 — MUST be `pnpm dev`, not `pn
 - API: http://localhost:3001
 - Swagger UI: http://localhost:3001/docs
 - OpenAPI spec: http://localhost:3001/openapi.json
-- **Testing docs** (features, URLs, demo logins, Mailpit): `pnpm dev:docs` → http://localhost:3002 — source in [`apps/docs`](apps/docs) (`pnpm dev:docs --locale it` / `de` for the translations; search only works on a build — `pnpm --filter @schuco/docs build && pnpm --filter @schuco/docs serve`)
+- **Testing handbook** (features, URLs, demo logins, Mailpit): http://localhost:3000/help — public, same language picker as the app (Italian by default). Source in [`apps/web/content/help`](apps/web/content/help)
 - **Demo product family** for testers: `pnpm --filter @schuco/api seed:demo-family` (idempotent; the server runs it on every deploy)
 - **Mailpit (local email inbox):** http://localhost:8025 — invite and password-reset emails land here instead of a real inbox (no `RESEND_API_KEY` needed for local dev); apps/api is already pointed at it by default (see `.env.example`)
 - Login: go to `/login` and sign in as one of the seeded demo users via the "dev seed login" shortcut (no password needed for these — real accounts go through email+password, invited from the admin panel and set via the `/set-password` link that shows up in Mailpit):
@@ -127,6 +127,7 @@ That's it — the whole app (Postgres, Redis, Mailpit, API, worker, web) comes u
 | `SMTP_HOST` | `mailpit` | Without `RESEND_API_KEY`, invite/reset emails go to the bundled `mailpit` container instead — see below for how to read them. Blank `SMTP_HOST` out to fall back to just logging the link (`docker compose logs api`) |
 | `MAILPIT_UI_AUTH` | *(unset)* | Set to `user:pass` to protect Mailpit's web UI with HTTP Basic Auth, as an alternative to the SSH tunnel below — only takes effect together with `MAILPIT_BIND=0.0.0.0` |
 | `MAILPIT_BIND` | `127.0.0.1` | Set to `0.0.0.0` to publish Mailpit's ports (8025 web UI, 1025 SMTP) off the box — only do this alongside a real `MAILPIT_UI_AUTH`, or anyone can read every invite/reset-password email |
+| `MAILPIT_DOMAIN` | *(unset)* | Hostname Caddy uses for Mailpit's HTTPS UI. The handbook's Mailpit links use `https://<MAILPIT_DOMAIN>` when this is set, otherwise `http://localhost:8025` |
 | `DOMAIN` | *(unset)* | Set to enable automatic HTTPS via the bundled `caddy` reverse proxy — see below |
 
 **Reading Mailpit's inbox** — its web UI is bound to `127.0.0.1:8025` on the server by default (not reachable off the box), so pick one:
@@ -186,9 +187,8 @@ Spins up a real `previo_test` Postgres database (dropped/recreated each run) and
 
 ```
 apps/
-  web/     → Next.js frontend (+ server-side proxy to the API)
+  web/     → Next.js frontend (+ server-side proxy to the API). Public testing handbook at `/help`
   api/     → Hono API (Docker); also the BullMQ worker entrypoint (src/worker.ts)
-  docs/    → Docusaurus testing docs (features, URLs, demo logins) — `pnpm dev:docs`
 packages/
   calculation/  → Quote pricing engine
   db/           → Drizzle schema, migrations, RBAC, RLS policies

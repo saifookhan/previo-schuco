@@ -212,26 +212,10 @@ services:
       # and is not the gate — the route reads ALLOW_DEV_LOGIN at request time.
       ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-false}
       NEXT_PUBLIC_ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-false}
+      # Handbook Mailpit links. Empty means http://localhost:8025.
+      MAILPIT_DOMAIN: ${MAILPIT_DOMAIN:-}
     depends_on:
       - api
-
-  # Testing docs (apps/docs, Docusaurus) — a static build served on
-  # DOCS_DOMAIN through the `caddy` service below; no published port.
-  # The app/Mailpit URLs inside the docs are baked in at build time, so a
-  # changed DOMAIN / MAILPIT_DOMAIN needs `up -d --build` to show up.
-  docs:
-    logging: *default-logging
-    profiles: ['selfhost']
-    build:
-      context: .
-      dockerfile: apps/docs/Dockerfile
-      args:
-        DOMAIN: ${DOMAIN:-}
-        APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
-        MAILPIT_DOMAIN: ${MAILPIT_DOMAIN:-}
-        DOCS_DOMAIN: ${DOCS_DOMAIN:-}
-        # Shown in the docs footer; deploy.yml exports it.
-        GIT_COMMIT: ${GIT_COMMIT:-}
 
   # Reverse proxy fronting `web` with automatic HTTPS — Caddy requests and
   # auto-renews a real Let's Encrypt certificate for DOMAIN the first time
@@ -252,9 +236,6 @@ services:
       # subdomain (e.g. mail.188-245-28-215.sslip.io) instead of a
       # directly-published port. See README's Mailpit section.
       MAILPIT_DOMAIN: ${MAILPIT_DOMAIN:-}
-      # Optional — serves the docs site (the `docs` service) on its own
-      # subdomain, e.g. docs.188-245-28-215.sslip.io.
-      DOCS_DOMAIN: ${DOCS_DOMAIN:-}
     ports:
       - '80:80'
       - '443:443'

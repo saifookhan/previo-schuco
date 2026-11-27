@@ -205,6 +205,7 @@ previo-schuco/
 | Path | Description |
 |------|-------------|
 | `/` | Public home |
+| `/help` | Public testing handbook (features, URLs, demo logins). No language prefix |
 | `/login` | Email + password (or the demo-user shortcut) |
 | `/app/*` | Authenticated app (dashboard, invoice editor, settings) |
 | `/admin/*` | Super-admin portal |

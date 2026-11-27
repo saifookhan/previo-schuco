@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx'
  * A small, entirely made-up product family in the v2 Excel import format
  * (`src/lib/excel-import`) — safe to publish in the docs, unlike the real
  * supplier workbook in `tests/fixtures`. Used by `seed-demo-family.ts` and
- * written to the docs site as the downloadable sample.
+ * written to the handbook as the downloadable sample.
  */
 export const SAMPLE_FAMILY_NAME = 'Demo Window W70'
 
@@ -141,7 +141,7 @@ export const buildSampleWorkbook = (): Buffer => {
 
 // `tsx scripts/sample-workbook.ts` regenerates the docs' downloadable copy.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const target = join(dirname(fileURLToPath(import.meta.url)), '../../docs/static/samples/previo-sample-family.xlsx')
+  const target = join(dirname(fileURLToPath(import.meta.url)), '../../web/public/help/samples/previo-sample-family.xlsx')
   writeFileSync(target, buildSampleWorkbook())
   console.log(`Wrote ${target}`)
 }

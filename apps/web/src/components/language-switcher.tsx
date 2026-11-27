@@ -13,10 +13,15 @@ const localeLabels: Record<Locale, string> = {
   de: 'DE',
 }
 
+type LanguageSwitcherProps = {
+  /** `fixed` floats over the page. `inline` sits in a header so it does not cover content. */
+  variant?: 'fixed' | 'inline'
+}
+
 /**
  * Language switcher using next-intl cookie-based locale.
  */
-export const LanguageSwitcher = () => {
+export const LanguageSwitcher = ({ variant = 'fixed' }: LanguageSwitcherProps) => {
   const t = useTranslations('language')
   const locale = useLocale()
   const pathname = usePathname()
@@ -32,9 +37,16 @@ export const LanguageSwitcher = () => {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-lg">
+    <div
+      className={cn(
+        'flex items-center gap-2 rounded-xl border border-slate-200 bg-white',
+        variant === 'fixed' ? 'fixed bottom-6 right-6 z-50 px-3 py-2 shadow-lg' : 'px-2 py-1',
+      )}
+    >
       <Globe className="h-4 w-4 text-slate-500" aria-hidden="true" />
-      <span className="text-xs font-medium text-slate-500">{t('label')}</span>
+      <span className={cn('text-xs font-medium text-slate-500', variant === 'inline' && 'sr-only')}>
+        {t('label')}
+      </span>
       <div className="flex gap-1">
         {locales.map((loc) => (
           <button
