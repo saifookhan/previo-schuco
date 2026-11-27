@@ -234,14 +234,11 @@ export const productLineCharacteristics = pgTable(
 )
 
 /**
- * A product family's marketing images (Excel "Immagine_1/2/3" — embedded
- * images inside the .xlsx, not cell values; extracted separately from the
- * rest of the sheet via `extract-embedded-images.ts` since the `xlsx`
- * library only reads cell values, not drawings). `localPath` for now
- * (matches `productFamilies.sourceExcelPath`'s local-disk-first
- * approach) — an unbounded list rather than 3 fixed columns, since the
- * sample workbook already has exactly 3 but nothing guarantees that
- * stays true for every supplier's file.
+ * A product family's pictures. Slots 0–2 are managed (shown with the family
+ * in the preventivo); slots 3–9 are extra and print at the end. `localPath`
+ * is null until someone uploads a file, or after that file is removed.
+ * Embedded workbook images fill slots in row order; titles come from
+ * `Titolo_immagine_N` (see `extract-product-family.ts`).
  */
 export const productFamilyImages = pgTable('product_family_images', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -249,7 +246,7 @@ export const productFamilyImages = pgTable('product_family_images', {
     .notNull()
     .references(() => productFamilies.id, { onDelete: 'cascade' }),
   title: text('title'),
-  localPath: text('local_path').notNull(),
+  localPath: text('local_path'),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [

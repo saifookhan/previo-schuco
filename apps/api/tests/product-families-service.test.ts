@@ -3,12 +3,14 @@ process.env.DATABASE_URL =
   `postgresql://previo_app:${process.env.APP_DB_PASSWORD ?? 'previo_app'}@localhost:5434/previo_test`
 
 import { readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { auditLog, companies, createDb, productFamilies, roles, users, withSystemTransaction, type Db } from '@schuco/db'
 import { and, eq, inArray } from 'drizzle-orm'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
+import { buildSampleWorkbook } from '../scripts/sample-workbook'
 import { getDb } from '../src/lib/db'
 import {
   createNewVersionFromExcel,
@@ -19,6 +21,8 @@ import {
   PriceValidityOverlapError,
   importProductFamilyFromExcel,
   ExcelImportError,
+  removeProductFamilyImage,
+  uploadProductFamilyImage,
   listProductFamilies,
   previewProductFamilyImport,
   setProductFamilyHasPriceListStatus,
@@ -113,7 +117,8 @@ describe('importProductFamilyFromExcel', () => {
     expect(detail!.lines).toHaveLength(5)
     expect(detail!.characteristics).toHaveLength(17) // 5 main + 12 sub — counted by hand against the fixture
     expect(detail!.matrices).toHaveLength(5) // 3 product-line matrices (LP1-3) + 2 characteristic matrices (C3_2, C3_3)
-    expect(detail!.images).toHaveLength(3)
+    expect(detail!.images.map((image) => image.title)).toEqual(['Applicazione tenda', 'Link al sito', 'Altra applicazione'])
+    expect(detail!.images.every((image) => image.localPath)).toBe(true)
     expect(detail!.relations).toHaveLength(11)
 
     // Excel stores discount/markup as raw multipliers (0.43, 1.5); the
@@ -705,5 +710,87 @@ describe('upload dialog: preview, then save with the confirmed fields', () => {
     await expect(
       setProductFamilyPriceValidityDates(stranger, actor, family.id, { priceValidFrom: '2026-01-01', priceValidTo: null }),
     ).rejects.toThrow(ProductFamilyNotFoundError)
+  })
+})
+
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+)
+
+describe('product family image slots', () => {
+  const ctx = () => ({ effectiveCompanyId: supplierCompanyId, isSuperAdmin: false })
+
+  it('creates the three managed slots from the workbook titles, and empty ones when the file has no pictures', async () => {
+    const family = await importProductFamilyFromExcel(ctx(), actor, supplierCompanyId, {
+      buffer: buildSampleWorkbook(),
+      originalName: 'sample.xlsx',
+    })
+    const detail = await getProductFamilyDetail(ctx(), family.id)
+    expect(detail!.images.map((image) => ({ title: image.title, sortOrder: image.sortOrder, localPath: image.localPath }))).toEqual([
+      { title: 'Generale', sortOrder: 0, localPath: null },
+      { title: 'Dettaglio', sortOrder: 1, localPath: null },
+      { title: 'Sezione', sortOrder: 2, localPath: null },
+    ])
+  })
+
+  it('uploads, replaces, clears a managed slot and removes an extra one, and keeps a shared file until the last copy drops it', async () => {
+    const family = await importProductFamilyFromExcel(ctx(), actor, supplierCompanyId, {
+      buffer: buildSampleWorkbook(),
+      originalName: 'sample.xlsx',
+    })
+    const slots = (await getProductFamilyDetail(ctx(), family.id))!.images
+    const filled = await uploadProductFamilyImage(ctx(), actor, family.id, { buffer: PNG, mimeType: 'image/png' }, slots[0].id)
+    expect(filled.sortOrder).toBe(0)
+    expect(filled.localPath).toBeTruthy()
+
+    const replaced = await uploadProductFamilyImage(ctx(), actor, family.id, { buffer: PNG, mimeType: 'image/png' }, slots[0].id)
+    expect(replaced.localPath).not.toBe(filled.localPath)
+    await expect(readFile(filled.localPath!)).rejects.toThrow()
+
+    const extra = await uploadProductFamilyImage(ctx(), actor, family.id, { buffer: PNG, mimeType: 'image/png' })
+    expect(extra.sortOrder).toBe(3)
+    await removeProductFamilyImage(ctx(), actor, family.id, extra.id)
+    expect((await getProductFamilyDetail(ctx(), family.id))!.images.map((image) => image.sortOrder)).toEqual([0, 1, 2])
+
+    await removeProductFamilyImage(ctx(), actor, family.id, slots[0].id)
+    const cleared = (await getProductFamilyDetail(ctx(), family.id))!.images[0]
+    expect(cleared).toMatchObject({ title: 'Generale', localPath: null })
+
+    await expect(
+      uploadProductFamilyImage(ctx(), actor, family.id, { buffer: Buffer.from('not-an-image'), mimeType: 'text/plain' }, slots[1].id),
+    ).rejects.toThrow(ProductFamilyValidationError)
+
+    const original = await importProductFamilyFromExcel(ctx(), actor, supplierCompanyId, {
+      buffer: fixtureBuffer,
+      originalName: 'product-family-sample.xlsx',
+    })
+    const copy = await duplicateProductFamily(ctx(), actor, original.id, {
+      name: 'Image copy',
+      priceValidFrom: '2027-01-01',
+      priceValidTo: null,
+      publish: false,
+      readyForInvoicing: false,
+    })
+    const originalImage = (await getProductFamilyDetail(ctx(), original.id))!.images[0]
+    const copyImage = (await getProductFamilyDetail(ctx(), copy.id))!.images[0]
+    expect(copyImage.localPath).toBe(originalImage.localPath)
+    await removeProductFamilyImage(ctx(), actor, copy.id, copyImage.id)
+    await expect(readFile(originalImage.localPath!)).resolves.toBeInstanceOf(Buffer)
+    await removeProductFamilyImage(ctx(), actor, original.id, originalImage.id)
+    await expect(readFile(originalImage.localPath!)).rejects.toThrow()
+  })
+
+  it('refuses an eleventh image', async () => {
+    const family = await importProductFamilyFromExcel(ctx(), actor, supplierCompanyId, {
+      buffer: buildSampleWorkbook(),
+      originalName: 'sample.xlsx',
+    })
+    for (let index = 0; index < 7; index += 1) {
+      await uploadProductFamilyImage(ctx(), actor, family.id, { buffer: PNG, mimeType: 'image/png' })
+    }
+    await expect(uploadProductFamilyImage(ctx(), actor, family.id, { buffer: PNG, mimeType: 'image/png' })).rejects.toThrow(
+      /at most 10/,
+    )
   })
 })

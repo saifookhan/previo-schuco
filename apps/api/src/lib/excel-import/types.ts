@@ -21,6 +21,8 @@ export interface RawProductFamilyRow {
   /** v2 template only. */
   note?: string
   distributor?: string
+  /** `Titolo_immagine_1` … `Titolo_immagine_10`. Missing rows are undefined. */
+  image_titles?: (string | undefined)[]
   [key: string]: unknown
 }
 

@@ -37,6 +37,8 @@ import {
   getProductFamilyHistory,
   importProductFamilyFromExcel,
   listProductFamilies,
+  removeProductFamilyImage,
+  uploadProductFamilyImage,
   previewProductFamilyImport,
   setProductFamilyArchived,
   setProductFamilyFavorite,
@@ -56,7 +58,7 @@ import {
   ProductFamilyValidationError,
   isProductFamilyEditable,
 } from '../lib/product-family-edit'
-import { rejectNonUuidParams } from '../lib/uuid'
+import { isUuid, rejectNonUuidParams } from '../lib/uuid'
 import type { AuthVariables } from '../middleware/auth'
 import { hasPermission, requireAuth, requirePermission, requireRoles } from '../middleware/auth'
 import { respondWithRecordHistory } from './record-history'
@@ -375,7 +377,60 @@ const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
   webp: 'image/webp',
 }
 
-/** Streams one embedded image — RLS-scoped the same way the rest of the family's detail is (via getProductFamilyDetail's own image list). */
+const readImageUpload = async (
+  body: Record<string, unknown>,
+): Promise<{ buffer: Buffer; mimeType: string; imageId?: string } | { error: string; status: 400 }> => {
+  const file = body.file
+  if (!(file instanceof File)) {
+    return { error: MISSING_FILE.error, status: 400 }
+  }
+  const imageId = typeof body.imageId === 'string' && body.imageId.trim() ? body.imageId.trim() : undefined
+  if (imageId && !isUuid(imageId)) {
+    return { error: 'Invalid image id', status: 400 }
+  }
+  const mimeType = file.type === 'image/jpg' ? 'image/jpeg' : file.type
+  return { buffer: Buffer.from(await file.arrayBuffer()), mimeType, imageId }
+}
+
+/** Fills or replaces one image slot (`imageId`), or adds an extra slot when `imageId` is omitted. */
+productFamilies.post('/:id/images', rejectNonUuidParams, rejectUnlessMultipart, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const id = c.req.param('id') ?? ''
+  const body = await parseMultipartBody(c)
+  if (body instanceof Response) return body
+  const upload = await readImageUpload(body)
+  if ('status' in upload) return c.json({ error: upload.error }, upload.status)
+  try {
+    const image = await uploadProductFamilyImage(
+      { effectiveCompanyId: c.get('effectiveCompanyId'), isSuperAdmin: c.get('isSuperAdmin') },
+      actorFrom(c),
+      id,
+      upload,
+      upload.imageId,
+    )
+    return c.json({ image }, 201)
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
+})
+
+/** Clears a managed slot, or removes an extra slot. */
+productFamilies.delete('/:id/images/:imageId', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const id = c.req.param('id') ?? ''
+  const imageId = c.req.param('imageId') ?? ''
+  try {
+    await removeProductFamilyImage(
+      { effectiveCompanyId: c.get('effectiveCompanyId'), isSuperAdmin: c.get('isSuperAdmin') },
+      actorFrom(c),
+      id,
+      imageId,
+    )
+    return c.json({ ok: true })
+  } catch (error) {
+    return editErrorResponse(c, error)
+  }
+})
+
+/** Streams one image — RLS-scoped the same way the rest of the family's detail is (via getProductFamilyDetail's own image list). */
 productFamilies.get('/:id/images/:imageId', rejectNonUuidParams, requireAuth, requirePermission('catalog.view'), async (c) => {
   const id = c.req.param('id') ?? ''
   const imageId = c.req.param('imageId')
@@ -388,7 +443,7 @@ productFamilies.get('/:id/images/:imageId', rejectNonUuidParams, requireAuth, re
   }
   const detail = await getProductFamilyDetail(ctx, id)
   const image = detail?.images.find((img) => img.id === imageId)
-  if (!image) {
+  if (!image?.localPath) {
     return c.json({ error: 'Not found' }, 404)
   }
 
@@ -575,7 +630,7 @@ productFamilies.delete('/:id', rejectNonUuidParams, requireAuth, requirePermissi
 })
 
 /** Maps the edit-flow errors to HTTP statuses; anything else is a real 500. */
-const editErrorResponse = (c: Context<{ Variables: AuthVariables }>, error: unknown) => {
+function editErrorResponse(c: Context<{ Variables: AuthVariables }>, error: unknown): Response {
   if (error instanceof ProductFamilyValidationError) {
     return c.json({ error: error.message }, 400)
   }

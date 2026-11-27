@@ -35,8 +35,12 @@ Two columns, `Label` and `Value`, one row per field:
 | `Distributore` | no | Who the family is bought through |
 | `Note` | no | Free text, e.g. a link to the technical documentation |
 | `Descrizione_1`, `Descrizione_2` | no | Free text |
+| `Titolo_immagine_1` … `Titolo_immagine_10` | no | Generale, Dettaglio, Sezione |
 
-Images placed on this sheet are imported as the family's pictures.
+A family has three managed image slots and up to seven more. Titles come from `Titolo_immagine_1` to `Titolo_immagine_10`.
+When a managed title is missing it becomes **Generale**, **Dettaglio** or **Sezione**. Pictures placed on this sheet fill
+those slots in row order. None are required, and there are never more than ten. The three managed pictures are shown
+with the family in the preventivo; the other seven are shown at the end. Empty slots can be filled later on the family's page.
 
 ## `Product lines`
 

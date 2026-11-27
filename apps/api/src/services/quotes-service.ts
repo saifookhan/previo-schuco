@@ -15,6 +15,7 @@ import {
   isProductFamilyInLibrary,
   listFamiliesHiddenFromLibrary,
   listFamiliesSharedWith,
+  listFilledProductFamilyImages,
   listBusinessUnitsWithUsers,
   listProductFamilyVersionsOfChains,
   listQuoteRevisions,
@@ -1255,6 +1256,8 @@ export const getQuotePrintData = (
     const units = await listBusinessUnitsWithUsers(tx, quote.supplierCompanyId, { withLogos: false })
     const contacts = await listSalesContacts(tx, quote.supplierCompanyId)
     const settings = version.document.printSettings
+    const familyIds = [...new Set(version.document.families.flatMap((family) => (family.productFamilyId ? [family.productFamilyId] : [])))]
+    const familyImages = await listFilledProductFamilyImages(tx, familyIds)
     const unit = units.find((u) => u.id === settings.businessUnitId) ?? units[0] ?? null
     // Only the logo of the branch heading the pages.
     const logoDataUrl = unit ? await getBusinessUnitLogo(tx, quote.supplierCompanyId, unit.id) : null
@@ -1284,5 +1287,6 @@ export const getQuotePrintData = (
           }
         : null,
       salesContact: contacts.find((contact) => contact.id === settings.salesContactUserId) ?? null,
+      familyImages,
     }
   })

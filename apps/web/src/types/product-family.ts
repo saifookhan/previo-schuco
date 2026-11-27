@@ -36,7 +36,8 @@ export interface ProductFamilyImage {
   id: string
   productFamilyId: string
   title: string | null
-  localPath: string
+  /** Null while the slot has no file. */
+  localPath: string | null
   sortOrder: number
 }
 

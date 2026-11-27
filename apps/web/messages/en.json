@@ -432,6 +432,27 @@
     "optionHours": "+{hours} h installation",
     "optionMin": "min. {value}"
   },
+  "productFamilyImages": {
+    "title": "Images",
+    "hint": "You can add from 0 to 10 images. The first three are managed and appear with this family in the preventivo. Up to seven more appear at the end of the preventivo.",
+    "managed": "In the preventivo",
+    "additional": "At the end of the preventivo",
+    "add": "Add image",
+    "upload": "Upload",
+    "replace": "Replace",
+    "delete": "Delete",
+    "empty": "No image yet",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomReset": "Reset zoom",
+    "close": "Close",
+    "tooLarge": "The image is larger than 5 MB",
+    "wrongType": "Use a PNG, JPEG, WebP or GIF image",
+    "saved": "Image saved",
+    "removed": "Image removed",
+    "saveFailed": "Could not save the image",
+    "deleteFailed": "Could not remove the image"
+  },
   "productFamilyVersion": {
     "versionBadge": "Version {version}",
     "short": "V{version}",
@@ -963,7 +984,8 @@
     "amount": "Amount",
     "activities": "Activities",
     "included": "Included",
-    "notIncluded": "Not included"
+    "notIncluded": "Not included",
+    "images": "Images"
   },
   "adminCompanies": {
     "title": "Companies",
@@ -1150,7 +1172,9 @@
       "product_family_price_list_set": "Marked as having a price list",
       "product_family_price_list_unset": "Marked as having no price list",
       "product_family_library_add": "Put back in the company library",
-      "product_family_library_remove": "Taken out of the company library"
+      "product_family_library_remove": "Taken out of the company library",
+      "product_family_image_upload": "Image uploaded",
+      "product_family_image_delete": "Image removed"
     }
   },
   "productFamilyUpload": {

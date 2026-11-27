@@ -15,6 +15,7 @@ import {
   type QuoteDocument,
   type QuoteLine,
   type QuotePrintData,
+  type QuotePrintFamilyImage,
   type QuotePrintSettings,
   type SalesContact,
 } from '@schuco/contracts'
@@ -218,8 +219,44 @@ const sectionTitle = (size: string, spacing: string, margin: string) =>
 const summaryRow = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', borderBottom: '1px solid #f1f5f9', fontSize: '10px' } as const
 const mono = { fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace', color: '#1e293b' } as const
 
+const familyImageSrc = (image: QuotePrintFamilyImage): string =>
+  `/api/product-families/${image.productFamilyId}/images/${image.id}`
+
+/** Managed pictures (the first three slots) sit with the family; the rest are collected for the end. */
+const imagesFor = (familyImages: QuotePrintFamilyImage[], productFamilyId: string | null, managed: boolean): QuotePrintFamilyImage[] =>
+  productFamilyId
+    ? familyImages.filter((image) => image.productFamilyId === productFamilyId && (image.sortOrder < 3) === managed)
+    : []
+
+/** A row of family pictures. `compact` is the strip at the end of the document. */
+const PrintImages = ({ images, compact = false }: { images: QuotePrintFamilyImage[]; compact?: boolean }) => {
+  if (images.length === 0) return null
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: compact ? '8px' : '6px', margin: compact ? 0 : '4px 0 6px' }}>
+      {images.map((image) => (
+        <div key={image.id} style={{ width: compact ? '120px' : `calc((100% - ${(Math.min(images.length, 3) - 1) * 6}px) / ${Math.min(images.length, 3)})` }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- same-origin authenticated image */}
+          <img
+            src={familyImageSrc(image)}
+            alt={image.title ?? ''}
+            style={{
+              width: '100%',
+              height: compact ? '72px' : '88px',
+              objectFit: 'contain',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '3px',
+            }}
+          />
+          {image.title ? <div style={{ fontSize: '8px', color: '#64748b', textAlign: 'center', marginTop: '2px' }}>{image.title}</div> : null}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /** The printed quote as a flat list of blocks, to be laid out on A4 pages. */
-const buildContentItems = (document: QuoteDocument, reference: string, t: T): ContentItem[] => {
+const buildContentItems = (document: QuoteDocument, reference: string, t: T, familyImages: QuotePrintFamilyImage[]): ContentItem[] => {
   const settings = document.printSettings
   const items: ContentItem[] = []
   const total = quoteTotal(document)
@@ -289,6 +326,7 @@ const buildContentItems = (document: QuoteDocument, reference: string, t: T): Co
           {settings.showFamilyDescription && family.description ? (
             <p style={{ fontSize: '8.5px', color: '#64748b', marginBottom: '4px', lineHeight: 1.4, whiteSpace: 'pre-line' }}>{family.description}</p>
           ) : null}
+          {settings.showImages ? <PrintImages images={imagesFor(familyImages, family.productFamilyId, true)} /> : null}
           <ColHeader settings={settings} t={t} />
         </div>
       ),
@@ -491,6 +529,29 @@ const buildContentItems = (document: QuoteDocument, reference: string, t: T): Co
     }
   }
 
+  if (settings.showImages) {
+    const groups = document.families.flatMap((family) => {
+      const images = imagesFor(familyImages, family.productFamilyId, false)
+      return images.length > 0 ? [{ family, images }] : []
+    })
+    if (groups.length > 0) {
+      items.push({
+        key: 'extra-images',
+        element: (
+          <div style={{ marginTop: '16px' }}>
+            <div style={sectionTitle('7.5px', '0.06em', '4px')}>{t('images')}</div>
+            {groups.map(({ family, images }) => (
+              <div key={family.id} style={{ marginBottom: '8px' }}>
+                <div style={{ fontSize: '9px', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>{family.name}</div>
+                <PrintImages images={images} compact />
+              </div>
+            ))}
+          </div>
+        ),
+      })
+    }
+  }
+
   return items
 }
 
@@ -517,15 +578,17 @@ const Paginated = ({
   company,
   unit,
   contact,
+  familyImages,
 }: {
   document: QuoteDocument
   reference: string
   company: CompanyProfile
   unit: BusinessUnit | null
   contact: SalesContact | null
+  familyImages: QuotePrintFamilyImage[]
 }) => {
   const t = useTranslations('quotePrint')
-  const items = useMemo(() => buildContentItems(document, reference, t), [document, reference, t])
+  const items = useMemo(() => buildContentItems(document, reference, t, familyImages), [document, reference, t, familyImages])
   const [pages, setPages] = useState<ContentItem[][] | null>(null)
   const measureRef = useRef<HTMLDivElement>(null)
 
@@ -663,6 +726,8 @@ export const QuotePrintView = ({
   const t = useTranslations('quotePrint')
   const [document, setDocument] = useState<QuoteDocument | null>(unsaved ? null : data.version.document)
   const [failed, setFailed] = useState(false)
+  const [familyImages, setFamilyImages] = useState(data.familyImages)
+  const requestedFamilies = useRef(new Set(data.familyImages.map((image) => image.productFamilyId)))
 
   useEffect(() => {
     if (!unsaved) return
@@ -682,6 +747,39 @@ export const QuotePrintView = ({
     const discountRequired = document.families.some((family) => family.lines.some((line) => line.discountPct !== 0))
     return discountRequired && !document.printSettings.showDiscount ? { ...document, printSettings: { ...document.printSettings, showDiscount: true } } : document
   }, [document])
+
+  // An unsaved preview can name a family the saved print payload does not include yet.
+  useEffect(() => {
+    if (!shown?.printSettings.showImages) return
+    const missing = [
+      ...new Set(
+        shown.families.flatMap((family) =>
+          family.productFamilyId && !requestedFamilies.current.has(family.productFamilyId) ? [family.productFamilyId] : [],
+        ),
+      ),
+    ]
+    if (missing.length === 0) return
+    missing.forEach((id) => requestedFamilies.current.add(id))
+    let cancelled = false
+    let finished = false
+    void Promise.all(
+      missing.map(async (id) => {
+        const response = await fetch(`/api/product-families/${id}`)
+        if (!response.ok) return []
+        const detail = (await response.json()) as { images?: { id: string; title: string | null; localPath: string | null; sortOrder: number }[] }
+        return (detail.images ?? [])
+          .filter((image) => image.localPath)
+          .map((image) => ({ productFamilyId: id, id: image.id, title: image.title, sortOrder: image.sortOrder }))
+      }),
+    ).then((groups) => {
+      finished = true
+      if (!cancelled) setFamilyImages((current) => [...current, ...groups.flat()])
+    })
+    return () => {
+      cancelled = true
+      if (!finished) missing.forEach((id) => requestedFamilies.current.delete(id))
+    }
+  }, [shown])
 
   if (failed) {
     return (
@@ -704,5 +802,5 @@ export const QuotePrintView = ({
   const settings = shown.printSettings
   const unit = unsaved ? (businessUnits.find((u) => u.id === settings.businessUnitId) ?? businessUnits[0] ?? null) : data.businessUnit
   const contact = unsaved ? (salesContacts.find((c) => c.id === settings.salesContactUserId) ?? null) : data.salesContact
-  return <Paginated document={shown} reference={data.quote.reference} company={data.company} unit={unit} contact={contact} />
+  return <Paginated document={shown} reference={data.quote.reference} company={data.company} unit={unit} contact={contact} familyImages={familyImages} />
 }

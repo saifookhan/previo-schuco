@@ -238,6 +238,15 @@ export type QuoteRevisionsResponse = z.infer<typeof quoteRevisionsResponseSchema
 export const quoteRevisionDetailSchema = quoteRevisionSchema.extend({ document: quoteDocumentSchema })
 export type QuoteRevisionDetail = z.infer<typeof quoteRevisionDetailSchema>
 
+/** One uploaded product-family picture included in the printed quote. */
+export const quotePrintFamilyImageSchema = z.object({
+  productFamilyId: z.string().uuid(),
+  id: z.string().uuid(),
+  title: z.string().nullable(),
+  sortOrder: z.number().int(),
+})
+export type QuotePrintFamilyImage = z.infer<typeof quotePrintFamilyImageSchema>
+
 /** GET /api/sales-quotes/:id/print(?version=n) — everything the printed quote shows. */
 export const quotePrintDataSchema = z.object({
   quote: quoteSummarySchema,
@@ -246,5 +255,7 @@ export const quotePrintDataSchema = z.object({
   /** The branch heading the pages: the one chosen in the print settings, else the company's first. */
   businessUnit: businessUnitSchema.nullable(),
   salesContact: salesContactSchema.nullable(),
+  /** Pictures of the catalog families on this quote. Empty slots are left out. `sortOrder` 0–2 print with the family; the rest at the end. */
+  familyImages: z.array(quotePrintFamilyImageSchema),
 })
 export type QuotePrintData = z.infer<typeof quotePrintDataSchema>

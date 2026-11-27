@@ -153,7 +153,7 @@ export const defaultQuotePrintSettings: QuotePrintSettings = {
   salesContactUserId: null,
   businessUnitId: null,
   showSalesContact: true,
-  showImages: false,
+  showImages: true,
   showFamilyDescription: true,
   showLineCharacteristics: true,
   showExtraMarkup: false,

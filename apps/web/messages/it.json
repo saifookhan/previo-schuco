@@ -432,6 +432,27 @@
     "optionHours": "+{hours} h di posa",
     "optionMin": "min. {value}"
   },
+  "productFamilyImages": {
+    "title": "Immagini",
+    "hint": "Puoi aggiungere da 0 a 10 immagini. Le prime tre sono gestite e compaiono con questa famiglia nel preventivo. Fino a sette altre compaiono alla fine del preventivo.",
+    "managed": "Nel preventivo",
+    "additional": "Alla fine del preventivo",
+    "add": "Aggiungi immagine",
+    "upload": "Carica",
+    "replace": "Sostituisci",
+    "delete": "Elimina",
+    "empty": "Nessuna immagine",
+    "zoomIn": "Ingrandisci",
+    "zoomOut": "Riduci",
+    "zoomReset": "Reimposta zoom",
+    "close": "Chiudi",
+    "tooLarge": "L'immagine supera 5 MB",
+    "wrongType": "Usa un'immagine PNG, JPEG, WebP o GIF",
+    "saved": "Immagine salvata",
+    "removed": "Immagine rimossa",
+    "saveFailed": "Impossibile salvare l'immagine",
+    "deleteFailed": "Impossibile rimuovere l'immagine"
+  },
   "productFamilyVersion": {
     "versionBadge": "Versione {version}",
     "short": "V{version}",
@@ -963,7 +984,8 @@
     "amount": "Importo",
     "activities": "Attività",
     "included": "Incluse",
-    "notIncluded": "Non incluse"
+    "notIncluded": "Non incluse",
+    "images": "Immagini"
   },
   "adminCompanies": {
     "title": "Aziende",
@@ -1150,7 +1172,9 @@
       "product_family_price_list_set": "Segnata con listino",
       "product_family_price_list_unset": "Segnata senza listino",
       "product_family_library_add": "Rimessa nella libreria aziendale",
-      "product_family_library_remove": "Tolta dalla libreria aziendale"
+      "product_family_library_remove": "Tolta dalla libreria aziendale",
+      "product_family_image_upload": "Immagine caricata",
+      "product_family_image_delete": "Immagine rimossa"
     }
   },
   "productFamilyUpload": {
