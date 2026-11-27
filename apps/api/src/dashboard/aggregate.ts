@@ -102,6 +102,20 @@ export const pickFinalVariant = <T extends { version: number; alternative: numbe
 ): T | null => highestVariant(variants.filter((variant) => variant.isFinal))
 
 /**
+ * The variant that stands for the quote in the book (funnel, accepted, recent).
+ * An accepted variant wins, even when it was never marked final — accepting is the
+ * decision, and hiding it behind the final flag is what dropped won quotes off the
+ * dashboard. Among several accepted cells, the highest version then alternative.
+ * With no acceptance, the variant marked final. With neither, the quote is left out.
+ */
+export const pickBookVariant = <T extends { version: number; alternative: number; isFinal: boolean; status: string }>(
+  variants: readonly T[],
+): T | null => {
+  const accepted = highestVariant(variants.filter((variant) => variant.status === 'accepted'))
+  return accepted ?? pickFinalVariant(variants)
+}
+
+/**
  * The open quote: a favorite when one is marked (the highest version, then the
  * highest alternative among favorites). Otherwise the latest cell, highest version
  * then highest alternative.
@@ -133,7 +147,8 @@ const sourceFrom = (group: DashboardQuoteGroup, variant: DashboardVariant): Dash
 })
 
 /**
- * Finals are the book (pipeline, funnel, accepted, recent). A quote with no final is left out.
+ * The book (pipeline, funnel, accepted, recent) is the accepted variant when there is one,
+ * otherwise the variant marked final. A quote with neither is left out.
  * Open quotes are a separate pick: favorite if marked, otherwise the latest VxAy, and only while
  * that variant is still draft or invoiced.
  */
@@ -143,8 +158,8 @@ export const collapseDashboardQuotes = (
   const counted: DashboardSourceQuote[] = []
   const open: DashboardSourceQuote[] = []
   for (const group of groups) {
-    const final = pickFinalVariant(group.variants)
-    if (final) counted.push(sourceFrom(group, final))
+    const book = pickBookVariant(group.variants)
+    if (book) counted.push(sourceFrom(group, book))
     const opened = pickOpenVariant(group.variants)
     if (opened && (opened.status === 'draft' || opened.status === 'invoiced')) open.push(sourceFrom(group, opened))
   }

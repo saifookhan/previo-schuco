@@ -31,7 +31,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "subtitle": "Summen ohne MwSt. Die Woche läuft von Donnerstag bis Mittwoch. Die Zahlen nutzen die als final markierte Variante. Offene Angebote sind die letzte Version und Alternative, außer eine ist als Favorit markiert.",
+    "subtitle": "Summen ohne MwSt. Die Woche läuft von Donnerstag bis Mittwoch. Die Zahlen nutzen die angenommene Variante, sonst die als final markierte. Offene Angebote sind die letzte Version und Alternative, außer eine ist als Favorit markiert.",
     "finalVariant": "Final",
     "periodWeek": "Diese Woche",
     "periodMonth": "Dieser Monat",
