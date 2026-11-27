@@ -14,6 +14,8 @@ import {
   getProductFamilyDetail as getProductFamilyDetailQuery,
   insertCharacteristic,
   insertPricingMatrix,
+  countProductFamilyImagesAtPath,
+  deleteProductFamilyImage,
   insertProductFamily,
   insertProductFamilyImage,
   insertProductLine,
@@ -32,6 +34,7 @@ import {
   setProductFamilyInLibrary,
   setProductFamilyPriceValidity,
   setProductFamilyPublished,
+  setProductFamilyImagePath,
   setProductFamilyReadyForInvoicing,
   userMayArchive,
   type CharacteristicRow,
@@ -62,12 +65,16 @@ import {
 
 import { isUuid } from '../lib/uuid'
 import { extractEmbeddedImages } from '../lib/excel-import/extract-embedded-images'
+import { MAX_PRODUCT_FAMILY_IMAGES, MANAGED_IMAGE_SLOT_COUNT, planImageSlots } from '../lib/excel-import/image-slots'
 import { parseProductFamilyWorkbook, type ParsedWorkbook } from '../lib/excel-import'
 import { resolvePriceListType } from '../lib/excel-import/price-list-types'
 import type { RawPricingMatrix } from '../lib/excel-import/types'
+import { unlink } from 'node:fs/promises'
+
 import {
   ProductFamilyLockedError,
   ProductFamilyNotFoundError,
+  ProductFamilyValidationError,
   isProductFamilyEditable,
   validateCharacteristicPatch,
   validateLinePatch,
@@ -282,11 +289,16 @@ export const importProductFamilyFromExcel = async (
   const extensionMatch = /\.[^.]+$/.exec(file.originalName)
   const excelPath = await saveLocalFile('product-family-excel', file.buffer, extensionMatch?.[0] ?? '.xlsx')
   const images = await extractEmbeddedImages(file.buffer, 'Product Family')
+  const slots = planImageSlots(parsed.family.image_titles ?? [], images.length)
   const savedImages = await Promise.all(
-    images.map(async (image, index) => ({
-      localPath: await saveLocalFile('product-family-images', image.data, image.extension),
-      sortOrder: index,
-    })),
+    slots.map(async (slot) => {
+      const embedded = slot.embeddedIndex === null ? null : images[slot.embeddedIndex]
+      return {
+        title: slot.title,
+        sortOrder: slot.sortOrder,
+        localPath: embedded ? await saveLocalFile('product-family-images', embedded.data, embedded.extension) : null,
+      }
+    }),
   )
 
   const family = await withTenantDb(ctx, async (tx) => {
@@ -313,6 +325,7 @@ export const importProductFamilyFromExcel = async (
     for (const image of savedImages) {
       await insertProductFamilyImage(tx, {
         productFamilyId: familyId,
+        title: image.title,
         localPath: image.localPath,
         sortOrder: image.sortOrder,
       })
@@ -423,7 +436,7 @@ export const importProductFamilyFromExcel = async (
         fileName: file.originalName,
         productLinesCount: parsed.productLines.length,
         characteristicsCount: parsed.characteristics.length,
-        imagesCount: savedImages.length,
+        imagesCount: savedImages.filter((image) => image.localPath).length,
         ...priceValidity,
         // Part of this entry, not a separate product_family.publish: both would share the
         // transaction's timestamp, so their order in the history would be arbitrary.
@@ -441,6 +454,140 @@ export const importProductFamilyFromExcel = async (
 
   return family
 }
+
+const IMAGE_EXTENSION_BY_TYPE: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+}
+const MAX_FAMILY_IMAGE_BYTES = 5 * 1024 * 1024
+
+/** Drops a file once no image row points at it. Copies share one path, so the last reference wins. */
+const releaseImageFile = async (db: Parameters<Parameters<typeof withTenantDb>[1]>[0], localPath: string | null): Promise<void> => {
+  if (!localPath) return
+  if ((await countProductFamilyImagesAtPath(db, localPath)) > 0) return
+  await unlink(localPath).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== 'ENOENT') throw error
+  })
+}
+
+const loadEditableFamily = async (
+  tx: Parameters<Parameters<typeof withTenantDb>[1]>[0],
+  familyId: string,
+): Promise<ProductFamilyDetail> => {
+  const detail = await getProductFamilyDetailQuery(tx, familyId)
+  if (!detail) throw new ProductFamilyNotFoundError()
+  if (!isProductFamilyEditable(detail.family)) throw new ProductFamilyLockedError()
+  return detail
+}
+
+export interface UploadedFamilyImage {
+  buffer: Buffer
+  mimeType: string
+}
+
+/**
+ * Puts a picture in one slot. `imageId` fills or replaces that slot; without it, a new extra
+ * slot is added while the family has fewer than ten.
+ * @throws {ProductFamilyValidationError} the file is the wrong type or size, or the family already has ten images
+ * @throws {ProductFamilyNotFoundError} the family or slot is missing or not owned
+ * @throws {ProductFamilyLockedError} the family's edit policy locks it
+ */
+export const uploadProductFamilyImage = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  file: UploadedFamilyImage,
+  imageId?: string,
+): Promise<{ id: string; title: string | null; localPath: string | null; sortOrder: number }> => {
+  const extension = IMAGE_EXTENSION_BY_TYPE[file.mimeType]
+  if (!extension) {
+    throw new ProductFamilyValidationError('Use a PNG, JPEG, WebP or GIF image')
+  }
+  if (file.buffer.length === 0 || file.buffer.length > MAX_FAMILY_IMAGE_BYTES) {
+    throw new ProductFamilyValidationError('The image must be at most 5 MB')
+  }
+
+  const localPath = await saveLocalFile('product-family-images', file.buffer, extension)
+  try {
+    return await withTenantDb(ctx, async (tx) => {
+      const detail = await loadEditableFamily(tx, familyId)
+      let slotId = imageId
+      let sortOrder: number
+      let title: string | null
+      let previousPath: string | null = null
+
+      if (imageId) {
+        const slot = detail.images.find((image) => image.id === imageId)
+        if (!slot) throw new ProductFamilyNotFoundError('Image not found in this product family')
+        sortOrder = slot.sortOrder
+        title = slot.title
+        previousPath = slot.localPath
+        const updated = await setProductFamilyImagePath(tx, imageId, localPath)
+        if (!updated) throw new ProductFamilyNotFoundError('Image not found in this product family')
+      } else {
+        if (detail.images.length >= MAX_PRODUCT_FAMILY_IMAGES) {
+          throw new ProductFamilyValidationError('A product family can have at most 10 images')
+        }
+        const used = new Set(detail.images.map((image) => image.sortOrder))
+        sortOrder = MANAGED_IMAGE_SLOT_COUNT
+        while (used.has(sortOrder)) sortOrder += 1
+        if (sortOrder >= MAX_PRODUCT_FAMILY_IMAGES) {
+          throw new ProductFamilyValidationError('A product family can have at most 10 images')
+        }
+        title = null
+        slotId = await insertProductFamilyImage(tx, { productFamilyId: familyId, title, localPath, sortOrder })
+      }
+
+      await releaseImageFile(tx, previousPath)
+      await touchProductFamily(tx, familyId)
+      await recordAuditEvent(tx, auditActor(actor), detail.family.supplierCompanyId, {
+        action: 'product_family.image_upload',
+        resourceType: 'product_family',
+        resourceId: familyId,
+        metadata: { imageId: slotId, sortOrder, title, replaced: Boolean(imageId && previousPath) },
+      })
+      return { id: slotId!, title, localPath, sortOrder }
+    })
+  } catch (error) {
+    await unlink(localPath).catch(() => undefined)
+    throw error
+  }
+}
+
+/**
+ * Clears a managed slot's file, or removes an extra slot. The title of a managed slot stays.
+ * @throws {ProductFamilyNotFoundError} the family or slot is missing or not owned
+ * @throws {ProductFamilyLockedError} the family's edit policy locks it
+ */
+export const removeProductFamilyImage = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  imageId: string,
+): Promise<void> =>
+  withTenantDb(ctx, async (tx) => {
+    const detail = await loadEditableFamily(tx, familyId)
+    const slot = detail.images.find((image) => image.id === imageId)
+    if (!slot) throw new ProductFamilyNotFoundError('Image not found in this product family')
+    const managed = slot.sortOrder < MANAGED_IMAGE_SLOT_COUNT
+    if (managed) {
+      const updated = await setProductFamilyImagePath(tx, imageId, null)
+      if (!updated) throw new ProductFamilyNotFoundError('Image not found in this product family')
+    } else {
+      const removed = await deleteProductFamilyImage(tx, imageId)
+      if (!removed) throw new ProductFamilyNotFoundError('Image not found in this product family')
+    }
+    await releaseImageFile(tx, slot.localPath)
+    await touchProductFamily(tx, familyId)
+    await recordAuditEvent(tx, auditActor(actor), detail.family.supplierCompanyId, {
+      action: 'product_family.image_delete',
+      resourceType: 'product_family',
+      resourceId: familyId,
+      metadata: { imageId, sortOrder: slot.sortOrder, title: slot.title, cleared: managed },
+    })
+  })
 
 /**
  * Families visible to the caller's company. Those it took out of its library are left out

@@ -50,9 +50,11 @@ Come si calcola ogni numero: [Come vengono calcolati i prezzi](../pricing.md).
 ## Impostazioni di stampa
 
 Chi stampa come **referente** (*Vostro referente*: nome, email, telefono), quale **unità locale** è in testa alle pagine
-(se il referente lavora per più unità) e quali parti stampare: referente, descrizioni delle famiglie, caratteristiche
+(se il referente lavora per più unità) e quali parti stampare: referente, **immagini**, descrizioni delle famiglie, caratteristiche
 delle righe, dettaglio per prodotto, raggruppamento per categoria, totale offerta, piano di pagamento, attività,
-colonne Extra % e Sconto %. La colonna sconto è obbligatoria se una riga ha uno sconto.
+colonne Extra % e Sconto %. **Immagini** mostra le tre foto gestite di ogni famiglia insieme a quella famiglia, e le
+altre insieme alla fine. Ogni foto ha una casella nell'anteprima e sotto **Immagini**; nel PDF entrano solo quelle
+selezionate. I preventivi nuovi nascono con tutte le foto selezionate. La colonna sconto è obbligatoria se una riga ha uno sconto.
 
 Intestazione, piè di pagina e referenti vengono da **Impostazioni → Azienda**: dati fiscali, unità locali (logo fino a
 512 KB, colore, indirizzo, email, telefono, utenti), telefono di ogni utente e testi salvati.
@@ -101,5 +103,5 @@ Nell'elenco e su un preventivo, chi può modificare i preventivi ha un pulsante 
 
 ## Non ancora disponibile
 
-- Esportazione Word ed Excel, immagini nella stampa, invio del preventivo per email dall'app.
+- Esportazione Word ed Excel, invio del preventivo per email dall'app.
 - Eliminare un preventivo in modo definitivo. L'archivio lo nasconde.

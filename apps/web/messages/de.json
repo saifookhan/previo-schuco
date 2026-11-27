@@ -432,6 +432,27 @@
     "optionHours": "+{hours} h Montage",
     "optionMin": "min. {value}"
   },
+  "productFamilyImages": {
+    "title": "Bilder",
+    "hint": "Sie können 0 bis 10 Bilder hinzufügen. Die ersten drei sind verwaltet und erscheinen mit dieser Familie im Angebot. Bis zu sieben weitere erscheinen am Ende des Angebots.",
+    "managed": "Im Angebot",
+    "additional": "Am Ende des Angebots",
+    "add": "Bild hinzufügen",
+    "upload": "Hochladen",
+    "replace": "Ersetzen",
+    "delete": "Löschen",
+    "empty": "Noch kein Bild",
+    "zoomIn": "Vergrößern",
+    "zoomOut": "Verkleinern",
+    "zoomReset": "Zoom zurücksetzen",
+    "close": "Schließen",
+    "tooLarge": "Das Bild ist größer als 5 MB",
+    "wrongType": "Verwenden Sie ein PNG-, JPEG-, WebP- oder GIF-Bild",
+    "saved": "Bild gespeichert",
+    "removed": "Bild entfernt",
+    "saveFailed": "Das Bild konnte nicht gespeichert werden",
+    "deleteFailed": "Das Bild konnte nicht entfernt werden"
+  },
   "productFamilyVersion": {
     "versionBadge": "Version {version}",
     "short": "V{version}",
@@ -963,7 +984,11 @@
     "amount": "Betrag",
     "activities": "Leistungen",
     "included": "Inbegriffen",
-    "notIncluded": "Nicht inbegriffen"
+    "notIncluded": "Nicht inbegriffen",
+    "images": "Bilder",
+    "chooseImagesHint": "Wählen Sie die Fotos, die im PDF erscheinen sollen.",
+    "includeImage": "{title} ins PDF aufnehmen",
+    "chooseImagesFailed": "Die Fotoauswahl konnte nicht gespeichert werden"
   },
   "adminCompanies": {
     "title": "Unternehmen",
@@ -1150,7 +1175,9 @@
       "product_family_price_list_set": "Als mit Preisliste markiert",
       "product_family_price_list_unset": "Als ohne Preisliste markiert",
       "product_family_library_add": "Wieder in die Firmenbibliothek aufgenommen",
-      "product_family_library_remove": "Aus der Firmenbibliothek genommen"
+      "product_family_library_remove": "Aus der Firmenbibliothek genommen",
+      "product_family_image_upload": "Bild hochgeladen",
+      "product_family_image_delete": "Bild entfernt"
     }
   },
   "productFamilyUpload": {

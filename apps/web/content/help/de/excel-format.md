@@ -35,8 +35,13 @@ Zwei Spalten, `Label` und `Value`, eine Zeile pro Feld:
 | `Distributore` | nein | Über wen die Familie bezogen wird |
 | `Note` | nein | Freitext, z. B. ein Link zur technischen Dokumentation |
 | `Descrizione_1`, `Descrizione_2` | nein | Freitext |
+| `Titolo_immagine_1` … `Titolo_immagine_10` | nein | Generale, Dettaglio, Sezione |
 
-Bilder auf diesem Blatt werden als Bilder der Familie importiert.
+Eine Familie hat drei verwaltete Bildplätze und bis zu sieben weitere. Die Titel kommen aus `Titolo_immagine_1` bis
+`Titolo_immagine_10`. Fehlt ein verwalteter Titel, wird er zu **Generale**, **Dettaglio** oder **Sezione**. Bilder auf
+diesem Blatt füllen diese Plätze in Zeilenreihenfolge. Keines ist Pflicht, und es gibt nie mehr als zehn. Die drei
+verwalteten Bilder stehen bei der Familie im Angebot; die anderen sieben am Ende. Leere Plätze lassen sich später auf
+der Seite der Familie füllen.
 
 ## `Product lines`
 

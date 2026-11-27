@@ -34,6 +34,7 @@ import {
   setProductFamilyPriceValidityDates,
   setProductFamilyPublishedStatus,
   setProductFamilyReadyForInvoicingStatus,
+  uploadProductFamilyImage,
 } from '../src/services/product-families-service'
 import {
   QuoteConflictError,
@@ -553,7 +554,35 @@ describe('printing', () => {
     expect(data.company).toMatchObject({ name: 'Quote Service Test Supplier', vatNumber: 'QSVC-SUP' })
     expect(data.businessUnit).toBeNull()
     expect(data.salesContact).toMatchObject({ id: actorUserId, name: 'Quote Tester', email: 'quote-svc-test-actor@example.com' })
+    expect(data.familyImages).toEqual([])
     expect(await getQuotePrintData(ctx(), quote.quote.id, 9)).toBeNull()
+  })
+
+  it('sends managed images with the family and extra images for the end of the document', async () => {
+    const family = await importFreshFamily()
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    )
+    await uploadProductFamilyImage(ctx(), actor, family.id, { buffer: png, mimeType: 'image/png' })
+    const quote = await newQuote('TEST-Q-SVC-PRINT-IMAGES')
+    const line = await matrixLineOf(family.id)
+    const saved = await save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] })
+    const data = (await getQuotePrintData(ctx(), quote.quote.id))!
+    const images = data.familyImages.filter((image) => image.productFamilyId === family.id)
+    expect(images.map((image) => image.sortOrder)).toEqual([0, 1, 2, 3])
+    expect(images.filter((image) => image.sortOrder < 3)).toHaveLength(3)
+    expect(images.find((image) => image.sortOrder === 3)?.title).toBeNull()
+
+    const hidden = images.find((image) => image.sortOrder === 1)!
+    const chosen = await save(saved, {
+      printSettings: { ...saved.version.document.printSettings, excludedImageIds: [hidden.id] },
+    })
+    expect(chosen.version.document.printSettings.excludedImageIds).toEqual([hidden.id])
+    // The preview still receives every photo, so an unticked one can be ticked again.
+    const again = (await getQuotePrintData(ctx(), quote.quote.id))!
+    expect(again.version.document.printSettings.excludedImageIds).toEqual([hidden.id])
+    expect(again.familyImages.some((image) => image.id === hidden.id)).toBe(true)
   })
 })
 

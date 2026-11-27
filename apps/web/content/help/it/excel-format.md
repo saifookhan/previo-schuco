@@ -35,8 +35,13 @@ Due colonne, `Label` e `Value`, una riga per campo:
 | `Distributore` | no | Da chi si acquista la famiglia |
 | `Note` | no | Testo libero, ad es. un link alla documentazione tecnica |
 | `Descrizione_1`, `Descrizione_2` | no | Testo libero |
+| `Titolo_immagine_1` … `Titolo_immagine_10` | no | Generale, Dettaglio, Sezione |
 
-Le immagini inserite in questo foglio diventano le immagini della famiglia.
+Una famiglia ha tre slot immagine gestiti e fino a sette altri. I titoli vengono da `Titolo_immagine_1` a
+`Titolo_immagine_10`. Se manca un titolo gestito diventa **Generale**, **Dettaglio** o **Sezione**. Le immagini
+inserite in questo foglio riempiono quegli slot in ordine di riga. Nessuna è obbligatoria, e non se ne superano dieci.
+Le tre gestite compaiono con la famiglia nel preventivo; le altre sette alla fine. Gli slot vuoti si possono riempire
+dopo, nella pagina della famiglia.
 
 ## `Product lines`
 

@@ -150,6 +150,13 @@ Above the list, for the tab you're on:
 
 Filters are part of the page address, so you can bookmark or share a filtered list, and **Back** undoes the last change.
 
+## Images
+
+A family has three managed image slots — **Generale**, **Dettaglio** and **Sezione**, unless the Excel file names them
+otherwise — and up to seven more. None are required. On the family's page you can upload, replace and delete a picture
+(PNG, JPEG, WebP or GIF, up to 5 MB) and zoom it. The three managed pictures print with the family in the preventivo;
+the others print at the end. **Images** in the quote's print settings turns that on or off. New quotes start with it on.
+
 ## Not built yet
 
 Editing which characteristics apply to which lines without re-importing the Excel file.

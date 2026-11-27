@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx'
 import { buildSampleWorkbook, SAMPLE_FAMILY_NAME } from '../scripts/sample-workbook'
 import { extract2DArray } from '../src/lib/excel-import/extract-2d-array'
 import { extractEmbeddedImages } from '../src/lib/excel-import/extract-embedded-images'
+import { planImageSlots } from '../src/lib/excel-import/image-slots'
 import { parseProductFamilyWorkbook } from '../src/lib/excel-import'
 import { PRICE_LIST_TYPE_FORMULAS, resolvePriceListType } from '../src/lib/excel-import/price-list-types'
 
@@ -59,6 +60,25 @@ describe('extract2DArray', () => {
   })
 })
 
+describe('planImageSlots', () => {
+  it('always creates the three managed slots, then any further titled or embedded slot, capped at ten', () => {
+    expect(planImageSlots([], 0).map((slot) => [slot.sortOrder, slot.title, slot.embeddedIndex])).toEqual([
+      [0, 'Generale', null],
+      [1, 'Dettaglio', null],
+      [2, 'Sezione', null],
+    ])
+    expect(planImageSlots(['Generale', 'Dettaglio', 'Sezione', 'Montaggio'], 3).map((slot) => slot.title)).toEqual([
+      'Generale',
+      'Dettaglio',
+      'Sezione',
+      'Montaggio',
+    ])
+    expect(planImageSlots(['Generale', 'Dettaglio', 'Sezione'], 5)).toHaveLength(5)
+    expect(planImageSlots(Array.from({ length: 12 }, (_, index) => `Foto ${index + 1}`), 12)).toHaveLength(10)
+    expect(planImageSlots(['Applicazione tenda', 'Link al sito', 'Altra applicazione'], 3).every((slot) => slot.embeddedIndex === slot.sortOrder)).toBe(true)
+  })
+})
+
 describe('extract2DArray — phantom trailing axis entries', () => {
   it('drops a non-numeric trailing header cell and its column, and a non-numeric trailing height and its row', () => {
     const rows = [
@@ -102,6 +122,7 @@ describe('parseProductFamilyWorkbook (real fixture)', () => {
     expect(parsed.family.technical_name).toBe('NEST')
     expect(parsed.family.category).toBe('Awning')
     expect(parsed.family.brand).toBe('Tendital')
+    expect(parsed.family.image_titles?.slice(0, 3)).toEqual(['Applicazione tenda', 'Link al sito', 'Altra applicazione'])
   })
 
   it('filters out template placeholder rows (only real product lines survive)', () => {
@@ -182,6 +203,7 @@ describe('sample workbook (scripts/sample-workbook.ts)', () => {
     // Every cell is SI or NO (v2); only the SI ones are relations.
     expect(parsed.relations).toHaveLength(10)
     expect(parsed.family).toMatchObject({ brand: 'PREVIO Demo', distributor: 'Demo Distribution' })
+    expect(parsed.family.image_titles?.slice(0, 3)).toEqual(['Generale', 'Dettaglio', 'Sezione'])
     expect(parsed.productLines[2].minValue).toBe(40)
     const vetro = parsed.characteristics.find((main) => main.name === 'Vetro')!
     expect(vetro.subCharacters[2]).toMatchObject({ minValue: 30, discountPct: 0.05, markupPct: 1.2, installationHoursPerUnit: 0.5 })

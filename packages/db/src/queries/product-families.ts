@@ -105,7 +105,8 @@ export const insertProductLineCharacteristic = async (
 export interface InsertProductFamilyImageInput {
   productFamilyId: string
   title?: string | null
-  localPath: string
+  /** Null while the slot has no file. */
+  localPath: string | null
   sortOrder: number
 }
 
@@ -118,6 +119,62 @@ export const insertProductFamilyImage = async (
     .values(input)
     .returning({ id: productFamilyImages.id })
   return row.id
+}
+
+/** Replaces or clears the file on one slot. Returns null when the row is not visible to the caller. */
+export const setProductFamilyImagePath = async (
+  db: DbLike,
+  imageId: string,
+  localPath: string | null,
+): Promise<{ id: string; localPath: string | null; sortOrder: number; title: string | null; productFamilyId: string } | null> => {
+  const [row] = await db
+    .update(productFamilyImages)
+    .set({ localPath })
+    .where(eq(productFamilyImages.id, imageId))
+    .returning({
+      id: productFamilyImages.id,
+      localPath: productFamilyImages.localPath,
+      sortOrder: productFamilyImages.sortOrder,
+      title: productFamilyImages.title,
+      productFamilyId: productFamilyImages.productFamilyId,
+    })
+  return row ?? null
+}
+
+/** Removes an extra slot. Returns false when the row is not visible to the caller. */
+export const deleteProductFamilyImage = async (db: DbLike, imageId: string): Promise<boolean> => {
+  const rows = await db
+    .delete(productFamilyImages)
+    .where(eq(productFamilyImages.id, imageId))
+    .returning({ id: productFamilyImages.id })
+  return rows.length > 0
+}
+
+/** How many image rows still point at this file. Copies share one path, so a file is removed only at zero. */
+export const countProductFamilyImagesAtPath = async (db: DbLike, localPath: string): Promise<number> => {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(productFamilyImages)
+    .where(eq(productFamilyImages.localPath, localPath))
+  return row?.count ?? 0
+}
+
+/** Uploaded pictures for the preventivo. Empty slots are left out. RLS hides families the caller cannot see. */
+export const listFilledProductFamilyImages = async (
+  db: DbLike,
+  familyIds: string[],
+): Promise<{ id: string; productFamilyId: string; title: string | null; sortOrder: number }[]> => {
+  if (familyIds.length === 0) return []
+  return db
+    .select({
+      id: productFamilyImages.id,
+      productFamilyId: productFamilyImages.productFamilyId,
+      title: productFamilyImages.title,
+      sortOrder: productFamilyImages.sortOrder,
+    })
+    .from(productFamilyImages)
+    .where(and(inArray(productFamilyImages.productFamilyId, familyIds), isNotNull(productFamilyImages.localPath)))
+    .orderBy(asc(productFamilyImages.sortOrder), asc(productFamilyImages.createdAt))
 }
 
 export interface ProductFamilySummary {
@@ -267,7 +324,11 @@ export const getProductFamilyDetail = async (
   }
 
   const [images, lines, characteristicRows, matrices] = await Promise.all([
-    db.select().from(productFamilyImages).where(eq(productFamilyImages.productFamilyId, familyId)),
+    db
+      .select()
+      .from(productFamilyImages)
+      .where(eq(productFamilyImages.productFamilyId, familyId))
+      .orderBy(asc(productFamilyImages.sortOrder), asc(productFamilyImages.createdAt)),
     db.select().from(productLines).where(eq(productLines.productFamilyId, familyId)),
     db.select().from(characteristics).where(eq(characteristics.productFamilyId, familyId)),
     db.select().from(pricingMatrices).where(eq(pricingMatrices.productFamilyId, familyId)),

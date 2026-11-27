@@ -158,6 +158,14 @@ sehen ihn — nicht die Unternehmen, mit denen die Familie geteilt wurde.
 
 Die Filter sind Teil der Seitenadresse: Sie können sie speichern oder teilen, und **Zurück** macht die letzte Änderung rückgängig.
 
+## Bilder
+
+Eine Familie hat drei verwaltete Bildplätze — **Generale**, **Dettaglio** und **Sezione**, sofern die Excel-Datei sie
+nicht anders benennt — und bis zu sieben weitere. Keines ist Pflicht. Auf der Seite der Familie kann man ein Bild
+hochladen, ersetzen und löschen (PNG, JPEG, WebP oder GIF, bis 5 MB) und es vergrößern. Die drei verwalteten Bilder
+werden mit der Familie im Angebot gedruckt; die anderen am Ende. **Bilder** in den Druckeinstellungen des Angebots
+schaltet das ein oder aus. Neue Angebote starten mit der Option an.
+
 ## Noch nicht umgesetzt
 
 Festlegen, welche Merkmale für welche Linien gelten, ohne die Excel-Datei neu zu importieren.

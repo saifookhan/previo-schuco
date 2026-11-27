@@ -232,6 +232,13 @@
       "when": 1795766400002,
       "tag": "0033_favorites",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1795766400003,
+      "tag": "0034_product_family_image_slots",
+      "breakpoints": true
     }
   ]
 }

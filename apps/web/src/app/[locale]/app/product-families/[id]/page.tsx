@@ -191,7 +191,7 @@ const ProductFamilyDetailPage = async ({ params, searchParams }: ProductFamilyDe
         </Card>
       )}
 
-      <ProductFamilyImageGallery familyId={family.id} familyName={family.name} images={images} />
+      <ProductFamilyImageGallery familyId={family.id} familyName={family.name} images={images} canEdit={editable && canManage} />
 
       <Card className="mb-6">
         <CardHeader>

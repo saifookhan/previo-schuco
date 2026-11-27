@@ -153,6 +153,14 @@ Sopra l'elenco, per la scheda aperta:
 
 I filtri fanno parte dell'indirizzo della pagina: puoi salvarlo o condividerlo, e **Indietro** annulla l'ultima modifica.
 
+## Immagini
+
+Una famiglia ha tre slot immagine gestiti — **Generale**, **Dettaglio** e **Sezione**, se il file Excel non dà altri
+nomi — e fino a sette altri. Nessuna è obbligatoria. Nella pagina della famiglia si può caricare, sostituire ed
+eliminare un'immagine (PNG, JPEG, WebP o GIF, fino a 5 MB) e ingrandirla. Le tre gestite si stampano con la famiglia
+nel preventivo; le altre alla fine. **Immagini** nelle impostazioni di stampa del preventivo le accende o le spegne.
+I preventivi nuovi nascono con l'opzione attiva.
+
 ## Non ancora realizzato
 
 Modificare quali caratteristiche valgono per quali linee senza reimportare il file Excel.

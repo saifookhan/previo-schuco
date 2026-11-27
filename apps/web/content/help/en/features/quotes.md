@@ -50,9 +50,11 @@ How every number is computed: [How prices are calculated](../pricing.md).
 ## Print settings
 
 Who prints as **sales contact** (*Vostro referente*: name, email, phone), which **branch** heads the pages (when the
-contact works for more than one), and which parts print: sales contact, family descriptions, line characteristics,
-detail by product, grouping by category, offer total, payment plan, activities, Extra % and Discount % columns. The
-discount column is required while any line has a discount.
+contact works for more than one), and which parts print: sales contact, **images**, family descriptions, line characteristics,
+detail by product, grouping by category, offer total, payment plan, activities, Extra % and Discount % columns. **Images**
+shows each family's three managed pictures with that family, and any further pictures together at the end. Each photo
+has a checkbox on the preview and under **Images**; only the ticked ones are in the PDF. New quotes start with
+every photo ticked. The discount column is required while any line has a discount.
 
 The header, footer and sales contacts come from **Settings → Company**: fiscal data, branches (logo up to 512 KB,
 colour, address, email, phone, users), each user's phone, and the saved texts.
@@ -102,5 +104,5 @@ On the quotes list and on a quote, users who can edit quotes get a chat button. 
 
 ## Not built yet
 
-- Word and Excel export, images in the print, sending the quote by email from the app.
+- Word and Excel export, sending the quote by email from the app.
 - Permanently deleting a quote. Archive hides it instead.

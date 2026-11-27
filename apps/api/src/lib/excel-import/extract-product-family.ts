@@ -50,5 +50,6 @@ export const extractProductFamily = (workbook: XLSX.WorkBook): RawProductFamilyR
     description_2: asString('Descrizione_2'),
     note: asString('Note'),
     distributor: asString('Distributore'),
+    image_titles: Array.from({ length: 10 }, (_, index) => asString(`Titolo_immagine_${index + 1}`)),
   }
 }
