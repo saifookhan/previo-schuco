@@ -13,10 +13,11 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 - **Versioni e alternative**: un preventivo è una griglia (`V1A2`). Una nuova alternativa copia solo la cella aperta; una nuova versione copia solo quella cella in avanti. La matrice versioni riempie la cella vuota sotto una salvata. Vedi [Preventivi](./features/quotes.md) e [ADR 0016](https://github.com/saifookhan/previo-schuco/blob/main/docs/adr/0016-quote-variants.md).
 - Lo **stato** è bozza, fatturato o accettato. Una variante si può segnare finale; la dashboard usa quella.
 - **Archivia** (amministratori di azienda) nasconde un preventivo o una versione di famiglia. **Duplica** copia una variante in un nuovo preventivo come `V1A1`. L'occhio su una riga è un'occhiata rapida.
+- **Preferiti**: una stella blu su una variante di preventivo o su una versione di famiglia. Se ne possono segnare più di una. **Preferiti** in ogni elenco resta spento finché non lo spunti. Una nuova versione nasce senza. Vedi [ADR 0017](https://github.com/saifookhan/previo-schuco/blob/main/docs/adr/0017-favorites.md).
 
 **Settimana del 23 novembre**
 - **Preventivi rifatti sul design del cliente a pagina unica**: moduli di testo d'intestazione, famiglie di prodotto con le linee una per riga e *Riepilogo e Chiusura* (testi, dettaglio per prodotto, raggruppamento per categoria, totale, piano di pagamento, attività), tutto ordinabile con il trascinamento. Vedi [Preventivi](./features/quotes.md).
-- **Versioni**: una bozza si può correggere o salvare come nuova versione; una versione inviata ha solo una nuova versione. Stato: bozza → inviato → accettato / rifiutato.
+- **Versioni**: una bozza si può correggere o salvare come nuova versione; una versione inviata ha solo una nuova versione. Stato: bozza → inviato → accettato / rifiutato. *Sostituito nella settimana del 27 novembre: una cella alla volta, e gli stati sono bozza, fatturato e accettato.*
 - **Cronologia modifiche** di ogni salvataggio, con cosa è cambiato; ogni salvataggio si può aprire e ripristinare.
 - **Stampa**: *Anteprima Preventivo* su pagine A4, stampata o salvata in PDF dal browser, con impostazioni di stampa. Il vecchio download PDF non c'è più.
 - **Listini scaduti**: le bozze passano alla versione valida più recente della famiglia e vengono ricalcolate; se non c'è, salvataggio e stampa sono bloccati con un link per caricare una nuova versione.

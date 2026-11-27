@@ -151,6 +151,7 @@ sehen ihn — nicht die Unternehmen, mit denen die Familie geteilt wurde.
 - **Preisgültigkeit** — *Heute gültig* (was das Angebot anbietet; Familien ohne Daten zählen mit), *Demnächst*, *Abgelaufen*, *Ohne Daten*.
 - **Bereit zur Fakturierung** (unter *Weitere Filter*) — Ja / Nein.
 - **Mit Preisliste** und **In Bibliothek** (unter *Weitere Filter*) — Ja / Nein.
+- **Favoriten** — standardmäßig aus. Anhaken, um nur Versionen zu sehen, die dieses Unternehmen mit dem Stern markiert hat.
 - **Archiviert** — standardmäßig aus. Anhaken, um Versionen zu sehen, die ein Unternehmensadmin archiviert hat.
 - **Weitere Filter** — *Preise gültig am* bestimmten Tag, *Aktualisiert ab / bis*, *Nur neueste Versionen* (blendet Versionen aus, die eine neuere ersetzt); unter *Mit mir geteilt* zusätzlich **Eigentümer** und **Ihr Rabatt** (mit / ohne).
 - **Sortieren** — neueste zuerst (Standard), zuletzt aktualisiert, Name, Preise laufen zuerst ab.

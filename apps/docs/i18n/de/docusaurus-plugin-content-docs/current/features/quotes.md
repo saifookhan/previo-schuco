@@ -16,7 +16,7 @@ title: Angebote
 2. Das Angebot öffnet sich auf einer Seite, wie im Design des Kunden:
    - **Obere Leiste** — Referenz, Variante (`V1A2`), Name und Status, Kunde und Projekt (anklicken, um Kunde, Steuernummer, Adresse,
      Ort, Projekt, Datum und interne Notizen zu ändern), die **Summe zzgl. MwSt** und die Schaltflächen
-     **Versionsmatrix**, **Druckeinstellungen**, **Vorschau**, **Export** (demnächst), **Änderungsverlauf** und **Speichern**.
+     **Favorit** (blauer Stern), **Versionsmatrix**, **Druckeinstellungen**, **Vorschau**, **Export** (demnächst), **Änderungsverlauf** und **Speichern**.
    - **Einleitung** — Textmodule (Überschriften, Fett, Listen, Ausrichtung, Links, Bilder bis 1 MB). Leeren Text oder
      einen der **gespeicherten Texte** des Unternehmens hinzufügen; jeder Text kann als neuer gespeicherter Text
      gesichert werden. Ziehen oder Pfeile zum Sortieren.
@@ -68,8 +68,8 @@ Ein Angebot ist ein Raster: Versionen nach unten, Alternativen nach rechts (`V1A
 - Die **Versionsmatrix** (im Editor und in der aufgeklappten Zeile der Liste) zeigt das Raster. Über einer gespeicherten Zelle
   entsteht die darunter. Über einer leeren Zelle, wenn die darüber existiert, wird das gespeicherte Dokument nach unten kopiert.
   Ungespeicherte Änderungen im Editor sind nicht dabei.
-- Das Variantenmenü setzt den Namen, dupliziert diese Variante als neues Angebot (nur `V1A1`), markiert sie als **final**
-  (die das Dashboard nutzt) und setzt den Status auf **Entwurf**, **fakturiert** oder **angenommen** — jeder außer dem aktuellen.
+- Der blaue Stern markiert diese Variante als **Favorit**. Mehrere Varianten können Favoriten sein. Er ändert nicht, welche final ist, und eine neue Version oder ein Duplikat startet ohne Markierung.
+- Das Variantenmenü setzt den Namen, dupliziert diese Variante als neues Angebot (nur `V1A1`), markiert sie als **final** (gelber Stern, die das Dashboard nutzt) und setzt den Status auf **Entwurf**, **fakturiert** oder **angenommen** — jeder außer dem aktuellen.
   Nur ein Entwurf wird an Ort und Stelle bearbeitet. Fakturiert oder angenommen verlangt Katalogfamilien mit heute gültigen Preisen.
 - Sind die Preise einer Familie abgelaufen, verschiebt ein **Entwurf** ihre Linien auf die neueste gültige Version der
   Familie (nach Namen von Linie und Merkmal) und berechnet sie neu, mit einem Hinweis, was verschoben wurde und was
@@ -91,6 +91,14 @@ blendet das Angebot aus der Liste aus; der direkte Link öffnet es weiter. Dasse
 Kopfes, Familien und Linien, hinzugefügte/entfernte/umsortierte Elemente, Abschluss und Druckeinstellungen). Jede
 Speicherung lässt sich schreibgeschützt öffnen und **Wiederherstellen** als Ausgangspunkt. Das Audit-Protokoll des
 Angebots (Erstellung, Speichern, neue Version, Status) bleibt wie bisher.
+
+## Dashboard
+
+Das *Dashboard* nutzt die Variante, die jedes Angebot als **final** markiert, und nur Angebote, die nicht archiviert sind. **Offene Angebote** zählt finale Entwürfe oder fakturierte. Die **Pipeline** summiert deren Beträge. Die **Umwandlung** ist, wie viele finale angenommen sind. **Letzte Angebote** öffnet diese Variante. **Aktive Benutzer** ist weiter eine Beispielzahl.
+
+## Angebotsassistent
+
+In der Liste und auf einem Angebot haben Benutzer, die Angebote bearbeiten dürfen, eine Chat-Schaltfläche. Der Assistent legt einen Entwurf an, fügt ein Katalogprodukt als neue Zeile hinzu und bearbeitet das offene Angebot: Kopf, Zeilen, Optionen, Leistungen, Zahlungen, Texte, Druckeinstellungen und Status (Entwurf, fakturiert oder angenommen). Er erzeugt keine Alternativen, markiert keine Variante als final, archiviert nicht und dupliziert kein Angebot. Ein Klick auf einen Chip führt die Aktion aus. Eine Zeile entfernen, ein manueller Preis, eine Änderung vieler Zeilen und ein Statuswechsel fragen zuerst nach. Eine Katalogzeile wird nur in einem Maß hinzugefügt, das du geschrieben hast. Netto € und die Summe bleiben berechnet. Die Preise kommen aus dem Katalog. Das Gespräch bleibt nur im Browser; Schließen oder Aktualisieren löscht es, das gespeicherte Angebot bleibt. Entwürfe und abgelaufene Familien bleiben verborgen, bis du sie sehen willst, und werden weiterhin nicht hinzugefügt. Passen mehrere Linien oder Familien, fragt der Assistent welche und wählt nicht selbst.
 
 ## Noch nicht gebaut
 

@@ -13,10 +13,11 @@ Was sich geändert hat, neueste zuerst. Zeigt, was neu zu testen ist.
 - **Versionen und Alternativen**: ein Angebot ist ein Raster (`V1A2`). Eine neue Alternative kopiert nur die offene Zelle; eine neue Version kopiert nur diese Zelle weiter. Die Versionsmatrix füllt die leere Zelle unter einer gespeicherten. Siehe [Angebote](./features/quotes.md) und [ADR 0016](https://github.com/saifookhan/previo-schuco/blob/main/docs/adr/0016-quote-variants.md).
 - Der **Status** ist Entwurf, fakturiert oder angenommen. Eine Variante kann als final markiert werden; das Dashboard nutzt sie.
 - **Archivieren** (Unternehmensadmins) blendet ein Angebot oder eine Produktfamilien-Version aus. **Duplizieren** kopiert eine Variante in ein neues Angebot als `V1A1`. Das Auge in einer Zeile ist eine Kurzansicht.
+- **Favoriten**: ein blauer Stern an einer Angebotsvariante oder einer Produktfamilien-Version. Mehrere können markiert werden. **Favoriten** in jeder Liste bleibt aus, bis es angehakt wird. Eine neue Version startet ohne Markierung. Siehe [ADR 0017](https://github.com/saifookhan/previo-schuco/blob/main/docs/adr/0017-favorites.md).
 
 **Woche vom 23. November**
 - **Angebote im einseitigen Design des Kunden neu gebaut**: Textmodule der Einleitung, Produktfamilien mit ihren Linien je in einer Zeile und *Zusammenfassung und Abschluss* (Texte, Details nach Produkt, Gruppierung nach Kategorie, Summe, Zahlungsplan, Leistungen), alles per Drag & Drop sortierbar. Siehe [Angebote](./features/quotes.md).
-- **Versionen**: ein Entwurf kann korrigiert oder als neue Version gespeichert werden; eine gesendete Version bekommt nur eine neue Version. Status: Entwurf → gesendet → angenommen / abgelehnt.
+- **Versionen**: ein Entwurf kann korrigiert oder als neue Version gespeichert werden; eine gesendete Version bekommt nur eine neue Version. Status: Entwurf → gesendet → angenommen / abgelehnt. *Ersetzt in der Woche vom 27. November: eine Zelle nach der anderen, und die Status sind Entwurf, fakturiert und angenommen.*
 - **Änderungsverlauf** jeder Speicherung mit den Änderungen; jede Speicherung lässt sich öffnen und wiederherstellen.
 - **Druck**: *Anteprima Preventivo* auf A4-Seiten, vom Browser gedruckt oder als PDF gespeichert, mit Druckeinstellungen. Der alte PDF-Download entfällt.
 - **Abgelaufene Preislisten**: Entwürfe wechseln auf die neueste gültige Version der Familie und werden neu berechnet; ohne eine solche sind Speichern und Drucken gesperrt, mit einem Link zum Hochladen einer neuen Version.

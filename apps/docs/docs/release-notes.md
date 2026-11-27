@@ -13,10 +13,11 @@ What changed, newest first. Use it to see what's new to test.
 - **Versions and alternatives**: a quote is a grid (`V1A2`). A new alternative copies only the open cell; a new version copies only that cell forward. The version matrix fills the empty cell below a saved one. See [Quotes](./features/quotes.md) and [ADR 0016](https://github.com/saifookhan/previo-schuco/blob/main/docs/adr/0016-quote-variants.md).
 - **Status** is draft, invoiced or accepted. One variant can be marked final; the dashboard uses that variant.
 - **Archive** (company admins) hides a quote or one product-family version. **Duplicate** copies one variant into a new quote as `V1A1`. The eye on a list row is a quick look.
+- **Favorites**: a blue star on a quote variant or a product-family version. Any number can be marked. **Favorites** on each list is off until it is ticked. A new version starts unmarked. See [ADR 0017](https://github.com/saifookhan/previo-schuco/blob/main/docs/adr/0017-favorites.md).
 
 **Week of 23 November**
 - **Quotes rebuilt as the client's single-page design**: introduction text modules, product families with their lines on one row each, and *Riepilogo e Chiusura* (texts, detail by product, grouping by category, total, payment plan, activities), all sortable by drag and drop. See [Quotes](./features/quotes.md).
-- **Versions**: a draft can be fixed in place or saved as a new version; a sent version only gets a new version. Status: draft → sent → accepted / rejected.
+- **Versions**: a draft can be fixed in place or saved as a new version; a sent version only gets a new version. Status: draft → sent → accepted / rejected. *Replaced the week of 27 November: one cell at a time, and the statuses are draft, invoiced and accepted.*
 - **Change history** of every save, with what changed; any save can be opened and restored.
 - **Print**: *Anteprima Preventivo* on A4 pages, printed or saved as PDF by the browser, with print settings for what shows. The old PDF download is gone.
 - **Expired price lists**: drafts move to the newest valid version of the family and are repriced; without one, saving and printing are blocked with a link to upload a new version.

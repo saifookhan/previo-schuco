@@ -11,5 +11,5 @@ Things testers should **not** report as bugs — they are known and planned:
   use the variant each quote marks as final.
 - Permanently deleting a quote. **Archive** hides it until the Archived filter is on.
 - Editing characteristic ↔ line relations without the Excel import.
-- Reporting, notifications, print templates, export.
+- Reporting, print templates beyond the current quote print, and Word/Excel export. Connection requests already notify in the bell and by email.
 - Automated backups, monitoring and error tracking (infrastructure).

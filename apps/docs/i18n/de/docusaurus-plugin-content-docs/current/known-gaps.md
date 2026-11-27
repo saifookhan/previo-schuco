@@ -11,5 +11,5 @@ Dinge, die Tester **nicht** als Fehler melden sollen — sie sind bekannt und ge
   nutzen die Variante, die jedes Angebot als final markiert.
 - Ein Angebot endgültig löschen. **Archivieren** blendet es aus, bis der Filter Archiviert an ist.
 - Merkmal ↔ Linie-Zuordnungen ohne Excel-Import bearbeiten.
-- Berichte, Benachrichtigungen, Druckvorlagen, Export.
+- Berichte, Druckvorlagen über den jetzigen Angebotsdruck hinaus und Export nach Word/Excel. Verbindungsanfragen benachrichtigen bereits über die Glocke und per E-Mail.
 - Automatische Backups, Monitoring und Fehlertracking (Infrastruktur).

@@ -146,6 +146,7 @@ Sopra l'elenco, per la scheda aperta:
 - **Validità prezzi** — *Validi oggi* (quello che propone il preventivo; contano anche le famiglie senza date), *In arrivo*, *Scaduti*, *Senza date*.
 - **Pronta per la fatturazione** (in *Più filtri*) — Sì / No.
 - **Con listino** e **In libreria** (in *Più filtri*) — Sì / No.
+- **Preferiti** — spento di default. Spuntalo per vedere solo le versioni che questa azienda ha segnato con la stella.
 - **Archiviati** — spento di default. Spuntalo per vedere le versioni archiviate da un amministratore di azienda.
 - **Altri filtri** — *Prezzi validi il* un certo giorno, *Aggiornata dal / al*, *Solo ultime versioni* (nasconde le versioni sostituite da una più recente); in *Condivise con me* anche **Proprietario** e **Il tuo sconto** (con / senza).
 - **Ordina** — più recenti prima (predefinito), aggiornate di recente, nome, prezzi in scadenza prima.

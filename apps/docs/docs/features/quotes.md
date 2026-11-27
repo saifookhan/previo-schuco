@@ -16,7 +16,7 @@ which only **supplier** companies have (in the demo data: Suppli).
 2. The quote opens on one page, as in the client's design:
    - **Top bar** — the reference, the variant (`V1A2`), its name and status, the customer and project (click them to edit the
      customer, fiscal code, address, city, project, date and internal notes), the **total VAT excluded**, and the
-     buttons **Version matrix**, **Print settings**, **Preview**, **Export** (coming soon), **Change history** and **Save**.
+     buttons **Favorite** (blue star), **Version matrix**, **Print settings**, **Preview**, **Export** (coming soon), **Change history** and **Save**.
    - **Intestazione** — text modules (rich text: headings, bold, lists, alignment, links, images up to 1 MB). Add an
      empty text or one of the company's **saved texts**; any text can be saved as a new saved text. Drag or use the arrows
      to reorder.
@@ -67,7 +67,8 @@ A quote is a grid: versions down the side, alternatives across (`V1A1`, `V1A2`, 
 - The **version matrix** (in the editor, and in the expanded row on the quotes list) shows the grid. Hover a saved cell
   to create the one below it. Hover an empty cell, when the one above exists, to copy that saved document down.
   Unsaved editor edits are not included.
-- The variant menu sets a name, duplicates this variant as a new quote (`V1A1` only), marks it **final** (the one the
+- The blue star marks this variant as a **favorite**. Any number of variants can be favorites. It does not change which one is final, and a new version or a duplicate starts without it.
+- The variant menu sets a name, duplicates this variant as a new quote (`V1A1` only), marks it **final** (the amber star, the one the
   dashboard uses), and sets the status to **draft**, **invoiced** or **accepted** — any of them except the current one.
   Only a draft is edited in place. Marking invoiced or accepted still requires catalog families whose prices are valid today.
 - When a family's prices have expired, a **draft** moves its lines to the newest valid version of that family (matched
@@ -90,6 +91,10 @@ quote from the list; a direct link still opens it. The same archive exists on pr
 families and lines, added/removed/reordered items, closing and print settings). Any save can be opened read-only and
 **Restored** as the starting point of new edits. The quote's audit trail (created, saved, new version, status) is kept
 as before.
+
+## Dashboard
+
+*Dashboard* uses the variant each quote marks as **final**, and only quotes that are not archived. **Open quotes** counts finals that are draft or invoiced. **Pipeline** adds up their totals. **Conversion** is how many finals are accepted. **Recent quotes** links to that variant. **Active users** is still a sample number.
 
 ## Quote assistant
 

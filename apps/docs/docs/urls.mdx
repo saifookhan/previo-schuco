@@ -37,12 +37,13 @@ URLs carry no language prefix — the language (Italian by default, English, Ger
 
 | Page | URL | Needs |
 |---|---|---|
-| Dashboard | <AppLink path="/app/dashboard" /> | — |
+| Dashboard | <AppLink path="/app/dashboard" /> | Quote cards need `quote.view`. They follow the variant marked final. Active users is still a sample number. |
 | Product families (catalog) | <AppLink path="/app/product-families" /> | `catalog.view` |
 | Product family detail | `/app/product-families/<id>` | `catalog.view` |
 | Quotes | <AppLink path="/app/quotes" /> | `quote.view` |
-| Quote detail / builder | `/app/quotes/<id>` | `quote.view` (`quote.edit` to change) |
-| Preventivo editor (early demo replica) | <AppLink path="/app/invoice" /> | — |
+| Quote detail / builder | `/app/quotes/<id>?version=2&alternative=1` | `quote.view` (`quote.edit` to change). Without `alternative`, the lowest one on that version opens. |
+
+`/app/invoice` and `/app/invoices` open Quotes. The quotes address can also carry `q`, `status` (`draft`, `invoiced` or `accepted`), `archived=1` and `favorites=1`. The product-families address carries the same kind of filters, including `archived=1` and `favorites=1`.
 
 ### Settings
 

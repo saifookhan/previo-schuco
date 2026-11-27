@@ -143,6 +143,7 @@ Above the list, for the tab you're on:
 - **Price validity** — *Valid today* (what the quote builder offers; families without dates count), *Upcoming*, *Expired*, *No dates*.
 - **Ready for invoicing** (under *More filters*) — Yes / No.
 - **With price list** and **In library** (under *More filters*) — Yes / No.
+- **Favorites** — off by default. Tick it to show only versions this company has marked with the star.
 - **Archived** — off by default. Tick it to show versions a company admin has archived.
 - **More filters** — *Prices valid on* a given day, *Updated from / to*, *Latest versions only* (hides versions a newer one replaces); on *Shared with me* also **Owner** and **Your discount** (with / without).
 - **Sort** — newest first (default), recently updated, name, prices ending soonest.
