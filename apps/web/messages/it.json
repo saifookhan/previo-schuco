@@ -31,7 +31,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "subtitle": "Totali IVA esclusa. La settimana va da giovedì a mercoledì. I totali usano la variante segnata come finale. I preventivi aperti sono l'ultima versione e alternativa, salvo una segnata come preferita.",
+    "subtitle": "Totali IVA esclusa. La settimana va da giovedì a mercoledì. I totali usano la variante accettata, oppure quella segnata come finale. I preventivi aperti sono l'ultima versione e alternativa, salvo una segnata come preferita.",
     "finalVariant": "Finale",
     "periodWeek": "Questa settimana",
     "periodMonth": "Questo mese",

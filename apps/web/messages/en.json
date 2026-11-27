@@ -31,7 +31,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "subtitle": "Totals exclude IVA. Weeks run from Thursday to Wednesday. Figures use the variant marked final. Open quotes are the latest version and alternative, unless one is marked favorite.",
+    "subtitle": "Totals exclude IVA. Weeks run from Thursday to Wednesday. Figures use the accepted variant, or the one marked final. Open quotes are the latest version and alternative, unless one is marked favorite.",
     "finalVariant": "Final",
     "periodWeek": "This week",
     "periodMonth": "This month",

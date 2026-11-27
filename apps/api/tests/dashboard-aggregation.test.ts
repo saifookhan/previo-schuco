@@ -11,6 +11,7 @@ import {
   buildDashboard,
   collapseDashboardQuotes,
   dashboardScopeForRoles,
+  pickBookVariant,
   pickFinalVariant,
   pickOpenVariant,
   type BuildDashboardInput,
@@ -158,6 +159,19 @@ describe('which variant counts', () => {
     const cells = [variant(1, 1, { totalPrice: '100.00' }), variant(2, 3, { totalPrice: '250.00', status: 'invoiced' })]
     expect(pickFinalVariant(cells)).toBeNull()
     expect(collapseDashboardQuotes([group(cells)]).counted).toEqual([])
+  })
+
+  it('counts an accepted variant even when it is not marked final', () => {
+    const cells = [
+      variant(1, 1, { isFinal: true, status: 'draft', totalPrice: '100.00' }),
+      variant(2, 1, { status: 'accepted', totalPrice: '800.00' }),
+    ]
+    expect(pickBookVariant(cells)).toMatchObject({ version: 2, alternative: 1, status: 'accepted', totalPrice: '800.00' })
+    const collapsed = collapseDashboardQuotes([group(cells)])
+    expect(collapsed.counted).toHaveLength(1)
+    expect(collapsed.counted[0]).toMatchObject({ latestVersion: 2, alternative: 1, status: 'accepted', totalPrice: '800.00' })
+    expect(build({ quotes: collapsed.counted }).kpis.pipelineByStatus.accepted).toEqual({ count: 1, total: '800.00' })
+    expect(build({ quotes: collapsed.counted }).recentQuotes.map((row) => row.id)).toEqual([id(1)])
   })
 
   it('counts only the final variant, even when a later alternative is worth more', () => {
