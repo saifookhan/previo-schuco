@@ -85,10 +85,3 @@ jobs:
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
-      - name: Docker build docs
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/docs/Dockerfile
-          cache-from: type=gha,scope=docs
-          cache-to: type=gha,mode=max,scope=docs

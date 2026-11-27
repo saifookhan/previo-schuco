@@ -26,7 +26,6 @@ jobs:
             cd /root/previo-schuco
             git fetch origin main
             git reset --hard origin/main
-            export GIT_COMMIT=$(git rev-parse --short HEAD)
             docker compose --profile selfhost up -d --build
             # Demo data for testers: imports + publishes the sample product
             # family for the seeded Suppli company. Idempotent (skips when it

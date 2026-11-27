@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  BookOpen,
   Building2,
+  ExternalLink,
   FileSpreadsheet,
   Handshake,
   LayoutDashboard,
@@ -195,6 +197,16 @@ export const AppShell = ({ children }: AppShellProps) => {
         </nav>
 
         <div className="border-t border-slate-100 p-4">
+          <Link
+            href="/help"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+          >
+            <BookOpen className="h-4 w-4" />
+            <span className="flex-1">{t('help')}</span>
+            <ExternalLink className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+          </Link>
           <button
             type="button"
             onClick={() => void signOut()}

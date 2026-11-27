@@ -19,7 +19,7 @@ PREVIO is a B2B platform where companies create **invoices** and **quotations** 
 | Hosting | One Hetzner server, Docker Compose, Caddy (HTTPS) |
 | Delivery | GitHub Actions CI → SSH deploy ([deployment.md](./deployment.md), [ADR 0013](./adr/0013-single-server-docker-compose-deployment.md)) |
 | Monorepo | pnpm + Turborepo + Changesets (planned) |
-| Docs site | Docusaurus `apps/docs` (planned) |
+| Handbook | Public testing handbook at `/help` in `apps/web` |
 
 ## Actors
 
@@ -143,6 +143,6 @@ docker-compose.yml, Caddyfile   The deployable stack
 infra/terraform/                Legacy, unused (retired AWS setup)
 ```
 
-**Possible future services:** see [architecture.md](./architecture.md) — `apps/docs`, optional `calculation-service` and `files-service`.
+**Possible future services:** see [architecture.md](./architecture.md) — optional `calculation-service` and `files-service`.
 
 **Diagrams:** see [technical-overview.md](./technical-overview.md) for system architecture, domain model, auth flow, and RBAC.

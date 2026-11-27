@@ -14,9 +14,14 @@ const HomePage = () => (
           <Building2 className="h-6 w-6 text-brand" />
           <span className="text-lg font-bold text-slate-900">Schuco</span>
         </div>
-        <Link href="/login">
-          <Button variant="outline">Sign in</Button>
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/help" className="text-sm font-medium text-slate-600 hover:text-slate-900">
+            Handbook
+          </Link>
+          <Link href="/login">
+            <Button variant="outline">Sign in</Button>
+          </Link>
+        </div>
       </div>
     </header>
 

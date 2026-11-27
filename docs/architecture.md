@@ -1,6 +1,6 @@
 # PREVIO — Architecture (current & future)
 
-How the monorepo is organized today and how it could evolve toward separately deployable services, Changesets, and a Docusaurus docs site.
+How the monorepo is organized today and how it could evolve toward separately deployable services and Changesets.
 
 ## Principles
 
@@ -10,7 +10,7 @@ How the monorepo is organized today and how it could evolve toward separately de
 | **One gateway** | `apps/api` is the only service that authenticates users and decides what they may do (session JWT, RBAC + permissions, tenant context); anything else would sit behind it on the internal network |
 | **Shared contracts** | `@schuco/contracts` holds Zod schemas, the permission map and the OpenAPI document so the web app and API don't drift |
 | **The database enforces tenancy** | Postgres Row-Level Security does tenant isolation and share visibility; application code never relies on filtering alone ([ADR 0006](./adr/0006-rls-request-scoped-transaction.md)) |
-| **Independent docs** | User-facing testing docs in Docusaurus (`apps/docs`); repo `docs/` for ADRs and internal notes |
+| **Handbook in the app** | Public testing handbook at `/help` in `apps/web` (EN/IT/DE, same language cookie as the app). Repo `docs/` stays the place for ADRs and internal notes |
 
 ---
 
@@ -85,7 +85,6 @@ previo-schuco/
 ├── apps/
 │   ├── web/
 │   ├── api/                      # still the only authenticated entry point
-│   ├── docs/                     # Docusaurus site
 │   ├── calculation-service/      # HTTP quote engine, if recalculation outgrows the API
 │   └── files-service/            # PDF render, import/export, storage abstraction
 ├── packages/
@@ -129,16 +128,14 @@ Each extra service would be one more Compose service behind the same network (or
 
 Workflow (future): run `pnpm changeset` when changing a package; on merge, a GitHub Action opens a "Version packages" PR; app deploys continue to run on `main` as today. Internal packages stay `private: true` — the goal is changelog discipline, not npm publishing.
 
-## Docusaurus (planned)
+## Handbook and reference
 
 | Content | Location |
 |---------|----------|
-| Product/domain docs, user guides | `apps/docs/docs/` |
-| API reference | `@schuco/contracts` OpenAPI + Swagger UI at `/docs` on the API |
-| Deployment runbooks | Port from `docs/deployment.md` |
-| ADRs, internal architecture | Repo `docs/` |
-
-It is a static build served by the `docs` container behind Caddy on `DOCS_DOMAIN` (e.g. `docs.<domain>`). Repo [`docs/`](.) stays the place for internal/architecture docs.
+| Testing handbook (features, URLs, demo logins) | `apps/web` at `/help` (`apps/web/content/help/{en,it,de}`). Public, no login. Language follows the app cookie |
+| API reference | `@schuco/contracts` OpenAPI + Swagger UI at `/docs` on the API (Caddy sends `/docs` to `api`, so the handbook cannot use that path) |
+| Deployment runbooks | [`deployment.md`](./deployment.md) |
+| ADRs, internal architecture | Repo [`docs/`](.) |
 
 ---
 
@@ -154,7 +151,7 @@ It is a static build served by the `docs` container behind Caddy on `DOCS_DOMAIN
 ## Implementation checklist (future work)
 
 - [ ] Add `@changesets/cli` + `.changeset/config.json`
-- [x] Scaffold `apps/docs` (Docusaurus classic)
+- [x] Testing handbook at `/help` in `apps/web`
 - [x] `packages/contracts` with quote/product/permission schemas
 - [x] OpenAPI spec in `@schuco/contracts` (Swagger UI at `/docs`)
 - [x] Background jobs on BullMQ (`worker` service)

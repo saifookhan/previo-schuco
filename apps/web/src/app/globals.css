@@ -108,3 +108,122 @@ body {
     animation: none;
   }
 }
+
+/* Public testing handbook at /help. */
+.help-prose {
+  color: #0f172a;
+  line-height: 1.65;
+  font-size: 0.975rem;
+}
+.help-prose h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0 0 0.75rem;
+}
+.help-prose h2 {
+  font-size: 1.35rem;
+  font-weight: 650;
+  margin: 1.75rem 0 0.6rem;
+}
+.help-prose h3 {
+  font-size: 1.1rem;
+  font-weight: 650;
+  margin: 1.4rem 0 0.4rem;
+}
+.help-prose p,
+.help-prose ul,
+.help-prose ol,
+.help-prose blockquote,
+.help-prose pre {
+  margin: 0.75rem 0;
+}
+.help-prose ul,
+.help-prose ol {
+  padding-left: 1.25rem;
+}
+.help-prose ul {
+  list-style: disc;
+}
+.help-prose ol {
+  list-style: decimal;
+}
+.help-prose li {
+  margin: 0.25rem 0;
+}
+.help-prose li > ul,
+.help-prose li > ol {
+  margin: 0.25rem 0;
+}
+.help-prose a {
+  color: #1e5f8c;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.help-prose strong {
+  font-weight: 650;
+}
+.help-prose code {
+  font-size: 0.85em;
+  background: #f1f5f9;
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+}
+.help-prose pre {
+  overflow-x: auto;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 0.6rem;
+  padding: 0.9rem 1rem;
+}
+.help-prose pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.help-prose blockquote {
+  border-left: 4px solid #1e5f8c;
+  background: #f8fafc;
+  border-radius: 0 0.5rem 0.5rem 0;
+  padding: 0.6rem 1rem;
+  color: #334155;
+}
+.help-prose img {
+  max-width: 100%;
+  height: auto;
+  margin: 1rem 0;
+  border-radius: 0.6rem;
+  border: 1px solid #e2e8f0;
+}
+.help-prose hr {
+  margin: 1.5rem 0;
+  border-color: #e2e8f0;
+}
+.help-table {
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+.help-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.help-prose th,
+.help-prose td {
+  border: 1px solid #e2e8f0;
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}
+.help-prose th {
+  background: #f8fafc;
+  font-weight: 600;
+}
+/* Label/value tables in the handbook use an empty header row. */
+.help-prose thead:not(:has(th:not(:empty))) {
+  display: none;
+}
+.help-prose input[type='checkbox'] {
+  margin-right: 0.4rem;
+}
