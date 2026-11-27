@@ -15,7 +15,9 @@ const NEW_QUOTE = /\b(nuovo\s+preventivo|new\s+quote|neues\s+angebot|crea(?:re)?
 
 const REMOVING = /\b(elimina\w*|rimuov\w*|delete|remove|togli\w*|lösch\w*|entfern\w*)\b/i
 
-const SIZE = /(\d{2,5})\s*[x×]\s*(\d{2,5})/i
+/** Width × height: 2500x500, 2500 x 500, 2500X500, 2500×500, 2500*500, 2500 per 500, 2500 by 500, optional mm. */
+const SIZE_SOURCE = String.raw`(\d{2,5})\s*(?:mm)?\s*(?:[x×*]|\b(?:per|by)\b)\s*(\d{2,5})\s*(?:mm)?`
+const sizePattern = (): RegExp => new RegExp(SIZE_SOURCE, 'gi')
 
 export const isRemoving = (text: string): boolean => REMOVING.test(text)
 
@@ -28,14 +30,41 @@ export const isNewRowRequest = (text: string): boolean => NEW_ROW.test(text) || 
 export const isEditRequest = (text: string): boolean => EDIT.test(text) && !isNewRowRequest(text)
 
 export const sizesIn = (text: string): { widthMm: number; heightMm: number }[] =>
-  [...text.matchAll(/(\d{2,5})\s*[x×]\s*(\d{2,5})/gi)].map((match) => ({
+  [...text.matchAll(sizePattern())].map((match) => ({
     widthMm: Number(match[1]),
     heightMm: Number(match[2]),
   }))
 
+/** Remove every size so a product query does not have to contain 2000x2000. */
+export const stripSizes = (text: string): string => text.replace(sizePattern(), ' ').replace(/\s+/g, ' ').trim()
+
 /** True only when the user typed both millimetre numbers. A prompt example does not count. */
 export const userGaveSize = (userTexts: readonly string[], widthMm: number, heightMm: number): boolean =>
   userTexts.some((text) => sizesIn(text).some((size) => size.widthMm === widthMm && size.heightMm === heightMm))
+
+const finite = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value)
+  return undefined
+}
+
+/**
+ * The size for this turn. Numbers from the tool count only when the user typed them.
+ * If the tool omitted both, the last size in the conversation is used, in any accepted form.
+ */
+export const sizeForTurn = (
+  userTexts: readonly string[],
+  width: unknown,
+  height: unknown,
+): { widthMm: number; heightMm: number } | undefined => {
+  const combined = (typeof width === 'string' ? sizesIn(width)[0] : undefined) ?? (typeof height === 'string' ? sizesIn(height)[0] : undefined)
+  if (combined) return userGaveSize(userTexts, combined.widthMm, combined.heightMm) ? combined : undefined
+  const widthMm = finite(width)
+  const heightMm = finite(height)
+  if (widthMm && heightMm) return userGaveSize(userTexts, widthMm, heightMm) ? { widthMm, heightMm } : undefined
+  if (widthMm || heightMm) return undefined
+  return userTexts.flatMap((text) => sizesIn(text)).at(-1)
+}
 
 export const mentionedId = (userTexts: readonly string[], id: string): boolean =>
   userTexts.some((text) => text.toLowerCase().includes(id.toLowerCase()))
@@ -43,6 +72,7 @@ export const mentionedId = (userTexts: readonly string[], id: string): boolean =
 export const isUuid = (value: string): boolean => UUID.test(value) && value.length === 36
 
 export const detectLanguage = (text: string, fallback: ChatLocale): ChatLocale => {
+  if (choiceIndex(text, 32) !== null || sizeOnly(text)) return fallback
   const score = (pattern: RegExp) => text.match(pattern)?.length ?? 0
   const italian = score(
     /\b(aggiungi|quale|riga|righe|preventivo|famiglia|misura|sconto|quantità|cliente|bozza|altezza|larghezza|il|la|per|una|della|cambia|metti|elimina|rimuovi|nota|pagament\w*|inviato)\b/gi,
@@ -77,6 +107,25 @@ export const phrases = {
     draft: 'bozza',
     expired: 'scaduto',
     cannotAdd: 'non aggiungibile',
+    notOnQuote: 'Quella riga non è nel preventivo',
+    notOnQuoteFamily: 'Quella famiglia non è nel preventivo',
+    noTemplate: 'Nessun testo salvato con quel nome.',
+    confirmInvalid: 'La conferma non è valida. Nessuna modifica.',
+    noSwitch: 'Nessuna famiglia scaduta da aggiornare.',
+    hiddenNone: 'Nessuna bozza o listino scaduto corrisponde.',
+    invalidSize: 'La misura non è valida. Servono larghezza e altezza in millimetri interi, maggiori di zero.',
+    needBoth: 'Manca una dimensione. Indica larghezza e altezza in mm.',
+    paymentsSum: 'Le percentuali non fanno 100. Completa i pagamenti: non invento il resto.',
+    badTransition: 'Da bozza si può solo passare a inviato. Accettato e rifiutato arrivano dopo l’invio.',
+    conflict: 'Il preventivo è stato salvato altrove. Ho ricaricato i dati: ripeti la modifica.',
+    restored: 'Annullata l’ultima modifica. Ripristinata la revisione',
+    noPrevious: 'Non c’è una revisione precedente da ripristinare.',
+    nonsense: 'Non salvo un testo così lungo o ripetuto. Scrivi il testo da mettere nel preventivo.',
+    refuse: 'Non posso ignorare le regole del preventivo, né cancellarlo senza conferma.',
+    quantity: 'La quantità deve essere un numero intero compreso tra 1 e 1.000.000.',
+    printUpdated: 'Impostazioni di stampa aggiornate.',
+    copied: 'Preventivo copiato per',
+    restoreRevision: 'Ripristina la revisione',
   },
   en: {
     which: 'Which one?',
@@ -96,6 +145,25 @@ export const phrases = {
     draft: 'draft',
     expired: 'expired',
     cannotAdd: 'cannot add',
+    notOnQuote: 'That row is not on the quote',
+    notOnQuoteFamily: 'That family is not on the quote',
+    noTemplate: 'No saved text with that name.',
+    confirmInvalid: 'That confirmation is not valid. Nothing was changed.',
+    noSwitch: 'There is no expired family to update.',
+    hiddenNone: 'No draft or expired price list matches.',
+    invalidSize: 'That size is not valid. Width and height must be whole millimetres greater than zero.',
+    needBoth: 'One dimension is missing. Give both width and height in mm.',
+    paymentsSum: 'Those percentages do not add up to 100. Complete the payments. I will not fill in the rest.',
+    badTransition: 'A draft can only be marked sent. Accepted and rejected come after it is sent.',
+    conflict: 'The quote was saved somewhere else. I reloaded it: please retry the edit.',
+    restored: 'Undid the last edit. Restored revision',
+    noPrevious: 'There is no previous revision to restore.',
+    nonsense: 'I will not save a long or repeated block. Send the text you want on the quote.',
+    refuse: 'I cannot ignore the quote rules or delete the quote without confirmation.',
+    quantity: 'Quantity must be a whole number from 1 to 1,000,000.',
+    printUpdated: 'Print settings updated.',
+    copied: 'Quote copied for',
+    restoreRevision: 'Restore revision',
   },
   de: {
     which: 'Welche?',
@@ -115,6 +183,25 @@ export const phrases = {
     draft: 'Entwurf',
     expired: 'abgelaufen',
     cannotAdd: 'nicht hinzufügbar',
+    notOnQuote: 'Diese Zeile ist nicht im Angebot',
+    notOnQuoteFamily: 'Diese Familie ist nicht im Angebot',
+    noTemplate: 'Kein gespeicherter Text mit diesem Namen.',
+    confirmInvalid: 'Die Bestätigung ist ungültig. Nichts wurde geändert.',
+    noSwitch: 'Keine abgelaufene Familie zum Aktualisieren.',
+    hiddenNone: 'Kein Entwurf und keine abgelaufene Preisliste passt.',
+    invalidSize: 'Das Maß ist ungültig. Breite und Höhe müssen ganze Millimeter größer als null sein.',
+    needBoth: 'Eine Seite fehlt. Gib Breite und Höhe in mm an.',
+    paymentsSum: 'Die Prozente ergeben nicht 100. Ergänze die Zahlungen. Den Rest erfinde ich nicht.',
+    badTransition: 'Ein Entwurf kann nur als gesendet markiert werden. Angenommen und abgelehnt geht erst danach.',
+    conflict: 'Das Angebot wurde anderswo gespeichert. Ich habe es neu geladen: bitte die Änderung wiederholen.',
+    restored: 'Letzte Änderung rückgängig. Revision wiederhergestellt',
+    noPrevious: 'Es gibt keine vorherige Revision zum Wiederherstellen.',
+    nonsense: 'So einen langen oder wiederholten Text speichere ich nicht. Schreib den Text für das Angebot.',
+    refuse: 'Ich kann die Angebotsregeln nicht ignorieren und das Angebot nicht ohne Bestätigung löschen.',
+    quantity: 'Die Menge muss eine ganze Zahl zwischen 1 und 1.000.000 sein.',
+    printUpdated: 'Druckeinstellungen aktualisiert.',
+    copied: 'Angebot kopiert für',
+    restoreRevision: 'Revision wiederherstellen',
   },
 } as const
 
@@ -126,9 +213,9 @@ const ORDINALS: { pattern: RegExp; index: number }[] = [
   { pattern: /^(?:il |la |the |die )?(?:quinto|quinta|fifth|fünfte)(?: one| uno| una)?$/i, index: 4 },
 ]
 
-/** "1", "the first", "la seconda" pick a pending chip. */
+/** "1", "the first", "la prima" pick a pending chip. Punctuation at the end still counts. */
 export const choiceIndex = (message: string, count: number): number | null => {
-  const trimmed = message.trim()
+  const trimmed = message.trim().replace(/[.!?)]+$/g, '').trim()
   const number = trimmed.match(/^(\d+)\.?$/)
   if (number) {
     const index = Number(number[1]) - 1
@@ -139,6 +226,48 @@ export const choiceIndex = (message: string, count: number): number | null => {
   return found.index
 }
 
+/** A message that is only a width × height, such as "2000x2000" or "1000 × 300 mm". */
+export const sizeOnly = (text: string): { widthMm: number; heightMm: number } | null => {
+  const trimmed = text.trim()
+  const sizes = sizesIn(trimmed)
+  if (sizes.length !== 1) return null
+  const rest = stripSizes(trimmed).replace(/\b(mm|millimetri|millimeters?)\b/gi, ' ').trim()
+  return rest.length === 0 ? (sizes[0] ?? null) : null
+}
+
+/** The user asked to see draft and expired families, not to add a current one. */
+export const wantsHiddenCatalog = (text: string): boolean =>
+  /bozz\w*|listini?\s+scadut\w*|scadut\w*|expired|\bdrafts?\b|include hidden/i.test(text)
+
+const ALL_ROWS = /\b(tutte le righe|all rows|whole quote|intero preventivo|alle zeilen|ogni riga)\b/i
+const TARGET_NOISE =
+  /\b(metti|imposta|set|change|cambia\w*|aggiung\w*|apply|applica\w*|sconto|discount|iva|vat|exempt|esente|prezzo|price|misura|size|ore|hours|stunden|installation|installazione|posa|ricarico|extra|quantit\w*|qty|q\.?ty|pezzi|rinomina\w*|rename|blocca\w*|lock(?:ed)?|alternativ\w*|elimina\w*|rimuov\w*|delete|remove|togli\w*|riga|righe|row|rows|zeile|sulla|sul|sull|alla|al|di|del|della|dei|the|of|to|a|an|un|una|per|in|su|euro|pc|famiglia|family|mark|as|la|il|lo|le|make|description|descrizione|copy|copia)\b/gi
+
+/** The row or family the user named in an edit or a removal. "all rows" has no single target. */
+export const namedTarget = (text: string): string | null => {
+  if (ALL_ROWS.test(text)) return null
+  if (!isEditRequest(text) && !isRemoving(text) && !/\bfamigli|\bfamily\b/i.test(text)) return null
+  const pos = text.match(/\bpos(?:izione)?\s*\d+\b/i)
+  if (pos) return pos[0]
+  const rowNum = text.match(/\b(?:riga|row|zeile)\s+\d+\b/i)
+  if (rowNum) return rowNum[0]
+  const quoted = text.match(/["“]([^"”]+)["”]/)?.[1]?.trim()
+  if (quoted) return quoted
+  const cleaned = text
+    .replace(/\d+(?:[.,]\d+)?\s*%/g, ' ')
+    .replace(sizePattern(), ' ')
+    .replace(/\b\d+(?:[.,]\d+)?\b/g, ' ')
+    .replace(TARGET_NOISE, ' ')
+    .replace(/[%€]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+-\s+/g, ' ')
+    .trim()
+  return cleaned.length >= 3 ? cleaned : null
+}
+
+const CONFIRM_WORD = /^(?:conferma|confirm|bestätigen|bestaetigen)$/i
+const CANCEL_WORD = /^(?:annulla|cancel|abbrechen)$/i
+
 export const resolveDirectAction = (input: {
   latestUser: string
   pendingChoices?: Suggestion[]
@@ -147,8 +276,83 @@ export const resolveDirectAction = (input: {
   if (input.action?.tool) return input.action
   const choices = input.pendingChoices ?? []
   const index = choiceIndex(input.latestUser, choices.length)
-  if (index === null) return null
-  return choices[index]?.action ?? null
+  if (index !== null) return choices[index]?.action ?? null
+  const word = input.latestUser.trim()
+  if (CONFIRM_WORD.test(word)) return choices.find((choice) => choice.action?.args && 'confirmToken' in choice.action.args)?.action ?? null
+  if (CANCEL_WORD.test(word)) return { tool: 'cancel_action', args: {} }
+  const size = sizeOnly(input.latestUser)
+  if (!size) return null
+  const adds = choices.filter((choice) => choice.action?.tool === 'add_product')
+  const pending = adds.length === 1 ? adds[0]?.action : null
+  if (!pending) return null
+  return { tool: 'add_product', args: { ...pending.args, widthMm: size.widthMm, heightMm: size.heightMm } }
 }
 
-export const hasSize = (text: string): boolean => SIZE.test(text)
+const LOOSE_SIZE = /(-?\d+(?:[.,]\d+)?)\s*(?:mm|cm|m)?\s*(?:[x×*]|\b(?:per|by)\b)\s*(-?\d+(?:[.,]\d+)?)/i
+
+/** A pair that must not be written: decimals, zero, or a negative side. A lone number is only half a size. */
+export const sizeIssue = (text: string): 'invalid' | 'partial' | null => {
+  const loose = text.match(LOOSE_SIZE)
+  if (loose) {
+    const width = Number(loose[1]?.replace(',', '.'))
+    const height = Number(loose[2]?.replace(',', '.'))
+    const whole = Number.isInteger(width) && Number.isInteger(height)
+    const inRange = width >= 1 && height >= 1 && width <= 99_999 && height <= 99_999
+    return whole && inRange ? null : 'invalid'
+  }
+  if (sizesIn(text).length > 0) return null
+  const onlyNumber = /^\s*\d{2,5}(?:\s*mm)?\s*$/i.test(text.trim())
+  const sizeTalk = /\b(misur\w*|size|larghezza|altezza|width|height|breite|höhe|mm)\b/i.test(text)
+  const numbers = text.match(/\d+(?:[.,]\d+)?/g) ?? []
+  if ((onlyNumber || sizeTalk) && numbers.length === 1) return 'partial'
+  return null
+}
+
+/** Percentages the user typed, such as 30% and 30%. */
+export const statedPercents = (text: string): number[] =>
+  [...text.matchAll(/(\d+(?:[.,]\d+)?)\s*%/g)].map((match) => Number(match[1]?.replace(',', '.') ?? ''))
+
+export const percentsSumTo100 = (values: readonly number[]): boolean =>
+  Math.abs(values.reduce((sum, value) => sum + value, 0) - 100) <= 0.01
+
+/** A long block, or the same short phrase repeated, is not a text module. */
+export const isNonsenseDump = (text: string): boolean => {
+  const folded = text.trim().toLowerCase().replace(/\s+/g, ' ')
+  if (folded.length >= 2_000) return true
+  const words = folded.split(' ').filter(Boolean)
+  if (words.length < 8) return false
+  const counts = new Map<string, number>()
+  for (let index = 0; index <= words.length - 4; index += 1) {
+    const key = words.slice(index, index + 4).join(' ')
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return [...counts.values()].some((count) => count >= 3)
+}
+
+/** The user told the assistant to drop its rules or to wipe the quote without a confirm. */
+export const isPromptInjection = (text: string): boolean =>
+  /ignora\s+(?:le\s+|tutte\s+le\s+)?istruzioni|ignore\s+(?:all\s+|the\s+)?(?:previous|prior|above)\s+instructions|disregard\s+(?:your\s+|the\s+)?(?:previous\s+|prior\s+)?instructions|ignorier\w*\s+(?:die\s+)?(?:vorherigen\s+)?anweisungen|(?:cancella|elimina|delete|lösch\w*)\s+tutto[\s\S]{0,80}senza\s+chiedere/i.test(
+    text,
+  )
+
+/** Undo the last saved edit, as opposed to cancelling a confirm chip. */
+export const wantsUndo = (text: string): boolean =>
+  /annulla l['’]ultima modifica|undo the last|letzte\s+(?:änderung|aenderung)\s+rückgängig/i.test(text)
+
+/** The save just before the current one, not revision 1. */
+export const wantsPreviousRevision = (text: string): boolean =>
+  wantsUndo(text) || /revisione precedente|previous revision|vorherige\s+revision|torna alla revisione/i.test(text)
+
+const STATUS_WORD = {
+  it: { draft: 'bozza', sent: 'inviato', accepted: 'accettato', rejected: 'rifiutato' },
+  en: { draft: 'draft', sent: 'sent', accepted: 'accepted', rejected: 'rejected' },
+  de: { draft: 'Entwurf', sent: 'gesendet', accepted: 'angenommen', rejected: 'abgelehnt' },
+} as const
+
+export const statusWord = (locale: ChatLocale, status: string): string => {
+  const words = STATUS_WORD[locale]
+  if (status === 'draft' || status === 'sent' || status === 'accepted' || status === 'rejected') return words[status]
+  return status
+}
+
+export const hasSize = (text: string): boolean => sizesIn(text).length > 0

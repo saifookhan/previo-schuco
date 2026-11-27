@@ -250,7 +250,7 @@ export const QUOTE_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'set_payments',
-    description: 'Replace the payment rows. Percentages must sum to 100. This is not an activity.',
+    description: 'Replace the payment rows. Percentages must be the ones the user typed and must sum to 100. If they do not, ask the user to complete them. Do not invent the remainder. This is not an activity.',
     parameters: {
       type: 'object',
       properties: {
@@ -261,7 +261,7 @@ export const QUOTE_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'set_quote_status',
-    description: 'Mark the open version draft, sent, accepted, or rejected. Requires a confirm token. A draft can be sent; a sent version can be accepted or rejected.',
+    description: 'Mark the open version sent, accepted, or rejected. Requires a confirm token. A draft can only become sent. A sent version can be accepted or rejected. Do not offer an invalid transition.',
     parameters: {
       type: 'object',
       properties: { status: { type: 'string', enum: ['draft', 'sent', 'accepted', 'rejected'] }, confirmToken: { type: 'string' } },
@@ -275,7 +275,7 @@ export const QUOTE_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'restore_revision',
-    description: 'Restore a previous save of this version. Requires a confirm token.',
+    description: 'Restore a previous save of this version. Omit revisionNumber to restore the immediately previous revision. Do not pass 1 unless that is the previous save. Requires a confirm token, except when the user asked to undo the last edit.',
     parameters: {
       type: 'object',
       properties: { revisionNumber: { type: 'integer' }, confirmToken: { type: 'string' } },

@@ -1,3 +1,5 @@
+import { stripSizes } from './intent'
+
 /** Fold accents and case so "Profondità" matches "profondita". */
 export const foldName = (value: string): string =>
   value
@@ -77,9 +79,8 @@ export const positionQuery = (query: string): string | null => {
   return digits.replace(/^0+/, '') || '0'
 }
 
-/** Drop a trailing size such as 1000×300 so it does not have to appear in the product name. */
-export const withoutSize = (query: string): string =>
-  query.replace(/\d{2,5}\s*[x×]\s*\d{2,5}(?:\s*(?:mm|millimetri|millimeters|millimeter))?/gi, ' ').replace(/\s+/g, ' ').trim()
+/** Drop a size such as 1000×300 or 2000x2000 so it does not have to appear in the product name. */
+export const withoutSize = (query: string): string => stripSizes(query)
 
 const positionDigits = (code: string): string => code.replace(/\D/g, '').replace(/^0+/, '') || '0'
 

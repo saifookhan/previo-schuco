@@ -1,4 +1,4 @@
-import { detectLanguage, resolveDirectAction, runQuoteAgent, type ChatLocale, type ModelMessage, type Suggestion, type SuggestionAction, completeWithCloudflare } from '@schuco/ai-quote-agent'
+import { detectLanguage, isPromptInjection, phrases, resolveDirectAction, runQuoteAgent, type ChatLocale, type ModelMessage, type Suggestion, type SuggestionAction, completeWithCloudflare } from '@schuco/ai-quote-agent'
 import { streamSSE } from 'hono/streaming'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -53,7 +53,8 @@ quoteChat.post('/', requireAuth, requirePermission('quote.edit'), async (c) => {
   const userTexts = parsed.data.messages.filter((message) => message.role === 'user').map((message) => message.content)
   const latestUser = userTexts.at(-1) ?? ''
   const uiLocale: ChatLocale = parsed.data.locale ?? 'it'
-  const locale = detectLanguage(latestUser, uiLocale)
+  const prior = userTexts.slice(0, -1).join('\n')
+  const locale = detectLanguage(latestUser, prior.trim() ? detectLanguage(prior, uiLocale) : uiLocale)
   const state = createChatState({ userTexts, locale })
   const history: ModelMessage[] = parsed.data.messages.map((message) => ({ role: message.role, content: message.content }))
   const direct = resolveDirectAction({
@@ -74,6 +75,10 @@ quoteChat.post('/', requireAuth, requirePermission('quote.edit'), async (c) => {
     const execute = (name: string, args: unknown) =>
       runQuoteChatTools(ctx, actor, parsed.data.quoteId, parsed.data.document, parsed.data.baseRevision, name, args, state)
     try {
+      if (isPromptInjection(latestUser)) {
+        await send('text', { delta: phrases[locale].refuse })
+        return
+      }
       if (direct) {
         await send('status', { tool: direct.tool })
         const outcome = await execute(direct.tool, direct.args)
