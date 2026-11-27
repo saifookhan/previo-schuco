@@ -38,6 +38,9 @@ const formatNumber = (value: number, locale: string) =>
 
 const money = (total: string, locale: string) => formatCurrency(Number(total), locale)
 
+/** V2A3 — version x, alternative y. */
+const variantCode = (quote: DashboardQuoteRef) => `V${quote.latestVersion}A${quote.alternative}`
+
 const statusVariant = (status: QuoteStatus): 'success' | 'muted' | 'warning' | 'danger' => {
   if (status === 'accepted') return 'success'
   if (status === 'rejected') return 'danger'
@@ -260,7 +263,16 @@ const DashboardPage = async ({ searchParams }: { searchParams: Promise<Record<st
                 {data.recentQuotes.length === 0 ? (
                   <Empty text={t('recentEmpty')} />
                 ) : (
-                  data.recentQuotes.map((row) => <QuoteRow key={row.id} quote={row} locale={locale} statusLabel={statusLabels[row.status]} editedLabel={t('editedAt', { when: formatWhen(row.updatedAt, locale) })} />)
+                  data.recentQuotes.map((row) => (
+                    <QuoteRow
+                      key={row.id}
+                      quote={row}
+                      locale={locale}
+                      statusLabel={statusLabels[row.status]}
+                      finalLabel={t('finalVariant')}
+                      editedLabel={t('editedAt', { when: formatWhen(row.updatedAt, locale) })}
+                    />
+                  ))
                 )}
               </CardContent>
             </Card>
@@ -354,7 +366,8 @@ const DashboardPage = async ({ searchParams }: { searchParams: Promise<Record<st
                     <div key={row.quote.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-4 py-3">
                       <div>
                         <Link href={`/app/quotes/${row.quote.id}`} className="font-medium text-slate-900 hover:text-brand">
-                          {row.quote.reference}
+                          {row.quote.reference}{' '}
+                          <span className="font-normal text-slate-400">{variantCode(row.quote)}</span>
                         </Link>
                         <p className="text-sm text-slate-500">{row.quote.customerName}</p>
                       </div>
@@ -517,23 +530,28 @@ const QuoteRow = ({
   quote,
   locale,
   statusLabel,
+  finalLabel,
   editedLabel,
 }: {
   quote: DashboardQuoteRef
   locale: string
   statusLabel: string
+  finalLabel: string
   editedLabel: string
 }) => (
   <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-4 py-3">
     <div>
       <Link href={`/app/quotes/${quote.id}`} className="font-medium text-slate-900 hover:text-brand">
-        {quote.reference}
+        {quote.reference} <span className="font-normal text-slate-400">{variantCode(quote)}</span>
       </Link>
       <p className="text-sm text-slate-500">{quote.customerName}</p>
       <p className="text-xs text-slate-400">{editedLabel}</p>
     </div>
     <div className="text-right">
-      <Badge variant={statusVariant(quote.status)}>{statusLabel}</Badge>
+      <div className="flex justify-end gap-1">
+        {quote.isFinal ? <Badge>{finalLabel}</Badge> : null}
+        <Badge variant={statusVariant(quote.status)}>{statusLabel}</Badge>
+      </div>
       <p className="mt-1 font-mono text-sm font-semibold text-brand">{money(quote.totalPrice, locale)}</p>
     </div>
   </div>
@@ -568,7 +586,7 @@ const Attention = ({
         {rows.quotes.map((quote) => (
           <li key={quote.id} className="flex items-center justify-between gap-2 text-sm">
             <Link href={`/app/quotes/${quote.id}`} className="truncate text-slate-700 hover:text-brand">
-              {quote.reference} · {quote.customerName}
+              {quote.reference} {variantCode(quote)} · {quote.customerName}
             </Link>
             <span className="shrink-0 text-slate-500">{money(quote.totalPrice, locale)}</span>
           </li>

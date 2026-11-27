@@ -7,7 +7,18 @@ import {
 } from '@schuco/contracts'
 import { describe, expect, it } from 'vitest'
 
-import { buildDashboard, dashboardScopeForRoles, type BuildDashboardInput, type DashboardFamilySource, type DashboardSourceQuote, type DashboardStatusEvent } from '../src/dashboard/aggregate'
+import {
+  buildDashboard,
+  collapseDashboardQuotes,
+  dashboardScopeForRoles,
+  pickDashboardVariant,
+  type BuildDashboardInput,
+  type DashboardFamilySource,
+  type DashboardQuoteGroup,
+  type DashboardSourceQuote,
+  type DashboardStatusEvent,
+  type DashboardVariant,
+} from '../src/dashboard/aggregate'
 import { chartBuckets, periodRange } from '../src/dashboard/period'
 
 /**
@@ -31,6 +42,8 @@ const quote = (overrides: Partial<DashboardSourceQuote> = {}): DashboardSourceQu
   projectLocation: null,
   totalPrice: '100.00',
   latestVersion: 1,
+  alternative: 1,
+  isFinal: false,
   createdAt: new Date('2026-11-26T10:00:00.000Z'),
   updatedAt: new Date('2026-11-26T10:00:00.000Z'),
   sentAt: null,
@@ -112,6 +125,65 @@ const catalogFamily = (overrides: Partial<DashboardFamilySource> = {}): Dashboar
   readyForInvoicing: true,
   priceValidTo: '2026-12-31',
   ...overrides,
+})
+
+const variant = (version: number, alternative: number, overrides: Partial<DashboardVariant> = {}): DashboardVariant => ({
+  version,
+  alternative,
+  isFinal: false,
+  status: 'draft',
+  totalPrice: '10.00',
+  updatedAt: NOW,
+  sentAt: null,
+  document: null,
+  ...overrides,
+})
+
+describe('which variant counts', () => {
+  it('uses the highest version, then the highest alternative, when nothing is marked final', () => {
+    expect(pickDashboardVariant([variant(1, 1), variant(1, 3, { totalPrice: '30.00' }), variant(2, 1), variant(2, 2, { totalPrice: '22.00', status: 'sent' })])).toMatchObject({
+      version: 2,
+      alternative: 2,
+      totalPrice: '22.00',
+      isFinal: false,
+    })
+  })
+
+  it('uses the variant marked final even when a later VxAy exists', () => {
+    const picked = pickDashboardVariant([
+      variant(1, 2, { isFinal: true, status: 'accepted', totalPrice: '80.00' }),
+      variant(2, 4, { status: 'draft', totalPrice: '999.00' }),
+    ])
+    expect(picked).toMatchObject({ version: 1, alternative: 2, isFinal: true, totalPrice: '80.00' })
+  })
+
+  it('counts a quote once, at the final variant or else the latest VxAy', () => {
+    const group = (variants: DashboardVariant[]): DashboardQuoteGroup => ({
+      id: id(1),
+      reference: 'PRV-1',
+      customerName: 'Rossi',
+      projectLocation: null,
+      createdAt: new Date('2026-11-26T10:00:00.000Z'),
+      createdByUserId: USER_A,
+      createdByName: 'Ada',
+      variants,
+    })
+    const latest = collapseDashboardQuotes([
+      group([variant(1, 1, { totalPrice: '100.00' }), variant(1, 2, { totalPrice: '250.00', status: 'sent' })]),
+    ])
+    expect(latest).toHaveLength(1)
+    expect(build({ quotes: latest }).kpis.openQuotes).toEqual({ count: 1, total: '250.00' })
+
+    const favorite = collapseDashboardQuotes([
+      group([
+        variant(1, 1, { isFinal: true, status: 'draft', totalPrice: '40.00' }),
+        variant(3, 2, { status: 'accepted', totalPrice: '900.00' }),
+      ]),
+    ])
+    expect(favorite[0]).toMatchObject({ latestVersion: 1, alternative: 1, isFinal: true, totalPrice: '40.00' })
+    expect(build({ quotes: favorite }).kpis.openQuotes).toEqual({ count: 1, total: '40.00' })
+    expect(build({ quotes: favorite }).kpis.pipelineByStatus.accepted).toEqual({ count: 0, total: '0.00' })
+  })
 })
 
 describe('dashboard periods (Europe/Rome, Thursday–Wednesday)', () => {

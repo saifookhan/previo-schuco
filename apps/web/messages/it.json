@@ -31,7 +31,8 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "subtitle": "Totali IVA esclusa. La settimana va da giovedì a mercoledì.",
+    "subtitle": "Totali IVA esclusa. La settimana va da giovedì a mercoledì. Ogni preventivo conta una volta: la variante segnata come finale, altrimenti l'ultima (versione più alta, poi alternativa più alta).",
+    "finalVariant": "Finale",
     "periodWeek": "Questa settimana",
     "periodMonth": "Questo mese",
     "periodYear": "Quest'anno",

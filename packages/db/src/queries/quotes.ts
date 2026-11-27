@@ -1,4 +1,4 @@
-import { aliasedTable, and, asc, desc, eq, getTableColumns } from 'drizzle-orm'
+import { aliasedTable, and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm'
 
 import type { DbLike } from '../client'
 import { quoteRevisions, quoteTextTemplates, quoteVersions, quotes, users } from '../schema'
@@ -44,7 +44,18 @@ export const listQuoteSummaries = (
       sentAt: quoteVersions.sentAt,
     })
     .from(quotes)
-    .leftJoin(quoteVersions, and(eq(quoteVersions.quoteId, quotes.id), eq(quoteVersions.version, quotes.latestVersion)))
+    .leftJoin(
+      quoteVersions,
+      and(
+        eq(quoteVersions.quoteId, quotes.id),
+        eq(quoteVersions.version, quotes.latestVersion),
+        // Several alternatives can share the latest version. The list keeps one row: the highest A.
+        sql`${quoteVersions.alternative} = (
+          SELECT MAX(qv.alternative) FROM quote_versions qv
+          WHERE qv.quote_id = ${quotes.id} AND qv.version = ${quotes.latestVersion}
+        )`,
+      ),
+    )
     .where(eq(quotes.supplierCompanyId, companyId))
     .orderBy(desc(quotes.createdAt))
 
@@ -115,6 +126,8 @@ export const getQuoteVersion = async (
     .leftJoin(createdByUser, eq(createdByUser.id, quoteVersions.createdByUserId))
     .leftJoin(updatedByUser, eq(updatedByUser.id, quoteVersions.updatedByUserId))
     .where(and(eq(quoteVersions.quoteId, quoteId), eq(quoteVersions.version, version)))
+    // A version can have several alternatives. Callers that don't name one get A1 when it exists.
+    .orderBy(asc(quoteVersions.alternative))
   return row ? { ...row.version, createdByName: row.createdByName, updatedByName: row.updatedByName } : null
 }
 

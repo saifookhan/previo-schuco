@@ -47,15 +47,87 @@ export interface DashboardSourceQuote {
   customerName: string
   projectLocation: string | null
   totalPrice: string
+  /** Version number of the variant this row represents (the x in VxAy). */
   latestVersion: number
+  /** Alternative number of that variant (the y in VxAy). */
+  alternative: number
+  /** True when this variant is the quote's final / favorite. */
+  isFinal: boolean
   createdAt: Date
   updatedAt: Date
   sentAt: Date | null
   createdByUserId: string | null
   createdByName: string | null
-  /** Latest version document. Only read for sent and accepted quotes. */
+  /** Document of the counted variant. Only read for sent and accepted quotes. */
   document: unknown
 }
+
+/** One cell of a quote's V×A grid, before the dashboard picks a single variant. */
+export interface DashboardVariant {
+  version: number
+  alternative: number
+  isFinal: boolean
+  status: QuoteStatus
+  totalPrice: string
+  updatedAt: Date
+  sentAt: Date | null
+  document: unknown
+}
+
+export interface DashboardQuoteGroup {
+  id: string
+  reference: string
+  customerName: string
+  projectLocation: string | null
+  createdAt: Date
+  createdByUserId: string | null
+  createdByName: string | null
+  variants: DashboardVariant[]
+}
+
+/**
+ * The one variant a quote contributes to the dashboard.
+ * A variant marked final (the favorite) wins. Otherwise the open quote is the
+ * latest cell: highest version, then highest alternative on that version.
+ * Other versions and alternatives are not counted.
+ */
+export const pickDashboardVariant = <T extends { version: number; alternative: number; isFinal: boolean }>(
+  variants: readonly T[],
+): T | null => {
+  if (variants.length === 0) return null
+  const finals = variants.filter((variant) => variant.isFinal)
+  const pool = finals.length > 0 ? finals : variants
+  return pool.reduce((best, variant) => {
+    if (variant.version !== best.version) return variant.version > best.version ? variant : best
+    return variant.alternative > best.alternative ? variant : best
+  })
+}
+
+/** One dashboard row per quote, using {@link pickDashboardVariant}. Quotes with no variants are dropped. */
+export const collapseDashboardQuotes = (groups: readonly DashboardQuoteGroup[]): DashboardSourceQuote[] =>
+  groups.flatMap((group) => {
+    const variant = pickDashboardVariant(group.variants)
+    if (!variant) return []
+    return [
+      {
+        id: group.id,
+        reference: group.reference,
+        status: variant.status,
+        customerName: group.customerName,
+        projectLocation: group.projectLocation,
+        totalPrice: variant.totalPrice,
+        latestVersion: variant.version,
+        alternative: variant.alternative,
+        isFinal: variant.isFinal,
+        createdAt: group.createdAt,
+        updatedAt: variant.updatedAt,
+        sentAt: variant.sentAt,
+        createdByUserId: group.createdByUserId,
+        createdByName: group.createdByName,
+        document: variant.document,
+      },
+    ]
+  })
 
 export interface DashboardStatusEvent {
   quoteId: string
@@ -132,6 +204,8 @@ const toRef = (quote: DashboardSourceQuote): DashboardQuoteRef => ({
   projectLocation: quote.projectLocation,
   totalPrice: money(centsOf(quote.totalPrice)),
   latestVersion: quote.latestVersion,
+  alternative: quote.alternative,
+  isFinal: quote.isFinal,
   createdAt: quote.createdAt.toISOString(),
   updatedAt: quote.updatedAt.toISOString(),
   sentAt: quote.sentAt ? quote.sentAt.toISOString() : null,

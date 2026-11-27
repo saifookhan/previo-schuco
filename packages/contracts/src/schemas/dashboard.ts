@@ -51,7 +51,12 @@ export const dashboardQuoteRefSchema = z.object({
   customerName: z.string(),
   projectLocation: z.string().nullable(),
   totalPrice: z.string(),
+  /** The counted variant: final if one is marked, otherwise the highest version. */
   latestVersion: z.number().int(),
+  /** Alternative of that variant. The code is V{latestVersion}A{alternative}. */
+  alternative: z.number().int(),
+  /** True when this variant is the quote's final / favorite. */
+  isFinal: z.boolean(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   sentAt: z.string().datetime().nullable(),

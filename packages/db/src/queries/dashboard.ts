@@ -1,13 +1,25 @@
-import { and, asc, eq, getTableColumns, sql } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 
 import type { DbLike } from '../client'
 import { auditLog, productFamilies, quoteVersions, quotes, users } from '../schema'
-import type { QuoteRow } from './quotes'
+import type { QuoteStatusValue } from './quotes'
 
-export interface DashboardQuoteRow extends QuoteRow {
-  sentAt: Date | null
+export interface DashboardVariantRow {
+  quoteId: string
+  reference: string
+  customerName: string
+  projectLocation: string | null
+  createdAt: Date
+  createdByUserId: string | null
   createdByName: string | null
-  /** Latest version document when the quote is sent or accepted; null for drafts and rejected. */
+  version: number
+  alternative: number
+  isFinal: boolean
+  status: QuoteStatusValue
+  totalPrice: string
+  updatedAt: Date
+  sentAt: Date | null
+  /** Document when this variant is sent or accepted; null otherwise. */
   document: unknown
 }
 
@@ -28,25 +40,37 @@ export interface DashboardFamilyHealthRow {
 }
 
 /**
- * Every quote of `companyId`, with the creator's name, the latest version's
- * `sent_at`, and that version's document when the quote is sent or accepted.
- * Explicit company filter, same reason as `listQuotes`: a super-admin's RLS
- * policy would otherwise see every tenant.
+ * Every variant (VxAy) of every quote of `companyId`. The dashboard keeps one
+ * per quote — the final/favorite, or otherwise the highest version and alternative —
+ * so this returns the whole grid and the caller picks. Explicit company filter,
+ * same reason as `listQuotes`.
  */
-export const listDashboardQuotes = (db: DbLike, companyId: string, createdByUserId: string | null): Promise<DashboardQuoteRow[]> => {
+export const listDashboardQuotes = (db: DbLike, companyId: string, createdByUserId: string | null): Promise<DashboardVariantRow[]> => {
   const filters = [eq(quotes.supplierCompanyId, companyId)]
   if (createdByUserId) filters.push(eq(quotes.createdByUserId, createdByUserId))
   return db
     .select({
-      ...getTableColumns(quotes),
-      sentAt: quoteVersions.sentAt,
+      quoteId: quotes.id,
+      reference: quotes.reference,
+      customerName: quotes.customerName,
+      projectLocation: quotes.projectLocation,
+      createdAt: quotes.createdAt,
+      createdByUserId: quotes.createdByUserId,
       createdByName: users.name,
-      document: sql<unknown>`case when ${quotes.status} in ('sent', 'accepted') then ${quoteVersions.document} else null end`,
+      version: quoteVersions.version,
+      alternative: quoteVersions.alternative,
+      isFinal: quoteVersions.isFinal,
+      status: quoteVersions.status,
+      totalPrice: quoteVersions.totalPrice,
+      updatedAt: quoteVersions.updatedAt,
+      sentAt: quoteVersions.sentAt,
+      document: sql<unknown>`case when ${quoteVersions.status} in ('sent', 'accepted') then ${quoteVersions.document} else null end`,
     })
     .from(quotes)
-    .leftJoin(quoteVersions, and(eq(quoteVersions.quoteId, quotes.id), eq(quoteVersions.version, quotes.latestVersion)))
+    .innerJoin(quoteVersions, eq(quoteVersions.quoteId, quotes.id))
     .leftJoin(users, eq(users.id, quotes.createdByUserId))
     .where(and(...filters))
+    .orderBy(asc(quotes.createdAt), asc(quoteVersions.version), asc(quoteVersions.alternative))
 }
 
 /**

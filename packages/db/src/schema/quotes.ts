@@ -1,4 +1,5 @@
-import { index, integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+import { boolean, index, integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 import { companies } from './companies'
 import { users } from './users'
@@ -48,6 +49,14 @@ export const quoteVersions = pgTable(
       .notNull()
       .references(() => quotes.id, { onDelete: 'cascade' }),
     version: integer('version').notNull(),
+    /** Alternative within the version. The code is V{version}A{alternative} (V2A3). Existing rows are A1. */
+    alternative: integer('alternative').notNull().default(1),
+    /**
+     * The variant the dashboard treats as the chosen offer (final / favorite).
+     * At most one per quote. When none is set, the dashboard uses the highest
+     * version and, on that version, the highest alternative.
+     */
+    isFinal: boolean('is_final').notNull().default(false),
     status: quoteStatusEnum('status').notNull().default('draft'),
     /** A `QuoteDocument` (@schuco/contracts), validated by the API before it is stored. */
     document: jsonb('document').$type<Record<string, unknown>>().notNull(),
@@ -61,8 +70,9 @@ export const quoteVersions = pgTable(
     sentAt: timestamp('sent_at', { withTimezone: true }),
   },
   (table) => ({
-    // Loading a quote's versions, and one version by number.
-    quoteVersionIdx: uniqueIndex('quote_versions_quote_id_version_idx').on(table.quoteId, table.version),
+    // One cell of the V×A grid.
+    quoteVersionIdx: uniqueIndex('quote_versions_quote_id_version_alternative_idx').on(table.quoteId, table.version, table.alternative),
+    oneFinalIdx: uniqueIndex('quote_versions_one_final_idx').on(table.quoteId).where(sql`${table.isFinal}`),
   }),
 )
 

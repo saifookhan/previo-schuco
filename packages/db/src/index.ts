@@ -191,7 +191,7 @@ export {
   listDashboardQuotes,
   listDashboardStatusEvents,
   type DashboardFamilyHealthRow,
-  type DashboardQuoteRow,
+  type DashboardVariantRow,
   type DashboardStatusEventRow,
 } from './queries/dashboard'
 export {
