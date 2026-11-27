@@ -23,8 +23,17 @@ export const applyMigrationsAndRls = async (
 
   await migrate(db, { migrationsFolder: MIGRATIONS_DIR })
 
+  // `invoiced` is added in 0031. Postgres refuses to use a new enum value until that
+  // transaction commits, and Drizzle runs every migration in one transaction, so the
+  // existing sent/rejected rows are moved here, after migrate returns.
   const rlsSql = readFileSync(join(MIGRATIONS_DIR, '0001_rls.sql'), 'utf8')
   const rlsClient = postgres(connectionString, { max: 1 })
+  await rlsClient.unsafe(`
+    UPDATE "quotes" SET "status" = 'invoiced' WHERE "status" = 'sent';
+    UPDATE "quote_versions" SET "status" = 'invoiced' WHERE "status" = 'sent';
+    UPDATE "quotes" SET "status" = 'draft' WHERE "status" = 'rejected';
+    UPDATE "quote_versions" SET "status" = 'draft' WHERE "status" = 'rejected';
+  `)
   await rlsClient.unsafe(rlsSql)
   // ALTER ROLE is a utility statement — Postgres doesn't accept a bind
   // parameter ($1) in place of the password literal there (`syntax error

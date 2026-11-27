@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises'
 
 import {
   duplicateProductFamilyRequestSchema,
+  setArchivedRequestSchema,
+  setFavoriteRequestSchema,
   familySharesResponseSchema,
   priceValidityRequestSchema,
   productFamilyImportFieldsSchema,
@@ -22,6 +24,7 @@ import {
 import {
   ExcelImportError,
   PriceValidityOverlapError,
+  ProductFamilyForbiddenError,
   ProductFamilyHistoryForbiddenError,
   compareProductFamilyVersions,
   createNewVersionFromExcel,
@@ -35,6 +38,8 @@ import {
   importProductFamilyFromExcel,
   listProductFamilies,
   previewProductFamilyImport,
+  setProductFamilyArchived,
+  setProductFamilyFavorite,
   setProductFamilyHasPriceListStatus,
   setProductFamilyLibraryStatus,
   setProductFamilyPriceValidityDates,
@@ -53,7 +58,7 @@ import {
 } from '../lib/product-family-edit'
 import { rejectNonUuidParams } from '../lib/uuid'
 import type { AuthVariables } from '../middleware/auth'
-import { hasPermission, requireAuth, requirePermission } from '../middleware/auth'
+import { hasPermission, requireAuth, requirePermission, requireRoles } from '../middleware/auth'
 import { respondWithRecordHistory } from './record-history'
 
 /** Product family catalog: import from Excel, list/detail, duplicate, publish toggle (Phase 2). */
@@ -247,7 +252,11 @@ productFamilies.get('/', requireAuth, requirePermission('catalog.view'), async (
     effectiveCompanyId: c.get('effectiveCompanyId'),
     isSuperAdmin: c.get('isSuperAdmin'),
   }
-  const families = await listProductFamilies(ctx, { includeOutOfLibrary: await hasPermission(c, LIBRARY_PERMISSION) })
+  const includeRaw = c.req.query('includeArchived')
+  const families = await listProductFamilies(ctx, {
+    includeOutOfLibrary: await hasPermission(c, LIBRARY_PERMISSION),
+    includeArchived: includeRaw === '1' || includeRaw === 'true',
+  })
   return c.json({ families })
 })
 
@@ -512,6 +521,39 @@ productFamilies.patch('/:id/library', rejectNonUuidParams, requireAuth, requireP
     throw error
   }
   return c.json({ ok: true })
+})
+
+/** Marks or clears this company's favorite on one family version. */
+productFamilies.post('/:id/favorite', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const parsed = setFavoriteRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400)
+  const ctx = {
+    effectiveCompanyId: c.get('effectiveCompanyId'),
+    isSuperAdmin: c.get('isSuperAdmin'),
+  }
+  try {
+    return c.json(await setProductFamilyFavorite(ctx, actorFrom(c), c.req.param('id')!, parsed.data.favorite))
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Product family not found') return c.json({ error: 'Not found' }, 404)
+    throw error
+  }
+})
+
+/** Soft-deletes or restores one family version. Company admins and super admins of the owning company. */
+productFamilies.post('/:id/archive', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), requireRoles(['company-admin', 'super-admin']), async (c) => {
+  const parsed = setArchivedRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400)
+  const ctx = {
+    effectiveCompanyId: c.get('effectiveCompanyId'),
+    isSuperAdmin: c.get('isSuperAdmin'),
+  }
+  try {
+    return c.json(await setProductFamilyArchived(ctx, actorFrom(c), c.req.param('id')!, parsed.data.archived))
+  } catch (error) {
+    if (error instanceof ProductFamilyForbiddenError) return c.json({ error: error.message }, 403)
+    if (error instanceof Error && error.message === 'Product family not found') return c.json({ error: 'Not found' }, 404)
+    throw error
+  }
 })
 
 /** Permanently deletes a family and everything under it (lines, characteristics, matrices, images). */

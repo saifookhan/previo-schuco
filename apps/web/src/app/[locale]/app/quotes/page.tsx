@@ -1,28 +1,24 @@
 import { AlertTriangle, FileText } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 
-import { Badge } from '@/components/ui/badge'
+import { QuoteChat } from '@/components/quote-chat/quote-chat'
+import { QuoteFiltersBar } from '@/components/quote-filters'
+import { QuoteNewButton } from '@/components/quote-new-button'
+import { QuotesTable } from '@/components/quotes-table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingRegion, LoadingRegionProvider } from '@/components/ui/loading-region'
-import { Link } from '@/i18n/navigation'
 import { fetchFromApiResult } from '@/lib/api/server-client'
-import { QuoteChat } from '@/components/quote-chat/quote-chat'
-import { QuoteNewButton } from '@/components/quote-new-button'
-import { EUR } from '@/lib/format'
-import type { QuoteSummary } from '@schuco/contracts'
+import { parseQuoteListFilters, quoteListFiltersToApiQuery, type QuoteSummary } from '@schuco/contracts'
 
-const statusVariant = (status: QuoteSummary['status']): 'success' | 'muted' | 'warning' => {
-  if (status === 'accepted') return 'success'
-  if (status === 'sent' || status === 'rejected') return 'warning'
-  return 'muted'
-}
-
-/** Supplier's own quotes: create a new one, or open one at its latest version. */
-const QuotesPage = async () => {
+/** Supplier's own quotes. Filters, including archived, come from the URL. */
+const QuotesPage = async ({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) => {
+  const params = await searchParams
+  const filters = parseQuoteListFilters(params)
   const t = await getTranslations('quotes')
-  const result = await fetchFromApiResult<{ quotes: QuoteSummary[] }>('/api/sales-quotes')
+  const result = await fetchFromApiResult<{ quotes: QuoteSummary[] }>(`/api/sales-quotes${quoteListFiltersToApiQuery(filters)}`)
   const quotes = result.data?.quotes ?? []
   const loadFailed = result.status === 'error'
+  const filtered = filters.q !== '' || filters.status !== '' || filters.archived || filters.favorites
 
   return (
     <div className="p-6 md:p-8">
@@ -42,6 +38,8 @@ const QuotesPage = async () => {
           </div>
         ) : null}
 
+        <QuoteFiltersBar filters={filters} />
+
         <LoadingRegion>
           <Card>
             <CardHeader>
@@ -51,43 +49,10 @@ const QuotesPage = async () => {
               {quotes.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 px-6 py-16 text-center text-slate-400">
                   <FileText className="h-8 w-8" />
-                  <p className="text-sm">{t('emptyState')}</p>
+                  <p className="text-sm">{filtered ? t('noMatches') : t('emptyState')}</p>
                 </div>
               ) : (
-                <table className="w-full min-w-[880px] text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-left text-slate-500">
-                      <th className="px-6 py-3 font-medium">{t('reference')}</th>
-                      <th className="px-6 py-3 font-medium">{t('customer')}</th>
-                      <th className="px-6 py-3 font-medium">{t('project')}</th>
-                      <th className="px-6 py-3 font-medium">{t('version')}</th>
-                      <th className="px-6 py-3 font-medium">{t('status')}</th>
-                      <th className="px-6 py-3 font-medium">{t('total')}</th>
-                      <th className="px-6 py-3 font-medium">{t('created')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {quotes.map((quote) => (
-                      <tr key={quote.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                        <td className="px-6 py-4 font-medium text-slate-900">
-                          <Link href={`/app/quotes/${quote.id}`} className="hover:text-brand">
-                            {quote.reference}
-                          </Link>
-                        </td>
-                        <td className="px-6 py-4 text-slate-600">{quote.customerName}</td>
-                        <td className="px-6 py-4 text-slate-500">{quote.projectLocation ?? '—'}</td>
-                        <td className="px-6 py-4 text-slate-500">v{quote.latestVersion}</td>
-                        <td className="px-6 py-4">
-                          <Badge variant={statusVariant(quote.status)}>{t(`statusValue.${quote.status}`)}</Badge>
-                        </td>
-                        <td className="px-6 py-4 text-slate-600">{EUR.format(Number(quote.totalPrice))}</td>
-                        <td className="px-6 py-4 text-slate-500">
-                          {new Date(quote.createdAt).toLocaleDateString('it-IT')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <QuotesTable quotes={quotes} />
               )}
             </CardContent>
           </Card>

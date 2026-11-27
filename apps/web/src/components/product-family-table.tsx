@@ -1,15 +1,20 @@
 'use client'
 
-import { ChevronRight, ExternalLink } from 'lucide-react'
+import { ChevronRight, ExternalLink, Star } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Fragment, useState, type MouseEvent, type ReactNode } from 'react'
 
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ProductFamilyFlagSelect } from '@/components/product-family-flag-select'
 import { PriceValidityBadge, PriceValidityFields } from '@/components/product-family-price-validity'
 import { ProductFamilyPublishSwitch, ProductFamilyRowActions } from '@/components/product-family-row-actions'
 import { ProductFamilyShareButton } from '@/components/product-family-share-button'
+import { FamilyQuickLook, QuickLookButton } from '@/components/quick-look-dialog'
 import { Badge } from '@/components/ui/badge'
-import { Link } from '@/i18n/navigation'
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/use-auth'
+import { Link, useRouter } from '@/i18n/navigation'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import type { ProductFamilySummary } from '@/types/product-family'
 import type { PriceValidity } from '@schuco/contracts'
@@ -122,7 +127,7 @@ const ExpandedFamily = ({ family, tab }: { family: ProductFamilySummary; tab: 'o
             canEdit={tab === 'own'}
           />
           {tab === 'own' ? (
-            <div className="flex justify-start">
+            <div className="flex flex-wrap items-center justify-start gap-2">
               <ProductFamilyRowActions
                 familyId={family.id}
                 familyName={family.name}
@@ -133,6 +138,7 @@ const ExpandedFamily = ({ family, tab }: { family: ProductFamilySummary; tab: 'o
                 showDuplicate={false}
                 labeledDelete
               />
+              <ArchiveFamilyButton family={family} />
             </div>
           ) : null}
         </div>
@@ -236,6 +242,9 @@ export const ProductFamilyTable = ({
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                     </Link>
+                    <QuickLookButton label={t('quickLook')}>
+                      {(close) => <FamilyQuickLook familyId={family.id} onClose={close} />}
+                    </QuickLookButton>
                   </div>
                 </td>
                 <td className="min-w-[11rem] font-medium text-slate-900">
@@ -250,6 +259,8 @@ export const ProductFamilyTable = ({
                     >
                       {tVersion('short', { version: family.version })}
                     </Badge>
+                    <FavoriteFamilyButton family={family} />
+                    {family.archivedAt ? <Badge variant="warning">{t('archivedBadge')}</Badge> : null}
                   </div>
                 </td>
                 {shared ? <td className="text-slate-600">{family.ownerCompanyName ?? '—'}</td> : null}
@@ -301,5 +312,106 @@ export const ProductFamilyTable = ({
         })}
       </tbody>
     </table>
+  )
+}
+
+/** Marks this version as a favorite for the company. Other versions of the chain stay as they are. */
+const FavoriteFamilyButton = ({ family }: { family: ProductFamilySummary }) => {
+  const t = useTranslations('productFamilies')
+  const tVersion = useTranslations('productFamilyVersion')
+  const { can } = useAuth()
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const canEdit = can('catalog.edit')
+  const favorite = Boolean(family.isFavorite)
+  if (!canEdit && !favorite) return null
+  const code = tVersion('short', { version: family.version })
+
+  const toggle = async () => {
+    setBusy(true)
+    try {
+      const response = await fetch(`/api/product-families/${family.id}/favorite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorite: !favorite }),
+      })
+      if (!response.ok) {
+        showToast(t('favoriteFailed'), 'error')
+        return
+      }
+      router.refresh()
+    } catch {
+      showToast(t('favoriteFailed'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!canEdit) return <Star className="h-3.5 w-3.5 fill-sky-500 text-sky-500" aria-label={t('favorite', { code })} />
+
+  return (
+    <button
+      type="button"
+      aria-pressed={favorite}
+      aria-label={t(favorite ? 'unfavorite' : 'favorite', { code })}
+      disabled={busy}
+      onClick={(event) => {
+        event.stopPropagation()
+        void toggle()
+      }}
+      className="rounded p-0.5 text-slate-300 hover:bg-white hover:text-sky-500 disabled:opacity-50"
+    >
+      <Star className={cn('h-3.5 w-3.5', favorite && 'fill-sky-500 text-sky-500')} />
+    </button>
+  )
+}
+
+/** Soft-delete for company admins. Other versions of the chain stay as they are. */
+const ArchiveFamilyButton = ({ family }: { family: ProductFamilySummary }) => {
+  const t = useTranslations('productFamilies')
+  const { hasRole } = useAuth()
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  if (!hasRole('company-admin', 'super-admin')) return null
+  const archived = Boolean(family.archivedAt)
+
+  const confirm = async () => {
+    setBusy(true)
+    try {
+      const response = await fetch(`/api/product-families/${family.id}/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived: !archived }),
+      })
+      if (!response.ok) {
+        showToast(t('archiveFailed'), 'error')
+        return
+      }
+      setOpen(false)
+      router.refresh()
+    } catch {
+      showToast(t('archiveFailed'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <Button type="button" variant="outline" className="h-8 text-xs" onClick={() => setOpen(true)}>
+        {archived ? t('restore') : t('archive')}
+      </Button>
+      <ConfirmDialog
+        open={open}
+        title={archived ? t('restoreConfirmTitle') : t('archiveConfirmTitle')}
+        description={archived ? t('restoreConfirmDescription', { name: family.name }) : t('archiveConfirmDescription', { name: family.name })}
+        confirmLabel={archived ? t('restore') : t('archive')}
+        cancelLabel={t('cancel')}
+        busy={busy}
+        onConfirm={() => void confirm()}
+        onCancel={() => setOpen(false)}
+      />
+    </>
   )
 }

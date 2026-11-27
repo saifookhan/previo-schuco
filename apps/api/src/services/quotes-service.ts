@@ -18,16 +18,26 @@ import {
   listBusinessUnitsWithUsers,
   listProductFamilyVersionsOfChains,
   listQuoteRevisions,
-  listQuoteVersions,
   listQuotes,
+  listQuoteVersionRows,
+  listQuoteVariantsForQuotes,
+  listQuoteVersions,
   listSalesContacts,
   lockQuote,
   quoteExists,
+  setQuoteArchivedAt,
+  setQuoteVersionFavorite,
+  setQuoteVersionFinal,
+  setQuoteVersionLabel,
   setQuoteVersionStatus,
   updateQuoteSummary,
   updateQuoteVersionDocument,
+  userMayArchive,
   type DbLike,
+  type ListQuotesFilter,
   type QuoteRow,
+  type QuoteVariantListRow,
+  type QuoteVersionRow,
   type QuoteVersionWithUsers,
 } from '@schuco/db'
 import { computeCharacteristicPrice, computeLinePrice, type PricingMatrix } from '@schuco/calculation'
@@ -40,7 +50,9 @@ import {
   quoteTotal,
   type AuditLogListResponse,
   type ClosingBlock,
+  type CreateQuoteAlternativeRequest,
   type CreateSalesQuoteRequest,
+  type DuplicateSalesQuoteRequest,
   type PriceLinesRequest,
   type PricedLine,
   type QuoteChange,
@@ -53,8 +65,10 @@ import {
   type QuoteVersion,
   type RecordHistoryQuery,
   type QuotePrintData,
+  type QuoteVariantRef,
   type SalesQuoteDetailResponse,
   type SaveQuoteRequest,
+  type SetQuoteVariantLabelRequest,
 } from '@schuco/contracts'
 
 import { diffQuoteDocuments } from '../lib/quote-diff'
@@ -73,6 +87,9 @@ export class QuoteValidationError extends Error {}
 
 /** The version was saved by someone else since the caller loaded it (`baseRevision` is stale). */
 export class QuoteConflictError extends Error {}
+
+/** The caller can see the quote but isn't allowed to archive it. */
+export class QuoteForbiddenError extends Error {}
 
 type ProductFamilyDetail = NonNullable<Awaited<ReturnType<typeof getProductFamilyDetail>>>
 
@@ -125,6 +142,9 @@ const assertFamilyUsable = async (
   { isNew }: { isNew: boolean },
 ): Promise<void> => {
   if (isNew) {
+    if (family.archivedAt) {
+      throw new QuoteValidationError(`"${family.name}" is archived`)
+    }
     if (!(await isProductFamilyInLibrary(tx, companyId, family.id))) {
       throw new QuoteValidationError(`"${family.name}" is not in your company's library`)
     }
@@ -365,7 +385,19 @@ export const priceQuoteLines = (ctx: TenantContext, input: PriceLinesRequest): P
 
 // ── Reading ───────────────────────────────────────────────────────────────────
 
-const toSummary = (quote: QuoteRow): QuoteSummary => ({
+const toVariantRef = (row: QuoteVariantListRow): QuoteVariantRef => ({
+  id: row.id,
+  version: row.version,
+  alternative: row.alternative,
+  label: row.label,
+  isFinal: row.isFinal,
+  isFavorite: row.isFavorite,
+  status: row.status,
+  totalPrice: row.totalPrice,
+  updatedAt: row.updatedAt.toISOString(),
+})
+
+const toSummary = (quote: QuoteRow, variants: QuoteVariantListRow[]): QuoteSummary => ({
   id: quote.id,
   reference: quote.reference,
   status: quote.status,
@@ -373,14 +405,22 @@ const toSummary = (quote: QuoteRow): QuoteSummary => ({
   projectLocation: quote.projectLocation,
   totalPrice: quote.totalPrice,
   latestVersion: quote.latestVersion,
+  archivedAt: quote.archivedAt?.toISOString() ?? null,
+  variants: variants.map(toVariantRef),
   createdAt: quote.createdAt.toISOString(),
   updatedAt: quote.updatedAt.toISOString(),
+  sentAt: null,
+  createdByUserId: quote.createdByUserId,
 })
 
 const toVersion = (row: QuoteVersionWithUsers): QuoteVersion => ({
   id: row.id,
   quoteId: row.quoteId,
   version: row.version,
+  alternative: row.alternative,
+  label: row.label,
+  isFinal: row.isFinal,
+  isFavorite: row.isFavorite,
   status: row.status,
   revision: row.revision,
   document: quoteDocumentSchema.parse(row.document),
@@ -451,38 +491,72 @@ const familyStatuses = async (tx: DbLike, companyId: string, document: QuoteDocu
   })
 }
 
+/**
+ * The alternative to open when the caller didn't name one: the lowest that exists on that
+ * version. A new version copies only one cell, so alternative 1 of the latest version may be empty.
+ */
+const alternativeOnVersion = async (
+  tx: DbLike,
+  quoteId: string,
+  versionNumber: number,
+  alternativeNumber: number | undefined,
+): Promise<number> => {
+  if (alternativeNumber !== undefined) return alternativeNumber
+  const alternatives = (await listQuoteVersionRows(tx, quoteId))
+    .filter((row) => row.version === versionNumber)
+    .map((row) => row.alternative)
+  return alternatives.length > 0 ? Math.min(...alternatives) : 1
+}
+
 const loadDetail = async (
   tx: DbLike,
   companyId: string,
   quote: QuoteRow,
   versionNumber: number,
+  alternativeNumber = 1,
 ): Promise<SalesQuoteDetailResponse | null> => {
-  const version = await getQuoteVersion(tx, quote.id, versionNumber)
+  const version = await getQuoteVersion(tx, quote.id, versionNumber, alternativeNumber)
   if (!version) return null
   const dto = toVersion(version)
+  const variants = await listQuoteVersions(tx, quote.id)
   return {
-    quote: toSummary(quote),
-    versions: (await listQuoteVersions(tx, quote.id)).map((v) => ({
-      id: v.id,
-      version: v.version,
-      status: v.status,
-      totalPrice: v.totalPrice,
-      updatedAt: v.updatedAt.toISOString(),
-    })),
+    quote: toSummary(quote, variants),
+    versions: variants.map(toVariantRef),
     version: dto,
     familyStatus: await familyStatuses(tx, companyId, dto.document),
   }
 }
 
-export const listMyQuotes = (ctx: TenantContext): Promise<QuoteSummary[]> =>
-  withTenantDb(ctx, async (tx) => (await listQuotes(tx, ctx.effectiveCompanyId)).map(toSummary))
+export const listMyQuotes = (ctx: TenantContext, filter: ListQuotesFilter & { favorites?: boolean } = {}): Promise<QuoteSummary[]> =>
+  withTenantDb(ctx, async (tx) => {
+    const rows = await listQuotes(tx, ctx.effectiveCompanyId, filter)
+    const variants = await listQuoteVariantsForQuotes(tx, rows.map((row) => row.id))
+    const byQuote = new Map<string, QuoteVariantListRow[]>()
+    for (const variant of variants) {
+      const list = byQuote.get(variant.quoteId) ?? []
+      list.push(variant)
+      byQuote.set(variant.quoteId, list)
+    }
+    const summaries = rows.map((row) => toSummary(row, byQuote.get(row.id) ?? []))
+    return filter.favorites ? summaries.filter((quote) => quote.variants.some((variant) => variant.isFavorite)) : summaries
+  })
 
-/** A quote with one of its versions (the latest by default); null when the quote or the version doesn't exist or isn't visible. */
-export const getQuote = (ctx: TenantContext, quoteId: string, versionNumber?: number): Promise<SalesQuoteDetailResponse | null> =>
+/**
+ * A quote with one variant. With no alternative, that is the lowest one on the requested version
+ * (the latest version when none is named). Null when the quote or that variant doesn't exist or
+ * isn't visible. An archived quote still loads, so a direct link works.
+ */
+export const getQuote = (
+  ctx: TenantContext,
+  quoteId: string,
+  versionNumber?: number,
+  alternativeNumber?: number,
+): Promise<SalesQuoteDetailResponse | null> =>
   withTenantDb(ctx, async (tx) => {
     const quote = await getQuoteRow(tx, quoteId)
     if (!quote) return null
-    return loadDetail(tx, ctx.effectiveCompanyId, quote, versionNumber ?? quote.latestVersion)
+    const version = versionNumber ?? quote.latestVersion
+    return loadDetail(tx, ctx.effectiveCompanyId, quote, version, await alternativeOnVersion(tx, quote.id, version, alternativeNumber))
   })
 
 // ── Creating ──────────────────────────────────────────────────────────────────
@@ -670,20 +744,76 @@ const prepareDocument = async (
   }
 }
 
-const mirrorLatest = (tx: DbLike, quoteId: string, latestVersion: number, status: QuoteStatus, document: QuoteDocument, totalPrice: string) =>
-  updateQuoteSummary(tx, quoteId, {
-    status,
+/**
+ * The quotes list follows the lowest alternative that exists on the highest version, so a
+ * version that only promoted V2A2 still has a row to show.
+ */
+const syncQuoteMirror = async (tx: DbLike, quoteId: string): Promise<void> => {
+  const rows = await listQuoteVersionRows(tx, quoteId)
+  if (rows.length === 0) return
+  const latestVersion = Math.max(...rows.map((row) => row.version))
+  const head = rows
+    .filter((row) => row.version === latestVersion)
+    .sort((a, b) => a.alternative - b.alternative)[0]
+  if (!head) return
+  const document = quoteDocumentSchema.parse(head.document)
+  await updateQuoteSummary(tx, quoteId, {
+    status: head.status,
     customerName: document.header.customerName,
     projectLocation: document.header.projectLocation,
-    totalPrice,
+    totalPrice: head.totalPrice,
     latestVersion,
   })
+}
 
 /**
- * Saves the builder's document. `update` fixes the version in place as its next revision (a
- * draft only); `newVersion` stores it as the quote's next version, a draft, and leaves this one
- * as it was. Either way the full document and what changed are kept in the history.
- * @throws {QuoteValidationError} no such version, a non-draft fixed in place, or an invalid document
+ * Copies one variant to the next version, same alternative (V1A2 → V2A2). The other alternatives
+ * are not created. Refuses when that cell already exists.
+ */
+const insertPromotedVariant = async (
+  tx: DbLike,
+  actor: QuoteActor,
+  quoteId: string,
+  source: QuoteVersionRow,
+  document: QuoteDocument,
+  totalPrice: string,
+  changes: QuoteChange[],
+): Promise<number> => {
+  const targetVersion = source.version + 1
+  const taken = (await listQuoteVersionRows(tx, quoteId)).some(
+    (row) => row.version === targetVersion && row.alternative === source.alternative,
+  )
+  if (taken) {
+    throw new QuoteValidationError(`V${targetVersion}A${source.alternative} already exists`)
+  }
+  const created = await insertQuoteVersion(tx, {
+    quoteId,
+    version: targetVersion,
+    alternative: source.alternative,
+    label: source.label,
+    status: 'draft',
+    document,
+    totalPrice,
+    createdByUserId: actor.actorUserId,
+  })
+  await insertQuoteRevision(tx, {
+    quoteVersionId: created.id,
+    revision: 1,
+    document,
+    totalPrice,
+    changes,
+    fromVersion: source.version,
+    fromAlternative: source.alternative,
+    savedByUserId: actor.actorUserId,
+  })
+  await syncQuoteMirror(tx, quoteId)
+  return targetVersion
+}
+
+/**
+ * Saves the builder's document. `update` fixes this variant in place (drafts only). `newVersion`
+ * copies only this alternative to the next version (V1A2 → V2A2) and leaves every other cell empty.
+ * @throws {QuoteValidationError} no such version, a non-draft fixed in place, the next cell already exists, or an invalid document
  * @throws {QuoteConflictError} someone saved the version after `baseRevision`
  */
 export const saveQuoteVersion = async (
@@ -724,56 +854,37 @@ export const saveQuoteVersion = async (
         totalPrice,
         changes,
         fromVersion: null,
+        fromAlternative: null,
         savedByUserId: actor.actorUserId,
       })
       savedVersion = version.version
-      if (version.version === quote.latestVersion) {
-        await mirrorLatest(tx, quoteId, quote.latestVersion, version.status, document, totalPrice)
-      }
+      await syncQuoteMirror(tx, quoteId)
     } else {
-      savedVersion = quote.latestVersion + 1
-      const created = await insertQuoteVersion(tx, {
-        quoteId,
-        version: savedVersion,
-        status: 'draft',
-        document,
-        totalPrice,
-        createdByUserId: actor.actorUserId,
-      })
-      await insertQuoteRevision(tx, {
-        quoteVersionId: created.id,
-        revision: 1,
-        document,
-        totalPrice,
-        changes,
-        fromVersion: version.version,
-        savedByUserId: actor.actorUserId,
-      })
-      await mirrorLatest(tx, quoteId, savedVersion, 'draft', document, totalPrice)
+      // Only this alternative moves forward: V1A2 becomes V2A2. The other columns stay empty.
+      savedVersion = await insertPromotedVariant(tx, actor, quoteId, version, document, totalPrice, changes)
     }
 
     await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
       action: input.mode === 'update' ? 'quote.save' : 'quote.new_version',
       resourceType: 'quote',
       resourceId: quoteId,
-      metadata: { version: savedVersion, fromVersion: input.mode === 'update' ? undefined : version.version, changes: changes.length },
+      metadata: {
+        version: savedVersion,
+        alternative: version.alternative,
+        fromVersion: input.mode === 'update' ? undefined : version.version,
+        changes: changes.length,
+      },
     })
     const fresh = await getQuoteRow(tx, quoteId)
-    return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, savedVersion))!
+    return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, savedVersion, version.alternative))!
   })
 
-/** Allowed status changes: a draft is sent; a sent version is accepted or rejected (or sent again after being reopened is not possible — make a new version). */
-const NEXT_STATUSES: Record<QuoteStatus, QuoteStatus[]> = {
-  draft: ['sent'],
-  sent: ['accepted', 'rejected'],
-  accepted: ['rejected'],
-  rejected: ['accepted'],
-}
+const QUOTE_STATUSES: QuoteStatus[] = ['draft', 'invoiced', 'accepted']
 
 /**
- * Marks a version sent, accepted or rejected. A draft can only be sent while all of its catalog
- * families have prices valid today and are published (an expired one must be replaced first).
- * @throws {QuoteValidationError} no such version, a change that isn't allowed, or a family that can't price today
+ * Sets a variant to draft, invoiced or accepted. Leaving draft (invoicing or accepting) requires
+ * every catalog family to have prices valid today. Only a draft can be edited in place.
+ * @throws {QuoteValidationError} no such version, the same status again, or a family that can't price today
  */
 export const setQuoteVersionStatusById = async (
   ctx: TenantContext,
@@ -787,11 +898,16 @@ export const setQuoteVersionStatusById = async (
     if (!quote) throw new QuoteValidationError('Quote not found')
     const version = await getQuoteVersionById(tx, quoteId, versionId)
     if (!version) throw new QuoteValidationError('Version not found')
-    if (!NEXT_STATUSES[version.status].includes(status)) {
-      throw new QuoteValidationError(`A ${version.status} version can't be marked ${status}`)
+    if (!QUOTE_STATUSES.includes(status)) {
+      throw new QuoteValidationError('Status must be draft, invoiced, or accepted')
+    }
+    if (status === version.status) {
+      throw new QuoteValidationError(`This version is already ${status}`)
     }
     const document = quoteDocumentSchema.parse(version.document)
-    if (status === 'sent') {
+    // Leaving a draft (to invoiced or accepted) still needs catalog families that can price today.
+    // A quote already invoiced can be accepted later, even after those prices expire.
+    if (version.status === 'draft' && (status === 'invoiced' || status === 'accepted')) {
       const blocked = (await familyStatuses(tx, ctx.effectiveCompanyId, document)).find((family) => family.status !== 'current')
       if (blocked) {
         throw new QuoteValidationError(
@@ -805,20 +921,258 @@ export const setQuoteVersionStatusById = async (
     }
     await setQuoteVersionStatus(tx, version.id, {
       status,
-      sentAt: status === 'sent' ? new Date() : version.sentAt,
+      sentAt: status === 'invoiced' ? new Date() : version.sentAt,
       updatedByUserId: actor.actorUserId,
     })
-    if (version.version === quote.latestVersion) {
-      await mirrorLatest(tx, quoteId, quote.latestVersion, status, document, version.totalPrice)
-    }
+    await syncQuoteMirror(tx, quoteId)
     await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
       action: 'quote.set_status',
       resourceType: 'quote',
       resourceId: quoteId,
-      metadata: { version: version.version, from: version.status, to: status },
+      metadata: { version: version.version, alternative: version.alternative, from: version.status, to: status },
     })
     const fresh = await getQuoteRow(tx, quoteId)
-    return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, version.version))!
+    return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, version.version, version.alternative))!
+  })
+
+const assertMayArchive = async (tx: DbLike, actor: QuoteActor): Promise<void> => {
+  if (!(await userMayArchive(tx, actor.actorUserId))) {
+    throw new QuoteForbiddenError('Only a company admin can archive a quote')
+  }
+}
+
+/** Soft-deletes or restores a quote. The versions stay; the list hides it until archived is included. */
+export const setQuoteArchived = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  quoteId: string,
+  archived: boolean,
+): Promise<{ archivedAt: string | null }> =>
+  withTenantDb(ctx, async (tx) => {
+    await assertMayArchive(tx, actor)
+    const quote = await getQuoteRow(tx, quoteId)
+    if (!quote) throw new QuoteValidationError('Quote not found')
+    const archivedAt = archived ? new Date() : null
+    await setQuoteArchivedAt(tx, quoteId, archivedAt)
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: archived ? 'quote.archive' : 'quote.restore',
+      resourceType: 'quote',
+      resourceId: quoteId,
+    })
+    return { archivedAt: archivedAt?.toISOString() ?? null }
+  })
+
+/**
+ * Copies the document open in the editor as the next alternative of the same version (V1A2, V1A3, …).
+ * A new draft with no label. The source variant is left as it was.
+ */
+export const createQuoteAlternative = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  quoteId: string,
+  versionId: string,
+  input: CreateQuoteAlternativeRequest,
+): Promise<SalesQuoteDetailResponse> =>
+  withTenantDb(ctx, async (tx) => {
+    const quote = await lockQuote(tx, quoteId)
+    if (!quote) throw new QuoteValidationError('Quote not found')
+    const version = await getQuoteVersionById(tx, quoteId, versionId)
+    if (!version) throw new QuoteValidationError('Version not found')
+    const previous = quoteDocumentSchema.parse(version.document)
+    const document = await prepareDocument(tx, ctx.effectiveCompanyId, input.document, previous)
+    const totalPrice = quoteTotal(document).toFixed(2)
+    const used = new Set(
+      (await listQuoteVersionRows(tx, quoteId)).filter((row) => row.version === version.version).map((row) => row.alternative),
+    )
+    let alternative = version.alternative + 1
+    while (used.has(alternative)) alternative += 1
+    const created = await insertQuoteVersion(tx, {
+      quoteId,
+      version: version.version,
+      alternative,
+      label: null,
+      status: 'draft',
+      document,
+      totalPrice,
+      createdByUserId: actor.actorUserId,
+    })
+    await insertQuoteRevision(tx, {
+      quoteVersionId: created.id,
+      revision: 1,
+      document,
+      totalPrice,
+      changes: diffQuoteDocuments(previous, document),
+      fromVersion: version.version,
+      fromAlternative: version.alternative,
+      savedByUserId: actor.actorUserId,
+    })
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: 'quote.new_alternative',
+      resourceType: 'quote',
+      resourceId: quoteId,
+      metadata: { version: version.version, alternative, fromAlternative: version.alternative },
+    })
+    const fresh = await getQuoteRow(tx, quoteId)
+    return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, version.version, alternative))!
+  })
+
+/**
+ * Copies a saved variant into the next version, same alternative. Used by the matrix: hovering
+ * a cell creates the one below it, and hovering an empty cell copies the one above into it.
+ * The stored document is copied; unsaved editor changes are not.
+ */
+export const promoteQuoteVariant = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  quoteId: string,
+  versionId: string,
+): Promise<SalesQuoteDetailResponse> =>
+  withTenantDb(ctx, async (tx) => {
+    const quote = await lockQuote(tx, quoteId)
+    if (!quote) throw new QuoteValidationError('Quote not found')
+    const version = await getQuoteVersionById(tx, quoteId, versionId)
+    if (!version) throw new QuoteValidationError('Version not found')
+    const document = quoteDocumentSchema.parse(version.document)
+    const targetVersion = await insertPromotedVariant(tx, actor, quoteId, version, document, version.totalPrice, [])
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: 'quote.new_version',
+      resourceType: 'quote',
+      resourceId: quoteId,
+      metadata: { version: targetVersion, alternative: version.alternative, fromVersion: version.version },
+    })
+    const fresh = await getQuoteRow(tx, quoteId)
+    return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, targetVersion, version.alternative))!
+  })
+
+/** Marks or clears a favorite on this variant. The final offer, and the other variants, stay as they are. */
+export const setQuoteVariantFavorite = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  quoteId: string,
+  versionId: string,
+  favorite: boolean,
+): Promise<SalesQuoteDetailResponse> =>
+  withTenantDb(ctx, async (tx) => {
+    const quote = await getQuoteRow(tx, quoteId)
+    if (!quote) throw new QuoteValidationError('Quote not found')
+    const version = await getQuoteVersionById(tx, quoteId, versionId)
+    if (!version) throw new QuoteValidationError('Version not found')
+    await setQuoteVersionFavorite(tx, version.id, favorite)
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: favorite ? 'quote.favorite' : 'quote.unfavorite',
+      resourceType: 'quote',
+      resourceId: quoteId,
+      metadata: { version: version.version, alternative: version.alternative },
+    })
+    const fresh = await getQuoteRow(tx, quoteId)
+    return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, version.version, version.alternative))!
+  })
+
+/** Marks this variant as the one the dashboard shows. Any previous final on the quote is cleared. */
+export const setQuoteVariantFinal = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  quoteId: string,
+  versionId: string,
+): Promise<SalesQuoteDetailResponse> =>
+  withTenantDb(ctx, async (tx) => {
+    const quote = await getQuoteRow(tx, quoteId)
+    if (!quote) throw new QuoteValidationError('Quote not found')
+    const version = await getQuoteVersionById(tx, quoteId, versionId)
+    if (!version) throw new QuoteValidationError('Version not found')
+    await setQuoteVersionFinal(tx, quoteId, version.id)
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: 'quote.final',
+      resourceType: 'quote',
+      resourceId: quoteId,
+      metadata: { version: version.version, alternative: version.alternative },
+    })
+    const fresh = await getQuoteRow(tx, quoteId)
+    return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, version.version, version.alternative))!
+  })
+
+/** Sets the name shown next to the variant code. Does not change the document. */
+export const setQuoteVariantLabelById = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  quoteId: string,
+  versionId: string,
+  input: SetQuoteVariantLabelRequest,
+): Promise<SalesQuoteDetailResponse> =>
+  withTenantDb(ctx, async (tx) => {
+    const quote = await getQuoteRow(tx, quoteId)
+    if (!quote) throw new QuoteValidationError('Quote not found')
+    const version = await getQuoteVersionById(tx, quoteId, versionId)
+    if (!version) throw new QuoteValidationError('Version not found')
+    await setQuoteVersionLabel(tx, version.id, input.label)
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: 'quote.label',
+      resourceType: 'quote',
+      resourceId: quoteId,
+      metadata: { version: version.version, alternative: version.alternative, label: input.label },
+    })
+    const fresh = await getQuoteRow(tx, quoteId)
+    return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, version.version, version.alternative))!
+  })
+
+/**
+ * A new quote whose only variant is V1A1, copied from one specific variant. The new reference is
+ * the caller's; the label travels with the copy.
+ */
+export const duplicateQuoteVariant = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  quoteId: string,
+  input: DuplicateSalesQuoteRequest,
+): Promise<SalesQuoteDetailResponse> =>
+  withTenantDb(ctx, async (tx) => {
+    const sourceQuote = await getQuoteRow(tx, quoteId)
+    if (!sourceQuote) throw new QuoteValidationError('Quote not found')
+    const source = await getQuoteVersionById(tx, quoteId, input.versionId)
+    if (!source) throw new QuoteValidationError('Version not found')
+    const document = quoteDocumentSchema.parse(source.document)
+    const totalPrice = source.totalPrice
+    const newQuoteId = await insertQuote(tx, {
+      supplierCompanyId: ctx.effectiveCompanyId,
+      createdByUserId: actor.actorUserId,
+      reference: input.reference,
+      customerName: document.header.customerName,
+      projectLocation: document.header.projectLocation,
+      totalPrice,
+    })
+    const created = await insertQuoteVersion(tx, {
+      quoteId: newQuoteId,
+      version: 1,
+      alternative: 1,
+      label: source.label,
+      status: 'draft',
+      document,
+      totalPrice,
+      createdByUserId: actor.actorUserId,
+    })
+    await insertQuoteRevision(tx, {
+      quoteVersionId: created.id,
+      revision: 1,
+      document,
+      totalPrice,
+      changes: [],
+      fromVersion: null,
+      fromAlternative: null,
+      savedByUserId: actor.actorUserId,
+    })
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: 'quote.duplicate',
+      resourceType: 'quote',
+      resourceId: newQuoteId,
+      metadata: {
+        reference: input.reference,
+        fromQuoteId: quoteId,
+        fromVersion: source.version,
+        fromAlternative: source.alternative,
+      },
+    })
+    const quote = await getQuoteRow(tx, newQuoteId)
+    return (await loadDetail(tx, ctx.effectiveCompanyId, quote!, 1, 1))!
   })
 
 // ── History ───────────────────────────────────────────────────────────────────
@@ -835,6 +1189,7 @@ export const getQuoteRevisions = (ctx: TenantContext, quoteId: string, versionId
       totalPrice: row.totalPrice,
       changes: row.changes as QuoteChange[],
       fromVersion: row.fromVersion,
+      fromAlternative: row.fromAlternative,
     }))
   })
 
@@ -857,6 +1212,7 @@ export const getQuoteRevisionDetail = (
       totalPrice: row.totalPrice,
       changes: row.changes as QuoteChange[],
       fromVersion: row.fromVersion,
+      fromAlternative: row.fromAlternative,
       document: quoteDocumentSchema.parse(row.document),
     }
   })
@@ -882,11 +1238,17 @@ export const getQuoteHistory = (
 
 
 /** Everything the printed quote shows: the version, the company's fiscal data, the branch and the sales contact. */
-export const getQuotePrintData = (ctx: TenantContext, quoteId: string, versionNumber?: number): Promise<QuotePrintData | null> =>
+export const getQuotePrintData = (
+  ctx: TenantContext,
+  quoteId: string,
+  versionNumber?: number,
+  alternativeNumber?: number,
+): Promise<QuotePrintData | null> =>
   withTenantDb(ctx, async (tx) => {
     const quote = await getQuoteRow(tx, quoteId)
     if (!quote) return null
-    const row = await getQuoteVersion(tx, quoteId, versionNumber ?? quote.latestVersion)
+    const openedVersion = versionNumber ?? quote.latestVersion
+    const row = await getQuoteVersion(tx, quoteId, openedVersion, await alternativeOnVersion(tx, quoteId, openedVersion, alternativeNumber))
     if (!row) return null
     const version = toVersion(row)
     const profile = await getCompanyProfile(tx, quote.supplierCompanyId)
@@ -897,7 +1259,7 @@ export const getQuotePrintData = (ctx: TenantContext, quoteId: string, versionNu
     // Only the logo of the branch heading the pages.
     const logoDataUrl = unit ? await getBusinessUnitLogo(tx, quote.supplierCompanyId, unit.id) : null
     return {
-      quote: toSummary(quote),
+      quote: toSummary(quote, await listQuoteVersions(tx, quote.id)),
       version,
       company: {
         name: profile?.name ?? '',

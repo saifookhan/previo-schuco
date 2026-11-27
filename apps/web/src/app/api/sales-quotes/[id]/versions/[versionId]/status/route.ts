@@ -2,7 +2,7 @@ import type { NextResponse } from 'next/server'
 
 import { proxyJson } from '@/lib/api/proxy-patch'
 
-/** Marks a version sent, accepted or rejected. */
+/** Marks a variant draft, invoiced, or accepted. */
 export const POST = async (
   request: Request,
   { params }: { params: Promise<{ id: string; versionId: string }> },

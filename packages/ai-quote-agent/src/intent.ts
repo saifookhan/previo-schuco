@@ -116,7 +116,7 @@ export const phrases = {
     invalidSize: 'La misura non è valida. Servono larghezza e altezza in millimetri interi, maggiori di zero.',
     needBoth: 'Manca una dimensione. Indica larghezza e altezza in mm.',
     paymentsSum: 'Le percentuali non fanno 100. Completa i pagamenti: non invento il resto.',
-    badTransition: 'Da bozza si può solo passare a inviato. Accettato e rifiutato arrivano dopo l’invio.',
+    badTransition: 'Questa variante ha già quello stato. Puoi scegliere bozza, fatturato o accettato.',
     conflict: 'Il preventivo è stato salvato altrove. Ho ricaricato i dati: ripeti la modifica.',
     restored: 'Annullata l’ultima modifica. Ripristinata la revisione',
     noPrevious: 'Non c’è una revisione precedente da ripristinare.',
@@ -154,7 +154,7 @@ export const phrases = {
     invalidSize: 'That size is not valid. Width and height must be whole millimetres greater than zero.',
     needBoth: 'One dimension is missing. Give both width and height in mm.',
     paymentsSum: 'Those percentages do not add up to 100. Complete the payments. I will not fill in the rest.',
-    badTransition: 'A draft can only be marked sent. Accepted and rejected come after it is sent.',
+    badTransition: 'This variant already has that status. Choose draft, invoiced, or accepted.',
     conflict: 'The quote was saved somewhere else. I reloaded it: please retry the edit.',
     restored: 'Undid the last edit. Restored revision',
     noPrevious: 'There is no previous revision to restore.',
@@ -192,7 +192,7 @@ export const phrases = {
     invalidSize: 'Das Maß ist ungültig. Breite und Höhe müssen ganze Millimeter größer als null sein.',
     needBoth: 'Eine Seite fehlt. Gib Breite und Höhe in mm an.',
     paymentsSum: 'Die Prozente ergeben nicht 100. Ergänze die Zahlungen. Den Rest erfinde ich nicht.',
-    badTransition: 'Ein Entwurf kann nur als gesendet markiert werden. Angenommen und abgelehnt geht erst danach.',
+    badTransition: 'Diese Variante hat diesen Status bereits. Wähle Entwurf, fakturiert oder angenommen.',
     conflict: 'Das Angebot wurde anderswo gespeichert. Ich habe es neu geladen: bitte die Änderung wiederholen.',
     restored: 'Letzte Änderung rückgängig. Revision wiederhergestellt',
     noPrevious: 'Es gibt keine vorherige Revision zum Wiederherstellen.',
@@ -354,14 +354,14 @@ export const wantsPreviousRevision = (text: string): boolean =>
   wantsUndo(text) || /revisione precedente|previous revision|vorherige\s+revision|torna alla revisione/i.test(text)
 
 const STATUS_WORD = {
-  it: { draft: 'bozza', sent: 'inviato', accepted: 'accettato', rejected: 'rifiutato' },
-  en: { draft: 'draft', sent: 'sent', accepted: 'accepted', rejected: 'rejected' },
-  de: { draft: 'Entwurf', sent: 'gesendet', accepted: 'angenommen', rejected: 'abgelehnt' },
+  it: { draft: 'bozza', invoiced: 'fatturato', accepted: 'accettato' },
+  en: { draft: 'draft', invoiced: 'invoiced', accepted: 'accepted' },
+  de: { draft: 'Entwurf', invoiced: 'fakturiert', accepted: 'angenommen' },
 } as const
 
 export const statusWord = (locale: ChatLocale, status: string): string => {
   const words = STATUS_WORD[locale]
-  if (status === 'draft' || status === 'sent' || status === 'accepted' || status === 'rejected') return words[status]
+  if (status === 'draft' || status === 'invoiced' || status === 'accepted') return words[status]
   return status
 }
 

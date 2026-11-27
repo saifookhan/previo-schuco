@@ -27,7 +27,9 @@ Every environment already has one: **Demo Window W70** (see [Demo data](../demo-
 | Publish / unpublish | **Status (published)** switch in the expanded row (button on the family's page) | The row shows Published or Draft. Only published families can be shared |
 | New version | **New version** on the family's page | Same dialog as an import; the new version gets its own price validity and the old one keeps its dates |
 | Duplicate | Copy icon on the row | A dialog asks for the copy's name, price validity and whether to publish it (starts from the original's dates, unpublished) |
-| Delete | **Delete** inside the expanded row (button on the family's page) | |
+| Delete | **Delete** inside the expanded row (button on the family's page) | Removes that version |
+| Archive | **Archive** inside the expanded row, next to delete | Company admins and super admins. Hides that version only; a newer version stays. The list shows it again when **Archived** is ticked. A family already on a quote may stay |
+| Favorite | The star next to the version badge | This company's mark on that version (`V2` does not favorite `V1`). A shared family can be a favorite here without changing the owner's list. **Favorites** on the filter bar shows only those versions |
 | Change price validity | **Valid from** and **Valid to** inside the expanded row, then **Save** (or **Edit** on the family's page) | Owner (or super-admin) only. The **Validity dates** column shows the dates as DD.MM.YYYY |
 | Ready for invoicing | Tag in the **Tags** column when it is on; switch in the expanded row (Yes/No on the family's page) | Only families ready for invoicing are offered in the quote builder. Owner only |
 | With price list | Tag in the **Tags** column when it is on; switch in the expanded row (Yes/No on the family's page) | Whether there are prices behind the family — shown in the quote builder. Owner only |
@@ -141,6 +143,8 @@ Above the list, for the tab you're on:
 - **Price validity** — *Valid today* (what the quote builder offers; families without dates count), *Upcoming*, *Expired*, *No dates*.
 - **Ready for invoicing** (under *More filters*) — Yes / No.
 - **With price list** and **In library** (under *More filters*) — Yes / No.
+- **Favorites** — off by default. Tick it to show only versions this company has marked with the star.
+- **Archived** — off by default. Tick it to show versions a company admin has archived.
 - **More filters** — *Prices valid on* a given day, *Updated from / to*, *Latest versions only* (hides versions a newer one replaces); on *Shared with me* also **Owner** and **Your discount** (with / without).
 - **Sort** — newest first (default), recently updated, name, prices ending soonest.
 

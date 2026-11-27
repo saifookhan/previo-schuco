@@ -27,6 +27,9 @@ import {
   createNewVersionFromExcel,
   getProductFamilyDetail,
   importProductFamilyFromExcel,
+  listProductFamilies,
+  setProductFamilyArchived,
+  setProductFamilyFavorite,
   setProductFamilyLibraryStatus,
   setProductFamilyPriceValidityDates,
   setProductFamilyPublishedStatus,
@@ -34,15 +37,23 @@ import {
 } from '../src/services/product-families-service'
 import {
   QuoteConflictError,
+  QuoteForbiddenError,
   QuoteValidationError,
   createQuote,
+  createQuoteAlternative,
+  duplicateQuoteVariant,
   getQuote,
   getQuotePrintData,
   getQuoteRevisionDetail,
   getQuoteRevisions,
   listMyQuotes,
   priceQuoteLines,
+  promoteQuoteVariant,
   saveQuoteVersion,
+  setQuoteArchived,
+  setQuoteVariantFavorite,
+  setQuoteVariantFinal,
+  setQuoteVariantLabelById,
   setQuoteVersionStatusById,
 } from '../src/services/quotes-service'
 
@@ -365,23 +376,23 @@ describe('saving a version', () => {
     expect(await getQuoteRevisionDetail(ctx(), quote.quote.id, quote.version.id, 99)).toBeNull()
   })
 
-  it('a sent version is never changed in place: its edits become the next version, a draft', async () => {
+  it('an invoiced version is never changed in place: its edits become the next version, a draft', async () => {
     const family = await importFreshFamily()
     const line = await matrixLineOf(family.id)
     const quote = await newQuote('TEST-Q-SVC-VERSIONS')
     const draft = await save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] })
-    const sent = await setQuoteVersionStatusById(ctx(), actor, quote.quote.id, draft.version.id, 'sent')
-    expect(sent.version).toMatchObject({ status: 'sent', sentAt: expect.any(String) })
-    expect(sent.quote.status).toBe('sent')
+    const invoiced = await setQuoteVersionStatusById(ctx(), actor, quote.quote.id, draft.version.id, 'invoiced')
+    expect(invoiced.version).toMatchObject({ status: 'invoiced', sentAt: expect.any(String) })
+    expect(invoiced.quote.status).toBe('invoiced')
 
-    const edited = { families: [{ ...sent.version.document.families[0], name: 'Finestre bis' }] }
-    await expect(save(sent, edited)).rejects.toThrow(/save your changes as a new version/)
-    const v2 = await save(sent, edited, 'newVersion')
-    expect(v2.version).toMatchObject({ version: 2, status: 'draft', revision: 1 })
+    const edited = { families: [{ ...invoiced.version.document.families[0], name: 'Finestre bis' }] }
+    await expect(save(invoiced, edited)).rejects.toThrow(/save your changes as a new version/)
+    const v2 = await save(invoiced, edited, 'newVersion')
+    expect(v2.version).toMatchObject({ version: 2, alternative: 1, status: 'draft', revision: 1 })
     expect(v2.quote).toMatchObject({ latestVersion: 2, status: 'draft' })
-    expect(v2.versions.map((v) => [v.version, v.status])).toEqual([
-      [1, 'sent'],
-      [2, 'draft'],
+    expect(v2.versions.map((v) => [v.version, v.alternative, v.status])).toEqual([
+      [1, 1, 'invoiced'],
+      [2, 1, 'draft'],
     ])
     expect((await getQuoteRevisions(ctx(), quote.quote.id, v2.version.id))![0]).toMatchObject({
       fromVersion: 1,
@@ -390,7 +401,7 @@ describe('saving a version', () => {
 
     const v1 = await getQuote(ctx(), quote.quote.id, 1)
     expect(v1!.version.document.families[0].name).toBe('Finestre')
-    await expect(setQuoteVersionStatusById(ctx(), actor, quote.quote.id, draft.version.id, 'sent')).rejects.toThrow(/can't be marked sent/)
+    await expect(setQuoteVersionStatusById(ctx(), actor, quote.quote.id, draft.version.id, 'invoiced')).rejects.toThrow(/already invoiced/)
     expect((await setQuoteVersionStatusById(ctx(), actor, quote.quote.id, draft.version.id, 'accepted')).version.status).toBe('accepted')
     // v1 isn't the latest, so the list keeps showing v2's status.
     expect((await getQuote(ctx(), quote.quote.id))!.quote.status).toBe('draft')
@@ -496,7 +507,7 @@ describe('price validity', () => {
       expect.objectContaining({ productFamilyId: family.id, status: 'expired', priceValidTo: '2020-12-31', replacement: null }),
     ])
     await expect(save(expired, {})).rejects.toThrow(/expired on 2020-12-31: switch to a newer version/)
-    await expect(setQuoteVersionStatusById(ctx(), actor, quote.quote.id, saved.version.id, 'sent')).rejects.toThrow(/expired on 2020-12-31/)
+    await expect(setQuoteVersionStatusById(ctx(), actor, quote.quote.id, saved.version.id, 'invoiced')).rejects.toThrow(/expired on 2020-12-31/)
     const [priced] = await priceQuoteLines(ctx(), {
       lines: [{ key: 'a', productFamilyId: family.id, productLineId: line.id, widthMm: 1000, heightMm: 800, options: [] }],
     })
@@ -521,12 +532,12 @@ describe('price validity', () => {
     expect(switched.version.document.families[0].lines[0].unitPrice).toBeCloseTo(CATALOG_UNIT_PRICE, 4)
   })
 
-  it('a sent version keeps its prices after its family expires', async () => {
+  it('an invoiced version keeps its prices after its family expires', async () => {
     const family = await importFreshFamily()
     const line = await matrixLineOf(family.id)
     const quote = await newQuote('TEST-Q-SVC-SENT-EXPIRED')
     const saved = await save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] })
-    await setQuoteVersionStatusById(ctx(), actor, quote.quote.id, saved.version.id, 'sent')
+    await setQuoteVersionStatusById(ctx(), actor, quote.quote.id, saved.version.id, 'invoiced')
     await setProductFamilyPriceValidityDates(ctx(), actor, family.id, { priceValidFrom: '2020-01-01', priceValidTo: '2020-12-31' })
     const later = (await getQuote(ctx(), quote.quote.id))!
     expect(later.version.totalPrice).toBe(saved.version.totalPrice)
@@ -558,5 +569,97 @@ describe('listMyQuotes', () => {
     const asClient = (await listMyQuotes({ effectiveCompanyId: linkedClientCompanyId, isSuperAdmin: true })).map((q) => q.reference)
     expect(asClient).toContain('TEST-Q-SVC-LIST-CLIENT')
     expect(asClient).not.toContain('TEST-Q-SVC-LIST-SUPPLIER')
+  })
+})
+
+describe('alternatives, final and archive', () => {
+  it('copies one cell forward, then fills the empty cell from the one above', async () => {
+    const quote = await newQuote('TEST-Q-SVC-MATRIX')
+    const a2 = await createQuoteAlternative(ctx(), actor, quote.quote.id, quote.version.id, { document: quote.version.document })
+    expect(a2.version).toMatchObject({ version: 1, alternative: 2, label: null, isFinal: false, status: 'draft' })
+    const labeled = await setQuoteVariantLabelById(ctx(), actor, quote.quote.id, a2.version.id, { label: 'Wood' })
+    const promoted = await promoteQuoteVariant(ctx(), actor, quote.quote.id, labeled.version.id)
+    expect(promoted.version).toMatchObject({ version: 2, alternative: 2, label: 'Wood', status: 'draft', isFinal: false })
+    expect(promoted.versions.map((variant) => [variant.version, variant.alternative])).toEqual([
+      [1, 1],
+      [1, 2],
+      [2, 2],
+    ])
+    // The latest version has no A1, so opening the quote lands on V2A2.
+    expect((await getQuote(ctx(), quote.quote.id))!.version).toMatchObject({ version: 2, alternative: 2 })
+    const filled = await promoteQuoteVariant(ctx(), actor, quote.quote.id, quote.version.id)
+    expect(filled.version).toMatchObject({ version: 2, alternative: 1 })
+    expect(filled.versions.map((variant) => [variant.version, variant.alternative])).toEqual([
+      [1, 1],
+      [1, 2],
+      [2, 1],
+      [2, 2],
+    ])
+    await expect(promoteQuoteVariant(ctx(), actor, quote.quote.id, labeled.version.id)).rejects.toThrow(/V2A2 already exists/)
+
+    await setQuoteVariantFinal(ctx(), actor, quote.quote.id, quote.version.id)
+    const final = await setQuoteVariantFinal(ctx(), actor, quote.quote.id, labeled.version.id)
+    expect(final.versions.filter((variant) => variant.isFinal).map((variant) => [variant.version, variant.alternative])).toEqual([[1, 2]])
+
+    const favorite = await setQuoteVariantFavorite(ctx(), actor, quote.quote.id, labeled.version.id, true)
+    expect(favorite.versions.filter((variant) => variant.isFavorite).map((variant) => [variant.version, variant.alternative])).toEqual([[1, 2]])
+    const stillFinal = favorite.versions.find((variant) => variant.isFinal)
+    expect(stillFinal).toMatchObject({ version: 1, alternative: 2, isFavorite: true })
+    expect(favorite.versions.find((variant) => variant.version === 2 && variant.alternative === 2)?.isFavorite).toBe(false)
+    expect((await listMyQuotes(ctx(), { favorites: true })).map((row) => row.id)).toContain(quote.quote.id)
+    await setQuoteVariantFavorite(ctx(), actor, quote.quote.id, labeled.version.id, false)
+    expect((await listMyQuotes(ctx(), { favorites: true })).map((row) => row.id)).not.toContain(quote.quote.id)
+
+    const copy = await duplicateQuoteVariant(ctx(), actor, quote.quote.id, { versionId: labeled.version.id, reference: 'TEST-Q-SVC-MATRIX-COPY' })
+    expect(copy.version).toMatchObject({ version: 1, alternative: 1, label: 'Wood' })
+    expect(copy.versions).toHaveLength(1)
+    expect(copy.quote.reference).toBe('TEST-Q-SVC-MATRIX-COPY')
+  })
+
+  it('lets a company admin archive a quote, and refuses a sales user', async () => {
+    const quote = await newQuote('TEST-Q-SVC-ARCHIVE')
+    const [sales] = await withSystemTransaction(db, async (tx) => {
+      await tx.insert(roles).values({ id: 'user', name: 'User', description: 'test role' }).onConflictDoNothing({ target: roles.id })
+      return tx
+        .insert(users)
+        .values({
+          cognitoSub: 'quote-svc-test-sales',
+          email: 'quote-svc-test-sales@example.com',
+          name: 'Sales Associate',
+          companyId: supplierCompanyId,
+          roleId: 'user',
+          status: 'active',
+        })
+        .returning({ id: users.id })
+    })
+    try {
+      const salesActor = { actorUserId: sales.id, actorCompanyId: supplierCompanyId, requestId: 'test-request' }
+      await expect(setQuoteArchived(ctx(), salesActor, quote.quote.id, true)).rejects.toBeInstanceOf(QuoteForbiddenError)
+      const archived = await setQuoteArchived(ctx(), actor, quote.quote.id, true)
+      expect(archived.archivedAt).toEqual(expect.any(String))
+      expect((await listMyQuotes(ctx())).map((row) => row.id)).not.toContain(quote.quote.id)
+      expect((await listMyQuotes(ctx(), { includeArchived: true })).map((row) => row.id)).toContain(quote.quote.id)
+      expect((await getQuote(ctx(), quote.quote.id))!.quote.archivedAt).toEqual(expect.any(String))
+    } finally {
+      await withSystemTransaction(db, (tx) => tx.delete(users).where(eq(users.id, sales.id)))
+    }
+  })
+
+  it('archives one family version and leaves the newer one on the list', async () => {
+    const family = await importFreshFamily()
+    const newer = await createNewVersionFromExcel(ctx(), actor, family.id, fixtureFile, { readyForInvoicing: true })
+    await setProductFamilyArchived(ctx(), actor, family.id, true)
+    const visible = (await listProductFamilies(ctx())).map((row) => row.id)
+    expect(visible).not.toContain(family.id)
+    expect(visible).toContain(newer.id)
+    const archived = (await listProductFamilies(ctx(), { includeArchived: true })).find((row) => row.id === family.id)
+    expect(archived?.archivedAt).toBeInstanceOf(Date)
+
+    await setProductFamilyFavorite(ctx(), actor, newer.id, true)
+    const listed = await listProductFamilies(ctx())
+    expect(listed.find((row) => row.id === newer.id)?.isFavorite).toBe(true)
+    expect(listed.find((row) => row.id === family.id)?.isFavorite).not.toBe(true)
+    await setProductFamilyFavorite(ctx(), actor, newer.id, false)
+    expect((await listProductFamilies(ctx())).find((row) => row.id === newer.id)?.isFavorite).toBe(false)
   })
 })

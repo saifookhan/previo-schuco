@@ -261,10 +261,10 @@ export const QUOTE_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'set_quote_status',
-    description: 'Mark the open version sent, accepted, or rejected. Requires a confirm token. A draft can only become sent. A sent version can be accepted or rejected. Do not offer an invalid transition.',
+    description: 'Mark the open variant draft, invoiced, or accepted. Requires a confirm token. Any of the three can be chosen, except the status it already has. Only a draft can be edited in place.',
     parameters: {
       type: 'object',
-      properties: { status: { type: 'string', enum: ['draft', 'sent', 'accepted', 'rejected'] }, confirmToken: { type: 'string' } },
+      properties: { status: { type: 'string', enum: ['draft', 'invoiced', 'accepted'] }, confirmToken: { type: 'string' } },
       required: ['status'],
     },
   },
