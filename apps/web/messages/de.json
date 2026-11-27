@@ -985,7 +985,10 @@
     "activities": "Leistungen",
     "included": "Inbegriffen",
     "notIncluded": "Nicht inbegriffen",
-    "images": "Bilder"
+    "images": "Bilder",
+    "chooseImagesHint": "Wählen Sie die Fotos, die im PDF erscheinen sollen.",
+    "includeImage": "{title} ins PDF aufnehmen",
+    "chooseImagesFailed": "Die Fotoauswahl konnte nicht gespeichert werden"
   },
   "adminCompanies": {
     "title": "Unternehmen",

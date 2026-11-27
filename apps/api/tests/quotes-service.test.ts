@@ -567,12 +567,22 @@ describe('printing', () => {
     await uploadProductFamilyImage(ctx(), actor, family.id, { buffer: png, mimeType: 'image/png' })
     const quote = await newQuote('TEST-Q-SVC-PRINT-IMAGES')
     const line = await matrixLineOf(family.id)
-    await save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] })
+    const saved = await save(quote, { families: [familyOf(family.id, [catalogLine(line.id)])] })
     const data = (await getQuotePrintData(ctx(), quote.quote.id))!
     const images = data.familyImages.filter((image) => image.productFamilyId === family.id)
     expect(images.map((image) => image.sortOrder)).toEqual([0, 1, 2, 3])
     expect(images.filter((image) => image.sortOrder < 3)).toHaveLength(3)
     expect(images.find((image) => image.sortOrder === 3)?.title).toBeNull()
+
+    const hidden = images.find((image) => image.sortOrder === 1)!
+    const chosen = await save(saved, {
+      printSettings: { ...saved.version.document.printSettings, excludedImageIds: [hidden.id] },
+    })
+    expect(chosen.version.document.printSettings.excludedImageIds).toEqual([hidden.id])
+    // The preview still receives every photo, so an unticked one can be ticked again.
+    const again = (await getQuotePrintData(ctx(), quote.quote.id))!
+    expect(again.version.document.printSettings.excludedImageIds).toEqual([hidden.id])
+    expect(again.familyImages.some((image) => image.id === hidden.id)).toBe(true)
   })
 })
 

@@ -7,6 +7,7 @@ import {
   lineNetUnitPrice,
   lineTotal,
   lineTotalM2,
+  isEditableQuoteStatus,
   quoteDocumentSchema,
   quoteTotal,
   totalsByCategory,
@@ -25,6 +26,9 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type R
 
 import { previewStorageKey } from '@/components/quote-editor/preview-storage'
 import { DECIMAL, EUR } from '@/lib/format'
+import { showToast } from '@/lib/toast'
+
+import { QuoteImageChoices, type PrintImageChoice } from './quote-image-choices'
 
 // ── A4 dimensions (as the client's preview) ──────────────────────────────────
 const MM2PX = 96 / 25.4
@@ -223,9 +227,16 @@ const familyImageSrc = (image: QuotePrintFamilyImage): string =>
   `/api/product-families/${image.productFamilyId}/images/${image.id}`
 
 /** Managed pictures (the first three slots) sit with the family; the rest are collected for the end. */
-const imagesFor = (familyImages: QuotePrintFamilyImage[], productFamilyId: string | null, managed: boolean): QuotePrintFamilyImage[] =>
+const imagesFor = (
+  familyImages: QuotePrintFamilyImage[],
+  productFamilyId: string | null,
+  managed: boolean,
+  excluded: ReadonlySet<string>,
+): QuotePrintFamilyImage[] =>
   productFamilyId
-    ? familyImages.filter((image) => image.productFamilyId === productFamilyId && (image.sortOrder < 3) === managed)
+    ? familyImages.filter(
+        (image) => image.productFamilyId === productFamilyId && (image.sortOrder < 3) === managed && !excluded.has(image.id),
+      )
     : []
 
 /** A row of family pictures. `compact` is the strip at the end of the document. */
@@ -258,6 +269,7 @@ const PrintImages = ({ images, compact = false }: { images: QuotePrintFamilyImag
 /** The printed quote as a flat list of blocks, to be laid out on A4 pages. */
 const buildContentItems = (document: QuoteDocument, reference: string, t: T, familyImages: QuotePrintFamilyImage[]): ContentItem[] => {
   const settings = document.printSettings
+  const excluded = new Set(settings.excludedImageIds ?? [])
   const items: ContentItem[] = []
   const total = quoteTotal(document)
 
@@ -326,7 +338,7 @@ const buildContentItems = (document: QuoteDocument, reference: string, t: T, fam
           {settings.showFamilyDescription && family.description ? (
             <p style={{ fontSize: '8.5px', color: '#64748b', marginBottom: '4px', lineHeight: 1.4, whiteSpace: 'pre-line' }}>{family.description}</p>
           ) : null}
-          {settings.showImages ? <PrintImages images={imagesFor(familyImages, family.productFamilyId, true)} /> : null}
+          {settings.showImages ? <PrintImages images={imagesFor(familyImages, family.productFamilyId, true, excluded)} /> : null}
           <ColHeader settings={settings} t={t} />
         </div>
       ),
@@ -531,7 +543,7 @@ const buildContentItems = (document: QuoteDocument, reference: string, t: T, fam
 
   if (settings.showImages) {
     const groups = document.families.flatMap((family) => {
-      const images = imagesFor(familyImages, family.productFamilyId, false)
+      const images = imagesFor(familyImages, family.productFamilyId, false, excluded)
       return images.length > 0 ? [{ family, images }] : []
     })
     if (groups.length > 0) {
@@ -579,6 +591,9 @@ const Paginated = ({
   unit,
   contact,
   familyImages,
+  imageChoices,
+  onToggleImage,
+  imageChoiceDisabled,
 }: {
   document: QuoteDocument
   reference: string
@@ -586,6 +601,9 @@ const Paginated = ({
   unit: BusinessUnit | null
   contact: SalesContact | null
   familyImages: QuotePrintFamilyImage[]
+  imageChoices: PrintImageChoice[]
+  onToggleImage: (imageId: string) => void
+  imageChoiceDisabled: boolean
 }) => {
   const t = useTranslations('quotePrint')
   const items = useMemo(() => buildContentItems(document, reference, t, familyImages), [document, reference, t, familyImages])
@@ -658,6 +676,17 @@ const Paginated = ({
             {t('close')}
           </button>
         </div>
+        {document.printSettings.showImages && imageChoices.length > 0 ? (
+          <div className="mx-auto max-w-[1200px] border-t border-slate-100 px-6 py-3">
+            <QuoteImageChoices
+              images={imageChoices}
+              excludedIds={document.printSettings.excludedImageIds ?? []}
+              disabled={imageChoiceDisabled}
+              layout="row"
+              onToggle={onToggleImage}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -726,8 +755,10 @@ export const QuotePrintView = ({
   const t = useTranslations('quotePrint')
   const [document, setDocument] = useState<QuoteDocument | null>(unsaved ? null : data.version.document)
   const [failed, setFailed] = useState(false)
+  const [savingChoice, setSavingChoice] = useState(false)
   const [familyImages, setFamilyImages] = useState(data.familyImages)
   const requestedFamilies = useRef(new Set(data.familyImages.map((image) => image.productFamilyId)))
+  const revisionRef = useRef(data.version.revision)
 
   useEffect(() => {
     if (!unsaved) return
@@ -802,5 +833,66 @@ export const QuotePrintView = ({
   const settings = shown.printSettings
   const unit = unsaved ? (businessUnits.find((u) => u.id === settings.businessUnitId) ?? businessUnits[0] ?? null) : data.businessUnit
   const contact = unsaved ? (salesContacts.find((c) => c.id === settings.salesContactUserId) ?? null) : data.salesContact
-  return <Paginated document={shown} reference={data.quote.reference} company={data.company} unit={unit} contact={contact} familyImages={familyImages} />
+  const familyNameById = new Map(shown.families.flatMap((family) => (family.productFamilyId ? [[family.productFamilyId, family.name] as const] : [])))
+  const imageChoices: PrintImageChoice[] = familyImages
+    .map((image) => ({
+      id: image.id,
+      productFamilyId: image.productFamilyId,
+      title: image.title,
+      familyName: familyNameById.get(image.productFamilyId) ?? '',
+      sortOrder: image.sortOrder,
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id))
+
+  const toggleImage = async (imageId: string) => {
+    if (!document || savingChoice) return
+    const excluded = document.printSettings.excludedImageIds ?? []
+    const excludedImageIds = excluded.includes(imageId) ? excluded.filter((id) => id !== imageId) : [...excluded, imageId]
+    const updated: QuoteDocument = { ...document, printSettings: { ...document.printSettings, excludedImageIds } }
+    setDocument(updated)
+    if (unsaved) {
+      try {
+        window.sessionStorage.setItem(previewStorageKey(data.quote.id), JSON.stringify(updated))
+      } catch {
+        // The open preview still shows the choice; only a reload would lose it.
+      }
+      return
+    }
+    if (!isEditableQuoteStatus(data.version.status)) return
+    setSavingChoice(true)
+    try {
+      const response = await fetch(`/api/sales-quotes/${data.quote.id}/versions/${data.version.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document: updated, mode: 'update', baseRevision: revisionRef.current }),
+      })
+      if (!response.ok) {
+        setDocument(document)
+        showToast(t('chooseImagesFailed'))
+        return
+      }
+      const next = (await response.json()) as { version: { revision: number; document: QuoteDocument } }
+      revisionRef.current = next.version.revision
+      setDocument(next.version.document)
+    } catch {
+      setDocument(document)
+      showToast(t('chooseImagesFailed'))
+    } finally {
+      setSavingChoice(false)
+    }
+  }
+
+  return (
+    <Paginated
+      document={shown}
+      reference={data.quote.reference}
+      company={data.company}
+      unit={unit}
+      contact={contact}
+      familyImages={familyImages}
+      imageChoices={imageChoices}
+      onToggleImage={(imageId) => void toggleImage(imageId)}
+      imageChoiceDisabled={savingChoice}
+    />
+  )
 }

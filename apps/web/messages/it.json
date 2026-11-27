@@ -985,7 +985,10 @@
     "activities": "Attività",
     "included": "Incluse",
     "notIncluded": "Non incluse",
-    "images": "Immagini"
+    "images": "Immagini",
+    "chooseImagesHint": "Seleziona le foto da inserire nel PDF.",
+    "includeImage": "Includi {title} nel PDF",
+    "chooseImagesFailed": "Impossibile salvare la scelta delle foto"
   },
   "adminCompanies": {
     "title": "Aziende",

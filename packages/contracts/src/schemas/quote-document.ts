@@ -146,6 +146,11 @@ export const quotePrintSettingsSchema = z.object({
   showTotal: z.boolean(),
   showPayments: z.boolean(),
   showActivities: z.boolean(),
+  /**
+   * Photos left out of the PDF. Missing or empty means every uploaded photo prints
+   * (managed ones with the family, the rest at the end) while `showImages` is on.
+   */
+  excludedImageIds: z.array(z.string().uuid()).default([]),
 })
 export type QuotePrintSettings = z.infer<typeof quotePrintSettingsSchema>
 
@@ -163,6 +168,7 @@ export const defaultQuotePrintSettings: QuotePrintSettings = {
   showTotal: true,
   showPayments: true,
   showActivities: true,
+  excludedImageIds: [],
 }
 
 export const quoteDocumentSchema = z.object({

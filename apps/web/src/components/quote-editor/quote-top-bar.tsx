@@ -5,8 +5,9 @@ import * as Popover from '@radix-ui/react-popover'
 import { quoteVariantCode, type BusinessUnit, type QuoteHeader, type QuotePrintSettings, type QuoteStatus, type QuoteVersionRef, type SalesContact } from '@schuco/contracts'
 import { Check, ChevronDown, Eye, FileDown, History, LayoutGrid, Loader2, Pencil, Save, SlidersHorizontal, Star } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 
+import { QuoteImageChoices, type PrintImageChoice } from '@/components/quote-print/quote-image-choices'
 import { EUR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -24,7 +25,7 @@ const CheckBox = ({ checked }: { checked: boolean }) => (
 
 const SectionLabel = ({ label }: { label: string }) => <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">{label}</p>
 
-type PrintFlag = Exclude<keyof QuotePrintSettings, 'salesContactUserId' | 'businessUnitId'>
+type PrintFlag = Exclude<keyof QuotePrintSettings, 'salesContactUserId' | 'businessUnitId' | 'excludedImageIds'>
 
 const PRINT_FLAGS: { key: PrintFlag; label: string }[] = [
   { key: 'showSalesContact', label: 'printSalesContact' },
@@ -107,8 +108,11 @@ export interface QuoteTopBarProps {
   saving: boolean
   /** Why the quote can't be saved or printed right now (e.g. an expired family without a newer version). */
   blockedReason: string | null
+  /** Uploaded photos of the families on this quote. Empty until those families have loaded. */
+  imageChoices: PrintImageChoice[]
   onHeaderChange: (header: QuoteHeader) => void
   onPrintSettingsChange: (settings: QuotePrintSettings) => void
+  onToggleImage: (imageId: string) => void
   onPreview: () => void
   onSave: () => void
   onOpenHistory: () => void
@@ -353,20 +357,31 @@ export const QuoteTopBar = (props: QuoteTopBarProps) => {
                   {PRINT_FLAGS.map((flag) => {
                     const forced = flag.key === 'showDiscount' && props.discountRequired
                     return (
-                      <button
-                        key={flag.key}
-                        type="button"
-                        disabled={props.readOnly}
-                        onClick={() => toggle(flag.key)}
-                        title={forced ? t('discountRequiredTitle') : undefined}
-                        className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] transition-colors ${forced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700 hover:bg-slate-50'}`}
-                      >
-                        <CheckBox checked={forced || printSettings[flag.key]} />
-                        <span className="flex items-center gap-1.5">
-                          {t(flag.label)}
-                          {forced ? <span className="text-[10px] italic text-slate-400">{t('required')}</span> : null}
-                        </span>
-                      </button>
+                      <Fragment key={flag.key}>
+                        <button
+                          type="button"
+                          disabled={props.readOnly}
+                          onClick={() => toggle(flag.key)}
+                          title={forced ? t('discountRequiredTitle') : undefined}
+                          className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] transition-colors ${forced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700 hover:bg-slate-50'}`}
+                        >
+                          <CheckBox checked={forced || printSettings[flag.key]} />
+                          <span className="flex items-center gap-1.5">
+                            {t(flag.label)}
+                            {forced ? <span className="text-[10px] italic text-slate-400">{t('required')}</span> : null}
+                          </span>
+                        </button>
+                        {flag.key === 'showImages' && printSettings.showImages && props.imageChoices.length > 0 ? (
+                          <div className="px-3 pb-2">
+                            <QuoteImageChoices
+                              images={props.imageChoices}
+                              excludedIds={printSettings.excludedImageIds ?? []}
+                              disabled={props.readOnly}
+                              onToggle={props.onToggleImage}
+                            />
+                          </div>
+                        ) : null}
+                      </Fragment>
                     )
                   })}
                 </Popover.Content>

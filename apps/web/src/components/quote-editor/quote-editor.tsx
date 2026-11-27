@@ -31,6 +31,8 @@ import { previewStorageKey } from './preview-storage'
 import { catalogPricingKey, emptyFamily, familyFromCatalog, switchFamilyVersion } from './catalog'
 import { QuoteEditorProvider, type LinePriceErrors } from './context'
 import { QuoteClosing } from './quote-closing'
+import { type PrintImageChoice } from '@/components/quote-print/quote-image-choices'
+
 import { QuoteFamilyCard } from './quote-family-card'
 import { QuoteFamilyPicker } from './quote-family-picker'
 import { QuoteHistoryPanel } from './quote-history-panel'
@@ -536,6 +538,32 @@ export const QuoteEditor = ({ initialDetail, families, profile, initialTemplates
   }
 
   const discountRequired = shown.families.some((family) => family.lines.some((line) => line.discountPct !== 0))
+  const imageChoices = useMemo((): PrintImageChoice[] => {
+    const choices: PrintImageChoice[] = []
+    for (const family of shown.families) {
+      if (!family.productFamilyId) continue
+      const detail = catalog[family.productFamilyId]
+      if (!detail) continue
+      for (const image of detail.images) {
+        if (!image.localPath) continue
+        choices.push({
+          id: image.id,
+          productFamilyId: family.productFamilyId,
+          title: image.title,
+          familyName: family.name,
+          sortOrder: image.sortOrder,
+        })
+      }
+    }
+    return choices.sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id))
+  }, [shown.families, catalog])
+  const togglePrintImage = (imageId: string) => {
+    setDocument((current) => {
+      const excluded = current.printSettings.excludedImageIds ?? []
+      const excludedImageIds = excluded.includes(imageId) ? excluded.filter((id) => id !== imageId) : [...excluded, imageId]
+      return { ...current, printSettings: { ...current.printSettings, excludedImageIds } }
+    })
+  }
   const contextValue = useMemo(
     () => ({ readOnly, catalog, familyStatus, priceErrors, pricing, templates, saveTemplate }),
     [readOnly, catalog, familyStatus, priceErrors, pricing, templates, saveTemplate],
@@ -550,6 +578,8 @@ export const QuoteEditor = ({ initialDetail, families, profile, initialTemplates
             header={shown.header}
             total={total}
             printSettings={{ ...shown.printSettings, showDiscount: shown.printSettings.showDiscount || discountRequired }}
+            imageChoices={imageChoices}
+            onToggleImage={togglePrintImage}
             discountRequired={discountRequired}
             salesContacts={profile?.salesContacts ?? []}
             businessUnits={profile?.businessUnits ?? []}

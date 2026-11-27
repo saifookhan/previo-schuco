@@ -53,7 +53,8 @@ Chi stampa come **referente** (*Vostro referente*: nome, email, telefono), quale
 (se il referente lavora per più unità) e quali parti stampare: referente, **immagini**, descrizioni delle famiglie, caratteristiche
 delle righe, dettaglio per prodotto, raggruppamento per categoria, totale offerta, piano di pagamento, attività,
 colonne Extra % e Sconto %. **Immagini** mostra le tre foto gestite di ogni famiglia insieme a quella famiglia, e le
-altre insieme alla fine. I preventivi nuovi nascono con l'opzione attiva. La colonna sconto è obbligatoria se una riga ha uno sconto.
+altre insieme alla fine. Ogni foto ha una casella nell'anteprima e sotto **Immagini**; nel PDF entrano solo quelle
+selezionate. I preventivi nuovi nascono con tutte le foto selezionate. La colonna sconto è obbligatoria se una riga ha uno sconto.
 
 Intestazione, piè di pagina e referenti vengono da **Impostazioni → Azienda**: dati fiscali, unità locali (logo fino a
 512 KB, colore, indirizzo, email, telefono, utenti), telefono di ogni utente e testi salvati.

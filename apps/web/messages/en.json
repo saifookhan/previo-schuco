@@ -985,7 +985,10 @@
     "activities": "Activities",
     "included": "Included",
     "notIncluded": "Not included",
-    "images": "Images"
+    "images": "Images",
+    "chooseImagesHint": "Tick the photos that should appear in the PDF.",
+    "includeImage": "Include {title} in the PDF",
+    "chooseImagesFailed": "Could not save which photos appear in the PDF"
   },
   "adminCompanies": {
     "title": "Companies",

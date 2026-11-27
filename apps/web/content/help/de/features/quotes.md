@@ -54,7 +54,8 @@ Wer als **Ansprechpartner** gedruckt wird (*Vostro referente*: Name, E-Mail, Tel
 Seiten führt (wenn der Ansprechpartner für mehrere arbeitet) und welche Teile gedruckt werden: Ansprechpartner,
 **Bilder**, Familienbeschreibungen, Merkmale der Zeilen, Details nach Produkt, Gruppierung nach Kategorie, Angebotssumme,
 Zahlungsplan, Leistungen, Spalten Extra % und Rabatt %. **Bilder** zeigt die drei verwalteten Fotos jeder Familie bei
-dieser Familie und die weiteren Fotos gemeinsam am Ende. Neue Angebote starten mit der Option an. Die Rabattspalte ist Pflicht, solange eine Zeile einen Rabatt hat.
+dieser Familie und die weiteren Fotos gemeinsam am Ende. Jedes Foto hat ein Kontrollkästchen in der Vorschau und unter
+**Bilder**; nur die angehakten erscheinen im PDF. Neue Angebote starten mit allen Fotos angehakt. Die Rabattspalte ist Pflicht, solange eine Zeile einen Rabatt hat.
 
 Kopf, Fußzeile und Ansprechpartner kommen aus **Einstellungen → Unternehmen**: Steuerdaten, Niederlassungen (Logo bis
 512 KB, Farbe, Adresse, E-Mail, Telefon, Benutzer), Telefon jedes Benutzers und die gespeicherten Texte.
