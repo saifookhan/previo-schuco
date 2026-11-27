@@ -9,6 +9,11 @@ What changed, newest first. Use it to see what's new to test.
 
 ## November 2026
 
+**Week of 27 November**
+- **Versions and alternatives**: a quote is a grid (`V1A2`). A new alternative copies only the open cell; a new version copies only that cell forward. The version matrix fills the empty cell below a saved one. See [Quotes](./features/quotes.md) and [ADR 0016](https://github.com/saifookhan/previo-schuco/blob/main/docs/adr/0016-quote-variants.md).
+- **Status** is draft, invoiced or accepted. One variant can be marked final; the dashboard uses that variant.
+- **Archive** (company admins) hides a quote or one product-family version. **Duplicate** copies one variant into a new quote as `V1A1`. The eye on a list row is a quick look.
+
 **Week of 23 November**
 - **Quotes rebuilt as the client's single-page design**: introduction text modules, product families with their lines on one row each, and *Riepilogo e Chiusura* (texts, detail by product, grouping by category, total, payment plan, activities), all sortable by drag and drop. See [Quotes](./features/quotes.md).
 - **Versions**: a draft can be fixed in place or saved as a new version; a sent version only gets a new version. Status: draft → sent → accepted / rejected.

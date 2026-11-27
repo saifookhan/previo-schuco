@@ -9,6 +9,11 @@ Cosa è cambiato, dal più recente. Utile per sapere cosa c'è di nuovo da testa
 
 ## Novembre 2026
 
+**Settimana del 27 novembre**
+- **Versioni e alternative**: un preventivo è una griglia (`V1A2`). Una nuova alternativa copia solo la cella aperta; una nuova versione copia solo quella cella in avanti. La matrice versioni riempie la cella vuota sotto una salvata. Vedi [Preventivi](./features/quotes.md) e [ADR 0016](https://github.com/saifookhan/previo-schuco/blob/main/docs/adr/0016-quote-variants.md).
+- Lo **stato** è bozza, fatturato o accettato. Una variante si può segnare finale; la dashboard usa quella.
+- **Archivia** (amministratori di azienda) nasconde un preventivo o una versione di famiglia. **Duplica** copia una variante in un nuovo preventivo come `V1A1`. L'occhio su una riga è un'occhiata rapida.
+
 **Settimana del 23 novembre**
 - **Preventivi rifatti sul design del cliente a pagina unica**: moduli di testo d'intestazione, famiglie di prodotto con le linee una per riga e *Riepilogo e Chiusura* (testi, dettaglio per prodotto, raggruppamento per categoria, totale, piano di pagamento, attività), tutto ordinabile con il trascinamento. Vedi [Preventivi](./features/quotes.md).
 - **Versioni**: una bozza si può correggere o salvare come nuova versione; una versione inviata ha solo una nuova versione. Stato: bozza → inviato → accettato / rifiutato.

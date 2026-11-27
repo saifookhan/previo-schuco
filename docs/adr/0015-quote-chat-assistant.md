@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Copying one variant into a new quote is [0016](./0016-quote-variants.md); this decision still keeps that action out of the assistant.
 
 **Date:** 2026-11-25
 

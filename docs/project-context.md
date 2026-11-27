@@ -122,7 +122,9 @@ A user's effective permissions are the union of their roles' permissions, limite
 
 The roadmap above is the original plan; the platform has moved well past Phase 1. Built so far: product families (Excel import, versioning, pricing editor, publish), per-family sharing, the quote builder (auto/manual pricing, edit, custom position codes, PDF), company capabilities, custom roles and the permission matrix, invite-only user management with approval, tenant-aware audit logging ([ADR 0010](adr/0010-tenant-aware-audit-logging.md)), and the admin panel.
 
-Still open: quote status workflow (draft → sent → accepted/rejected), quote header edit / delete / full duplicate, editing characteristic ↔ line relations without Excel, automated backups and monitoring ([infra-status.md](./infra-status.md)).
+Quotes are a matrix of versions and alternatives ([ADR 0016](adr/0016-quote-variants.md)): a new alternative copies only the open cell (`V1A2` → `V1A3`), and a new version copies only that cell forward (`V1A2` → `V2A2`). Statuses are draft, invoiced and accepted. One variant per quote can be marked final and is what the dashboard uses. Company admins can archive a quote or one product-family version. A variant can be duplicated into a new quote as `V1A1`.
+
+Still open: editing characteristic ↔ line relations without Excel, Word/Excel export and emailing a quote, the dashboard's active-user count, and automated backups and monitoring ([infra-status.md](./infra-status.md)).
 
 ## Repository layout
 
