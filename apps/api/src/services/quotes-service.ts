@@ -26,6 +26,7 @@ import {
   lockQuote,
   quoteExists,
   setQuoteArchivedAt,
+  setQuoteVersionFavorite,
   setQuoteVersionFinal,
   setQuoteVersionLabel,
   setQuoteVersionStatus,
@@ -390,6 +391,7 @@ const toVariantRef = (row: QuoteVariantListRow): QuoteVariantRef => ({
   alternative: row.alternative,
   label: row.label,
   isFinal: row.isFinal,
+  isFavorite: row.isFavorite,
   status: row.status,
   totalPrice: row.totalPrice,
   updatedAt: row.updatedAt.toISOString(),
@@ -416,6 +418,7 @@ const toVersion = (row: QuoteVersionWithUsers): QuoteVersion => ({
   alternative: row.alternative,
   label: row.label,
   isFinal: row.isFinal,
+  isFavorite: row.isFavorite,
   status: row.status,
   revision: row.revision,
   document: quoteDocumentSchema.parse(row.document),
@@ -522,7 +525,7 @@ const loadDetail = async (
   }
 }
 
-export const listMyQuotes = (ctx: TenantContext, filter: ListQuotesFilter = {}): Promise<QuoteSummary[]> =>
+export const listMyQuotes = (ctx: TenantContext, filter: ListQuotesFilter & { favorites?: boolean } = {}): Promise<QuoteSummary[]> =>
   withTenantDb(ctx, async (tx) => {
     const rows = await listQuotes(tx, ctx.effectiveCompanyId, filter)
     const variants = await listQuoteVariantsForQuotes(tx, rows.map((row) => row.id))
@@ -532,7 +535,8 @@ export const listMyQuotes = (ctx: TenantContext, filter: ListQuotesFilter = {}):
       list.push(variant)
       byQuote.set(variant.quoteId, list)
     }
-    return rows.map((row) => toSummary(row, byQuote.get(row.id) ?? []))
+    const summaries = rows.map((row) => toSummary(row, byQuote.get(row.id) ?? []))
+    return filter.favorites ? summaries.filter((quote) => quote.variants.some((variant) => variant.isFavorite)) : summaries
   })
 
 /**
@@ -1036,6 +1040,30 @@ export const promoteQuoteVariant = async (
     })
     const fresh = await getQuoteRow(tx, quoteId)
     return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, targetVersion, version.alternative))!
+  })
+
+/** Marks or clears a favorite on this variant. The final offer, and the other variants, stay as they are. */
+export const setQuoteVariantFavorite = async (
+  ctx: TenantContext,
+  actor: QuoteActor,
+  quoteId: string,
+  versionId: string,
+  favorite: boolean,
+): Promise<SalesQuoteDetailResponse> =>
+  withTenantDb(ctx, async (tx) => {
+    const quote = await getQuoteRow(tx, quoteId)
+    if (!quote) throw new QuoteValidationError('Quote not found')
+    const version = await getQuoteVersionById(tx, quoteId, versionId)
+    if (!version) throw new QuoteValidationError('Version not found')
+    await setQuoteVersionFavorite(tx, version.id, favorite)
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: favorite ? 'quote.favorite' : 'quote.unfavorite',
+      resourceType: 'quote',
+      resourceId: quoteId,
+      metadata: { version: version.version, alternative: version.alternative },
+    })
+    const fresh = await getQuoteRow(tx, quoteId)
+    return (await loadDetail(tx, ctx.effectiveCompanyId, fresh!, version.version, version.alternative))!
   })
 
 /** Marks this variant as the one the dashboard shows. Any previous final on the quote is cleared. */

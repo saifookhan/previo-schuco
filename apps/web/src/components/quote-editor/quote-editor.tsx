@@ -426,6 +426,26 @@ export const QuoteEditor = ({ initialDetail, families, profile, initialTemplates
     }
   }
 
+  const toggleFavorite = async (variant: QuoteVariantRef = version) => {
+    setActionBusy(variant.id)
+    try {
+      const response = await fetch(`/api/sales-quotes/${quote.id}/versions/${variant.id}/favorite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorite: !variant.isFavorite }),
+      })
+      if (!response.ok) {
+        showToast(await errorMessage(response, t('favoriteFailed')), 'error')
+        return
+      }
+      applyDetail((await response.json()) as SalesQuoteDetailResponse)
+    } catch {
+      showToast(t('favoriteFailed'), 'error')
+    } finally {
+      setActionBusy(null)
+    }
+  }
+
   const markFinal = async () => {
     setActionBusy('final')
     try {
@@ -539,6 +559,7 @@ export const QuoteEditor = ({ initialDetail, families, profile, initialTemplates
             alternative={version.alternative}
             label={version.label}
             isFinal={version.isFinal}
+            isFavorite={version.isFavorite}
             status={version.status}
             readOnly={readOnly}
             canEdit={canEdit}
@@ -559,6 +580,7 @@ export const QuoteEditor = ({ initialDetail, families, profile, initialTemplates
             onOpenMatrix={() => setMatrixOpen(true)}
             onDuplicate={openDuplicate}
             onMarkFinal={() => void markFinal()}
+            onToggleFavorite={() => void toggleFavorite()}
             onSetLabel={(label) => void setLabel(label)}
           />
 
@@ -728,6 +750,7 @@ export const QuoteEditor = ({ initialDetail, families, profile, initialTemplates
                   selectVariant(variant.version, variant.alternative)
                 }}
                 onPromote={(variant) => void promoteVariant(variant)}
+                onToggleFavorite={(variant) => void toggleFavorite(variant)}
               />
             </Dialog.Content>
           </Dialog.Portal>

@@ -226,6 +226,15 @@ export const ProductFamilyFiltersBar = ({
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-slate-300 accent-brand"
+              checked={filters.favorites}
+              onChange={(event) => set('favorites', event.target.checked)}
+            />
+            {t('favorites')}
+          </label>
+          <label className="flex items-center gap-2 pr-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 accent-brand"
               checked={filters.archived}
               onChange={(event) => set('archived', event.target.checked)}
             />

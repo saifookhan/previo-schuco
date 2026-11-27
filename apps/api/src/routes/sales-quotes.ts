@@ -9,6 +9,7 @@ import {
   quoteStatusSchema,
   saveQuoteRequestSchema,
   setArchivedRequestSchema,
+  setFavoriteRequestSchema,
   setQuoteStatusRequestSchema,
   setQuoteVariantLabelRequestSchema,
 } from '@schuco/contracts'
@@ -30,6 +31,7 @@ import {
   promoteQuoteVariant,
   saveQuoteVersion,
   setQuoteArchived,
+  setQuoteVariantFavorite,
   setQuoteVariantFinal,
   setQuoteVariantLabelById,
   setQuoteVersionStatusById,
@@ -108,6 +110,7 @@ salesQuotes.get('/', requireAuth, requirePermission('quote.view'), async (c) => 
       q: c.req.query('q'),
       status: status?.success ? status.data : undefined,
       includeArchived: includeRaw === '1' || includeRaw === 'true',
+      favorites: c.req.query('favorites') === '1' || c.req.query('favorites') === 'true',
     }),
   })
 })
@@ -212,6 +215,19 @@ salesQuotes.patch('/:id/versions/:versionId/label', rejectNonUuidParams, require
   if (!parsed.success) return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400)
   try {
     return c.json(await setQuoteVariantLabelById(ctxFrom(c), actorFrom(c), c.req.param('id')!, c.req.param('versionId')!, parsed.data))
+  } catch (error) {
+    return quoteErrorResponse(c, error)
+  }
+})
+
+/** Marks or clears a favorite on this variant. Any number of a quote's variants can be favorites. */
+salesQuotes.post('/:id/versions/:versionId/favorite', rejectNonUuidParams, requireAuth, requirePermission('quote.edit'), async (c) => {
+  const parsed = setFavoriteRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400)
+  try {
+    return c.json(
+      await setQuoteVariantFavorite(ctxFrom(c), actorFrom(c), c.req.param('id')!, c.req.param('versionId')!, parsed.data.favorite),
+    )
   } catch (error) {
     return quoteErrorResponse(c, error)
   }

@@ -20,6 +20,8 @@ export const quoteVariantRefSchema = z.object({
   label: z.string().nullable(),
   /** The quote's chosen offer, the one the dashboard uses. */
   isFinal: z.boolean(),
+  /** A variant the company wants to come back to. Independent of `isFinal`, and not limited to one. */
+  isFavorite: z.boolean(),
   status: quoteStatusSchema,
   totalPrice: z.string(),
   updatedAt: z.string().datetime(),
@@ -57,6 +59,7 @@ export const quoteVersionSchema = z.object({
   alternative: z.number().int(),
   label: z.string().nullable(),
   isFinal: z.boolean(),
+  isFavorite: z.boolean(),
   status: quoteStatusSchema,
   /** How many times it was saved; a save must name the revision it was based on. */
   revision: z.number().int(),
@@ -109,6 +112,9 @@ export const duplicateSalesQuoteRequestSchema = z.object({
 export type DuplicateSalesQuoteRequest = z.infer<typeof duplicateSalesQuoteRequestSchema>
 
 /** POST /api/sales-quotes/:id/archive and the product-family equivalent. */
+export const setFavoriteRequestSchema = z.object({ favorite: z.boolean() })
+export type SetFavoriteRequest = z.infer<typeof setFavoriteRequestSchema>
+
 export const setArchivedRequestSchema = z.object({ archived: z.boolean() })
 export type SetArchivedRequest = z.infer<typeof setArchivedRequestSchema>
 

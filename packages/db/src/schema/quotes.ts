@@ -56,6 +56,8 @@ export const quoteVersions = pgTable(
     label: text('label'),
     /** The one variant the dashboard treats as the chosen offer. At most one per quote. */
     isFinal: boolean('is_final').notNull().default(false),
+    /** A variant the company wants to come back to. Any number of a quote's variants can be favorites. */
+    isFavorite: boolean('is_favorite').notNull().default(false),
     status: quoteStatusEnum('status').notNull().default('draft'),
     /** A `QuoteDocument` (@schuco/contracts), validated by the API before it is stored. */
     document: jsonb('document').$type<Record<string, unknown>>().notNull(),

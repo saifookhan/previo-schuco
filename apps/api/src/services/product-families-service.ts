@@ -27,6 +27,7 @@ import {
   isFamilySharedWith,
   isProductFamilyInLibrary,
   setProductFamilyArchivedAt,
+  setProductFamilyFavorite as setProductFamilyFavoriteQuery,
   setProductFamilyHasPriceList,
   setProductFamilyInLibrary,
   setProductFamilyPriceValidity,
@@ -1179,6 +1180,29 @@ export const updateCharacteristic = async (
     (tx) => updateCharacteristicQuery(tx, familyId, characteristicId, patch),
   )
 }
+
+/**
+ * Marks or clears this company's favorite on one family version. A company can favorite a
+ * version it can see, including one shared with it. Other versions of the chain stay as they are.
+ */
+export const setProductFamilyFavorite = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  favorite: boolean,
+): Promise<{ isFavorite: boolean }> =>
+  withTenantDb(ctx, async (tx) => {
+    const family = await getProductFamilyById(tx, familyId)
+    if (!family) throw new Error('Product family not found')
+    await setProductFamilyFavoriteQuery(tx, { companyId: ctx.effectiveCompanyId, familyId, favorite })
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: favorite ? 'product_family.favorite' : 'product_family.unfavorite',
+      resourceType: 'product_family',
+      resourceId: familyId,
+      metadata: { version: family.version },
+    })
+    return { isFavorite: favorite }
+  })
 
 /**
  * Soft-deletes or restores one family version. Only a company admin (or super admin) of the

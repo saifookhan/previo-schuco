@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
 import { EUR } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 const RadioDot = ({ selected }: { selected: boolean }) => (
   <span className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors ${selected ? 'border-brand' : 'border-slate-300'}`}>
@@ -98,6 +99,7 @@ export interface QuoteTopBarProps {
   alternative: number
   label: string | null
   isFinal: boolean
+  isFavorite: boolean
   status: QuoteStatus
   readOnly: boolean
   canEdit: boolean
@@ -116,6 +118,7 @@ export interface QuoteTopBarProps {
   onOpenMatrix: () => void
   onDuplicate: () => void
   onMarkFinal: () => void
+  onToggleFavorite: () => void
   onSetLabel: (label: string) => void
 }
 
@@ -152,6 +155,20 @@ export const QuoteTopBar = (props: QuoteTopBarProps) => {
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <span className="flex-shrink-0 rounded-md bg-brand px-2.5 py-1 text-[13px] font-semibold tracking-wide text-white">{props.reference}</span>
 
+          {props.canEdit ? (
+            <button
+              type="button"
+              aria-pressed={props.isFavorite}
+              aria-label={t(props.isFavorite ? 'unfavorite' : 'favorite', { code })}
+              disabled={props.saving}
+              onClick={props.onToggleFavorite}
+              className="rounded-md border border-slate-200 p-1.5 text-slate-400 hover:bg-slate-50"
+            >
+              <Star className={cn('h-4 w-4', props.isFavorite ? 'fill-sky-500 text-sky-500' : 'text-slate-300')} />
+            </button>
+          ) : props.isFavorite ? (
+            <Star className="h-4 w-4 fill-sky-500 text-sky-500" />
+          ) : null}
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <button
@@ -177,6 +194,7 @@ export const QuoteTopBar = (props: QuoteTopBarProps) => {
                     <RadioDot selected={variant.version === props.version && variant.alternative === props.alternative} />
                     <span className="flex flex-1 items-center gap-1">
                       {variant.isFinal ? <Star className="h-3 w-3 fill-amber-400 text-amber-500" /> : null}
+                      {variant.isFavorite ? <Star className="h-3 w-3 fill-sky-500 text-sky-500" /> : null}
                       {quoteVariantCode(variant.version, variant.alternative)}
                       {variant.label ? <span className="truncate text-slate-400">{variant.label}</span> : null}
                     </span>

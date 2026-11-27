@@ -360,6 +360,18 @@ CREATE POLICY product_family_share_items_write ON product_family_share_items
     )
   );
 
+-- product_family_favorites: each company's own favorite versions. A shared family can be
+-- a favorite for the company that sees it without changing the owner's mark.
+ALTER TABLE product_family_favorites ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS product_family_favorites_own ON product_family_favorites;
+CREATE POLICY product_family_favorites_own ON product_family_favorites
+  FOR ALL
+  USING (app_is_super_admin() OR company_id = app_current_company_id())
+  WITH CHECK (
+    (app_is_super_admin() OR company_id = app_current_company_id())
+    AND app_can_view_product_family(product_family_id)
+  );
+
 -- product_family_library_hidden: each company's own "In libreria: No" choices.
 -- Only that company reads or writes them, and only for families it can see.
 ALTER TABLE product_family_library_hidden ENABLE ROW LEVEL SECURITY;

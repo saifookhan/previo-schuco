@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronRight, ExternalLink } from 'lucide-react'
+import { ChevronRight, ExternalLink, Star } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Fragment, useState, type MouseEvent, type ReactNode } from 'react'
 
@@ -259,6 +259,7 @@ export const ProductFamilyTable = ({
                     >
                       {tVersion('short', { version: family.version })}
                     </Badge>
+                    <FavoriteFamilyButton family={family} />
                     {family.archivedAt ? <Badge variant="warning">{t('archivedBadge')}</Badge> : null}
                   </div>
                 </td>
@@ -311,6 +312,57 @@ export const ProductFamilyTable = ({
         })}
       </tbody>
     </table>
+  )
+}
+
+/** Marks this version as a favorite for the company. Other versions of the chain stay as they are. */
+const FavoriteFamilyButton = ({ family }: { family: ProductFamilySummary }) => {
+  const t = useTranslations('productFamilies')
+  const tVersion = useTranslations('productFamilyVersion')
+  const { can } = useAuth()
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const canEdit = can('catalog.edit')
+  const favorite = Boolean(family.isFavorite)
+  if (!canEdit && !favorite) return null
+  const code = tVersion('short', { version: family.version })
+
+  const toggle = async () => {
+    setBusy(true)
+    try {
+      const response = await fetch(`/api/product-families/${family.id}/favorite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorite: !favorite }),
+      })
+      if (!response.ok) {
+        showToast(t('favoriteFailed'), 'error')
+        return
+      }
+      router.refresh()
+    } catch {
+      showToast(t('favoriteFailed'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!canEdit) return <Star className="h-3.5 w-3.5 fill-sky-500 text-sky-500" aria-label={t('favorite', { code })} />
+
+  return (
+    <button
+      type="button"
+      aria-pressed={favorite}
+      aria-label={t(favorite ? 'unfavorite' : 'favorite', { code })}
+      disabled={busy}
+      onClick={(event) => {
+        event.stopPropagation()
+        void toggle()
+      }}
+      className="rounded p-0.5 text-slate-300 hover:bg-white hover:text-sky-500 disabled:opacity-50"
+    >
+      <Star className={cn('h-3.5 w-3.5', favorite && 'fill-sky-500 text-sky-500')} />
+    </button>
   )
 }
 

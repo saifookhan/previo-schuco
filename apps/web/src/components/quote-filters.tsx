@@ -74,15 +74,26 @@ export const QuoteFiltersBar = ({ filters: fromUrl }: { filters: QuoteListFilter
           ))}
         </select>
       </div>
-      <label className="flex items-center gap-2 pb-2 text-sm text-slate-700">
-        <input
-          type="checkbox"
-          className="h-4 w-4 rounded border-slate-300 accent-brand"
-          checked={filters.archived}
-          onChange={(event) => apply({ ...filters, archived: event.target.checked })}
-        />
-        {t('archived')}
-      </label>
+      <div className="flex flex-wrap items-center gap-4 pb-2">
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300 accent-brand"
+            checked={filters.favorites}
+            onChange={(event) => apply({ ...filters, favorites: event.target.checked })}
+          />
+          {t('favorites')}
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300 accent-brand"
+            checked={filters.archived}
+            onChange={(event) => apply({ ...filters, archived: event.target.checked })}
+          />
+          {t('archived')}
+        </label>
+      </div>
     </div>
   )
 }

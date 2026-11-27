@@ -58,6 +58,7 @@ Ein kompletter Durchlauf der wichtigsten Abläufe. Mit den [Demo-Anmeldungen](./
 - [ ] **Speichern** → `V1A1` korrigieren; als **Fakturiert** markieren; erneut ändern → nur **Als neue Version speichern**, und nur `V2A1` erscheint.
 - [ ] **Neue Alternative** aus `V1A1` erzeugt `V1A2` und lässt `V1A1` unverändert. In der **Versionsmatrix** über `V1A2` → nur `V2A2`; über der leeren Zelle unter `V1A1` → `V2A1`.
 - [ ] Eine Variante benennen, als **final** markieren und duplizieren: die einzige Variante des neuen Angebots ist `V1A1`. Die Angebotskarten im Dashboard folgen der finalen Variante.
+- [ ] `V1A2` und eine Produktfamilien-Version als **Favoriten** markieren. **Favoriten** in jeder Liste zeigt nur diese. Die anderen Versionen bleiben ohne Markierung, und das Dashboard folgt weiter der finalen Variante.
 - [ ] Als Unternehmensadmin **Archivieren** — es verschwindet aus der Liste, bis **Archiviert** angehakt ist, und der direkte Link öffnet es weiter. Ein Vertriebsnutzer sieht es mit dem Filter und kann nicht archivieren.
 - [ ] **Änderungsverlauf** listet jede Speicherung mit den Änderungen; eine ältere öffnen und **Wiederherstellen**.
 - [ ] **Vorschau** → A4-Seiten mit Logo der Niederlassung, *Vostro referente* und Fußzeile; **Drucken / Als PDF speichern**; Felder in den **Druckeinstellungen** abwählen und prüfen, dass sie verschwinden (die Rabattspalte bleibt, solange eine Zeile Rabatt hat).

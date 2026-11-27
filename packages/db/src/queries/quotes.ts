@@ -104,7 +104,7 @@ const updatedByUser = aliasedTable(users, 'updated_by_user')
 
 export type QuoteVariantListRow = Pick<
   QuoteVersionRow,
-  'id' | 'quoteId' | 'version' | 'alternative' | 'label' | 'isFinal' | 'status' | 'totalPrice' | 'updatedAt'
+  'id' | 'quoteId' | 'version' | 'alternative' | 'label' | 'isFinal' | 'isFavorite' | 'status' | 'totalPrice' | 'updatedAt'
 >
 
 /** A quote's versions and alternatives, oldest first (without their documents). */
@@ -117,6 +117,7 @@ export const listQuoteVersions = (db: DbLike, quoteId: string): Promise<QuoteVar
       alternative: quoteVersions.alternative,
       label: quoteVersions.label,
       isFinal: quoteVersions.isFinal,
+      isFavorite: quoteVersions.isFavorite,
       status: quoteVersions.status,
       totalPrice: quoteVersions.totalPrice,
       updatedAt: quoteVersions.updatedAt,
@@ -137,6 +138,7 @@ export const listQuoteVariantsForQuotes = (db: DbLike, quoteIds: string[]): Prom
           alternative: quoteVersions.alternative,
           label: quoteVersions.label,
           isFinal: quoteVersions.isFinal,
+          isFavorite: quoteVersions.isFavorite,
           status: quoteVersions.status,
           totalPrice: quoteVersions.totalPrice,
           updatedAt: quoteVersions.updatedAt,
@@ -232,6 +234,11 @@ export const setQuoteVersionStatus = async (
 /** Renames a variant. Does not change the document or its revision. */
 export const setQuoteVersionLabel = async (db: DbLike, versionId: string, label: string | null): Promise<void> => {
   await db.update(quoteVersions).set({ label, updatedAt: new Date() }).where(eq(quoteVersions.id, versionId))
+}
+
+/** Marks or clears a favorite on one variant. Other variants of the quote are left as they are. */
+export const setQuoteVersionFavorite = async (db: DbLike, versionId: string, favorite: boolean): Promise<void> => {
+  await db.update(quoteVersions).set({ isFavorite: favorite }).where(eq(quoteVersions.id, versionId))
 }
 
 /** Marks one variant as the quote's final offer and clears the flag on the others. */

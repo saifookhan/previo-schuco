@@ -52,6 +52,26 @@ export const QuotesTable = ({ quotes }: { quotes: QuoteSummary[] }) => {
     toggle(id)
   }
 
+  const toggleFavorite = async (quoteId: string, variant: QuoteVariantRef) => {
+    setBusyId(variant.id)
+    try {
+      const response = await fetch(`/api/sales-quotes/${quoteId}/versions/${variant.id}/favorite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorite: !variant.isFavorite }),
+      })
+      if (!response.ok) {
+        showToast(t('favoriteFailed'), 'error')
+        return
+      }
+      router.refresh()
+    } catch {
+      showToast(t('favoriteFailed'), 'error')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const promote = async (quoteId: string, variant: QuoteVariantRef) => {
     setBusyId(variant.id)
     try {
@@ -178,12 +198,30 @@ export const QuotesTable = ({ quotes }: { quotes: QuoteSummary[] }) => {
                   <td className="px-4 py-3 font-medium text-slate-900">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link href={hrefFor(quote.id)} className="hover:text-brand">{quote.reference}</Link>
-                      {tags.map((variant) => (
-                        <Badge key={variant.id} variant="muted" title={variant.label ?? undefined}>
-                          {variant.isFinal ? <Star className="mr-1 inline h-3 w-3 fill-amber-400 text-amber-500" /> : null}
-                          {quoteVariantCode(variant.version, variant.alternative)}
-                        </Badge>
-                      ))}
+                      {tags.map((variant) => {
+                        const code = quoteVariantCode(variant.version, variant.alternative)
+                        return (
+                          <Badge key={variant.id} variant="muted" title={variant.label ?? undefined} className="gap-1">
+                            {variant.isFinal ? <Star className="h-3 w-3 fill-amber-400 text-amber-500" /> : null}
+                            {canEdit || variant.isFavorite ? (
+                              <button
+                                type="button"
+                                aria-pressed={variant.isFavorite}
+                                aria-label={t(variant.isFavorite ? 'unfavorite' : 'favorite', { code })}
+                                disabled={!canEdit || busyId !== null}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  void toggleFavorite(quote.id, variant)
+                                }}
+                                className="rounded p-0.5 hover:bg-white disabled:cursor-default"
+                              >
+                                <Star className={cn('h-3 w-3', variant.isFavorite ? 'fill-sky-500 text-sky-500' : 'text-slate-300')} />
+                              </button>
+                            ) : null}
+                            {code}
+                          </Badge>
+                        )
+                      })}
                       {quote.archivedAt ? <Badge variant="warning">{t('archivedBadge')}</Badge> : null}
                     </div>
                   </td>
@@ -204,6 +242,7 @@ export const QuotesTable = ({ quotes }: { quotes: QuoteSummary[] }) => {
                         busyId={busyId}
                         onOpen={(variant) => router.push(hrefFor(quote.id, variant))}
                         onPromote={(variant) => void promote(quote.id, variant)}
+                        onToggleFavorite={(variant) => void toggleFavorite(quote.id, variant)}
                       />
                       <div className="mt-3 flex flex-wrap gap-2">
                         {quote.variants.map((variant) => (

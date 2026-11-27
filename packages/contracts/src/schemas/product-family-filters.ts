@@ -35,6 +35,8 @@ export interface ProductFamilyFilters {
   latestOnly: boolean
   /** Include families a company admin has archived. Off by default. */
   archived: boolean
+  /** Only versions this company has marked as a favorite. Off by default. */
+  favorites: boolean
   /** `YYYY-MM-DD`, inclusive, on the last-updated day in Italian time (like price validity). */
   updatedFrom: string
   updatedTo: string
@@ -55,6 +57,7 @@ export const EMPTY_PRODUCT_FAMILY_FILTERS: ProductFamilyFilters = {
   discount: '',
   latestOnly: false,
   archived: false,
+  favorites: false,
   updatedFrom: '',
   updatedTo: '',
   sort: 'created',
@@ -72,6 +75,8 @@ export interface FilterableProductFamily {
   hasPriceList: boolean
   /** In the company's library; the list endpoint always sends it. */
   inLibrary?: boolean
+  /** This company has marked this version as a favorite. */
+  isFavorite?: boolean
   supersedesId: string | null
   priceValidFrom: string | null
   priceValidTo: string | null
@@ -107,6 +112,7 @@ export const parseProductFamilyFilters = (
   discount: tab === 'shared' ? oneOf(one(params.discount), ['with', 'without'] as const) : '',
   latestOnly: one(params.latestOnly) === '1',
   archived: one(params.archived) === '1',
+  favorites: one(params.favorites) === '1',
   updatedFrom: day(one(params.updatedFrom)),
   updatedTo: day(one(params.updatedTo)),
   sort: oneOf(one(params.sort), PRODUCT_FAMILY_SORTS) || EMPTY_PRODUCT_FAMILY_FILTERS.sort,
@@ -177,6 +183,7 @@ export const filterProductFamilies = <T extends FilterableProductFamily>(
     if (filters.owner && family.ownerCompanyName !== filters.owner) return false
     if (filters.discount && Boolean(family.shareDiscountPct) !== (filters.discount === 'with')) return false
     if (filters.latestOnly && replaced.has(family.id)) return false
+    if (filters.favorites && !family.isFavorite) return false
     if (updatedFrom || updatedTo) {
       const updatedDay = priceValidityToday(new Date(family.updatedAt))
       if (updatedFrom && updatedDay < updatedFrom) return false

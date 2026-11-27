@@ -80,7 +80,7 @@ A quote is a grid: versions down the side, alternatives across (`V1A1`, `V1A2`, 
 ## List, archive and quick look
 
 The quotes list searches reference, customer and project, and filters by status. **Archived** is off until you tick it.
-Each row shows the alternatives of the latest version. Open the row for the matrix, **Duplicate** of one variant, and
+Each row shows the alternatives of the latest version. The blue star marks a favorite variant (any number of them); the amber star is the final offer the dashboard uses. **Favorites** is off until you tick it. Open the row for the matrix, **Duplicate** of one variant, and
 **Archive** (company admins and super admins). The eye is a short overview of families and lines. Archiving hides the
 quote from the list; a direct link still opens it. The same archive exists on product families, one version at a time.
 

@@ -10,12 +10,15 @@ export interface QuoteListFilters {
   q: string
   status: '' | QuoteStatus
   archived: boolean
+  /** Only quotes that have at least one favorite variant. Off by default. */
+  favorites: boolean
 }
 
 export const EMPTY_QUOTE_LIST_FILTERS: QuoteListFilters = {
   q: '',
   status: '',
   archived: false,
+  favorites: false,
 }
 
 const one = (value: string | string[] | undefined): string => (Array.isArray(value) ? (value[0] ?? '') : (value ?? '')).trim()
@@ -27,6 +30,7 @@ export const parseQuoteListFilters = (params: Record<string, string | string[] |
     q: one(params.q).slice(0, 200),
     status: quoteStatusSchema.safeParse(status).success ? (status as QuoteStatus) : '',
     archived: one(params.archived) === '1',
+    favorites: one(params.favorites) === '1',
   }
 }
 
@@ -36,6 +40,7 @@ export const quoteListFiltersToParams = (filters: QuoteListFilters): URLSearchPa
   if (filters.q) params.set('q', filters.q)
   if (filters.status) params.set('status', filters.status)
   if (filters.archived) params.set('archived', '1')
+  if (filters.favorites) params.set('favorites', '1')
   return params
 }
 
@@ -45,6 +50,7 @@ export const quoteListFiltersToApiQuery = (filters: QuoteListFilters): string =>
   if (filters.q) params.set('q', filters.q)
   if (filters.status) params.set('status', filters.status)
   if (filters.archived) params.set('includeArchived', '1')
+  if (filters.favorites) params.set('favorites', '1')
   const query = params.toString()
   return query ? `?${query}` : ''
 }

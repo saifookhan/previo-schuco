@@ -18,7 +18,7 @@ const QuotesPage = async ({ searchParams }: { searchParams: Promise<Record<strin
   const result = await fetchFromApiResult<{ quotes: QuoteSummary[] }>(`/api/sales-quotes${quoteListFiltersToApiQuery(filters)}`)
   const quotes = result.data?.quotes ?? []
   const loadFailed = result.status === 'error'
-  const filtered = filters.q !== '' || filters.status !== '' || filters.archived
+  const filtered = filters.q !== '' || filters.status !== '' || filters.archived || filters.favorites
 
   return (
     <div className="p-6 md:p-8">

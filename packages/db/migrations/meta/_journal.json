@@ -225,6 +225,13 @@
       "when": 1795766400001,
       "tag": "0032_archive_and_quote_alternatives",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795766400002,
+      "tag": "0033_favorites",
+      "breakpoints": true
     }
   ]
 }

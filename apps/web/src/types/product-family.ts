@@ -28,6 +28,8 @@ export interface ProductFamilySummary {
   shareDiscountPct?: number | null
   /** List endpoint only: whether the family is in the caller's company library ("In libreria"). */
   inLibrary?: boolean
+  /** List endpoint only: whether this company has marked this version as a favorite. */
+  isFavorite?: boolean
 }
 
 export interface ProductFamilyImage {

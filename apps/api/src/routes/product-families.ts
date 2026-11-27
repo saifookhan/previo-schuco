@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import {
   duplicateProductFamilyRequestSchema,
   setArchivedRequestSchema,
+  setFavoriteRequestSchema,
   familySharesResponseSchema,
   priceValidityRequestSchema,
   productFamilyImportFieldsSchema,
@@ -38,6 +39,7 @@ import {
   listProductFamilies,
   previewProductFamilyImport,
   setProductFamilyArchived,
+  setProductFamilyFavorite,
   setProductFamilyHasPriceListStatus,
   setProductFamilyLibraryStatus,
   setProductFamilyPriceValidityDates,
@@ -519,6 +521,22 @@ productFamilies.patch('/:id/library', rejectNonUuidParams, requireAuth, requireP
     throw error
   }
   return c.json({ ok: true })
+})
+
+/** Marks or clears this company's favorite on one family version. */
+productFamilies.post('/:id/favorite', rejectNonUuidParams, requireAuth, requirePermission('catalog.edit'), async (c) => {
+  const parsed = setFavoriteRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400)
+  const ctx = {
+    effectiveCompanyId: c.get('effectiveCompanyId'),
+    isSuperAdmin: c.get('isSuperAdmin'),
+  }
+  try {
+    return c.json(await setProductFamilyFavorite(ctx, actorFrom(c), c.req.param('id')!, parsed.data.favorite))
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Product family not found') return c.json({ error: 'Not found' }, 404)
+    throw error
+  }
 })
 
 /** Soft-deletes or restores one family version. Company admins and super admins of the owning company. */

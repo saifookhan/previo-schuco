@@ -21,6 +21,7 @@ export const QuoteVariantMatrix = ({
   busyId,
   onOpen,
   onPromote,
+  onToggleFavorite,
 }: {
   variants: QuoteVariantRef[]
   /** The variant open in the editor, if this matrix is inside it. */
@@ -30,6 +31,7 @@ export const QuoteVariantMatrix = ({
   onOpen: (variant: QuoteVariantRef) => void
   /** Copies this saved variant to version + 1, same alternative. */
   onPromote: (variant: QuoteVariantRef) => void
+  onToggleFavorite: (variant: QuoteVariantRef) => void
 }) => {
   const t = useTranslations('quoteEditor')
   const ts = useTranslations('quotes.statusValue')
@@ -111,6 +113,20 @@ export const QuoteVariantMatrix = ({
                         {variant.label ? <span className="max-w-full truncate text-[11px] text-slate-500">{variant.label}</span> : null}
                         <span className="text-[10px] uppercase tracking-wide text-slate-400">{ts(variant.status)}</span>
                       </button>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          aria-pressed={variant.isFavorite}
+                          aria-label={t(variant.isFavorite ? 'unfavorite' : 'favorite', { code })}
+                          disabled={busyId !== null}
+                          onClick={() => onToggleFavorite(variant)}
+                          className="absolute right-1.5 top-1.5 z-10 rounded p-0.5 hover:bg-slate-100"
+                        >
+                          <Star className={cn('h-3.5 w-3.5', variant.isFavorite ? 'fill-sky-500 text-sky-500' : 'text-slate-300')} />
+                        </button>
+                      ) : variant.isFavorite ? (
+                        <Star className="absolute right-1.5 top-1.5 h-3.5 w-3.5 fill-sky-500 text-sky-500" />
+                      ) : null}
                       {canPromote ? (
                         <button
                           type="button"

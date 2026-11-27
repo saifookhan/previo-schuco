@@ -8,6 +8,7 @@ import {
   productFamilies,
   productFamilyChanges,
   productFamilyImages,
+  productFamilyFavorites,
   productFamilyLibraryHidden,
   productLineCharacteristics,
   productLines,
@@ -152,6 +153,8 @@ export interface ProductFamilyListItem extends ProductFamilySummary {
   shareDiscountPct: number | null
   /** Whether the family is in the listing company's library ("In libreria"). */
   inLibrary: boolean
+  /** Whether the listing company has marked this version as a favorite. */
+  isFavorite: boolean
 }
 
 /**
@@ -194,6 +197,10 @@ export const listVisibleProductFamilies = (
       inLibrary: sql<boolean>`NOT EXISTS (
         SELECT 1 FROM product_family_library_hidden h
         WHERE h.company_id = ${companyId}::uuid AND h.product_family_id = ${productFamilies.id}
+      )`,
+      isFavorite: sql<boolean>`EXISTS (
+        SELECT 1 FROM product_family_favorites f
+        WHERE f.company_id = ${companyId}::uuid AND f.product_family_id = ${productFamilies.id}
       )`,
     })
     .from(productFamilies)
@@ -484,6 +491,23 @@ export const listFamiliesHiddenFromLibrary = async (db: DbLike, companyId: strin
  * Puts a family back in, or takes it out of, a company's library. Idempotent.
  * RLS only lets a company write its own rows, for families it can see.
  */
+/** Marks or clears this company's favorite on one family version. Other versions stay as they are. */
+export const setProductFamilyFavorite = async (
+  db: DbLike,
+  input: { companyId: string; familyId: string; favorite: boolean },
+): Promise<void> => {
+  if (!input.favorite) {
+    await db
+      .delete(productFamilyFavorites)
+      .where(and(eq(productFamilyFavorites.companyId, input.companyId), eq(productFamilyFavorites.productFamilyId, input.familyId)))
+    return
+  }
+  await db
+    .insert(productFamilyFavorites)
+    .values({ companyId: input.companyId, productFamilyId: input.familyId })
+    .onConflictDoNothing()
+}
+
 export const setProductFamilyInLibrary = async (
   db: DbLike,
   input: { companyId: string; familyId: string; inLibrary: boolean; userId: string | null },

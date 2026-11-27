@@ -81,7 +81,7 @@ Ein Angebot ist ein Raster: Versionen nach unten, Alternativen nach rechts (`V1A
 ## Liste, Archiv und Kurzansicht
 
 Die Liste sucht Referenz, Kunde und Projekt und filtert nach Status. **Archiviert** bleibt aus, bis es angehakt wird.
-Jede Zeile zeigt die Alternativen der letzten Version. Die Zeile öffnen für die Matrix, **Duplizieren** einer Variante und
+Jede Zeile zeigt die Alternativen der letzten Version. Der blaue Stern markiert eine Favoriten-Variante (mehrere sind möglich); der gelbe Stern ist das finale Angebot, das das Dashboard nutzt. **Favoriten** bleibt aus, bis es angehakt wird. Die Zeile öffnen für die Matrix, **Duplizieren** einer Variante und
 **Archivieren** (Unternehmensadmins und Super-Admins). Das Auge ist eine kurze Übersicht von Familien und Linien. Archivieren
 blendet das Angebot aus der Liste aus; der direkte Link öffnet es weiter. Dasselbe Archiv gilt für Produktfamilien, eine Version nach der anderen.
 

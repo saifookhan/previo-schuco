@@ -80,7 +80,7 @@ Un preventivo è una griglia: versioni in verticale, alternative in orizzontale 
 ## Elenco, archivio e occhiata
 
 L'elenco cerca riferimento, cliente e progetto e filtra per stato. **Archiviati** resta spento finché non lo spunti.
-Ogni riga mostra le alternative dell'ultima versione. Apri la riga per la matrice, **Duplica** di una variante e
+Ogni riga mostra le alternative dell'ultima versione. La stella blu segna una variante preferita (se ne possono segnare più di una); la stella ambra è l'offerta finale usata dalla dashboard. **Preferiti** resta spento finché non lo spunti. Apri la riga per la matrice, **Duplica** di una variante e
 **Archivia** (amministratori di azienda e super admin). L'occhio è una sintesi di famiglie e linee. L'archivio nasconde
 il preventivo dall'elenco; il link diretto lo apre ancora. Lo stesso archivio vale per le famiglie di prodotto, una versione alla volta.
 

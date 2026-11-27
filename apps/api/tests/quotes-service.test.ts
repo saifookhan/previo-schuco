@@ -29,6 +29,7 @@ import {
   importProductFamilyFromExcel,
   listProductFamilies,
   setProductFamilyArchived,
+  setProductFamilyFavorite,
   setProductFamilyLibraryStatus,
   setProductFamilyPriceValidityDates,
   setProductFamilyPublishedStatus,
@@ -50,6 +51,7 @@ import {
   promoteQuoteVariant,
   saveQuoteVersion,
   setQuoteArchived,
+  setQuoteVariantFavorite,
   setQuoteVariantFinal,
   setQuoteVariantLabelById,
   setQuoteVersionStatusById,
@@ -599,6 +601,15 @@ describe('alternatives, final and archive', () => {
     const final = await setQuoteVariantFinal(ctx(), actor, quote.quote.id, labeled.version.id)
     expect(final.versions.filter((variant) => variant.isFinal).map((variant) => [variant.version, variant.alternative])).toEqual([[1, 2]])
 
+    const favorite = await setQuoteVariantFavorite(ctx(), actor, quote.quote.id, labeled.version.id, true)
+    expect(favorite.versions.filter((variant) => variant.isFavorite).map((variant) => [variant.version, variant.alternative])).toEqual([[1, 2]])
+    const stillFinal = favorite.versions.find((variant) => variant.isFinal)
+    expect(stillFinal).toMatchObject({ version: 1, alternative: 2, isFavorite: true })
+    expect(favorite.versions.find((variant) => variant.version === 2 && variant.alternative === 2)?.isFavorite).toBe(false)
+    expect((await listMyQuotes(ctx(), { favorites: true })).map((row) => row.id)).toContain(quote.quote.id)
+    await setQuoteVariantFavorite(ctx(), actor, quote.quote.id, labeled.version.id, false)
+    expect((await listMyQuotes(ctx(), { favorites: true })).map((row) => row.id)).not.toContain(quote.quote.id)
+
     const copy = await duplicateQuoteVariant(ctx(), actor, quote.quote.id, { versionId: labeled.version.id, reference: 'TEST-Q-SVC-MATRIX-COPY' })
     expect(copy.version).toMatchObject({ version: 1, alternative: 1, label: 'Wood' })
     expect(copy.versions).toHaveLength(1)
@@ -643,5 +654,12 @@ describe('alternatives, final and archive', () => {
     expect(visible).toContain(newer.id)
     const archived = (await listProductFamilies(ctx(), { includeArchived: true })).find((row) => row.id === family.id)
     expect(archived?.archivedAt).toBeInstanceOf(Date)
+
+    await setProductFamilyFavorite(ctx(), actor, newer.id, true)
+    const listed = await listProductFamilies(ctx())
+    expect(listed.find((row) => row.id === newer.id)?.isFavorite).toBe(true)
+    expect(listed.find((row) => row.id === family.id)?.isFavorite).not.toBe(true)
+    await setProductFamilyFavorite(ctx(), actor, newer.id, false)
+    expect((await listProductFamilies(ctx())).find((row) => row.id === newer.id)?.isFavorite).toBe(false)
   })
 })
