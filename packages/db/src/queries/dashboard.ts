@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 
 import type { DbLike } from '../client'
 import { auditLog, productFamilies, quoteVersions, quotes, users } from '../schema'
@@ -15,6 +15,7 @@ export interface DashboardVariantRow {
   version: number
   alternative: number
   isFinal: boolean
+  isFavorite: boolean
   status: QuoteStatusValue
   totalPrice: string
   updatedAt: Date
@@ -46,7 +47,7 @@ export interface DashboardFamilyHealthRow {
  * same reason as `listQuotes`.
  */
 export const listDashboardQuotes = (db: DbLike, companyId: string, createdByUserId: string | null): Promise<DashboardVariantRow[]> => {
-  const filters = [eq(quotes.supplierCompanyId, companyId)]
+  const filters = [eq(quotes.supplierCompanyId, companyId), isNull(quotes.archivedAt)]
   if (createdByUserId) filters.push(eq(quotes.createdByUserId, createdByUserId))
   return db
     .select({
@@ -60,11 +61,12 @@ export const listDashboardQuotes = (db: DbLike, companyId: string, createdByUser
       version: quoteVersions.version,
       alternative: quoteVersions.alternative,
       isFinal: quoteVersions.isFinal,
+      isFavorite: quoteVersions.isFavorite,
       status: quoteVersions.status,
       totalPrice: quoteVersions.totalPrice,
       updatedAt: quoteVersions.updatedAt,
       sentAt: quoteVersions.sentAt,
-      document: sql<unknown>`case when ${quoteVersions.status} in ('sent', 'accepted') then ${quoteVersions.document} else null end`,
+      document: sql<unknown>`case when ${quoteVersions.status} in ('invoiced', 'accepted') then ${quoteVersions.document} else null end`,
     })
     .from(quotes)
     .innerJoin(quoteVersions, eq(quoteVersions.quoteId, quotes.id))

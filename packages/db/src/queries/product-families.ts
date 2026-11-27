@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, inArray, isNotNull, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, getTableColumns, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 
 import type { DbLike } from '../client'
 import {
@@ -8,6 +8,7 @@ import {
   productFamilies,
   productFamilyChanges,
   productFamilyImages,
+  productFamilyFavorites,
   productFamilyLibraryHidden,
   productLineCharacteristics,
   productLines,
@@ -139,6 +140,8 @@ export interface ProductFamilySummary {
   priceValidFrom: string | null
   /** ISO date (`YYYY-MM-DD`), inclusive; null = until further notice. */
   priceValidTo: string | null
+  /** Set when a company admin archives this version. Other versions of the chain stay as they are. */
+  archivedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -150,6 +153,8 @@ export interface ProductFamilyListItem extends ProductFamilySummary {
   shareDiscountPct: number | null
   /** Whether the family is in the listing company's library ("In libreria"). */
   inLibrary: boolean
+  /** Whether the listing company has marked this version as a favorite. */
+  isFavorite: boolean
 }
 
 /**
@@ -162,8 +167,19 @@ export interface ProductFamilyListItem extends ProductFamilySummary {
  * a super-admin acting as `companyId` sees exactly what `companyId`
  * itself would.
  */
-export const listVisibleProductFamilies = (db: DbLike, companyId: string): Promise<ProductFamilyListItem[]> =>
-  db
+export const listVisibleProductFamilies = (
+  db: DbLike,
+  companyId: string,
+  { includeArchived = false }: { includeArchived?: boolean } = {},
+): Promise<ProductFamilyListItem[]> => {
+  const visible = or(
+    eq(productFamilies.supplierCompanyId, companyId),
+    and(
+      eq(productFamilies.isPublished, true),
+      sql`app_family_reaches_company(${productFamilies.id}, ${companyId}::uuid)`,
+    ),
+  )
+  return db
     .select({
       ...getTableColumns(productFamilies),
       ownerCompanyName: companyDirectory.name,
@@ -182,19 +198,16 @@ export const listVisibleProductFamilies = (db: DbLike, companyId: string): Promi
         SELECT 1 FROM product_family_library_hidden h
         WHERE h.company_id = ${companyId}::uuid AND h.product_family_id = ${productFamilies.id}
       )`,
+      isFavorite: sql<boolean>`EXISTS (
+        SELECT 1 FROM product_family_favorites f
+        WHERE f.company_id = ${companyId}::uuid AND f.product_family_id = ${productFamilies.id}
+      )`,
     })
     .from(productFamilies)
     .leftJoin(companyDirectory, eq(productFamilies.supplierCompanyId, companyDirectory.id))
-    .where(
-      or(
-        eq(productFamilies.supplierCompanyId, companyId),
-        and(
-          eq(productFamilies.isPublished, true),
-          sql`app_family_reaches_company(${productFamilies.id}, ${companyId}::uuid)`,
-        ),
-      ),
-    )
+    .where(includeArchived ? visible : and(visible, isNull(productFamilies.archivedAt)))
     .orderBy(desc(productFamilies.createdAt))
+}
 
 export interface ProductLineName {
   id: string
@@ -392,6 +405,20 @@ export const listProductFamilyCopies = (db: DbLike, sourceIds: string[]): Promis
  * published family but not update it), which the caller must treat as
  * "not found", not a silent no-op success.
  */
+/** Archives or restores a family row (one version). Returns null when the row isn't visible to update. */
+export const setProductFamilyArchivedAt = async (
+  db: DbLike,
+  familyId: string,
+  archivedAt: Date | null,
+): Promise<{ id: string; supplierCompanyId: string } | null> => {
+  const [updated] = await db
+    .update(productFamilies)
+    .set({ archivedAt, updatedAt: new Date() })
+    .where(eq(productFamilies.id, familyId))
+    .returning({ id: productFamilies.id, supplierCompanyId: productFamilies.supplierCompanyId })
+  return updated ?? null
+}
+
 export const setProductFamilyPublished = async (
   db: DbLike,
   familyId: string,
@@ -464,6 +491,23 @@ export const listFamiliesHiddenFromLibrary = async (db: DbLike, companyId: strin
  * Puts a family back in, or takes it out of, a company's library. Idempotent.
  * RLS only lets a company write its own rows, for families it can see.
  */
+/** Marks or clears this company's favorite on one family version. Other versions stay as they are. */
+export const setProductFamilyFavorite = async (
+  db: DbLike,
+  input: { companyId: string; familyId: string; favorite: boolean },
+): Promise<void> => {
+  if (!input.favorite) {
+    await db
+      .delete(productFamilyFavorites)
+      .where(and(eq(productFamilyFavorites.companyId, input.companyId), eq(productFamilyFavorites.productFamilyId, input.familyId)))
+    return
+  }
+  await db
+    .insert(productFamilyFavorites)
+    .values({ companyId: input.companyId, productFamilyId: input.familyId })
+    .onConflictDoNothing()
+}
+
 export const setProductFamilyInLibrary = async (
   db: DbLike,
   input: { companyId: string; familyId: string; inLibrary: boolean; userId: string | null },

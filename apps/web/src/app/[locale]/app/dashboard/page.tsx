@@ -41,17 +41,16 @@ const money = (total: string, locale: string) => formatCurrency(Number(total), l
 /** V2A3 — version x, alternative y. */
 const variantCode = (quote: DashboardQuoteRef) => `V${quote.latestVersion}A${quote.alternative}`
 
-const statusVariant = (status: QuoteStatus): 'success' | 'muted' | 'warning' | 'danger' => {
+const statusVariant = (status: QuoteStatus): 'success' | 'muted' | 'warning' => {
   if (status === 'accepted') return 'success'
-  if (status === 'rejected') return 'danger'
-  if (status === 'sent') return 'warning'
+  if (status === 'invoiced') return 'warning'
   return 'muted'
 }
 
+const STATUSES = ['draft', 'invoiced', 'accepted'] as const
+
 const hasChartData = (data: DashboardResponse) =>
-  data.overTime.points.some((point) =>
-    (['draft', 'sent', 'accepted', 'rejected'] as const).some((status) => point.byStatus[status].count > 0),
-  )
+  data.overTime.points.some((point) => STATUSES.some((status) => point.byStatus[status].count > 0))
 
 /**
  * Company sales dashboard. Figures come from GET /api/dashboard.
@@ -103,9 +102,8 @@ const DashboardPage = async ({ searchParams }: { searchParams: Promise<Record<st
 
   const statusLabels = {
     draft: tStatus('draft'),
-    sent: tStatus('sent'),
+    invoiced: tStatus('invoiced'),
     accepted: tStatus('accepted'),
-    rejected: tStatus('rejected'),
   } as const
 
   const periodLabel = { week: t('periodWeek'), month: t('periodMonth'), year: t('periodYear') } as const
@@ -208,7 +206,7 @@ const DashboardPage = async ({ searchParams }: { searchParams: Promise<Record<st
               <CardContent className="pt-6">
                 <p className="text-sm text-slate-500">{t('pipeline')}</p>
                 <ul className="mt-2 space-y-1 text-sm">
-                  {(['draft', 'sent', 'accepted', 'rejected'] as const).map((status) => (
+                  {STATUSES.map((status) => (
                     <li key={status} className="flex items-center justify-between gap-3">
                       <span className="text-slate-600">{statusLabels[status]}</span>
                       <span className="font-medium text-slate-900">
@@ -228,9 +226,9 @@ const DashboardPage = async ({ searchParams }: { searchParams: Promise<Record<st
               <p className="mt-1 text-sm text-slate-500">{t('funnelHint')}</p>
             </CardHeader>
             <CardContent className="space-y-3">
-              {(['draft', 'sent', 'accepted', 'rejected'] as const).map((status) => {
+              {STATUSES.map((status) => {
                 const row = data.funnel[status]
-                const max = Math.max(...(['draft', 'sent', 'accepted', 'rejected'] as const).map((key) => data.funnel[key].count), 1)
+                const max = Math.max(...STATUSES.map((key) => data.funnel[key].count), 1)
                 return (
                   <div key={status}>
                     <div className="mb-1 flex items-center justify-between text-sm">
@@ -241,14 +239,14 @@ const DashboardPage = async ({ searchParams }: { searchParams: Promise<Record<st
                     </div>
                     <div className="h-2 rounded-full bg-slate-100">
                       <div
-                        className={cn('h-2 rounded-full', status === 'draft' && 'bg-slate-400', status === 'sent' && 'bg-amber-400', status === 'accepted' && 'bg-emerald-500', status === 'rejected' && 'bg-rose-400')}
+                        className={cn('h-2 rounded-full', status === 'draft' && 'bg-slate-400', status === 'invoiced' && 'bg-amber-400', status === 'accepted' && 'bg-emerald-500')}
                         style={{ width: `${(row.count / max) * 100}%` }}
                       />
                     </div>
                   </div>
                 )
               })}
-              {data.funnel.sent.count + data.funnel.accepted.count + data.funnel.rejected.count === 0 ? (
+              {data.funnel.invoiced.count + data.funnel.accepted.count === 0 ? (
                 <p className="text-sm text-slate-500">{t('funnelEmpty')}</p>
               ) : null}
             </CardContent>

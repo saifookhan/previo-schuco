@@ -86,4 +86,4 @@ Production is a single self-hosted server running Docker Compose. See [deploymen
 
 Built and in use: audit log viewer, structured logging, product families (Excel import, versioning, pricing editor, publish), per-family sharing with default discounts, quote builder (auto/manual pricing, edit, custom position codes, PDF), company capabilities, custom roles + permission matrix, invite-only user management, admin panel.
 
-Not built yet (see [project-context.md](./project-context.md)): quote status workflow (draft → sent → accepted/rejected), quote header edit / delete / full duplicate, editing characteristic ↔ line relations without Excel, automated backups, monitoring.
+Not built yet (see [project-context.md](./project-context.md)): editing characteristic ↔ line relations without Excel, Word/Excel export and emailing a quote, the dashboard's active-user count, automated backups, monitoring. Quote versions, alternatives, status (draft, invoiced, accepted), the final variant and archive are [ADR 0016](./adr/0016-quote-variants.md).

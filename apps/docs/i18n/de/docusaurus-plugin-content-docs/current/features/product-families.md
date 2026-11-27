@@ -27,7 +27,9 @@ Jede Umgebung hat bereits eine: **Demo Window W70** (siehe [Demo-Daten](../demo-
 | Veröffentlichen / zurückziehen | Schalter **Status (veröffentlicht)** in der aufgeklappten Zeile (Schaltfläche auf der Seite der Familie) | Die Zeile zeigt Veröffentlicht oder Entwurf. Nur veröffentlichte Familien können geteilt werden |
 | Neue Version | **Neue Version** auf der Seite der Familie | Derselbe Dialog wie beim Import; die neue Version bekommt eine eigene Preisgültigkeit, die alte behält ihre Daten |
 | Duplizieren | Kopier-Symbol in der Zeile | Ein Dialog fragt nach Name, Preisgültigkeit und Veröffentlichung der Kopie (startet mit den Daten des Originals, unveröffentlicht) |
-| Löschen | **Löschen** in der aufgeklappten Zeile (Schaltfläche auf der Seite der Familie) | |
+| Löschen | **Löschen** in der aufgeklappten Zeile (Schaltfläche auf der Seite der Familie) | Entfernt diese Version |
+| Archivieren | **Archivieren** in der aufgeklappten Zeile, neben Löschen | Unternehmensadmins und Super-Admins. Blendet nur diese Version aus; eine neuere bleibt. Die Liste zeigt sie wieder, wenn **Archiviert** angehakt ist. Eine Familie, die schon auf einem Angebot liegt, darf bleiben |
+| Favorit | Der Stern neben dem Versionsabzeichen | Die Markierung dieses Unternehmens auf dieser Version (`V2` markiert nicht `V1`). Eine geteilte Familie kann hier Favorit sein, ohne die Liste des Eigentümers zu ändern. **Favoriten** im Filter zeigt nur diese Versionen |
 | Preisgültigkeit ändern | **Gültig ab** und **Gültig bis** in der aufgeklappten Zeile, dann **Speichern** (oder **Bearbeiten** auf der Seite der Familie) | Nur Eigentümer (oder Super-Admin). Die Spalte **Gültigkeitsdaten** zeigt die Daten als TT.MM.JJJJ |
 | Bereit zur Fakturierung | Markierung in der Spalte **Tags**, wenn gesetzt; Schalter in der aufgeklappten Zeile (Ja/Nein auf der Seite der Familie) | Nur Familien, die bereit zur Fakturierung sind, werden im Angebot angeboten. Nur Eigentümer |
 | Mit Preisliste | Markierung in der Spalte **Tags**, wenn gesetzt; Schalter in der aufgeklappten Zeile (Ja/Nein auf der Seite der Familie) | Ob hinter der Familie Preise stehen — wird im Angebot angezeigt. Nur Eigentümer |
@@ -149,6 +151,8 @@ sehen ihn — nicht die Unternehmen, mit denen die Familie geteilt wurde.
 - **Preisgültigkeit** — *Heute gültig* (was das Angebot anbietet; Familien ohne Daten zählen mit), *Demnächst*, *Abgelaufen*, *Ohne Daten*.
 - **Bereit zur Fakturierung** (unter *Weitere Filter*) — Ja / Nein.
 - **Mit Preisliste** und **In Bibliothek** (unter *Weitere Filter*) — Ja / Nein.
+- **Favoriten** — standardmäßig aus. Anhaken, um nur Versionen zu sehen, die dieses Unternehmen mit dem Stern markiert hat.
+- **Archiviert** — standardmäßig aus. Anhaken, um Versionen zu sehen, die ein Unternehmensadmin archiviert hat.
 - **Weitere Filter** — *Preise gültig am* bestimmten Tag, *Aktualisiert ab / bis*, *Nur neueste Versionen* (blendet Versionen aus, die eine neuere ersetzt); unter *Mit mir geteilt* zusätzlich **Eigentümer** und **Ihr Rabatt** (mit / ohne).
 - **Sortieren** — neueste zuerst (Standard), zuletzt aktualisiert, Name, Preise laufen zuerst ab.
 

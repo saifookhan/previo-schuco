@@ -1319,18 +1319,13 @@ const setPayments = async (ctx: TenantContext, actor: QuoteActor, state: ChatSta
   return reply(`${text}\n${saved.content}`, undefined, text)
 }
 
-const NEXT_STATUS: Record<string, readonly string[]> = {
-  draft: ['sent'],
-  sent: ['accepted', 'rejected'],
-  accepted: ['rejected'],
-  rejected: ['accepted'],
-}
+const QUOTE_STATUSES = ['draft', 'invoiced', 'accepted'] as const
 
 const setStatus = async (ctx: TenantContext, actor: QuoteActor, state: ChatState, args: Record<string, unknown>): Promise<ToolResult> => {
   const status = str(args.status)
-  if (status !== 'draft' && status !== 'sent' && status !== 'accepted' && status !== 'rejected') return reply('Status must be draft, sent, accepted, or rejected.')
+  if (status !== 'draft' && status !== 'invoiced' && status !== 'accepted') return reply('Status must be draft, invoiced, or accepted.')
   const current = requireQuote(state)
-  if (!NEXT_STATUS[current.version.status]?.includes(status)) {
+  if (!QUOTE_STATUSES.includes(status) || status === current.version.status) {
     const text = say(state).badTransition
     return reply(text, undefined, text)
   }

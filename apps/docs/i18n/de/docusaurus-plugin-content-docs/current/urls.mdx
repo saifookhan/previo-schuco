@@ -37,12 +37,13 @@ Die URLs enthalten keine Sprache — die Sprache (standardmäßig Italienisch, E
 
 | Seite | URL | Benötigt |
 |---|---|---|
-| Dashboard | <AppLink path="/app/dashboard" /> | — |
+| Dashboard | <AppLink path="/app/dashboard" /> | Die Angebotskarten brauchen `quote.view`. Sie folgen der als final markierten Variante. Aktive Benutzer sind weiter eine Beispielzahl. |
 | Produktfamilien (Katalog) | <AppLink path="/app/product-families" /> | `catalog.view` |
 | Produktfamilie im Detail | `/app/product-families/<id>` | `catalog.view` |
 | Angebote | <AppLink path="/app/quotes" /> | `quote.view` |
-| Angebotsdetail / Angebotserstellung | `/app/quotes/<id>` | `quote.view` (`quote.edit` zum Ändern) |
-| Angebotseditor (frühe Demo-Nachbildung) | <AppLink path="/app/invoice" /> | — |
+| Angebotsdetail / Angebotserstellung | `/app/quotes/<id>?version=2&alternative=1` | `quote.view` (`quote.edit` zum Ändern). Ohne `alternative` öffnet sich die niedrigste dieser Version. |
+
+`/app/invoice` und `/app/invoices` öffnen Angebote. Die Angebotsadresse kann auch `q`, `status` (`draft`, `invoiced` oder `accepted`), `archived=1` und `favorites=1` tragen. Die Adresse der Produktfamilien trägt dieselben Filterarten, einschließlich `archived=1` und `favorites=1`.
 
 ### Einstellungen
 

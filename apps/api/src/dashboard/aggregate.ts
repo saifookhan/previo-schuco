@@ -51,8 +51,10 @@ export interface DashboardSourceQuote {
   latestVersion: number
   /** Alternative number of that variant (the y in VxAy). */
   alternative: number
-  /** True when this variant is the quote's final / favorite. */
+  /** True when this variant is the quote's chosen final offer. */
   isFinal: boolean
+  /** True when this variant is marked favorite. Favorites pick the open quote. */
+  isFavorite: boolean
   createdAt: Date
   updatedAt: Date
   sentAt: Date | null
@@ -67,6 +69,7 @@ export interface DashboardVariant {
   version: number
   alternative: number
   isFinal: boolean
+  isFavorite: boolean
   status: QuoteStatus
   totalPrice: string
   updatedAt: Date
@@ -85,49 +88,68 @@ export interface DashboardQuoteGroup {
   variants: DashboardVariant[]
 }
 
-/**
- * The one variant a quote contributes to the dashboard.
- * A variant marked final (the favorite) wins. Otherwise the open quote is the
- * latest cell: highest version, then highest alternative on that version.
- * Other versions and alternatives are not counted.
- */
-export const pickDashboardVariant = <T extends { version: number; alternative: number; isFinal: boolean }>(
-  variants: readonly T[],
-): T | null => {
+const highestVariant = <T extends { version: number; alternative: number }>(variants: readonly T[]): T | null => {
   if (variants.length === 0) return null
-  const finals = variants.filter((variant) => variant.isFinal)
-  const pool = finals.length > 0 ? finals : variants
-  return pool.reduce((best, variant) => {
+  return variants.reduce((best, variant) => {
     if (variant.version !== best.version) return variant.version > best.version ? variant : best
     return variant.alternative > best.alternative ? variant : best
   })
 }
 
-/** One dashboard row per quote, using {@link pickDashboardVariant}. Quotes with no variants are dropped. */
-export const collapseDashboardQuotes = (groups: readonly DashboardQuoteGroup[]): DashboardSourceQuote[] =>
-  groups.flatMap((group) => {
-    const variant = pickDashboardVariant(group.variants)
-    if (!variant) return []
-    return [
-      {
-        id: group.id,
-        reference: group.reference,
-        status: variant.status,
-        customerName: group.customerName,
-        projectLocation: group.projectLocation,
-        totalPrice: variant.totalPrice,
-        latestVersion: variant.version,
-        alternative: variant.alternative,
-        isFinal: variant.isFinal,
-        createdAt: group.createdAt,
-        updatedAt: variant.updatedAt,
-        sentAt: variant.sentAt,
-        createdByUserId: group.createdByUserId,
-        createdByName: group.createdByName,
-        document: variant.document,
-      },
-    ]
-  })
+/** The one variant the dashboard counts: the quote marked final. Null when none is marked. */
+export const pickFinalVariant = <T extends { version: number; alternative: number; isFinal: boolean }>(
+  variants: readonly T[],
+): T | null => highestVariant(variants.filter((variant) => variant.isFinal))
+
+/**
+ * The open quote: a favorite when one is marked (the highest version, then the
+ * highest alternative among favorites). Otherwise the latest cell, highest version
+ * then highest alternative.
+ */
+export const pickOpenVariant = <T extends { version: number; alternative: number; isFavorite: boolean }>(
+  variants: readonly T[],
+): T | null => {
+  const favorites = variants.filter((variant) => variant.isFavorite)
+  return highestVariant(favorites.length > 0 ? favorites : variants)
+}
+
+const sourceFrom = (group: DashboardQuoteGroup, variant: DashboardVariant): DashboardSourceQuote => ({
+  id: group.id,
+  reference: group.reference,
+  status: variant.status,
+  customerName: group.customerName,
+  projectLocation: group.projectLocation,
+  totalPrice: variant.totalPrice,
+  latestVersion: variant.version,
+  alternative: variant.alternative,
+  isFinal: variant.isFinal,
+  isFavorite: variant.isFavorite,
+  createdAt: group.createdAt,
+  updatedAt: variant.updatedAt,
+  sentAt: variant.sentAt,
+  createdByUserId: group.createdByUserId,
+  createdByName: group.createdByName,
+  document: variant.document,
+})
+
+/**
+ * Finals are the book (pipeline, funnel, accepted, recent). A quote with no final is left out.
+ * Open quotes are a separate pick: favorite if marked, otherwise the latest VxAy, and only while
+ * that variant is still draft or invoiced.
+ */
+export const collapseDashboardQuotes = (
+  groups: readonly DashboardQuoteGroup[],
+): { counted: DashboardSourceQuote[]; open: DashboardSourceQuote[] } => {
+  const counted: DashboardSourceQuote[] = []
+  const open: DashboardSourceQuote[] = []
+  for (const group of groups) {
+    const final = pickFinalVariant(group.variants)
+    if (final) counted.push(sourceFrom(group, final))
+    const opened = pickOpenVariant(group.variants)
+    if (opened && (opened.status === 'draft' || opened.status === 'invoiced')) open.push(sourceFrom(group, opened))
+  }
+  return { counted, open }
+}
 
 export interface DashboardStatusEvent {
   quoteId: string
@@ -154,7 +176,13 @@ export interface BuildDashboardInput {
   actorUserId: string
   /** Ignored unless `scope` is `company`. */
   salespersonId: string | null
+  /** Quotes that have a final variant. Every figure except open quotes uses these. */
   quotes: DashboardSourceQuote[]
+  /**
+   * Open quotes: favorite if marked, otherwise the latest VxAy, while that variant is draft or invoiced.
+   * When omitted, open quotes are the counted quotes that are still draft or invoiced.
+   */
+  openQuotes?: DashboardSourceQuote[]
   events: DashboardStatusEvent[]
   families: DashboardFamilySource[]
 }
@@ -168,9 +196,8 @@ const emptyBag = (): MoneyBag => ({ count: 0, cents: 0 })
 
 const emptyStatus = (): Record<QuoteStatus, MoneyBag> => ({
   draft: emptyBag(),
-  sent: emptyBag(),
+  invoiced: emptyBag(),
   accepted: emptyBag(),
-  rejected: emptyBag(),
 })
 
 /** `quotes.total_price` is numeric(14,2). Non-numeric junk counts as zero. */
@@ -186,9 +213,8 @@ const publishBag = (bag: MoneyBag): { count: number; total: string } => ({ count
 
 const publishStatus = (bags: Record<QuoteStatus, MoneyBag>): DashboardStatusAmounts => ({
   draft: publishBag(bags.draft),
-  sent: publishBag(bags.sent),
+  invoiced: publishBag(bags.invoiced),
   accepted: publishBag(bags.accepted),
-  rejected: publishBag(bags.rejected),
 })
 
 const addMoney = (bag: MoneyBag, cents: number) => {
@@ -206,6 +232,7 @@ const toRef = (quote: DashboardSourceQuote): DashboardQuoteRef => ({
   latestVersion: quote.latestVersion,
   alternative: quote.alternative,
   isFinal: quote.isFinal,
+  isFavorite: quote.isFavorite,
   createdAt: quote.createdAt.toISOString(),
   updatedAt: quote.updatedAt.toISOString(),
   sentAt: quote.sentAt ? quote.sentAt.toISOString() : null,
@@ -306,7 +333,7 @@ const periodOutcome = (
   }
   if (latest) return latest.to as 'accepted' | 'rejected'
   if (anyDecision) return null
-  if ((quote.status === 'accepted' || quote.status === 'rejected') && inRange(quote.updatedAt, range)) return quote.status
+  if (quote.status === 'accepted' && inRange(quote.updatedAt, range)) return 'accepted'
   return null
 }
 
@@ -324,10 +351,17 @@ export const buildDashboard = (input: BuildDashboardInput): DashboardResponse =>
   const currentWeek = periodRange('week', input.now)
   const salespersonId = input.scope === 'company' ? input.salespersonId : null
 
+  const visible = (quote: DashboardSourceQuote) =>
+    (input.scope === 'company' || quote.createdByUserId === input.actorUserId) &&
+    (input.includeTestQuotes || !isDashboardTestQuote(quote)) &&
+    (!salespersonId || quote.createdByUserId === salespersonId)
   const permitted = input.quotes.filter((quote) => input.scope === 'company' || quote.createdByUserId === input.actorUserId)
   const hiddenTestQuoteCount = input.includeTestQuotes ? 0 : permitted.filter((quote) => isDashboardTestQuote(quote)).length
   const afterTest = input.includeTestQuotes ? permitted : permitted.filter((quote) => !isDashboardTestQuote(quote))
   const inView = salespersonId ? afterTest.filter((quote) => quote.createdByUserId === salespersonId) : afterTest
+  const openView = (input.openQuotes ?? inView).filter(
+    (quote) => visible(quote) && (quote.status === 'draft' || quote.status === 'invoiced'),
+  )
 
   const eventsByQuote = new Map<string, DashboardStatusEvent[]>()
   for (const event of input.events) {
@@ -363,10 +397,6 @@ export const buildDashboard = (input: BuildDashboardInput): DashboardResponse =>
     const cents = centsOf(quote.totalPrice)
     const events = eventsByQuote.get(quote.id) ?? []
     addMoney(pipeline[quote.status], cents)
-    if (quote.status === 'draft' || quote.status === 'sent') {
-      addMoney(open, cents)
-      bumpCustomer(openCustomers, quote.customerName, cents)
-    }
 
     const outcome = periodOutcome(quote, events, range)
     if (outcome === 'accepted') {
@@ -416,7 +446,7 @@ export const buildDashboard = (input: BuildDashboardInput): DashboardResponse =>
       if (!creator.name && quote.createdByName) creator.name = quote.createdByName
     }
 
-    if (quote.status === 'sent' || quote.status === 'accepted') {
+    if (quote.status === 'invoiced' || quote.status === 'accepted') {
       const parsed = quoteDocumentSchema.safeParse(quote.document)
       if (parsed.success) {
         for (const family of parsed.data.families) {
@@ -444,7 +474,7 @@ export const buildDashboard = (input: BuildDashboardInput): DashboardResponse =>
   const drafts = inView.filter((quote) => quote.status === 'draft')
   const recent = [...inView].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()).slice(0, RECENT_LIMIT)
   const followUp = inView
-    .filter((quote) => quote.status === 'sent')
+    .filter((quote) => quote.status === 'invoiced')
     .map((quote) => ({
       quote,
       daysSinceSent: quote.sentAt ? Math.max(0, Math.floor((input.now.getTime() - quote.sentAt.getTime()) / DAY_MS)) : null,
@@ -455,6 +485,11 @@ export const buildDashboard = (input: BuildDashboardInput): DashboardResponse =>
       return right.daysSinceSent - left.daysSinceSent
     })
     .slice(0, FOLLOW_UP_LIMIT)
+
+  for (const quote of openView) {
+    addMoney(open, centsOf(quote.totalPrice))
+    bumpCustomer(openCustomers, quote.customerName, centsOf(quote.totalPrice))
+  }
 
   const salespeopleSource = afterTest
   const salespersonNames = new Map<string, string | null>()

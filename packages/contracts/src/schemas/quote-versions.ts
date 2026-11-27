@@ -3,13 +3,32 @@ import { z } from 'zod'
 import { businessUnitSchema, companyProfileSchema, salesContactSchema } from './company-profile'
 import { quoteDocumentSchema, quoteHeaderSchema } from './quote-document'
 
-export const quoteStatusSchema = z.enum(['draft', 'sent', 'accepted', 'rejected'])
+export const quoteStatusSchema = z.enum(['draft', 'invoiced', 'accepted'])
 export type QuoteStatus = z.infer<typeof quoteStatusSchema>
 
-/** A version can be fixed in place only while it is a draft; a sent, accepted or rejected one only gets a new version. */
+/** A variant can be fixed in place only while it is a draft. Invoiced and accepted ones stay as saved. */
 export const isEditableQuoteStatus = (status: QuoteStatus): boolean => status === 'draft'
 
-/** One quote in the quotes list: its latest version's customer, status and total. */
+/** `V1A2` — version and alternative, the code shown on the quote. */
+export const quoteVariantCode = (version: number, alternative: number): string => `V${version}A${alternative}`
+
+/** One version+alternative in the switcher and on the quotes list. */
+export const quoteVariantRefSchema = z.object({
+  id: z.string().uuid(),
+  version: z.number().int(),
+  alternative: z.number().int(),
+  label: z.string().nullable(),
+  /** The quote's chosen offer, the one the dashboard uses. */
+  isFinal: z.boolean(),
+  /** A variant the company wants to come back to. Independent of `isFinal`, and not limited to one. */
+  isFavorite: z.boolean(),
+  status: quoteStatusSchema,
+  totalPrice: z.string(),
+  updatedAt: z.string().datetime(),
+})
+export type QuoteVariantRef = z.infer<typeof quoteVariantRefSchema>
+
+/** One quote in the quotes list. Customer, status and total are alternative 1 of the latest version. */
 export const quoteSummarySchema = z.object({
   id: z.string().uuid(),
   reference: z.string(),
@@ -18,6 +37,10 @@ export const quoteSummarySchema = z.object({
   projectLocation: z.string().nullable(),
   totalPrice: z.string(),
   latestVersion: z.number().int(),
+  /** Null while the quote is on the list; set once a company admin archives it. */
+  archivedAt: z.string().datetime().nullable(),
+  /** Every saved variant, oldest version first. */
+  variants: z.array(quoteVariantRefSchema),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   /** Latest version's `sent_at`, when that version has been sent. */
@@ -29,20 +52,18 @@ export type QuoteSummary = z.infer<typeof quoteSummarySchema>
 
 export const quoteUserRefSchema = z.object({ id: z.string().uuid(), name: z.string().nullable() }).nullable()
 
-/** One version in the version switcher. */
-export const quoteVersionRefSchema = z.object({
-  id: z.string().uuid(),
-  version: z.number().int(),
-  status: quoteStatusSchema,
-  totalPrice: z.string(),
-  updatedAt: z.string().datetime(),
-})
-export type QuoteVersionRef = z.infer<typeof quoteVersionRefSchema>
+/** One variant in the version switcher. */
+export const quoteVersionRefSchema = quoteVariantRefSchema
+export type QuoteVersionRef = QuoteVariantRef
 
 export const quoteVersionSchema = z.object({
   id: z.string().uuid(),
   quoteId: z.string().uuid(),
   version: z.number().int(),
+  alternative: z.number().int(),
+  label: z.string().nullable(),
+  isFinal: z.boolean(),
+  isFavorite: z.boolean(),
   status: quoteStatusSchema,
   /** How many times it was saved; a save must name the revision it was based on. */
   revision: z.number().int(),
@@ -71,7 +92,7 @@ export const quoteFamilyStatusSchema = z.object({
 })
 export type QuoteFamilyStatus = z.infer<typeof quoteFamilyStatusSchema>
 
-/** GET /api/sales-quotes/:id(?version=n) */
+/** GET /api/sales-quotes/:id(?version=n&alternative=m) */
 export const salesQuoteDetailResponseSchema = z.object({
   quote: quoteSummarySchema,
   versions: z.array(quoteVersionRefSchema),
@@ -86,6 +107,37 @@ export const createSalesQuoteRequestSchema = z.object({
   header: quoteHeaderSchema.partial({ quoteDate: true, notes: true }),
 })
 export type CreateSalesQuoteRequest = z.infer<typeof createSalesQuoteRequestSchema>
+
+/** POST /api/sales-quotes/:id/duplicate — one variant becomes a new quote's V1A1. */
+export const duplicateSalesQuoteRequestSchema = z.object({
+  versionId: z.string().uuid(),
+  reference: z.string().trim().min(1).max(100),
+})
+export type DuplicateSalesQuoteRequest = z.infer<typeof duplicateSalesQuoteRequestSchema>
+
+/** POST /api/sales-quotes/:id/archive and the product-family equivalent. */
+export const setFavoriteRequestSchema = z.object({ favorite: z.boolean() })
+export type SetFavoriteRequest = z.infer<typeof setFavoriteRequestSchema>
+
+export const setArchivedRequestSchema = z.object({ archived: z.boolean() })
+export type SetArchivedRequest = z.infer<typeof setArchivedRequestSchema>
+
+/** POST /api/sales-quotes/:id/versions/:versionId/alternatives — copy the open document as the next A. */
+export const createQuoteAlternativeRequestSchema = z.object({
+  document: quoteDocumentSchema,
+})
+export type CreateQuoteAlternativeRequest = z.infer<typeof createQuoteAlternativeRequestSchema>
+
+/** PATCH /api/sales-quotes/:id/versions/:versionId/label */
+export const setQuoteVariantLabelRequestSchema = z.object({
+  label: z
+    .string()
+    .trim()
+    .max(120)
+    .nullable()
+    .transform((value) => (value ? value : null)),
+})
+export type SetQuoteVariantLabelRequest = z.infer<typeof setQuoteVariantLabelRequestSchema>
 
 /**
  * PUT /api/sales-quotes/:id/versions/:versionId — `update` fixes this version in place (drafts
@@ -174,6 +226,8 @@ export const quoteRevisionSchema = z.object({
   changes: z.array(quoteChangeSchema),
   /** For a version's first revision: the version it was created from, if any. */
   fromVersion: z.number().int().nullable(),
+  /** And which alternative of that version. */
+  fromAlternative: z.number().int().nullable(),
 })
 export type QuoteRevision = z.infer<typeof quoteRevisionSchema>
 

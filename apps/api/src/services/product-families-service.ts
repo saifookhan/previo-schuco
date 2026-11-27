@@ -26,11 +26,14 @@ import {
   listVisibleProductFamilies,
   isFamilySharedWith,
   isProductFamilyInLibrary,
+  setProductFamilyArchivedAt,
+  setProductFamilyFavorite as setProductFamilyFavoriteQuery,
   setProductFamilyHasPriceList,
   setProductFamilyInLibrary,
   setProductFamilyPriceValidity,
   setProductFamilyPublished,
   setProductFamilyReadyForInvoicing,
+  userMayArchive,
   type CharacteristicRow,
   type PricingMatrixRow,
   type ProductFamilyDetail,
@@ -85,6 +88,9 @@ export class ExcelImportError extends Error {}
 
 /** The caller can see the family (it was shared with them) but its history belongs to the owning company. */
 export class ProductFamilyHistoryForbiddenError extends Error {}
+
+/** The caller can see the family but isn't allowed to archive it. */
+export class ProductFamilyForbiddenError extends Error {}
 
 /** Two versions of one family would sell at the same day's prices: a quote couldn't tell which applies. */
 export class PriceValidityOverlapError extends Error {
@@ -442,9 +448,11 @@ export const importProductFamilyFromExcel = async (
  */
 export const listProductFamilies = async (
   ctx: TenantContext,
-  { includeOutOfLibrary = true }: { includeOutOfLibrary?: boolean } = {},
+  { includeOutOfLibrary = true, includeArchived = false }: { includeOutOfLibrary?: boolean; includeArchived?: boolean } = {},
 ): Promise<ProductFamilyListItem[]> => {
-  const families = await withTenantDb(ctx, (tx) => listVisibleProductFamilies(tx, ctx.effectiveCompanyId))
+  const families = await withTenantDb(ctx, (tx) =>
+    listVisibleProductFamilies(tx, ctx.effectiveCompanyId, { includeArchived }),
+  )
   return includeOutOfLibrary ? families : families.filter((family) => family.inLibrary)
 }
 
@@ -1172,6 +1180,63 @@ export const updateCharacteristic = async (
     (tx) => updateCharacteristicQuery(tx, familyId, characteristicId, patch),
   )
 }
+
+/**
+ * Marks or clears this company's favorite on one family version. A company can favorite a
+ * version it can see, including one shared with it. Other versions of the chain stay as they are.
+ */
+export const setProductFamilyFavorite = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  favorite: boolean,
+): Promise<{ isFavorite: boolean }> =>
+  withTenantDb(ctx, async (tx) => {
+    const family = await getProductFamilyById(tx, familyId)
+    if (!family) throw new Error('Product family not found')
+    await setProductFamilyFavoriteQuery(tx, { companyId: ctx.effectiveCompanyId, familyId, favorite })
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: favorite ? 'product_family.favorite' : 'product_family.unfavorite',
+      resourceType: 'product_family',
+      resourceId: familyId,
+      metadata: { version: family.version },
+    })
+    return { isFavorite: favorite }
+  })
+
+/**
+ * Soft-deletes or restores one family version. Only a company admin (or super admin) of the
+ * owning company. Other versions of the chain stay as they are.
+ */
+export const setProductFamilyArchived = async (
+  ctx: TenantContext,
+  actor: ProductFamilyActor,
+  familyId: string,
+  archived: boolean,
+): Promise<{ archivedAt: string | null }> =>
+  withTenantDb(ctx, async (tx) => {
+    if (!(await userMayArchive(tx, actor.actorUserId))) {
+      throw new ProductFamilyForbiddenError('Only a company admin can archive a product family')
+    }
+    const family = await getProductFamilyById(tx, familyId)
+    if (!family) {
+      throw new Error('Product family not found')
+    }
+    if (!canManageProductFamily(ctx, family)) {
+      throw new ProductFamilyForbiddenError('Only the owning company can archive this product family')
+    }
+    const archivedAt = archived ? new Date() : null
+    const updated = await setProductFamilyArchivedAt(tx, familyId, archivedAt)
+    if (!updated) {
+      throw new Error('Product family not found')
+    }
+    await recordAuditEvent(tx, auditActor(actor), ctx.effectiveCompanyId, {
+      action: archived ? 'product_family.archive' : 'product_family.restore',
+      resourceType: 'product_family',
+      resourceId: familyId,
+    })
+    return { archivedAt: archivedAt?.toISOString() ?? null }
+  })
 
 /** The owning company or a super-admin: who may see a family's history, upload a new version and change its price validity (the detail response's `canViewHistory` / `canManage`). */
 export const canManageProductFamily = (ctx: TenantContext, family: { supplierCompanyId: string }): boolean =>

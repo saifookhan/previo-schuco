@@ -46,6 +46,11 @@ describe('filterProductFamilies', () => {
     expect(ids({ q: 'schuco demo' })).toEqual(['c'])
   })
 
+  it('keeps only versions marked as a favorite', () => {
+    const marked = families.map((item) => (item.id === 'd' ? { ...item, isFavorite: true } : item))
+    expect(filterProductFamilies(marked, { ...EMPTY_PRODUCT_FAMILY_FILTERS, favorites: true }, TODAY).map((item) => item.id)).toEqual(['d'])
+  })
+
   it('filters by category, brand and status', () => {
     expect(ids({ category: 'Finestre' })).toEqual(['a', 'd'])
     expect(ids({ brand: 'Acme', status: 'published' })).toEqual(['c'])

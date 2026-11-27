@@ -11,7 +11,8 @@ import {
   buildDashboard,
   collapseDashboardQuotes,
   dashboardScopeForRoles,
-  pickDashboardVariant,
+  pickFinalVariant,
+  pickOpenVariant,
   type BuildDashboardInput,
   type DashboardFamilySource,
   type DashboardQuoteGroup,
@@ -43,7 +44,8 @@ const quote = (overrides: Partial<DashboardSourceQuote> = {}): DashboardSourceQu
   totalPrice: '100.00',
   latestVersion: 1,
   alternative: 1,
-  isFinal: false,
+  isFinal: true,
+  isFavorite: false,
   createdAt: new Date('2026-11-26T10:00:00.000Z'),
   updatedAt: new Date('2026-11-26T10:00:00.000Z'),
   sentAt: null,
@@ -131,6 +133,7 @@ const variant = (version: number, alternative: number, overrides: Partial<Dashbo
   version,
   alternative,
   isFinal: false,
+  isFavorite: false,
   status: 'draft',
   totalPrice: '10.00',
   updatedAt: NOW,
@@ -140,49 +143,56 @@ const variant = (version: number, alternative: number, overrides: Partial<Dashbo
 })
 
 describe('which variant counts', () => {
-  it('uses the highest version, then the highest alternative, when nothing is marked final', () => {
-    expect(pickDashboardVariant([variant(1, 1), variant(1, 3, { totalPrice: '30.00' }), variant(2, 1), variant(2, 2, { totalPrice: '22.00', status: 'sent' })])).toMatchObject({
-      version: 2,
-      alternative: 2,
-      totalPrice: '22.00',
-      isFinal: false,
-    })
+  const group = (variants: DashboardVariant[]): DashboardQuoteGroup => ({
+    id: id(1),
+    reference: 'PRV-1',
+    customerName: 'Rossi',
+    projectLocation: null,
+    createdAt: new Date('2026-11-26T10:00:00.000Z'),
+    createdByUserId: USER_A,
+    createdByName: 'Ada',
+    variants,
   })
 
-  it('uses the variant marked final even when a later VxAy exists', () => {
-    const picked = pickDashboardVariant([
-      variant(1, 2, { isFinal: true, status: 'accepted', totalPrice: '80.00' }),
-      variant(2, 4, { status: 'draft', totalPrice: '999.00' }),
-    ])
-    expect(picked).toMatchObject({ version: 1, alternative: 2, isFinal: true, totalPrice: '80.00' })
+  it('leaves a quote out of the book until one variant is marked final', () => {
+    const cells = [variant(1, 1, { totalPrice: '100.00' }), variant(2, 3, { totalPrice: '250.00', status: 'invoiced' })]
+    expect(pickFinalVariant(cells)).toBeNull()
+    expect(collapseDashboardQuotes([group(cells)]).counted).toEqual([])
   })
 
-  it('counts a quote once, at the final variant or else the latest VxAy', () => {
-    const group = (variants: DashboardVariant[]): DashboardQuoteGroup => ({
-      id: id(1),
-      reference: 'PRV-1',
-      customerName: 'Rossi',
-      projectLocation: null,
-      createdAt: new Date('2026-11-26T10:00:00.000Z'),
-      createdByUserId: USER_A,
-      createdByName: 'Ada',
-      variants,
-    })
-    const latest = collapseDashboardQuotes([
-      group([variant(1, 1, { totalPrice: '100.00' }), variant(1, 2, { totalPrice: '250.00', status: 'sent' })]),
-    ])
-    expect(latest).toHaveLength(1)
-    expect(build({ quotes: latest }).kpis.openQuotes).toEqual({ count: 1, total: '250.00' })
-
-    const favorite = collapseDashboardQuotes([
+  it('counts only the final variant, even when a later alternative is worth more', () => {
+    const collapsed = collapseDashboardQuotes([
       group([
-        variant(1, 1, { isFinal: true, status: 'draft', totalPrice: '40.00' }),
-        variant(3, 2, { status: 'accepted', totalPrice: '900.00' }),
+        variant(1, 2, { isFinal: true, status: 'accepted', totalPrice: '80.00' }),
+        variant(2, 4, { status: 'draft', totalPrice: '999.00' }),
       ]),
     ])
-    expect(favorite[0]).toMatchObject({ latestVersion: 1, alternative: 1, isFinal: true, totalPrice: '40.00' })
-    expect(build({ quotes: favorite }).kpis.openQuotes).toEqual({ count: 1, total: '40.00' })
-    expect(build({ quotes: favorite }).kpis.pipelineByStatus.accepted).toEqual({ count: 0, total: '0.00' })
+    expect(collapsed.counted).toHaveLength(1)
+    expect(collapsed.counted[0]).toMatchObject({ latestVersion: 1, alternative: 2, isFinal: true, totalPrice: '80.00' })
+    expect(build({ quotes: collapsed.counted, openQuotes: collapsed.open }).kpis.pipelineByStatus.accepted).toEqual({
+      count: 1,
+      total: '80.00',
+    })
+    expect(build({ quotes: collapsed.counted, openQuotes: collapsed.open }).kpis.pipelineByStatus.draft).toEqual({
+      count: 0,
+      total: '0.00',
+    })
+  })
+
+  it('takes the latest VxAy as the open quote, unless a favorite is marked', () => {
+    const plain = [variant(1, 1), variant(1, 3), variant(2, 1), variant(2, 2, { totalPrice: '22.00', status: 'invoiced' })]
+    expect(pickOpenVariant(plain)).toMatchObject({ version: 2, alternative: 2, totalPrice: '22.00' })
+
+    const marked = [
+      variant(2, 4, { status: 'draft', totalPrice: '999.00' }),
+      variant(1, 1, { isFavorite: true, status: 'draft', totalPrice: '40.00' }),
+    ]
+    expect(pickOpenVariant(marked)).toMatchObject({ version: 1, alternative: 1, isFavorite: true, totalPrice: '40.00' })
+
+    const collapsed = collapseDashboardQuotes([group(marked)])
+    expect(collapsed.open).toHaveLength(1)
+    expect(collapsed.open[0]).toMatchObject({ totalPrice: '40.00', isFavorite: true })
+    expect(build({ quotes: [], openQuotes: collapsed.open }).kpis.openQuotes).toEqual({ count: 1, total: '40.00' })
   })
 })
 
@@ -236,7 +246,7 @@ describe('dashboard periods (Europe/Rome, Thursday–Wednesday)', () => {
     const opening = quote({
       id: id(2),
       createdAt: new Date('2026-11-25T23:00:00.000Z'),
-      status: 'sent',
+      status: 'invoiced',
       totalPrice: '8.00',
     })
     const closing = quote({
@@ -248,24 +258,24 @@ describe('dashboard periods (Europe/Rome, Thursday–Wednesday)', () => {
     const next = quote({
       id: id(4),
       createdAt: new Date('2026-12-02T23:00:00.000Z'),
-      status: 'rejected',
+      status: 'invoiced',
       totalPrice: '21.00',
     })
     const result = build({ quotes: [previous, opening, closing, next] })
     const byStart = Object.fromEntries(result.overTime.points.map((point) => [point.start, point.byStatus]))
     expect(byStart['2026-11-19']).toMatchObject({ draft: { count: 1, total: '5.00' } })
     expect(byStart['2026-11-26']).toMatchObject({
-      sent: { count: 1, total: '8.00' },
+      invoiced: { count: 1, total: '8.00' },
       accepted: { count: 1, total: '13.00' },
       draft: { count: 0, total: '0.00' },
     })
     expect(byStart['2026-12-03']).toBeUndefined()
     const beforeMonth = quote({ id: id(5), createdAt: new Date('2026-10-30T11:00:00.000Z'), status: 'draft', totalPrice: '5.00' })
-    const firstOfMonth = quote({ id: id(6), createdAt: new Date('2026-11-01T11:00:00.000Z'), status: 'sent', totalPrice: '8.00' })
+    const firstOfMonth = quote({ id: id(6), createdAt: new Date('2026-11-01T11:00:00.000Z'), status: 'invoiced', totalPrice: '8.00' })
     const month = build({ period: 'month', quotes: [beforeMonth, firstOfMonth] })
     const octoberWeek = month.overTime.points.find((point) => point.start === '2026-10-29')!
     expect(octoberWeek.byStatus.draft.count).toBe(0)
-    expect(octoberWeek.byStatus.sent).toEqual({ count: 1, total: '8.00' })
+    expect(octoberWeek.byStatus.invoiced).toEqual({ count: 1, total: '8.00' })
   })
 })
 
@@ -344,7 +354,7 @@ describe('dashboard figures', () => {
         quote({ id: id(1), updatedAt: new Date('2026-11-13T09:59:59.999Z'), totalPrice: '10.00' }),
         quote({ id: id(2), updatedAt: new Date('2026-11-13T10:00:00.000Z'), totalPrice: '0.00' }),
         quote({ id: id(3), updatedAt: new Date('2026-11-20T10:00:00.000Z'), totalPrice: '4.00' }),
-        quote({ id: id(4), status: 'sent', updatedAt: new Date('2026-11-26T12:00:00.000Z'), totalPrice: '9.00', sentAt: NOW }),
+        quote({ id: id(4), status: 'invoiced', updatedAt: new Date('2026-11-26T12:00:00.000Z'), totalPrice: '9.00', sentAt: NOW }),
       ],
     })
     expect(result.attention.staleAfterDays).toBe(14)
@@ -358,17 +368,17 @@ describe('dashboard figures', () => {
   it('ranks sent quotes by days since sent_at and reports an empty win rate', () => {
     const older = quote({
       id: id(1),
-      status: 'sent',
+      status: 'invoiced',
       sentAt: new Date(NOW.getTime() - 10.5 * 86_400_000),
       totalPrice: '15.00',
     })
     const newer = quote({
       id: id(2),
-      status: 'sent',
+      status: 'invoiced',
       sentAt: new Date(NOW.getTime() - 1.2 * 86_400_000),
       totalPrice: '16.00',
     })
-    const missing = quote({ id: id(3), status: 'sent', sentAt: null, totalPrice: '17.00' })
+    const missing = quote({ id: id(3), status: 'invoiced', sentAt: null, totalPrice: '17.00' })
     const result = build({ quotes: [newer, missing, older] })
     expect(result.followUp.map((row) => [row.quote.id, row.daysSinceSent])).toEqual([
       [id(1), 10],
@@ -390,8 +400,8 @@ describe('dashboard figures', () => {
   it('computes win rate, median days and accepted € from status events', () => {
     const sentAt = new Date('2026-11-26T10:00:00.000Z')
     const accepted = quote({ id: id(1), status: 'accepted', totalPrice: '80.00', sentAt, customerName: '  Rossi  ' })
-    const rejected = quote({ id: id(2), status: 'rejected', totalPrice: '20.00', sentAt, customerName: 'Bianchi' })
-    const stillSent = quote({ id: id(3), status: 'sent', totalPrice: '10.00', sentAt, customerName: 'rossi' })
+    const rejected = quote({ id: id(2), status: 'invoiced', totalPrice: '20.00', sentAt, customerName: 'Bianchi' })
+    const stillSent = quote({ id: id(3), status: 'invoiced', totalPrice: '10.00', sentAt, customerName: 'rossi' })
     const events: DashboardStatusEvent[] = [
       { quoteId: id(1), at: new Date('2026-11-28T10:00:00.000Z'), to: 'accepted' },
       { quoteId: id(2), at: new Date('2026-11-27T10:00:00.000Z'), to: 'rejected' },
@@ -402,13 +412,16 @@ describe('dashboard figures', () => {
     expect(result.winRate.acceptedOverSent).toBeCloseTo(1 / 3)
     expect(result.winRate.medianDaysToAccept).toBeCloseTo(2)
     expect(result.winRate.timedAcceptances).toBe(1)
-    expect(result.topCustomers.byOpenPipeline).toEqual([{ name: 'rossi', count: 1, total: '10.00' }])
+    expect(result.topCustomers.byOpenPipeline).toEqual([
+      { name: 'Bianchi', count: 1, total: '20.00' },
+      { name: 'rossi', count: 1, total: '10.00' },
+    ])
     expect(result.topCustomers.byAccepted).toEqual([{ name: 'Rossi', count: 1, total: '80.00' }])
   })
 
   it('uses the latest decision in the period, and has no median without a usable sent date', () => {
     const sentAt = new Date('2026-11-29T10:00:00.000Z')
-    const flipped = quote({ id: id(1), status: 'rejected', totalPrice: '50.00', sentAt })
+    const flipped = quote({ id: id(1), status: 'invoiced', totalPrice: '50.00', sentAt })
     const events: DashboardStatusEvent[] = [
       { quoteId: id(1), at: new Date('2026-11-26T12:00:00.000Z'), to: 'accepted' },
       { quoteId: id(1), at: new Date('2026-11-28T12:00:00.000Z'), to: 'rejected' },
@@ -482,7 +495,7 @@ describe('dashboard figures', () => {
   it('sums families and categories from sent and accepted documents, with m², skipping alternatives and drafts', () => {
     const sent = quote({
       id: id(1),
-      status: 'sent',
+      status: 'invoiced',
       totalPrice: '200.00',
       document: document([
         family(),
@@ -536,7 +549,7 @@ describe('dashboard figures', () => {
 
   it('matches the dashboard response schema', () => {
     const result = build({
-      quotes: [quote({ status: 'sent', sentAt: NOW, totalPrice: '15.50' })],
+      quotes: [quote({ status: 'invoiced', sentAt: NOW, totalPrice: '15.50' })],
       families: [catalogFamily()],
     })
     expect(dashboardResponseSchema.parse(result)).toMatchObject({ period: 'week', timezone: 'Europe/Rome' })

@@ -96,6 +96,8 @@ export const productFamilies = pgTable('product_families', {
   priceValidTo: date('price_valid_to', { mode: 'string' }),
   /** Local-disk path for now (see ADR TBD) — swap for an S3 key without a schema change once that's decided. */
   sourceExcelPath: text('source_excel_path'),
+  /** Set when a company admin archives the family. Null means it shows on the list and in the quote picker. */
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [

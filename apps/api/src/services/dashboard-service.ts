@@ -37,6 +37,7 @@ export const getDashboard = (ctx: TenantContext, query: DashboardQuery): Promise
         version: row.version,
         alternative: row.alternative,
         isFinal: row.isFinal,
+        isFavorite: row.isFavorite,
         status: row.status,
         totalPrice: row.totalPrice,
         updatedAt: row.updatedAt,
@@ -45,8 +46,9 @@ export const getDashboard = (ctx: TenantContext, query: DashboardQuery): Promise
       })
       groups.set(row.quoteId, group)
     }
-    const quotes = collapseDashboardQuotes([...groups.values()])
-    const visibleIds = new Set(quotes.map((quote) => quote.id))
+    const collapsed = collapseDashboardQuotes([...groups.values()])
+    const quotes = collapsed.counted
+    const visibleIds = new Set([...quotes, ...collapsed.open].map((quote) => quote.id))
     const events = statusEvents.filter((event) => visibleIds.has(event.quoteId))
     const built = buildDashboard({
       now: query.now ?? new Date(),
@@ -56,6 +58,7 @@ export const getDashboard = (ctx: TenantContext, query: DashboardQuery): Promise
       actorUserId: query.actorUserId,
       salespersonId: query.salespersonId,
       quotes,
+      openQuotes: collapsed.open,
       events,
       families,
     })

@@ -38,9 +38,8 @@ export type DashboardCountTotal = z.infer<typeof countTotalSchema>
 
 const statusAmountsSchema = z.object({
   draft: countTotalSchema,
-  sent: countTotalSchema,
+  invoiced: countTotalSchema,
   accepted: countTotalSchema,
-  rejected: countTotalSchema,
 })
 export type DashboardStatusAmounts = z.infer<typeof statusAmountsSchema>
 
@@ -55,8 +54,10 @@ export const dashboardQuoteRefSchema = z.object({
   latestVersion: z.number().int(),
   /** Alternative of that variant. The code is V{latestVersion}A{alternative}. */
   alternative: z.number().int(),
-  /** True when this variant is the quote's final / favorite. */
+  /** True when this variant is the quote's chosen final offer. */
   isFinal: z.boolean(),
+  /** True when this variant is marked favorite. */
+  isFavorite: z.boolean(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   sentAt: z.string().datetime().nullable(),

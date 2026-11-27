@@ -139,7 +139,7 @@ Product family (versioned, owned by a manufacturer)
 - A family is visible to another company only when it is **published** and **shared** with it (or with someone who shared it onward). Unpublishing, or revoking an upstream share, hides it immediately.
 - Each share carries a **default discount** for the receiver's quote positions. It is only a default: the receiver can change it on each position. `0%` means "no specific discount" and the line's own catalog discount applies.
 - Material pricing differences still call for a **new product family** version.
-- Quotes belong to the supplier that issues them and are priced from its own families or families shared with it. Any position's price, and any characteristic's price, can be switched from automatic to a typed-in value.
+- Quotes belong to the supplier that issues them and are priced from its own families or families shared with it. Any position's price, and any characteristic's price, can be switched from automatic to a typed-in value. A quote is a matrix of versions and alternatives (`V1A2`): a new version copies only the selected cell, and one variant can be marked final for the dashboard ([ADR 0016](./adr/0016-quote-variants.md)).
 
 ---
 

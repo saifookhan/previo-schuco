@@ -1,12 +1,11 @@
 import type { DashboardResponse } from '@schuco/contracts'
 
-const STATUSES = ['draft', 'sent', 'accepted', 'rejected'] as const
+const STATUSES = ['draft', 'invoiced', 'accepted'] as const
 
 const FILL = {
   draft: '#94a3b8',
-  sent: '#f59e0b',
+  invoiced: '#f59e0b',
   accepted: '#10b981',
-  rejected: '#fb7185',
 } as const
 
 type Point = DashboardResponse['overTime']['points'][number]
